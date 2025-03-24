@@ -8,10 +8,10 @@ import numpy as np
 import casadi as cs
 
 from archimedes import tree
-from archimedes.core import (
+from archimedes._core import (
     array,
     sym_like,
-    casadi_array,
+    _as_casadi_array,
     SymbolicArray,
     SymbolicFunction,
 )
@@ -135,7 +135,7 @@ def nlp_solver(
         # either a CasADi symbol or a NumPy array
         p_arg = False if p is None else p
         x0, lbx, ubx, lbg, ubg, p_arg = map(
-            casadi_array,
+            _as_casadi_array,
             (x0, lbx, ubx, lbg, ubg, p_arg),
         )
 

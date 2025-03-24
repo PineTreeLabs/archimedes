@@ -30,7 +30,7 @@ from typing import Any, Callable, TypeVar, Hashable, Iterable, Iterator, NamedTu
 from functools import reduce, partial
 import itertools as it
 
-from .registry import _registry, unzip2
+from ._registry import _registry, unzip2
 
 
 T = TypeVar("T")

@@ -59,8 +59,8 @@ import dataclasses
 import numpy as np
 import pytest
 from archimedes import tree, struct
-from archimedes.core import SymbolicArray, sym, sym_function
-from archimedes.tree.tree_util import LEAF
+from archimedes._core import SymbolicArray, sym, sym_function
+from archimedes.tree._tree_util import LEAF
 
 
 

@@ -11,10 +11,10 @@ that calls the generated forward map with the given initial state and time span.
 import casadi as cs
 
 from archimedes import tree
-from archimedes.core import (
+from archimedes._core import (
     sym,
     sym_like,
-    casadi_array,
+    _as_casadi_array,
     SymbolicArray,
     SymbolicFunction,
 )
@@ -119,7 +119,7 @@ def integrator(
         # Before calling the CasADi solver interface, make sure everything is
         # either a CasADi symbol or a NumPy array
         p_arg = False if p is None else p
-        x0, p_arg = map(casadi_array, (x0, p_arg))
+        x0, p_arg = map(_as_casadi_array, (x0, p_arg))
 
         # The return is a dictionary with the final state of the system
         # and other information.  We will only return the final state.

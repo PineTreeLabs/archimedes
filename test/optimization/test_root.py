@@ -1,6 +1,6 @@
 import numpy as np
 
-from archimedes.optimization import root, implicit
+from archimedes._optimization import root, implicit
 from archimedes.error import ShapeDtypeError
 
 

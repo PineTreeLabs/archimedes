@@ -4,7 +4,7 @@ import numpy as np
 from typing import OrderedDict
 
 import archimedes as arc
-from archimedes.core import SymbolicFunction
+from archimedes._core import SymbolicFunction
 
 __all__ = [
     "rbf",

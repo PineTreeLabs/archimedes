@@ -4,7 +4,7 @@ import numpy as np
 import casadi as cs
 
 import archimedes as arc
-from archimedes.core import SymbolicArray, sym
+from archimedes._core import SymbolicArray, sym
 from archimedes.error import ShapeDtypeError
 
 # TODO:
@@ -171,7 +171,7 @@ class TestSymbolicArrayNotImplemented:
     def test_invalid_repmat(self):
         x = "abc"
         with pytest.raises(NotImplementedError):
-            arc.core._array_ops._array_ops._repmat(x, (3, 2))
+            arc._core._array_ops._array_ops._repmat(x, (3, 2))
 
 
 class TestSymbolicArrayBroadcasting:

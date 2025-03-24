@@ -4,7 +4,7 @@ import numpy as np
 import casadi as cs
 
 import archimedes as arc
-from archimedes.core import sym, SymbolicArray
+from archimedes._core import sym, SymbolicArray
 
 
 def f(carry, x):

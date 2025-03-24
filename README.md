@@ -1,8 +1,6 @@
 # Archimedes
 
-Archimedes is an open-source Python framework designed to simplify complex modeling and simulation tasks. By leveraging the power of CasADi, a symbolic framework for automatic differentiation and numerical optimization, Archimedes allows engineers and researchers to implement complex models using familiar NumPy syntax while gaining significant performance improvements and advanced capabilities.
-
-This module hides the CasADi symbolics behind an array API that dispatches from NumPy functions, along with JAX-style composable function transformations. This means that you can write (almost) normal NumPy functions, add a decorator, and get a "compiled" function that executes in pure C++, supports automatic differentiation, and can be evaluated either numerically or symbolically.
+Archimedes is an open-source Python framework designed to simplify complex modeling and simulation tasks, with the ultimate goal of making it possible to do practical hardware engineering with Python.
 
 ### Key features
 

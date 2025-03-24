@@ -35,7 +35,7 @@ import functools
 from typing import TypeVar
 from typing_extensions import dataclass_transform
 
-from .registry import register_dataclass
+from ._registry import register_dataclass
 
 
 __all__ = [

@@ -1,7 +1,7 @@
 """Utilities for discretizing a continuous ODE function"""
 import numpy as np
-from archimedes.core import scan, SymbolicFunction
-from archimedes.optimization import implicit
+from archimedes._core import scan, SymbolicFunction
+from archimedes._optimization import implicit
 
 
 # # NOTE: This implementation fails because alpha[i] is not allowed

@@ -1,8 +1,8 @@
 import pytest
 import numpy as np
 
-from archimedes.core import array, sym, sym_function, SymbolicArray
-from archimedes.optimization import minimize, root, implicit
+from archimedes._core import array, sym, sym_function, SymbolicArray
+from archimedes._optimization import minimize, root, implicit
 from archimedes.error import ShapeDtypeError
 
 

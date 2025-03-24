@@ -3,8 +3,7 @@
 import casadi as cs
 import numpy as np
 
-from ._array_impl import SymbolicArray, type_inference, casadi_array
-from ._array_ops import array
+from ._array_impl import array, SymbolicArray, type_inference, _as_casadi_array
 from ._function import SymbolicFunction
 
 
@@ -39,7 +38,7 @@ def _eval_interpolant(x, cs_interp, grid, data, name):
     # The output dtype is the promotion of the data and input dtypes
     dtype = type_inference("default", data, x)
 
-    x_cs = casadi_array(x)  # Either CasADi symbol or np.ndarray
+    x_cs = _as_casadi_array(x)  # Either CasADi symbol or np.ndarray
     return SymbolicArray(cs_interp(x_cs), shape=shape, dtype=dtype)
 
 

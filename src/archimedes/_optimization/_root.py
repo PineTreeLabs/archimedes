@@ -6,9 +6,9 @@ https://web.casadi.org/docs/#nonlinear-root-finding-problems
 import casadi as cs
 
 from archimedes import tree
-from archimedes.core import (
+from archimedes._core import (
     sym_like,
-    casadi_array,
+    _as_casadi_array,
     SymbolicArray,
     SymbolicFunction,
 )
@@ -135,7 +135,7 @@ def implicit(
         # Before calling the CasADi rootfinder, we have to make sure
         # the input data is either a CasADi symbol or a NumPy array
         z_arg = False if z is None else z
-        x0, z_arg = map(casadi_array, (x0, z_arg))
+        x0, z_arg = map(_as_casadi_array, (x0, z_arg))
 
         # The return is a dict with keys for the outputs of the residual
         # function.  The key "x" will contain the root of the function.

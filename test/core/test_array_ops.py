@@ -4,7 +4,7 @@ import numpy as np
 from numpy import exceptions as npex
 import casadi as cs
 
-from archimedes.core import SymbolicArray, sym, sym_function
+from archimedes._core import SymbolicArray, sym, sym_function
 from archimedes.error import ShapeDtypeError
 
 
@@ -308,7 +308,7 @@ class TestSymbolicArrayFunctions:
             np.reshape(x, (3, 2), order="A")
 
         # Test some edge cases by calling directly
-        from archimedes.core._array_ops._array_ops import _cs_reshape
+        from archimedes._core._array_ops._array_ops import _cs_reshape
         x = cs.SX.sym("x", 6, 1)
         y = _cs_reshape(x, (3, 2), order="F")
         assert y.shape == (3, 2)

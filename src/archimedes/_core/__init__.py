@@ -1,4 +1,5 @@
-from ._array import (
+from ._array_impl import (
+    _as_casadi_array,
     array,
     sym,
     sym_like,
@@ -12,7 +13,7 @@ from ._array import (
 # SymbolicArray is defined in ._array_impl, but its __array_ufunc__ and
 # __array_function__ methods are defined in _array_ops, so it must be
 # imported from there.
-from ._array_impl import SymbolicArray, casadi_array
+from ._array_ops import SymbolicArray
 
 from ._codegen import codegen
 
@@ -30,7 +31,7 @@ __all__ = [
     "ones_like,"
     "eye",
     "SymbolicArray",
-    "casadi_array",
+    "_as_casadi_array",
     "sym_function",
     "SymbolicFunction",
     "codegen",

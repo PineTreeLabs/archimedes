@@ -2,8 +2,8 @@ import pytest
 
 import numpy as np
 
-from archimedes.simulation import integrator, odeint
-from archimedes.core import sym, jac, SymbolicArray
+from archimedes._simulation import integrator, odeint
+from archimedes._core import sym, jac, SymbolicArray
 
 
 RTOL = 1e-10

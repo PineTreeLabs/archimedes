@@ -5,7 +5,7 @@ import numpy as np
 from scipy.interpolate import RectBivariateSpline
 
 import archimedes as arc
-from archimedes.core import SymbolicArray, sym, sym_function
+from archimedes._core import SymbolicArray, sym, sym_function
 
 
 class TestNumPyInterp:

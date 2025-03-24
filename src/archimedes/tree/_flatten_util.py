@@ -31,9 +31,9 @@ import warnings
 import numpy as np
 
 
-from archimedes.core._array_ops._array_ops import _result_type, array
-from archimedes.tree.registry import unzip2
-from archimedes.tree.tree_util import tree_flatten, tree_unflatten
+from archimedes._core._array_impl import _result_type, array
+from archimedes.tree._registry import unzip2
+from archimedes.tree._tree_util import tree_flatten, tree_unflatten
 
 
 # Original: jax._src.util.HashablePartial

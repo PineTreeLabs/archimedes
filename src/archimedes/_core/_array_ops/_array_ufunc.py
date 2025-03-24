@@ -3,7 +3,7 @@ from __future__ import annotations
 import numpy as np
 import casadi as cs
 
-from .._array_impl import casadi_array, SymbolicArray, DEFAULT_FLOAT
+from .._array_impl import _as_casadi_array, SymbolicArray, DEFAULT_FLOAT
 from .._type_inference import type_inference, shape_inference
 from ._array_ops import unary_op, binary_op, array
 
@@ -24,7 +24,7 @@ def _dot(x1, x2):
 
     # Now that type inference is done we can discard the SymbolicArray wrapper and just
     # use the underlying data (SX or NumPy array)
-    arg1, arg2 = map(casadi_array, (x1, x2))
+    arg1, arg2 = map(_as_casadi_array, (x1, x2))
 
     # CasADi's `dot` function requires that the two arrays have the same shape, and
     # acts as a flattened vector dot product. However, for NumPy it is equivalent to

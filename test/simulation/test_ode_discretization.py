@@ -1,5 +1,5 @@
 import numpy as np
-from archimedes.simulation._discretize import _discretize_rk4, _discretize_radau5
+from archimedes._simulation._discretize import _discretize_rk4, _discretize_radau5
 
 def rk4_step(f, t, x, p, h):
     k1 = f(t, x, p)

@@ -7,11 +7,10 @@ import numpy as np
 import casadi as cs
 
 from archimedes import tree
-from archimedes.tree.flatten_util import HashablePartial
+from archimedes.tree._flatten_util import HashablePartial
 
-from . import sym_like, SymbolicArray
-from ._array_impl import casadi_array
-from ._array_ops import array
+from . import sym_like
+from ._array_impl import array, _as_casadi_array
 
 
 # Type alias for the key in the compiled dictionary
@@ -36,7 +35,7 @@ class CompiledFunction(NamedTuple):
     results_unravel: tuple[HashablePartial, ...]
 
     def __call__(self, *args):
-        args = tuple(map(casadi_array, args))
+        args = tuple(map(_as_casadi_array, args))
         result = self.func(*args)
 
         if not isinstance(result, tuple):
@@ -223,7 +222,7 @@ class SymbolicFunction:
             sym_ret_flat.append(x_flat)
             results_unravel.append(unravel)
 
-        cs_ret = [casadi_array(x) for x in sym_ret_flat]
+        cs_ret = [_as_casadi_array(x) for x in sym_ret_flat]
 
         if self.ret_names is None:
             self.ret_names = [f"y{i}" for i in range(len(sym_ret_flat))]
@@ -473,7 +472,7 @@ def scan(
     # Convert arguments to either CasADi expressions or NumPy arrays
     # Note that CasADi will map over the _second_ axis of `xs`, so we need to
     # transpose the array before passing it.
-    cs_args = tuple(casadi_array(arg) for arg in (init_carry, xs.T))
+    cs_args = tuple(_as_casadi_array(arg) for arg in (init_carry, xs.T))
     cs_carry, cs_ys = scan_func(*cs_args)
 
     # Ensure that the return has shape and dtype consistent with the inputs

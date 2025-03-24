@@ -6,126 +6,9 @@ import numpy as np
 from numpy import exceptions as npex
 import casadi as cs
 
-from .._array_impl import casadi_array, SymbolicArray
+from .._array_impl import array, _as_casadi_array, SymbolicArray
 from .._type_inference import type_inference, shape_inference
 
-if TYPE_CHECKING:
-    from .._array_impl import ArrayLike
-
-
-def _empty_like(x):
-    if isinstance(x, SymbolicArray):
-        return np.empty(x.shape, dtype=x.dtype)
-    else:
-        return x
-
-
-def _result_type(*inputs):
-    np_inputs = tuple(map(_empty_like, inputs))
-    return np.result_type(*np_inputs)
-
-
-def _is_list_of_scalars(x):
-    return all(isinstance(xi, (int, float)) or len(xi) <= 1 for xi in x)
-
-
-def _dispatch_array(x, dtype=None) -> ArrayLike:
-    """`array` function dispatched from np.array(..., like=[SymbolicArray])"""
-    # For now, support three cases:
-    # 1. x is already an array (do nothing)
-    # 2. x is a list of scalars (convert to an (n,) array)
-    # 3. x is a list of lists (convert to an (n, m) array)
-
-    # Case 1: x is already an array
-    if isinstance(x, SymbolicArray):
-        if dtype is not None:
-            x = x.astype(dtype)
-        return x
-
-    if isinstance(x, (list, tuple)):
-        if len(x) == 0:
-            return np.array(x, dtype=dtype)
-
-        # Case 2. x is a list of scalars
-        if not all(isinstance(xi, (list, tuple, np.ndarray, SymbolicArray)) for xi in x):
-            # Check that everything is a scalar
-            if not _is_list_of_scalars(x):
-                raise ValueError(f"Creating array with inconsistent data: {x}")
-            result_shape = (len(x),)
-            result_dtype = dtype or _result_type(*x)
-            cs_x = list(map(casadi_array, x))
-            arr = cs.vcat(cs_x)
-            if isinstance(arr, cs.DM):
-                return np.array(arr, dtype=result_dtype).reshape(result_shape)
-            return SymbolicArray(arr, dtype=result_dtype, shape=result_shape)
-
-        # Case 3. x is a list of lists, arrays, etc
-        # check that all lists are only scalars
-        if not all(
-            _is_list_of_scalars(xi) for xi in x
-        ):
-            raise ValueError(
-                "Can only create array from list of scalars or list of "
-                "lists of scalars"
-            )
-
-        # Check that the lengths are consistent
-        len_set = set(map(len, x))
-        if len(len_set) != 1:
-            raise ValueError(f"Inconsistent lengths in list of lists: {len_set}")
-
-        result_shape = (len(x),) if len(x[0]) == 0 else (len(x), len(x[0]))
-        result_dtype = dtype or _result_type(*[_result_type(*xi) for xi in x])
-        cs_x = [list(map(casadi_array, xi)) for xi in x]
-
-        arr = cs.vcat([cs.hcat(xi) for xi in cs_x])
-        if isinstance(arr, cs.DM):
-            return np.array(arr, dtype=result_dtype).reshape(result_shape)
-        return SymbolicArray(
-            arr,
-            dtype=result_dtype,
-            shape=result_shape,
-        )
-
-    raise NotImplementedError(f"Converting {x} (type={type(x)}) to array is not supported")
-
-
-def array(x, dtype=None) -> ArrayLike:
-    """Create an array.
-    
-    Parameters
-    ----------
-    x : array_like
-        An array-like object, either a NumPy `ndarray`, a `SymbolicArray`,
-        a CasADi symbolic type (not recommended to use directly), or a list or
-        list-of-lists of scalars.
-    dtype : str, optional
-        The dtype of the array. If not specified, the dtype is inferred from `x`.
-
-    Returns
-    -------
-    array : numpy.ndarray | SymbolicArray
-
-    Notes
-    -----
-    Array creation using the NumPy dispatch mechanism (`np.array(..., like=...)`) is
-    recommended over calling `array(...)` directly.  This supports a wider range of
-    input types and should better support numerical input types.
-    """
-
-    # Case 1. x is already an array
-    if isinstance(x, (SymbolicArray, np.ndarray)):
-        if dtype is not None:
-            x = x.astype(dtype)
-        return x
-    
-    if isinstance(x, (cs.SX, cs.MX)):
-        return SymbolicArray(x, dtype=dtype)
-
-    if (np.isscalar(x) and np.isreal(x)) or isinstance(x, cs.DM):
-        return np.array(x, dtype=dtype)
-
-    return _dispatch_array(x, dtype=dtype)
 
 def normalize_axis_index(axis, ndim, msg_prefix="axis"):
     if not isinstance(axis, int):
@@ -176,7 +59,7 @@ class SymbolicOp:
         self._func = self._wrap(func=function, result_type=result_type)
 
     def _compute_result(self, op, inputs, result_shape):
-        cs_inputs = map(casadi_array, inputs)
+        cs_inputs = map(_as_casadi_array, inputs)
         return op(*cs_inputs)
 
     def _wrap(self, func, result_type=None):
@@ -207,9 +90,9 @@ class BroadcastOp(SymbolicOp):
     shape_inference_rule = "broadcast"
 
     def _compute_result(self, op, inputs, result_shape):
-        cs_inputs = map(casadi_array, inputs)
+        cs_inputs = map(_as_casadi_array, inputs)
         shapes = map(np.shape, inputs)  # Original shapes
-        return broadcast_binary_operation(op, *cs_inputs, *shapes, result_shape)
+        return _broadcast_binary_operation(op, *cs_inputs, *shapes, result_shape)
 
 
 def _repmat(x, reps):
@@ -239,7 +122,7 @@ def _cs_reshape(x, shape, order="C"):
     return cs.reshape(x, shape)
 
 
-def broadcast_binary_operation(operation, arr1, arr2, shape1, shape2, common_shape):
+def _broadcast_binary_operation(operation, arr1, arr2, shape1, shape2, common_shape):
     #
     # NOTE: For broadcasting purposes NumPy treats vectors (n,) as (1, n).  However,
     # trying to broadcast a (n,) NumPy array with a (1, n) CasADi array will return
@@ -289,7 +172,7 @@ def broadcast_binary_operation(operation, arr1, arr2, shape1, shape2, common_sha
 
     # Case 6 is a duplicate of case 5 with arguments reversed
     if len(shape1) == 2 and len(shape2) == 1:
-        return broadcast_binary_operation(
+        return _broadcast_binary_operation(
             operation, arr2, arr1, shape2, shape1, common_shape
         )
 

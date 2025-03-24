@@ -1,13 +1,13 @@
-from ._array_ops import array
-from ._function import zeros, ones, zeros_like, ones_like, eye
+"""Implementation of Numpy array dispatch for SymbolicArray objects.
 
+No part of this module should need to be imported directly or accessed by the user.
+However, when `SymbolicArray` is used internally it should be imported from here,
+since this is where the `__array_ufunc__` and `__array_function__` methods are defined.
+"""
 from .._array_impl import SymbolicArray
-from ._ufunc import SUPPORTED_UFUNCS
-from ._function import SUPPORTED_FUNCTIONS
+from ._array_ufunc import SUPPORTED_UFUNCS
+from ._array_function import SUPPORTED_FUNCTIONS
 
-# TODO:
-# - file too large: make this a submodule
-# - remove all implementations of numpy functions from public interface (add leading _)
 
 def __array_ufunc__(self: SymbolicArray, ufunc, method, *inputs, **kwargs):
     if method == "__call__":
@@ -46,12 +46,4 @@ SymbolicArray.__array_ufunc__ = __array_ufunc__
 SymbolicArray.__array_function__ = __array_function__
 
 
-__all__ = [
-    "SymbolicArray",
-    "array",
-    "zeros",
-    "ones",
-    "zeros_like",
-    "ones_like",
-    "eye",
-]
+__all__ = ["SymbolicArray"]

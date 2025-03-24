@@ -1,194 +1,31 @@
 from __future__ import annotations
-from typing import TYPE_CHECKING
 
 import numpy as np
 import numpy.exceptions as npex
 import casadi as cs
 
-from .._array_impl import casadi_array, SymbolicArray, SYM_KINDS
+from .._array_impl import (
+    array,
+    _as_casadi_array,
+    SymbolicArray,
+    _result_type,
+    _dispatch_array,
+    _empty_like,
+    zeros,
+    ones,
+    zeros_like,
+    ones_like,
+    eye,
+)
+
 from .._type_inference import type_inference, shape_inference
 from ._array_ops import (
-    array,
     unary_op,
     binary_op,
     normalize_axis_index,
     _cs_reshape,
-    _result_type,
-    _dispatch_array,
-    _empty_like,
 )
-from ._ufunc import SUPPORTED_UFUNCS, _dot
-
-if TYPE_CHECKING:
-    from .._array_impl import ArrayLike
-
-
-def _np_shape(shape):
-    # Check that the shape is valid and return a tuple of ints.
-    if isinstance(shape, int):
-        return (shape,)
-    if not isinstance(shape, tuple):
-        raise ValueError("shape must be an int or a tuple of ints")
-    if not all(isinstance(s, int) for s in shape):
-        raise ValueError("shape must be a tuple of ints")
-    return shape
-
-
-# zeros, ones, zeros_like, eye, diag
-def _cs_shape(shape):
-    # The shape of the CasADi object is always 2D, so we need to handle the
-    # cases where the specified shape is () or (n,) separately.
-    cs_shape = _np_shape(shape)
-
-    if len(cs_shape) > 2:
-        raise ValueError("Only scalars, vectors, and matrices are supported for now")
-
-    if len(cs_shape) == 0:
-        cs_shape = (1, 1)
-
-    elif len(cs_shape) == 1:
-        cs_shape = (cs_shape[0], 1)
-
-    return cs_shape
-
-
-def zeros(shape, dtype=np.float64, sparse=True, kind="SX") -> SymbolicArray:
-    """Construct an array of zeros with the given shape and dtype.
-    
-    Parameters
-    ----------
-    shape : int or tuple of ints
-        Shape of the array.
-    dtype : numpy.dtype, optional
-        Data type of the array. Default is np.float64.
-    sparse : bool, optional
-        If `True`, then the array will be a sparse array with "structural"
-        zeros.  Otherwise it will be "dense" and full of numerical zeros.
-    kind : str, optional
-        Kind of the symbolic variable (`"SX"` or `"MX"`). Default is `"SX"`.
-        See CasADi documentation for details on the differences between the two.
-
-    Returns
-    -------
-    SymbolicArray
-        Array of zeros with the given shape, dtype, and symbolic kind.
-
-    Notes
-    -----
-    Prefer using `np.zeros_like` or `np.zeros(..., like=SymbolicArray)` to directly calling
-    this function where possible, since this may handle dispatch to numeric arrays slightly
-    better.
-    """
-    X = SYM_KINDS[kind]
-    _zeros = X if sparse else X.zeros
-    return SymbolicArray(_zeros(*_cs_shape(shape)), dtype=dtype, shape=_np_shape(shape))
-
-
-def ones(shape, dtype=np.float64, kind="SX"):
-    """Construct an array of ones with the given shape and dtype.
-    
-    Parameters
-    ----------
-    shape : int or tuple of ints
-        Shape of the array.
-    dtype : numpy.dtype, optional
-        Data type of the array. Default is np.float64.
-    kind : str, optional
-        Kind of the symbolic variable (`"SX"` or `"MX"`). Default is `"SX"`.
-        See CasADi documentation for details on the differences between the two.
-
-    Returns
-    -------
-    SymbolicArray
-        Array of ones with the given shape, dtype, and symbolic kind.
-
-    Notes
-    -----
-    Prefer using `np.ones_like` or `np.ones(..., like=SymbolicArray)` to directly calling
-    this function where possible, since this may handle dispatch to numeric arrays slightly
-    better.
-    """
-    X = SYM_KINDS[kind]
-    return SymbolicArray(X.ones(*_cs_shape(shape)), dtype=dtype, shape=_np_shape(shape))
-
-
-def zeros_like(x, dtype=None, sparse=True, kind=None):
-    """Construct an array of zeros with the same shape and dtype as `x`.
-
-    Parameters
-    ----------
-    dtype : numpy.dtype, optional
-        Data type of the array. Default is np.float64.
-    sparse : bool, optional
-        If `True`, then the array will be a sparse array with "structural"
-        zeros.  Otherwise it will be "dense" and full of numerical zeros.
-    kind : str, optional
-        Kind of the symbolic variable (`"SX"` or `"MX"`). Default is `"SX"`.
-        See CasADi documentation for details on the differences between the two.
-
-    Returns
-    -------
-    SymbolicArray
-        Array of zeros with the given dtype, and symbolic kind, and with shape of `x`.
-    """
-    x = array(x)  # Should be SymbolicArray or ndarray
-    if kind is None and isinstance(x, SymbolicArray):
-        kind = x.kind
-    else:
-        kind = "SX"
-    return zeros(x.shape, dtype=dtype or x.dtype, sparse=sparse, kind=kind)
-
-
-def ones_like(x, dtype=None, kind=None):
-    """Construct an array of ones with the same shape and dtype as `x`.
-    
-    Parameters
-    ----------
-    dtype : numpy.dtype, optional
-        Data type of the array. Default is np.float64.
-    kind : str, optional
-        Kind of the symbolic variable (`"SX"` or `"MX"`). Default is `"SX"`.
-        See CasADi documentation for details on the differences between the two.
-
-    Returns
-    -------
-    SymbolicArray
-        Array of ones with the given dtype and symbolic kind, and with shape of `x`.
-    """
-    x = array(x)  # Should be SymbolicArray or ndarray
-    if kind is None and isinstance(x, SymbolicArray):
-        kind = x.kind
-    else:
-        kind = "SX"
-    return ones(x.shape, dtype=dtype or x.dtype, kind=kind)
-
-
-def eye(n, dtype=np.float64, kind="SX"):
-    """Construct an identity matrix of size `n` with the given dtype.
-    
-    Parameters
-    ----------
-    n : int
-        Size of the identity matrix.
-    dtype : numpy.dtype, optional
-        Data type of the array. Default is np.float64.
-    kind : str, optional
-        Kind of the symbolic variable (`"SX"` or `"MX"`). Default is `"SX"`.
-        See CasADi documentation for details on the differences between the two.
-
-    Returns
-    -------
-    SymbolicArray
-        Identity matrix of size `n` with the given dtype and symbolic kind.
-
-    Notes
-    -----
-    Prefer using `np.eye` or `np.eye(..., like=SymbolicArray)` to directly calling
-    this function where possible, since this may handle dispatch to numeric arrays slightly
-    better.
-    """
-    X = SYM_KINDS[kind]
-    return SymbolicArray(X.eye(n), dtype=dtype, shape=(n, n))
+from ._array_ufunc import SUPPORTED_UFUNCS, _dot
 
 
 # Do not call directly - this should be called by NumPy's array
@@ -339,7 +176,7 @@ def _concatenate(arrs, axis=0, dtype=None):
                         f"{j} has size {arr.shape[i]}."
                     )
 
-    args = [casadi_array(arr) for arr in arrs]
+    args = [_as_casadi_array(arr) for arr in arrs]
 
     # If all arrays are 1D, then use cs.vcat
     if ndim == 1:
@@ -433,7 +270,7 @@ def _array_split(arr, indices_or_sections, axis=0):
             raise IndexError("indices to split must be non-decreasing")
         ax_sizes.append(ix2 - ix1)
 
-    arr = casadi_array(arr)
+    arr = _as_casadi_array(arr)
 
     if ndim == 1:
         shapes = [(s,) for s in ax_sizes]
@@ -506,7 +343,7 @@ def _where(condition, x=None, y=None):
     y = y if np.prod(y.shape) <= 1 else np.reshape(y, shape)
 
     # Convert to NumPy or CasADi arrays only
-    condition, x, y = map(casadi_array, (condition, x, y))
+    condition, x, y = map(_as_casadi_array, (condition, x, y))
     result = cs.if_else(condition, x, y)
     return SymbolicArray(result, dtype=dtype, shape=shape)
 
@@ -595,7 +432,7 @@ def _interp1d(x, xp, fp, left=None, right=None, period=None, method="linear"):
     shape = x.shape
     dtype = type_inference("default", x, xp, fp)
 
-    x_cs = casadi_array(x)  # Map input to either NumPy or CasADi
+    x_cs = _as_casadi_array(x)  # Map input to either NumPy or CasADi
 
     # Create the CasADi interpolant object
     lut = cs.interpolant("interpolate", method, [xp], fp)

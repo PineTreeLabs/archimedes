@@ -1,7 +1,7 @@
 import pytest
 import numpy as np
 
-from archimedes.core import sym, sym_function, SymbolicFunction, SymbolicArray
+from archimedes._core import sym, sym_function, SymbolicFunction, SymbolicArray
 
 
 def f(x):

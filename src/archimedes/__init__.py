@@ -1,6 +1,6 @@
 from . import error
 
-from .core import (
+from ._core import (
     codegen,
     array,
     sym,
@@ -23,8 +23,8 @@ from .core import (
 from . import tree
 from .tree import struct
 
-from .simulation import integrator, odeint
-from .optimization import nlp_solver, minimize, implicit, root
+from ._simulation import integrator, odeint
+from ._optimization import nlp_solver, minimize, implicit, root
 
 
 __all__ = [
@@ -33,7 +33,6 @@ __all__ = [
     "struct",
     "codegen",
     "array",
-    "core",
     "sym",
     "sym_like",
     "zeros",
