@@ -49,7 +49,6 @@ select = [
 known-first-party = ["archimedes"]
 section-order = ["future", "standard-library", "third-party", "first-party", "local-folder"]
 
-
 [tool.mypy]
 python_version = "3.12"
 warn_return_any = true
