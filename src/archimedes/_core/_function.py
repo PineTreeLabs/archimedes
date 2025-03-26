@@ -378,7 +378,7 @@ def scan(
         carry = init_carry
         ys = []
         for x in xs:
-            carry, y = f(carry, x)
+            carry, y = func(carry, x)
             ys.append(y)
         return carry, np.stack(ys)
     ```
@@ -387,7 +387,7 @@ def scan(
     must be equal to `length`.  `xs` can be a symbolic or numeric array, but `length`
     must be a known integer value.
 
-    While the pure Python code above is valid, it generates to computational graphs
+    While the pure Python code above is valid, it generates computational graphs
     that grow linearly with the length of the loop, increasing compile time and memory
     usage.  On the other hand, `scan` will "roll up" the loop, resulting in much
     smaller computational graphs.  The number of iterations that are combined into a

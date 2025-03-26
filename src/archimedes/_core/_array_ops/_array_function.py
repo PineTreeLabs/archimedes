@@ -150,8 +150,8 @@ def _concatenate(arrs, axis=0, dtype=None):
         for i, arr in enumerate(arrs):
             if arr.ndim != ndim:
                 raise ValueError(
-                    "All arrays must have the same number of dimensions, but"
-                    f"the array at index 0 has {ndim} dimensions and the array"
+                    "All arrays must have the same number of dimensions, but "
+                    f"the array at index 0 has {ndim} dimensions and the array "
                     f"at index {i} has {arr.ndim} dimensions."
                 )
             
