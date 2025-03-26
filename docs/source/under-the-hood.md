@@ -229,3 +229,126 @@ The current default is `MX` and the current recommendation is to use `MX` symbol
 
 (function-transformations)=
 ## Function transformations
+
+
+The final key concept in Archimedes is _function transformations_, which take an existing function and produce a new function with modified behavior.
+
+### How Function Transformations Work
+
+Internally, a function transformation in Archimedes follows these steps:
+
+1. Convert the input function to a symbolic function (if it isn't already)
+2. Trace the function with appropriate symbolic inputs to get a computational graph
+3. Apply transformation-specific operations to this computational graph
+4. Wrap the transformed graph in a new function with an appropriate signature
+
+For example, when you call `arc.grad(f)`, Archimedes:
+1. Ensures `f` is a symbolic function
+2. Traces `f` with symbolic inputs to construct its computational graph
+3. Applies automatic differentiation to the graph to obtain the gradient
+4. Returns a new function that, when called, evaluates this gradient graph
+
+This approach allows transformations to be composable - you can apply multiple transformations in sequence:
+
+```python
+def f(x, y):
+    return x**2 + np.sin(y)
+
+# Compute the gradient with respect to x, then the Jacobian of that gradient with respect to y
+ddf_dxdy = arc.jac(arc.grad(f, argnums=0), argnums=1)
+```
+
+### Core Transformation Categories
+
+#### Automatic Differentiation
+
+Automatic differentiation transformations leverage CasADi's powerful AD capabilities:
+
+```python
+@arc.sym_function
+def f(x):
+    return 100 * (x[1] - x[0]**2)**2 + (1 - x[0])**2 
+
+# First-order derivatives
+df = arc.grad(f)  # Returns gradient (vector of partial derivatives)
+J = arc.jac(f)    # Returns Jacobian matrix
+
+# Higher-order derivatives
+H = arc.hess(f)   # Returns Hessian matrix
+```
+
+CasADi implements AD using a hybrid approach of forward and reverse mode differentiation, optimizing for computational efficiency based on the number of inputs and outputs.
+It also supports _sparse_ automatic differentiation, which is crucial for performance in many practical large-scale constrained optimization problems.
+
+#### Solver Embeddings
+
+Another category of transformations embeds iterative solvers directly into the computational graph:
+
+```python
+# Create an ODE solver function
+def dynamics(t, x):
+    return np.array([x[1], -np.sin(x[0])], like=x)
+
+solver = arc.integrator(dynamics, method="cvodes")
+```
+
+When you call `arc.integrator`, Archimedes:
+1. Traces the dynamics function to construct its computational graph
+2. Creates an ODE solver with the specified method
+3. Returns a function that, when called, applies this integrator to solve the ODE
+
+Similarly, `nlp_solver` embeds an optimization solver, and `implicit` embeds a root-finding solver. These embedded solvers:
+
+1. Execute in compiled C++ for high performance
+2. Can (sometimes) be differentiated through themselves (implicit differentiation)
+3. Can be composed with other functions and transformations
+
+
+### Implementation Details
+
+Function transformations operate on CasADi's graph representation rather than directly on Python code. This means:
+
+1. The transformation sees the already-traced computational graph, not the original Python logic
+2. Transformations are only aware of operations captured in the graph during tracing
+3. The resulting function is a new C++ computational graph wrapped in a Python callable
+
+For example, in gradient computation:
+```python
+# Original function
+@arc.sym_function
+def f(x):
+    return np.sin(x**2)
+
+# Gradient transformation
+df = arc.grad(f)
+```
+
+Archimedes traces `f` with a symbolic input, producing a symbolic output `sin(x^2)`. It then applies autodiff to the original computational graph to get `df/dx = 2x * cos(x^2)`. The resulting function `df` is a Python wrapper around this new CasADi Function.
+
+For advanced use cases, transformations accept additional parameters for customization:
+
+```python
+# Gradient with respect to second argument only
+df_dx1 = arc.grad(f, argnums=(1,))  
+
+# Customize ODE solver behavior
+solver = arc.integrator(dynamics, method="cvodes", rtol=1e-8, atol=1e-8)
+```
+
+These function transformations enable complex operations like sensitivity analysis, optimal control, and parameter estimation with minimal code.
+
+
+## Conclusion
+
+Understanding the "under the hood" mechanisms of Archimedes—symbolic arrays, symbolic functions, and function transformations—provides valuable insight into how to use the framework effectively. While you don't need to fully understand these concepts to use Archimedes productively, this knowledge can help you:
+
+1. **Debug difficult problems** - When encountering unexpected behavior, knowing how symbolic tracing works can help identify if the issue relates to control flow, array creation, or other common pitfalls.
+
+2. **Optimize performance** - Understanding how function caching works and how computational graphs are constructed allows you to structure your code for maximum efficiency.
+
+3. **Leverage advanced features** - With knowledge of how transformations operate, you can compose them in powerful ways to solve complex problems with minimal code.
+
+Archimedes provides the performance benefits of symbolic computation without requiring you to work directly with symbolic expressions.
+By using familiar NumPy syntax and adding just a few decorators and transformations, you can create high-performance numerical code that automatically supports features like automatic differentiation, efficient ODE solving, and optimization.
+
+For more detailed information on specific aspects of using Archimedes effectively, refer to the [Quirks and Gotchas](gotchas.md) page and the various examples in the documentation.
