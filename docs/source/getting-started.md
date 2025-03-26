@@ -1,9 +1,9 @@
-# Getting Started with Archimedes
+# Getting Started
 
 This page will walk through some basic functionality and examples to get you started with some of the patterns and conventions of Archimedes.
 Before working through this page, you may want to make sure you have a working [installation](quickstart) and read through ["What is Archimedes?"](about) to understand the basic conceptual framework and terminology.
 
-(symbolic-functions)=
+(creating-symbolic-functions)=
 ## Creating symbolic functions
 
 The most basic operation in Archimedes is creating a "symbolic function", which is done as follows:

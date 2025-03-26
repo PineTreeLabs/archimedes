@@ -1,24 +1,10 @@
-# Troubleshooting and "Gotchas"
-
-- Array creation
-- Control flow
-- Mixing symbolics (MX/SX and NotImplemented)
-- Printing/debugging
-- 0-2D arrays only
-
-
-
-- ValueError: setting an array element with a sequence. The requested array would exceed the maximum number of dimension of 64.
-
-
-
 # 🔪 Quirks and Gotchas 
 
 Archimedes is a Python framework for numerical modeling and simulation that bridges NumPy's ease of use with the performance benefits of symbolic computation through CasADi.
 While it makes complex modeling tasks more approachable, there are several "sharp bits" you should be aware of to avoid unexpected behavior.
 This document outlines common pitfalls and quirks you might encounter when using Archimedes.
 
-It is modeled after the page ["🔪 JAX - The Sharp Bits 🔪"](https://docs.jax.dev/en/latest/notebooks/Common_Gotchas_in_JAX.html), since JAX and Archimedes share many design features.
+This page is modeled after ["🔪 JAX - The Sharp Bits 🔪"](https://docs.jax.dev/en/latest/notebooks/Common_Gotchas_in_JAX.html), since JAX and Archimedes share many design features.
 
 ## 🔪 Pure Functions
 
@@ -45,9 +31,10 @@ def impure_accumulator(x):
 While Archimedes works with impure functions in simple cases, this can lead to surprising behavior when functions are transformed or reused. For example, if the global variable `g` changes value, the function might still use the original value in some contexts.
 
 Less obviously, print statements are a "side effect" that makes functions impure.
-For tips on printing and debugging see the [debug](#-debugging-symbolic-code) section below.
+For tips on printing and debugging see the [debug](#debugging) section below.
 
 
+(numpy-compatibility-limitations)=
 ## 🔪 NumPy Compatibility Limitations
 
 Archimedes currently supports many common NumPy operations, but not all.
@@ -59,31 +46,14 @@ To see the exhaustive list and current implementation status, see:
 Any entries with `NotImplemented` values are currently not supported.
 **If you'd like to see one of these implemented, feel free to file a feature request (or bump an existing one)!**
 
-## 🔪 Symbolic Types
+## 🔪 Matrix- vs. scalar-valued symbolics
 
 When creating symbolic functions, note that there are two basic symbolic types inherited from CasADi: `SX` and `MX`.
-The kind of function that is created is specified by the `kind=` keyword argument to the `sym_function` decorator, for example:
+`SX` symbolics create symbolic arrays as a collection of symbolic scalars, while `MX` directly create a single symbol to represent an array.
+There are performance and flexibility tradeoffs between the two, and trying to mix them can be error prone.
 
-```python
-@arc.sym_function(kind="SX")
-def norm(x):
-    return np.dot(x, x)
-```
-
-`SX` produces scalar symbolic arrays, meaning that every entry in the array has its own scalar symbol.
-This can produce highly efficient code, but is limited to a subset of possible operations.
-For example, `SX` symbolics don't support interpolation with lookup tables.
-
-`MX` symbolics are array-valued, meaning that the entire array is represented by a single symbol.
-This allows for embedding much more general operations like interpolation, ODE solves, and optimization solves into the computational graph, but may not be as fast as `SX` for functions that are dominated by scalar operations.
-
-<!-- TODO: Don't publish until the default is actually MX -->
-Using both `SX` and `MX` can be done to a limited extent, but can be error-prone and should be done with caution.
-The current default is `MX` and the current recommendation is to stick with `MX` symbolics unless you want to do targeted performance optimizations and feel comfortable with the symbolic array concepts.
-
-:::{note}
-If you get `NotImplemented` errors related to functions that you know are supported (see [above](#-numpy-compatibility-limitations)), a likely reason is that you have somehow mixed `SX` and `MX` symbolics.
-:::
+Specifically, if you get `NotImplemented` errors related to functions that you know are supported (see [above](#numpy-compatibility-limitations)), a likely reason is that you have somehow mixed `SX` and `MX` symbolics.
+For more information see the [section on symbolic types](symbolic-types) in Under the Hood.
 
 ## 🔪 Array Dimensions
 
@@ -138,7 +108,7 @@ def good_function4(x):
     return y
 ```
 
-:::{info}
+:::{note}
 If you get the error `ValueError: setting an array element with a sequence. The requested array would exceed the maximum number of dimension of 64.` this is most likely due to incorrect array creation.
 :::
 
@@ -186,7 +156,7 @@ def good_loop(x):
     return y
 ```
 
-See the [control flow](getting-started.md#control-flow) section of Getting Started for a simple example with `scan`, or see the `scan` API documentation for details.
+See the [control flow](control-flow)  section of Getting Started for a simple example with `scan`, or see the `scan` API documentation for details.
 
 ## 🔪 Static Arguments
 
@@ -218,6 +188,7 @@ f(np.array([1.0, 2.0, 3.0]))  # New trace with shape (3,)
 
 Be aware that excessive retracing with different argument shapes can lead to performance degradation and memory usage growth.
 
+(in-place-operations)=
 ## 🔪 In-place Operations
 
 Unlike NumPy, which allows in-place modification of arrays, symbolic arrays in Archimedes should be treated as immutable. Operations that appear to modify arrays in-place in Python actually create new symbolic expressions behind the scenes.
@@ -245,6 +216,7 @@ This behavior differs from both NumPy (which modifies arrays in-place) and JAX (
 The current recommendation is that it is okay to do in-place operations, but do it with caution.
 Specifically, it is a good idea when implementing a function like this to always decorate it so that there is not a "NumPy version" that may inadvertently behave differently than the "Archimedes version".
 
+(debugging)=
 ## 🔪 Debugging Symbolic Code
 
 Debugging symbolic code can be challenging because:
@@ -275,7 +247,7 @@ Some tips for debugging:
 A reliable workflow is to write small functions in pure NumPy first, validate the NumPy code, and then add the `sym_function` decorator once you're confident in the results.
 
 :::{note}
-Aside from specific cases like [in-place operations](#-in-place-operations), Archimedes and NumPy results should be consistent.
+Aside from specific cases like [in-place operations](#in-place-operations), Archimedes and NumPy results should be consistent.
 If you are seeing unexpected divergences, **please file a bug report.**
 :::
 
@@ -286,7 +258,7 @@ If you are seeing unexpected divergences, **please file a bug report.**
 While Archimedes tries to make symbolic and numeric functions behave identically, there are some unavoidable differences:
 
 1. Symbolic functions can't use arbitrary Python objects as inputs - stick to numeric values and arrays, or PyTree data structures that Archimedes knows how to work with
-2. Some NumPy functions may have subtly different behavior in symbolic vs. numeric contexts (e.g. [in-place operations](#-in-place-operations))
+2. Some NumPy functions may have subtly different behavior in symbolic vs. numeric contexts (e.g. [in-place operations](#in-place-operations))
 3. Not all NumPy functionality is available symbolically.  **If you find a missing function you need, feel free to file a feature request (or bump an existing one)**.
 
 ```python

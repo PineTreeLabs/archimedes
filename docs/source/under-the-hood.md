@@ -22,7 +22,7 @@ x = MyArray([1.0, 2.0])
 np.sin(x)  # AttributeError: 'MyArray' object has no attribute 'sin'
 ```
 
-What's happening here is that the NumPy function `sin` will check to see if (a) the argument has a `sin` method it can call, (b) the argument has an `__array__` method that returns a NumPy array, or (c) the argument is a "custom array container" implementing the [NumPy dispatch mechanism](https://numpy.org/doc/stable/user/basics.dispatch.html).
+What's happening here is that the NumPy function `sin` will check to see if (1) the argument has a `sin` method it can call, (2) the argument has an `__array__` method that returns a NumPy array, or (3) the argument is a "custom array container" implementing the [NumPy dispatch mechanism](https://numpy.org/doc/stable/user/basics.dispatch.html).
 The dispatch mechanism is essentially a way to tell NumPy functions how to work with non-NumPy-native data types like [dask](http://dask.pydata.org/) and [cupy](https://docs-cupy.chainer.org/en/stable/) arrays.
 Since we haven't done any of these things for our class yet, NumPy throws an error.
 
@@ -32,7 +32,7 @@ However, while its symbolic arrays have some NumPy compatibility because they ha
 ```python
 import casadi as cs
 
-x = cs.MX.sym("x", 2, 2)  # Create a 2x2 symbolic array
+x = cs.SX.sym("x", 2, 2)  # Create a 2x2 symbolic array
 np.sin(x)  # Calls x.sin to return the symbolic expression MX(sin(x))
 np.linalg.inv(x)  # numpy.linalg.LinAlgError
 ```
@@ -42,7 +42,7 @@ Archimedes defines a class called `SymbolicArray` that wraps CasADi symbolics in
 ```python
 import archimedes as arc
 
-x = arc.sym("x", shape=(2, 2))  # Create a SymbolicArray
+x = arc.sym("x", shape=(2, 2), kind="SX")  # Create a SymbolicArray
 np.sin(x)  # SymbolicArray containing sin(x)
 np.linalg.inv(x)  # SymbolicArray containing the expression @1=((x_0*x_3)-(x_1*x_2)), [[(x_3/@1), (-(x_1/@1))],  [(-(x_2/@1)), (x_0/@1)]]
 ```
@@ -202,16 +202,30 @@ def f(x):
 f(5.0)  # Returns cos(5.0)
 ```
 
-For more details, see documentation on [gotchas](gotchas.md) and [control flow](control-flow.md)
+For more details, see documentation on [gotchas](gotchas.md) and [control flow](control-flow)
 
+(symbolic-types)=
 ### Symbolic types: MX and SX
+
+There are two basic symbolic types inherited from CasADi: `SX` and `MX`.
+The kind of symbolic array or function that is created is specified by the `kind=` keyword argument, for example:
+
+```python
+@arc.sym_function(kind="SX")
+def norm(x):
+    return np.dot(x, x)
+```
+
+`SX` produces scalar symbolic arrays, meaning that every entry in the array has its own scalar symbol.
+This can produce highly efficient code, but is limited to a subset of possible operations.
+For example, `SX` symbolics don't support interpolation with lookup tables.
+
+`MX` symbolics are array-valued, meaning that the entire array is represented by a single symbol.
+This allows for embedding much more general operations like interpolation, ODE solves, and optimization solves into the computational graph, but may not be as fast as `SX` for functions that are dominated by scalar operations.
+
+<!-- TODO: Don't publish until the default is actually MX -->
+Using both `SX` and `MX` can be done to a limited extent, but can be error-prone and should be done with caution.
+The current default is `MX` and the current recommendation is to use `MX` symbolics unless you want to do targeted performance optimizations and feel comfortable with the symbolic array concepts.
 
 (function-transformations)=
 ## Function transformations
-
-### Automatic differentiation
-
-### Implicit functions and root-finding
-
-### Integrators
-
