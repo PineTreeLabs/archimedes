@@ -319,7 +319,7 @@ print(np.allclose(f(x, y), interp.ev(x, y)))
 The Archimedes interpolant matches the SciPy one, but can be embedded in other symbolic functions, differentiated through, etc.
 
 (control-flow)=
-## Control flow (scan, where)
+## Control flow
 
 One limitation of the symbolic-numeric computations in Archimedes is that it is not compatible with standard Python control flow constructs like `if`/`else` and `while` loops.
 This is because Python does not have a dispatch mechanism for control flow similar to NumPy's for array functions.
