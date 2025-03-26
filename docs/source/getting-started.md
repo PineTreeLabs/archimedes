@@ -448,15 +448,137 @@ In general, learning to work with pure functions can be an adjustment.
 Fortunately, domains like math and physics are built on pure functions, and impure functions usually arise as an implementation detail (e.g. allocating work arrays in legacy Fortran code).
 If you keep your code as close to the underlying mathematical model as possible, it will tend to be functionally pure.
 
-<!--
 (custom-callbacks)=
-# Custom callbacks
+## Custom callbacks
 
+<!--
 TODO: Write this once the functionality is implemented.
 -->
 
+(scipy-cookbook)=
+## SciPy Cookbook
+
+Archimedes supports some common functionality like [ODE solving](#ode-solving), [constrained nonlinear optimization](#optimization), and [nonlinear root-finding](#implicit-functions), but in some cases you may wish to use particular solvers or functionality from larger libraries like SciPy.
+
+In this case you have three basic options:
+
+1. Use the SciPy function as an "offline" step to generate static arrays.
+2. Pass Archimedes functions (and possibly derivatives) to SciPy functions
+3. Write a [callback function](#custom-callbacks) to embed the external function in the computational graph
+
+As an example of the first case, you can construct an IIR filter outside of an Archimedes function and then use the filter coefficients as NumPy arrays.  This doesn't require symbolically tracing the IIR filter construction.
+
+```python
+# Construct an IIR filter and write a `sym_function` stepping it forward
+import numpy as np
+import scipy.signal as signal
+import archimedes as arc
+import matplotlib.pyplot as plt
+
+
+# 1. Design a Butterworth lowpass filter (offline step with SciPy)
+fs = 1000  # Sample frequency in Hz
+cutoff = 100  # Cutoff frequency in Hz
+order = 4  # Filter order
+b, a = signal.butter(order, cutoff / (fs/2), 'low')
+
+# 2. Create a symbolic function that implements the IIR filter
+@arc.sym_function
+def iir_filter_step(x, state, b_coef, a_coef):
+    # Calculate output: y = b[0]*x + state[0]
+    y = b_coef[0] * x + state[0]
+    
+    # Update state using direct form II transposed structure
+    state_new = np.zeros_like(state)
+    
+    for i in range(len(state) - 1):
+        state_new[i] = state[i+1] + b_coef[i+1] * x - a_coef[i+1] * y
+    
+    # Handle the last state element
+    if len(state) > 0:
+        i = len(state) - 1
+        if i+1 < len(b_coef):
+            state_new[i] = b_coef[i+1] * x - a_coef[i+1] * y
+        else:
+            state_new[i] = -a_coef[i+1] * y
+    
+    return y, state_new
+
+# Function to filter an entire signal using our IIR filter
+def filter_signal(signal_data, b_coef, a_coef):
+    # Initialize state array (size depends on filter order)
+    n = max(len(a_coef), len(b_coef)) - 1
+    state = np.zeros(n)
+    output = np.zeros_like(signal_data)
+    
+    # Apply the filter step by step
+    for i in range(len(signal_data)):
+        output[i], state = iir_filter_step(signal_data[i], state, b_coef, a_coef)
+    
+    return output
+
+# Create a test signal with mixed frequencies
+t = np.linspace(0, 1, fs)
+signal_data = np.sin(2 * np.pi * 5 * t) + 0.5 * np.sin(2 * np.pi * 150 * t)
+
+# Apply our filter
+filtered = filter_signal(signal_data, b, a)
+
+# Compare with SciPy's lfilter (should be identical)
+filtered_scipy = signal.lfilter(b, a, signal_data)
+
+# Plot results
+plt.figure(figsize=(10, 6))
+plt.plot(t, signal_data, 'b-', alpha=0.5, label='Original Signal')
+plt.plot(t, filtered, 'r-', label='Archimedes Filtered')
+plt.plot(t, filtered_scipy, 'g--', label='SciPy Filtered')
+plt.legend()
+plt.grid(True)
+plt.xlabel('Time (s)')
+plt.ylabel('Amplitude')
+plt.title('IIR Filter Comparison')
+plt.tight_layout()
+plt.show()
+```
+
+For applications like data processing, it is clearly preferable to just use the SciPy implementation.
+However, combining the "offline" filter design with a symbolic filtering function allows you to use the filter as part of a control algorithm within a larger computational graph, and also opens up the possibility of automated C code generation for embedded applications. 
+
+In the second case, you may want to use a SciPy optimizer like BFGS for an unconstrained optimization problem.
+In this case you can still take advantage of the efficient C++ computations and automatic differentiation in Archimedes, for example:
+
+```python
+import numpy as np
+import archimedes as arc
+from scipy.optimize import minimize
+
+# Solve Rosenbrock problem using BFGS
+@arc.sym_function
+def func(x):
+    return 100 * (x[1] - x[0]**2)**2 + (1 - x[0])**2
+
+x0 = np.array([-1.2, 1.0])  # Initial guess
+result = minimize(
+    func, 
+    x0,
+    method='BFGS',
+    jac=arc.grad(func),
+)
+```
+
+Note that there is some overhead in translating between the NumPy arrays and CasADi's internal array structures, so this is not guaranteed to be faster than vanilla NumPy; the performance will be dictated by the relative complexity of an individual function evaluation compared to the number of function evaluations.
+For instance, in the Rosenbrock example above the fastest solution is actually plain NumPy with finite differencing, even though this uses about 3x as many function evaluations!
+This will often not be the case for more complex practical applications.
+
+<!-- TODO: Write an example callback when this is implemented -->
+
+All of these strategies will also work for libraries beyond SciPy.
+Integration with other libraries like Matplotlib is largely straightforward, since Archimedes works with NumPy arrays and visualizations can be created "offline" as a postprocessing step.
+
 (basic-troubleshooting)=
 ## Basic Troubleshooting
+
+For more details, see the [Quirks and Gotchas](gotchas.md) page, but here are some common early pitfalls:
 
 - **Error when creating arrays**: Remember to use `like=x` or functions like `vstack` with symbolic arguments
 - **Unexpected results with conditional logic**: Use `np.where` instead of Python `if/else` with symbolic arguments
