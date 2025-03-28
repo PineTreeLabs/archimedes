@@ -12,6 +12,17 @@ SYM_KINDS = {"MX": cs.MX, "SX": cs.SX, "DM": cs.DM, "ndarray": np.ndarray}
 SYM_NAMES = {cs.MX: "MX", cs.SX: "SX", cs.DM: "DM", np.ndarray: "ndarray"}
 
 
+__all__ = [
+    "array",
+    "sym",
+    "sym_like",
+    "zeros",
+    "ones",
+    "zeros_like",
+    "ones_like",
+]
+
+
 def _as_casadi_array(x):
     """Convert to a CasADi type (SX, MX, or ndarray)"""
     if isinstance(x, SymbolicArray):
@@ -296,24 +307,93 @@ ArrayLike = np.ndarray | SymbolicArray
 #
 
 def sym(name, shape=None, dtype=np.float64, kind="SX") -> SymbolicArray:
-    """Create a symbolic array.
+    """
+    Create a symbolic array for use in symbolic computations.
+    
+    This function creates symbolic variables that serve as the foundation for building 
+    computational graphs in Archimedes. Symbolic arrays can be manipulated with NumPy-like 
+    operations and transformed into efficient computational graphs.
     
     Parameters
     ----------
     name : str
-        Name of the symbolic variable.
-    shape : tuple of int, optional
-        Shape of the array. Default is ().
+        Name of the symbolic variable. This name is used for display purposes and 
+        debugging, and appears in symbolic expression representations.
+    shape : int or tuple of int, optional
+        Shape of the array. Default is (), which creates a scalar.
+        A single integer n creates a vector of length n.
+        A tuple (m, n) creates an m×n matrix.
     dtype : numpy.dtype, optional
-        Data type of the array. Default is np.float64.
-    kind : str, optional
-        Kind of the symbolic variable (`"SX"` or `"MX"`). Default is `"SX"`.
-        See CasADi documentation for details on the differences between the two.
-
+        Data type of the array. Default is np.float64. This is mostly unused for now
+        and all "compiled" functions use float64. It is included for consistency with
+        NumPy and will be used for better type control in C code generation in the
+        future.
+    kind : {"SX", "MX"}, optional
+        Kind of symbolic variable to create. Default is "SX".
+        - "SX": Scalar-based symbolic type. Each element of the array has its own 
+          symbolic representation. Generally more efficient for element-wise operations
+          and when computing gradients of scalar functions.
+        - "MX": Matrix-based symbolic type. The entire array is represented by a single 
+          symbolic object. Supports a broader range of operations but may be less 
+          efficient for some applications.
+        
     Returns
     -------
     SymbolicArray
-        Symbolic array with the given name, shape, dtype, and kind.
+        Symbolic array with the given name, shape, dtype, and kind. This object can be
+        used in NumPy operations and Archimedes function transformations.
+    
+    Notes
+    -----
+    Symbolic arrays are the building blocks of symbolic computation in Archimedes. They 
+    represent variables whose values are not specified until later computation, allowing 
+    for construction of computational graphs that can be efficiently evaluated, differentiated, 
+    and optimized.
+    
+    The difference between SX and MX symbolic types is important:
+    - SX types create element-wise symbolic variables and are more efficient for scalar 
+      operations and gradients of scalar functions.
+    - MX types represent entire matrices as single symbolic objects and support a wider range
+      of operations, including those that cannot be easily represented element-wise.
+    
+    Current limitations:
+    - Only supports up to 2D arrays (scalars, vectors, and matrices)
+    - Some operations may behave differently between SX and MX types
+    
+    Examples
+    --------
+    >>> import archimedes as arc
+    >>> import numpy as np
+    >>> 
+    >>> # Create a scalar symbolic variable
+    >>> x = arc.sym("x")
+    >>> print(x)
+    x
+    >>> 
+    >>> # Create a vector (1D array)
+    >>> v = arc.sym("v", shape=3)
+    >>> print(v)
+    [v[0], v[1], v[2]]
+    >>> 
+    >>> # Create a matrix (2D array)
+    >>> M = arc.sym("M", shape=(2, 2))
+    >>> print(M)
+    [[M[0,0], M[0,1]], [M[1,0], M[1,1]]]
+    >>> 
+    >>> # Use in symbolic computations
+    >>> f = np.sin(x) + np.cos(x)
+    >>> print(f)
+    sin(x) + cos(x)
+    >>> 
+    >>> # Create an MX-type symbolic variable
+    >>> y = arc.sym("y", shape=2, kind="MX")
+    >>> print(y)
+    [y[0], y[1]]
+    
+    See Also
+    --------
+    archimedes.array : Create a regular or symbolic array from data
+    archimedes.compile : Create a symbolic function from a Python function
     """
     # TODO: Use `scalar: bool` instead of `kind: str`
     if shape is None:
