@@ -157,6 +157,9 @@ class FunctionCache:
     @property
     def arg_names(self):
         return list(self.signature.parameters.keys())
+    
+    def __repr__(self):
+        return f"{self.name}({', '.join(self.arg_names)})"
 
     def _split_func(self, static_args, sym_args):
         # Wrap the function call by interleaving the static and symbolic arguments
