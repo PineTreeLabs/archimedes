@@ -45,6 +45,12 @@ cd archimedes
 uv pip install -e ".[all]"
 ```
 
+To install the Jupyter notebook kernel, if you have installed `[all]` dependencies you can run
+
+```bash
+uv run ipython kernel install --user --env VIRTUAL_ENV $(pwd)/.venv --name=archimedes
+```
+
 # Examples
 
 ### Automatic differentiation

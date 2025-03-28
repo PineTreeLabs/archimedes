@@ -15,3 +15,10 @@ documentation for details.
    :maxdepth: 2
    :caption: Contents:
 
+   quickstart
+   about
+   getting-started
+   under-the-hood
+   gotchas
+   pytrees
+   modular-design

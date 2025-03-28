@@ -77,16 +77,22 @@ When a symbolic function is called with specific arguments, Archimedes performs 
 
 3. **Numerical Evaluation**: The symbolic inputs are replaced with their original numerical values and passed to the CasADi computational graph, which executes efficiently in compiled C++ to return the numerical result.
 
-## Function Transformations
-
-The true power of symbolic computation emerges when applying function transformations or using symbolic functions in complex algorithms. Two key advantages are:
+Two key advantages to symbolic-numeric computation are:
 
 1. **Performance optimization** for complex functions that need to be evaluated repeatedly
 2. **Function transformation** capabilities that would otherwise require difficult manual implementations
 
-### Automatic Differentiation
+## Function Transformations
 
-Computing gradients for optimization becomes straightforward:
+A _function transformation_ is similar to a mathematical operator in that it takes one function and produces a different function.
+
+For example, in calculus the derivative is an operator that takes a function $f(x)$ and produces its derivative $f'(x)$.
+In Archimedes the same thing is accomplished by a function transformation that converts the code that calculates `f(x)` to code that calculates the derivative `df(x)`.
+
+### Automatic differentiation
+
+A common application of function transformation is computing derivatives via _automatic differentiation_
+For example:
 
 ```python
 import archimedes as arc
@@ -123,9 +129,18 @@ x = F(y=1.0, x0=0.0)  # x0 provides the initial guess
 
 Archimedes constructs a computational graph that automatically applies a Newton solver or equivalent method to efficiently solve the equation $f(x, y) = 0$ for any given value of $y$.
 
+### Other function transformations
+
+Archimedes provides a number of useful function transformations, including:
+
+* **Automatic differentiation**: Efficiently compute derivatives with `grad`, `jac`, `hess`, `jvp`, and `vjp`
+* **Implicit functions**: Combine a function with a Newton solver to create an implicit function using `implicit`
+* **ODE solves**: Convert an ODE model into a forward map through time using `integrator`
+* **Optimization solves**: Convert an objective and set of constraints into a parametric optimization solver with `nlp_solver`
+
 ### C Code Generation
 
-For embedded applications, the C++ computational graphs can be exported as standalone C code:
+While not strictly a function transformation in the sense of the other operations, the C++ computational graphs can also be exported as standalone C code for use in embedded systems:
 
 ```python
 def f(x, y):
@@ -139,9 +154,9 @@ arc.codegen(f, "func.c", (x_type, y_type), header=True)
 ```
 
 While the current code generation relies on CasADi's conventions and formatting, enhanced code generation for embedded systems is on the project roadmap.
-
 **If you are interested in using Archimedes for embedded applications, please let us know!**
 
+(tree-structure)=
 ## Tree-Structured Data
 
 Modern engineering models often involve complex, nested data structures that go beyond simple arrays.
@@ -189,70 +204,6 @@ print(flat_state)  # array([0.  , 0.  , 0.  , 1.  , 1.  , 2.  , ...
 # Reconstruct the original tree structure
 print(unravel(flat_state))  # {'end_effector': {'orientation': array([0., 0., 0., 1.]), ...
 ```
-
-### Structured Data Classes
-
-If you want to go beyond built-in Python containers, Archimedes provides a `struct` module that combines Python's `dataclass` with automatic PyTree registration:
-
-```python
-from archimedes.tree import struct
-
-@struct.pytree_node
-class VehicleState:
-    position: np.ndarray  # [x, y, z]
-    velocity: np.ndarray  # [vx, vy, vz]
-    attitude: np.ndarray  # quaternion [qx, qy, qz, qw]
-    angular_velocity: np.ndarray  # [wx, wy, wz]
-
-# Create an instance
-state = VehicleState(
-    position=np.zeros(3),
-    velocity=np.zeros(3),
-    attitude=np.array([0, 0, 0, 1]),
-    angular_velocity=np.zeros(3)
-)
-
-# Flatten to a single vector
-flat_state, unravel = arc.tree.ravel(state)
-
-# Pass to/from symbolic functions
-@arc.sym_function
-def euler_dynamics(state, control):
-    # Access structured fields naturally
-    new_position = state.velocity + dt * state.position
-    # ...
-    return VehicleState(
-        position=new_position,
-        # ...
-    )
-```
-
-In addition, these custom PyTree nodes are regular classes, so you can define methods as usual.
-For example, you can create a callable class with some parameters using the special `__call__` method:
-
-```python
-
-@struct.pytree_node
-class PredatorPrey:
-    a: float
-    b: float
-    c: float
-    d: float
-
-    def __call__(self, t, x):
-        return np.array([
-            self.a * x[0] - self.b * x[0] * x[1],
-            -self.c * x[1] + self.d * x[0] * x[1]
-        ], like=x)
-
-model = PredatorPrey(a=1.5, b=1.0, c=1.0, d=3.0)
-t0, tf = 0, 100
-x0 = np.array([1.0, 1.0])
-
-print(model(t0, x0))  # Call like a function
-```
-
-### Why PyTrees Matter
 
 PyTrees are particularly valuable when:
 
