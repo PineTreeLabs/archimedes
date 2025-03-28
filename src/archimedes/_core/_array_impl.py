@@ -831,12 +831,7 @@ def ones(shape, dtype=np.float64, kind="SX"):
     >>> 
     >>> # Create MX-type ones
     >>> o3 = arc.ones(4, kind="MX")
-    >>> 
-    >>> # In functions that handle both symbolic and numeric arrays:
-    >>> def example_func(x):
-    >>>     # This will work correctly whether x is symbolic or numeric
-    >>>     return np.ones_like(x) + np.sin(x)
-    
+
     See Also
     --------
     numpy.ones : NumPy's array of ones function
@@ -982,11 +977,11 @@ def ones_like(x, dtype=None, kind=None):
     
     Notes
     -----
-    This function is the symbolic counterpart to NumPy's `ones_like`. While creating
-    a standard NumPy array of ones requires numeric inputs, this function works with
-    both symbolic and numeric arrays, preserving the symbolic nature when needed.
+    This function is the symbolic counterpart to NumPy's `ones_like`. While a standard
+    NumPy array of ones can only hold numeric values, this function works with both
+    symbolic and numeric entries, preserving the symbolic nature when needed.
     
-    When used inside a function decorated with `sym_function`, this function helps create
+    When used inside a function decorated with `compile`, this function helps create
     arrays of ones that match the input's shape, which is particularly important for
     initializing accumulators, creating masks, or setting default values.
     
@@ -1011,15 +1006,15 @@ def ones_like(x, dtype=None, kind=None):
     >>> o_mx = arc.ones_like(x_sym, kind="MX")
     >>> 
     >>> # In a function that will be traced symbolically:
-    >>> @arc.sym_function
+    >>> @arc.compile
     >>> def process_array(x):
-    >>>     # Initialize result with ones
-    >>>     # Dispatches to this function when x is a SymbolicArray
+    >>>     # Initialize result with ones. Dispatches to this function when x is a
+    >>>     # SymbolicArray
     >>>     result = np.ones_like(x)
     >>>     for i in range(x.shape[0]):
     >>>         result[i] *= x[i]
     >>>     return result
-    
+
     See Also
     --------
     numpy.ones_like : NumPy's equivalent function for numeric arrays
@@ -1036,28 +1031,70 @@ def ones_like(x, dtype=None, kind=None):
 
 
 def eye(n, dtype=np.float64, kind="SX"):
-    """Construct an identity matrix of size `n` with the given dtype.
-    
+    """
+    Construct a symbolic identity matrix of size `n` with the given dtype.
+
+    This function creates an n×n matrix with ones on the diagonal and zeros elsewhere,
+    equivalent to NumPy's eye function but returning a symbolic array suitable for
+    use in symbolic computations.
+
     Parameters
     ----------
     n : int
         Size of the identity matrix.
     dtype : numpy.dtype, optional
         Data type of the array. Default is np.float64.
-    kind : str, optional
-        Kind of the symbolic variable (`"SX"` or `"MX"`). Default is `"SX"`.
-        See CasADi documentation for details on the differences between the two.
-
+    kind : {"SX", "MX"}, optional
+        Kind of symbolic variable to create. Default is "SX".
+        - "SX": Scalar-based symbolic type. Each element has its own symbolic
+          representation. Generally more efficient for element-wise operations.
+        - "MX": Matrix-based symbolic type. The entire array is represented by 
+          a single symbolic object. Supports a broader range of operations.
+        
     Returns
     -------
     SymbolicArray
-        Identity matrix of size `n` with the given dtype and symbolic kind.
-
+        Symbolic identity matrix of shape (n, n) with the given dtype and symbolic kind.
+    
     Notes
     -----
-    Prefer using `np.eye` or `np.eye(..., like=SymbolicArray)` to directly calling
-    this function where possible, since this may handle dispatch to numeric arrays slightly
-    better.
+    The identity matrix is a square matrix with ones on the main diagonal and zeros elsewhere.
+    It is commonly used in linear algebra operations, as it represents the multiplicative
+    identity for matrices (analogous to how 1 is the multiplicative identity for scalars).
+    
+    Identity matrices are useful in symbolic computation for:
+    - Initializing transformation matrices
+    - Setting up state transition matrices
+    - Formulating constraints in optimization problems
+    - Creating masks for specific diagonal elements
+    
+    When working within a function that will be executed with both symbolic and
+    numeric arrays, prefer using `np.eye(..., like=x)` where `x` is either a
+    SymbolicArray or NumPy array, for better compatibility with numerical inputs.
+    This function will automatically be dispatched to by NumPy when `x` is symbolic.
+    
+    Examples
+    --------
+    >>> import archimedes as arc
+    >>> import numpy as np
+    >>> 
+    >>> # Create a 3×3 identity matrix
+    >>> I = arc.eye(3)
+    >>> print(I)
+    [[1, 0, 0], [0, 1, 0], [0, 0, 1]]
+    >>> 
+    >>> # Create an MX-type identity matrix
+    >>> I_mx = arc.eye(4, kind="MX")
+    >>> 
+    >>> # Use in matrix operations
+    >>> x = arc.sym("x", shape=(3, 3))
+    >>> identity_transform = I @ x  # Equivalent to x
+
+    See Also
+    --------
+    numpy.eye : NumPy's identity matrix function
+    archimedes.ones : Create an array of ones
+    archimedes.zeros : Create an array of zeros
     """
     X = SYM_KINDS[kind]
     return SymbolicArray(X.eye(n), dtype=dtype, shape=(n, n))
