@@ -1,6 +1,6 @@
 """Autodiff transformations"""
 
-from ._function import SymbolicFunction
+from ._function import FunctionCache
 from . import SymbolicArray
 
 
@@ -19,8 +19,8 @@ def grad(
     """
     # TODO: expand docstring
 
-    if not isinstance(func, SymbolicFunction):
-        func = SymbolicFunction(
+    if not isinstance(func, FunctionCache):
+        func = FunctionCache(
             func,
             static_argnums=static_argnums,
             static_argnames=static_argnames,
@@ -37,7 +37,7 @@ def grad(
 
     # Function to evaluate the gradient using the underlying CasADi function,
     # assuming that the arguments are already symbolic arrays. This can then
-    # be used to create the gradient SymbolicFunction.
+    # be used to create the gradient FunctionCache.
     def _grad(*args):
         # First make sure that the primal function has been compiled for these
         # argument types
@@ -60,7 +60,7 @@ def grad(
 
     _grad.__name__ = name
 
-    return SymbolicFunction(
+    return FunctionCache(
         _grad,
         arg_names=func.arg_names,
         static_argnums=func.static_argnums,
@@ -84,8 +84,8 @@ def jac(
     # TODO: expand docstring
     # TODO: Support multiple returns?
 
-    if not isinstance(func, SymbolicFunction):
-        func = SymbolicFunction(
+    if not isinstance(func, FunctionCache):
+        func = FunctionCache(
             func,
             static_argnums=static_argnums,
             static_argnames=static_argnames,
@@ -106,7 +106,7 @@ def jac(
 
     # Function to evaluate the Jacobian using the underlying CasADi function,
     # assuming that the arguments are already symbolic arrays. This can then
-    # be used to create the Jacobian SymbolicFunction.
+    # be used to create the Jacobian FunctionCache.
     def _jac(*args):
         # First make sure that the primal function has been compiled for these
         # argument types
@@ -123,7 +123,7 @@ def jac(
 
     _jac.__name__ = name
 
-    return SymbolicFunction(
+    return FunctionCache(
         _jac,
         arg_names=func.arg_names,
         static_argnums=func.static_argnums,
@@ -145,8 +145,8 @@ def hess(
     # TODO: expand docstring
     # TODO: Support multiple returns?
     
-    if not isinstance(func, SymbolicFunction):
-        func = SymbolicFunction(
+    if not isinstance(func, FunctionCache):
+        func = FunctionCache(
             func,
             static_argnums=static_argnums,
             static_argnames=static_argnames,
@@ -182,7 +182,7 @@ def hess(
 
     _hess.__name__ = name
 
-    return SymbolicFunction(
+    return FunctionCache(
         _hess,
         arg_names=func.arg_names,
         static_argnums=func.static_argnums,
@@ -210,8 +210,8 @@ def jvp(
     # is computed symbolically up front and can then be evaluated efficiently for
     # every primal/tangent pair.
 
-    if not isinstance(func, SymbolicFunction):
-        func = SymbolicFunction(
+    if not isinstance(func, FunctionCache):
+        func = FunctionCache(
             func,
             static_argnums=static_argnums,
             static_argnames=static_argnames,
@@ -219,7 +219,7 @@ def jvp(
 
     # Function to evaluate the JVP using the underlying CasADi function,
     # assuming that the arguments are already symbolic arrays. This can then
-    # be used to create the JVP SymbolicFunction.
+    # be used to create the JVP FunctionCache.
     def _jvp(x, v):
         print(f"primals: {x}, {type(x)}, {x.shape}")
 
@@ -243,7 +243,7 @@ def jvp(
     primal_name = func_name + "_primal"
     tangent_name = func_name + "_tangent"
 
-    return SymbolicFunction(
+    return FunctionCache(
         _jvp,
         arg_names=[primal_name, tangent_name],
         static_argnums=func.static_argnums,
@@ -272,8 +272,8 @@ def vjp(
     # symbolically up front and can then be evaluated efficiently for every
     # primal/cotangent pair.
 
-    if not isinstance(func, SymbolicFunction):
-        func = SymbolicFunction(
+    if not isinstance(func, FunctionCache):
+        func = FunctionCache(
             func,
             static_argnums=static_argnums,
             static_argnames=static_argnames,
@@ -316,7 +316,7 @@ def vjp(
     if no_ret_names:
         func.ret_names = None
 
-    return SymbolicFunction(
+    return FunctionCache(
         _vjp,
         arg_names=func.arg_names + cotangent_names,
         static_argnums=func.static_argnums,

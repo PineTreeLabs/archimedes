@@ -15,8 +15,8 @@ Archimedes is based on three core concepts:
 Archimedes provides a seamless interface between symbolic and numeric computation by wrapping CasADi's symbolic engine in a NumPy-compatible array API. This approach, combined with JAX-style composable function transformations, enables a powerful workflow:
 
 1. Write functions using standard NumPy operations
-2. Convert these functions into "symbolic functions" with a simple decorator
-3. When called, these symbolic functions create an efficient computational graph in compiled C++
+2. Convert these functions into "compiled" functions with a simple decorator
+3. When called, these functions create an efficient computational graph in compiled C++
 4. This computational graph can be used for fast execution, automatic differentiation, and C code generation
 
 Consider this simple example:
@@ -29,10 +29,10 @@ import archimedes as arc
 def f(x, y):
     return x + np.sin(y)
 
-# Convert it into a "symbolic" function
-f_sym = arc.sym_function(f)
+# Convert it into a "compiled" function
+f_sym = arc.compile(f)
 
-# Call the symbolic function with standard arrays
+# Call the compiled function with standard arrays
 z = f_sym(1.0, np.array([2.0, 3.0]))
 ```
 
@@ -65,11 +65,11 @@ Obviously, each approach has its advantages.
 Interpreted code is easy to write and highly flexible, while compiled code offers hard-to-beat performance.
 Archimedes aims to strike a balance between these two, targeting both ease of use and high performance for the types of computations often used in numerical modeling, simulation, and optimization.
 
-### How Symbolic Functions Work
+### How Compilation Works
 
 <!-- TODO: Add a figure to represent this graphically -->
 
-When a symbolic function is called with specific arguments, Archimedes performs three key steps:
+When a "compiled" function is called with specific arguments, Archimedes performs three key steps:
 
 1. **Symbolic Replacement**: Arguments are replaced with equivalent symbolic variables having the same shape and dtype.  Here, `1.0` is replaced by a symbolic scalar, and `[2.0, 3.0]` is replaced by an array with shape `(2,)`.
 
@@ -97,7 +97,7 @@ For example:
 ```python
 import archimedes as arc
 
-@arc.sym_function
+@arc.compile
 def f(x):
     return 100 * (x[1] - x[0] ** 2) ** 2 + (1 - x[0]) ** 2
 
@@ -105,7 +105,7 @@ df = arc.grad(f)  # Transform the computational graph
 df(np.array([1.0, 1.0]))  # Evaluate numerically
 ```
 
-The `arc.grad(f)` transformation constructs a new symbolic function that computes the exact gradient of the original function. This provides numerically exact derivatives computed in C++, avoiding the slow and potentially unstable finite differencing methods used by default in MATLAB and Python.
+The `arc.grad(f)` transformation constructs a new compiled function that computes the gradient of the original function. This provides numerically exact derivatives computed in C++, avoiding the slow and potentially unstable finite differencing methods used by default in MATLAB and Python.
 
 ### Implicit Functions
 
@@ -115,7 +115,7 @@ Engineering problems frequently involve implicit functions (where a relationship
 import numpy as np
 import archimedes as arc
 
-@arc.sym_function
+@arc.compile
 def f(x, y):
     return x ** 2 + x * np.sin(y) - y
 ```

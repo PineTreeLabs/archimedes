@@ -1,7 +1,7 @@
 """Implementation of a nonlinear prediction error method"""
 import numpy as np
 
-from archimedes import tree, scan, sym_function
+from archimedes import tree, scan, compile
 from archimedes.experimental.state_estimation import ekf_step, ukf_step
 
 
@@ -39,9 +39,9 @@ def make_pem(
     if P0 is None:
         P0 = np.eye(nx)
 
-    @sym_function(kind="MX")
+    @compile(kind="MX")
     def kf_fwd(x0, args):
-        @sym_function(kind="MX")
+        @compile(kind="MX")
         def scan_fn(carry_flat, input):
             t, z = input[0], input[1:]
             x, P, args = unravel_carry(carry_flat)

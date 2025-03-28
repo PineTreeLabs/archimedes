@@ -1,7 +1,7 @@
 import pytest
 import numpy as np
 
-from archimedes._core import array, sym, sym_function, SymbolicArray
+from archimedes._core import array, sym, compile, SymbolicArray
 from archimedes._optimization import minimize, root, implicit
 from archimedes.error import ShapeDtypeError
 
@@ -96,8 +96,8 @@ class TestMinimize:
         def g(a, x):
             return a * x
         
-        f = sym_function(f, static_argnames=["a"])
-        g = sym_function(g)
+        f = compile(f, static_argnames=["a"])
+        g = compile(g)
 
         with pytest.raises(ValueError):
             minimize(f, constr=g, x0=1.0)

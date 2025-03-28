@@ -5,7 +5,7 @@ import casadi as cs
 
 from archimedes import (
     sym,
-    sym_function,
+    compile,
     jac,
     grad,
     hess,
@@ -45,7 +45,7 @@ class TestGrad:
         # Test evaluating the gradient with respect to multiple inputs.
         # This will also evaluate the gradient function numerically (though it
         # can also be evaluated symbolically, as in test_grad).
-        @sym_function
+        @compile
         def f(x, y):
             return x.T @ y
 
@@ -66,7 +66,7 @@ class TestGrad:
         def f(a, x):
             return np.sin(a * x[0]) * np.cos(x[1])
 
-        f_sym = sym_function(f, static_argnames=("a",))
+        f_sym = compile(f, static_argnames=("a",))
         grad_f = grad(f_sym, argnums=1)
 
         a = 2.0
@@ -137,12 +137,12 @@ class TestJac:
             return a * x
 
         # Test with no static args, just with specifying the second argument
-        f_sym = sym_function(f)
+        f_sym = compile(f)
         df = jac(f_sym, argnums=1)
         _test(df)
 
         # Test with a static argument specified by name
-        f_sym = sym_function(f, static_argnames=("a",))
+        f_sym = compile(f, static_argnames=("a",))
         df = jac(f_sym, argnums=1)
         _test(df)
 
@@ -194,7 +194,7 @@ class TestHess:
         def f(a, x):
             return a * x.T @ x
         
-        f = sym_function(f, static_argnames=("a",))
+        f = compile(f, static_argnames=("a",))
         with pytest.raises(ValueError):
             hess(f, argnums=0)
 
@@ -242,7 +242,7 @@ class TestJVP:
         m, n = 3, 2
         A = np.random.randn(m, n)
 
-        @sym_function
+        @compile
         def f(x):
             return A @ x
 
@@ -291,7 +291,7 @@ class TestVJP:
         m, n = 3, 2
         A = np.random.randn(m, n)
 
-        @sym_function
+        @compile
         def f(x):
             return A @ x
 

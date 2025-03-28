@@ -1,7 +1,7 @@
 import pytest
 import numpy as np
 
-from archimedes._core import sym, sym_function, SymbolicFunction, SymbolicArray
+from archimedes._core import sym, compile, FunctionCache, SymbolicArray
 
 
 def f(x):
@@ -11,14 +11,14 @@ def f(x):
 
 class TestSymFunction:
     def test_construction(self):
-        f_sym = sym_function(f)
-        assert isinstance(f_sym, SymbolicFunction)
+        f_sym = compile(f)
+        assert isinstance(f_sym, FunctionCache)
         assert f_sym.name == "f"
         assert f_sym.arg_names == ["x"]
         assert f_sym._compiled == {}
 
     def test_eval_numeric(self):
-        f_sym = sym_function(f)
+        f_sym = compile(f)
 
         # Scalar
         x = 2
@@ -36,7 +36,7 @@ class TestSymFunction:
             assert y.shape == x.shape
 
     def test_eval_symbolic(self):
-        f_sym = sym_function(f)
+        f_sym = compile(f)
 
         x = sym("x", shape=(), dtype=np.int32)
         y = f_sym(x)
@@ -49,7 +49,7 @@ class TestSymFunction:
         def f2(x):
             return x**2, x + 1
 
-        f_sym = sym_function(f2)
+        f_sym = compile(f2)
 
         x = np.array(2.0, dtype=np.float64)
         y1, y2 = f_sym(x)
@@ -63,7 +63,7 @@ class TestSymFunction:
         assert y2.dtype == x.dtype
 
     def test_pytree_returns(self):
-        @sym_function
+        @compile
         def g(x, y):
             return (x, y), 2 * x
 
@@ -78,8 +78,8 @@ class TestSymFunction:
 
         # Create functions specifying static data both by number and by name
         for f_sym in (
-            sym_function(f2, static_argnums=(0,)),
-            sym_function(f2, static_argnames=("a",)),
+            compile(f2, static_argnums=(0,)),
+            compile(f2, static_argnames=("a",)),
         ):
             # Nothing compiled yet
             assert len(f_sym._compiled) == 0
@@ -103,7 +103,7 @@ class TestSymFunction:
         def f(x, a=a0):
             return a * x
         
-        f_sym = sym_function(f)
+        f_sym = compile(f)
         x = 3.0
 
         # Call without specifying `a`
@@ -125,7 +125,7 @@ class TestSymFunction:
 
     def test_numeric_returns(self):
         # Should be able to return both numeric and symbolic arrays
-        @sym_function
+        @compile
         def f(x):
             return x, np.array([3.0, 4.0]), True, 3
         
@@ -147,21 +147,21 @@ class TestSymFunction:
             return x + sum(args)
         
         with pytest.raises(ValueError):
-            sym_function(f)
+            compile(f)
 
         # Specify both static_argnums and static_argnames
         def f(a, x):
             return a * x
         
         with pytest.raises(ValueError):
-            sym_function(f, static_argnums=(0,), static_argnames=("a",))
+            compile(f, static_argnums=(0,), static_argnames=("a",))
 
         # Static arg not in signature
         with pytest.raises(ValueError):
-            sym_function(f, static_argnames=("b",))
+            compile(f, static_argnames=("b",))
 
         # Call with incorrect number of arguments (raised by `inspect`)
-        f = sym_function(f, static_argnames=("a",))
+        f = compile(f, static_argnames=("a",))
         with pytest.raises(TypeError):
             f(2.0)
 
@@ -170,7 +170,7 @@ class TestSymFunction:
             return "abc"
         
         with pytest.raises(TypeError):
-            sym_function(f)(0.0)
+            compile(f)(0.0)
 
         # Return variable number of values
         def f(x, flag):
@@ -179,7 +179,7 @@ class TestSymFunction:
             else:
                 return 2 * x, 3 * x
         
-        f = sym_function(f, static_argnames=("flag",))
+        f = compile(f, static_argnames=("flag",))
         f(2.0, True)  # OK the first time
         with pytest.raises(ValueError):
             f(2.0, False)  # Fail the second time
@@ -188,7 +188,7 @@ class TestSymFunction:
         def f(a, x):
             return x
 
-        f = sym_function(f, static_argnames=("a",))
+        f = compile(f, static_argnames=("a",))
         with pytest.raises(ValueError):
             f([1.0], 2.0)
 
@@ -197,7 +197,7 @@ class TestSymFunction:
         # the original value (because dummy args are created during compilation)
         x = np.zeros((2, 3))
 
-        @sym_function
+        @compile
         def f(x):
             x[0] = x[0] + 1.0
             return x

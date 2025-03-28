@@ -4,10 +4,10 @@ import casadi as cs
 import numpy as np
 
 from ._array_impl import array, SymbolicArray, type_inference, _as_casadi_array
-from ._function import SymbolicFunction
+from ._function import FunctionCache
 
 
-# Wrap as a SymbolicFunction with an input for each grid dimension
+# Wrap as a FunctionCache with an input for each grid dimension
 def _eval_interpolant(x, cs_interp, grid, data, name):
     x = map(array, x)  # Convert any lists, tuples, etc to arrays
     x = np.atleast_1d(*x)
@@ -138,7 +138,7 @@ def interpolant(
 
     _interp.__name__ = name
 
-    return SymbolicFunction(
+    return FunctionCache(
         _interp,
         arg_names=arg_names,
         ret_names=[ret_name],

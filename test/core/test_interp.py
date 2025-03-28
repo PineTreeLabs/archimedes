@@ -5,7 +5,7 @@ import numpy as np
 from scipy.interpolate import RectBivariateSpline
 
 import archimedes as arc
-from archimedes._core import SymbolicArray, sym, sym_function
+from archimedes._core import SymbolicArray, sym, compile
 
 
 class TestNumPyInterp:
@@ -13,7 +13,7 @@ class TestNumPyInterp:
         xp = np.linspace(1, 6, 6)
         fp = np.array([-1, -1, -2, -3, 0, 2])
 
-        @sym_function(kind="MX")
+        @compile(kind="MX")
         def f(x):
             return np.interp(x, xp, fp)
 

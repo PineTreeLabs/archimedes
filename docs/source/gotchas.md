@@ -8,7 +8,7 @@ This page is modeled after ["🔪 JAX - The Sharp Bits 🔪"](https://docs.jax.d
 
 ## 🔪 Pure Functions
 
-Archimedes transformations and symbolic functions are designed to work only with functions that are *functionally pure*: all input data is passed through the function parameters, and all results are returned through the function return values.
+Archimedes transformations and compilation is designed to work only with functions that are *pure*: all input data is passed through the function parameters, and all results are returned through the function return values.
 
 ```python
 # NOT recommended: impure function that uses a global variable
@@ -48,7 +48,7 @@ Any entries with `NotImplemented` values are currently not supported.
 
 ## 🔪 Matrix- vs. scalar-valued symbolics
 
-When creating symbolic functions, note that there are two basic symbolic types inherited from CasADi: `SX` and `MX`.
+When compiling functions, note that there are two basic symbolic types inherited from CasADi: `SX` and `MX`.
 `SX` symbolics create symbolic arrays as a collection of symbolic scalars, while `MX` directly create a single symbol to represent an array.
 There are performance and flexibility tradeoffs between the two, and trying to mix them can be error prone.
 
@@ -62,7 +62,8 @@ Archimedes allows for 0-D, 1-D, and 2-D arrays to mimic NumPy behavior, but high
 
 ## 🔪 Array Creation
 
-One of the most common pitfalls in Archimedes involves creating arrays within symbolic functions. Standard NumPy array creation doesn't automatically work with symbolic arrays:
+One of the most common pitfalls in Archimedes involves creating arrays within compiled functions.
+This is because of the step where the function arguments are replaced with symbolic arrays; standard NumPy array creation doesn't automatically work with these symbolic arrays:
 
 ```python
 # This will NOT work with symbolic inputs:
@@ -118,7 +119,7 @@ Python's standard control flow constructs like `if/else` and loops with dynamic 
 
 ```python
 # This will NOT work correctly when x is symbolic
-@arc.sym_function
+@arc.compile
 def bad_conditional(x):
     if x > 0:  # Can't evaluate symbolic expression in boolean context
         return np.sin(x)
@@ -129,7 +130,7 @@ def bad_conditional(x):
 Instead, use `np.where` for conditionals:
 
 ```python
-@arc.sym_function
+@arc.compile
 def good_conditional(x):
     return np.where(x > 0, np.sin(x), np.cos(x))
 ```
@@ -140,7 +141,7 @@ For loops:
 
 ```python
 # This will NOT work with symbolic input
-@arc.sym_function
+@arc.compile
 def bad_loop(x):
     y = 0
     for i in range(sum(x)):  # sum(x) is symbolic, can't be used as loop bound
@@ -148,7 +149,7 @@ def bad_loop(x):
     return y
 
 # This will work
-@arc.sym_function
+@arc.compile
 def good_loop(x):
     y = 0
     for i in range(x.shape[0]):  # Fixed shape is fine
@@ -163,7 +164,7 @@ See the [control flow](control-flow)  section of Getting Started for a simple ex
 Some function arguments shouldn't be traced symbolically, but instead treated as fixed configuration parameters. Archimedes provides a way to specify these:
 
 ```python
-@arc.sym_function(static_argnames=("apply_bc",))
+@arc.compile(static_argnames=("apply_bc",))
 def solve_with_optional_bc(A, b, apply_bc=True):
     if apply_bc:  # This works because apply_bc is static
         b[[0, -1]] = 0.0  # Apply boundary conditions
@@ -174,10 +175,10 @@ When a function with static arguments is called, it will be retraced whenever th
 
 ## 🔪 Function Caching
 
-Symbolic functions in Archimedes are cached based on the shapes and dtypes of their arguments, as well as on the values of static parameters. This means the first call to a function with a specific argument shape might be slower (due to tracing), but subsequent calls with the same shape will be faster.
+"Compiled" functions in Archimedes are cached based on the shapes and dtypes of their arguments, as well as on the values of static parameters. This means the first call to a function with a specific argument shape might be slower (due to tracing), but subsequent calls with the same shape will be faster.
 
 ```python
-@arc.sym_function
+@arc.compile
 def f(x):
     return np.sin(x**2)
 
@@ -199,12 +200,12 @@ numpy_array = np.zeros(3)
 numpy_array[0] = 1.0  # Original array is modified
 
 # In Archimedes - creates new symbolic expression
-@arc.sym_function
+@arc.compile
 def f(x):
     x[0] = 1.0  # This doesn't actually modify x in-place when symbolic
     return x    # Instead, it creates a new expression
 
-# When using arc.sym_function, this becomes pure even if the Python code isn't!
+# When using arc.compile, this becomes pure even if the Python code isn't!
 x = np.zeros(3)
 y = f(x)
 print(x)  # [0., 0., 0.] - original is unchanged
@@ -222,10 +223,10 @@ Specifically, it is a good idea when implementing a function like this to always
 Debugging symbolic code can be challenging because:
 1. Error messages may refer to CasADi internals rather than your code
 2. Standard Python debuggers can't step through symbolically evaluated code
-3. `print` statements in symbolic functions won't execute at runtime
+3. `print` statements in compiled functions won't execute at runtime
 
 ```python
-@arc.sym_function
+@arc.compile
 def f(x):
     print("This won't print during symbolic tracing")  # Won't execute during tracing
     y = np.sin(x)
@@ -240,11 +241,11 @@ print("Output:", y)
 
 Some tips for debugging:
 - Print array shapes and dtypes instead of values at trace time
-- Add trace/debug prints before and after symbolic function calls
+- Add trace/debug prints before and after compiled function calls
 - Split complex operations into smaller, testable pieces
-- Test with concrete numeric values before using symbolic evaluation
+- Test with concrete numeric values before compiling
 
-A reliable workflow is to write small functions in pure NumPy first, validate the NumPy code, and then add the `sym_function` decorator once you're confident in the results.
+A reliable workflow is to write small functions in pure NumPy first, validate the NumPy code, and then add the `compile` decorator once you're confident in the results.
 
 :::{note}
 Aside from specific cases like [in-place operations](#in-place-operations), Archimedes and NumPy results should be consistent.
@@ -257,7 +258,7 @@ If you are seeing unexpected divergences, **please file a bug report.**
 
 While Archimedes tries to make symbolic and numeric functions behave identically, there are some unavoidable differences:
 
-1. Symbolic functions can't use arbitrary Python objects as inputs - stick to numeric values and arrays, or PyTree data structures that Archimedes knows how to work with
+1. Compiled functions can't use arbitrary Python objects as inputs - stick to numeric values and arrays, or PyTree data structures that Archimedes knows how to work with
 2. Some NumPy functions may have subtly different behavior in symbolic vs. numeric contexts (e.g. [in-place operations](#in-place-operations))
 3. Not all NumPy functionality is available symbolically.  **If you find a missing function you need, feel free to file a feature request (or bump an existing one)**.
 
@@ -273,7 +274,7 @@ def complex_function(x, callback):
     return result
 
 # Works IF the callback is hashable
-traced_function = arc.sym_function(complex_function, static_argnames=("callback",))
+traced_function = arc.compile(complex_function, static_argnames=("callback",))
 ```
 
 ## 🔪 PyTree Handling
@@ -296,8 +297,6 @@ restored = unflatten(modified)  # This works because shape is preserved
 #larger = np.concatenate([flat, np.array([4.0])])
 #broken = unflatten(larger)  # Error: incompatible flat array shape
 ```
-
-Custom PyTree nodes should be well-tested with symbolic functions to ensure proper behavior.
 
 ## 🔪 ODE Solving Intricacies
 

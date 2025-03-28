@@ -11,7 +11,7 @@ from ._array_function import SUPPORTED_FUNCTIONS
 
 def __array_ufunc__(self: SymbolicArray, ufunc, method, *inputs, **kwargs):
     if method == "__call__":
-        # Try to dispatch to the equivalent wrapped symbolic function
+        # Try to dispatch to the equivalent wrapped compiled function
         if (
             ufunc.__name__ not in SUPPORTED_UFUNCS
             or SUPPORTED_UFUNCS[ufunc.__name__] is NotImplemented

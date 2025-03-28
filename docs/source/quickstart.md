@@ -38,7 +38,7 @@ import numpy as np
 import archimedes as arc
 
 # Automatically convert NumPy code to efficient C++ with symbolic tracing
-@arc.sym_function
+@arc.compile
 def rotate(x, theta):
     # Rotate the vector x through the angle theta
     R = np.array([

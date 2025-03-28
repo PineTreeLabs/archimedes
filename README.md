@@ -184,7 +184,7 @@ def f5(x):
 Some familiar control flow constructs in Python are not supported in symbolic evaluations.  For example, the following will fail:
 
 ```python
-@arc.sym_function
+@arc.compile
 def f(x):
     if x > 0:
         return x
@@ -195,7 +195,7 @@ def f(x):
 The reason for this is that `x > 0` is a symbolic expression, and symbolic expressions can't be evaluated in a boolean context.  An easy workaround for this is to use `np.where` to implement a conditional:
 
 ```python
-@arc.sym_function
+@arc.compile
 def f(x):
     return np.where(x > 0, x, 0)
 ```
@@ -203,7 +203,7 @@ def f(x):
 Similarly, loop bounds must be "static" - that is, they can't be symbolic expressions.  For example, the following will fail:
 
 ```python
-@arc.sym_function
+@arc.compile
 def f(x):
     y = 0
     for i in range(sum(x)):
@@ -215,7 +215,7 @@ As with the conditional, `sum(x)` is a symbolic expression that can't be evaluat
 However, array sizes and other constants can be used in loop bounds.  For example, the following will work:
 
 ```python
-@arc.sym_function
+@arc.compile
 def f(x):
     y = 0
     for i in range(x.shape[0]):
@@ -230,7 +230,7 @@ For repeated evaluations of a function, it is recommended to use `arc.scan` to e
 Conversion back and forth between `casadi.DM` and `np.ndarray` is expensive (see ODE example).  For cases where the call will happen many times, conversion should be avoided via CasADi symbolic primitives like `integrator`.
 
 
-### Symbolic function evaluation
+### Function signatures
 
 Keyword arguments are supported, but all function arguments must be allowed to be either positional or keyword.  In addition, all arguments must be defined explicitly.  That is, the following signatures are valid:
 
@@ -238,12 +238,12 @@ Keyword arguments are supported, but all function arguments must be allowed to b
 def f1(x):
     return np.sin(x)
 
-sym_function(f1)  # OK, positional args are supported
+compile(f1)  # OK, positional args are supported
 
 def f2(x, a=2.0):
     return np.sin(a * x)
 
-sym_function(f2)  # OK, kwargs are supported
+compile(f2)  # OK, kwargs are supported
 ```
 
 but positional-only, keyword-only, varargs, etc. are not allowed.  The following signatures are therefore invalid:
@@ -252,22 +252,22 @@ but positional-only, keyword-only, varargs, etc. are not allowed.  The following
 def f3(x, /):
     return np.sin(x)
 
-sym_function(f3)  # Positional-only not allowed
+compile(f3)  # Positional-only not allowed
 
 def f4(x, *, a=2.0):
     return np.sin(a * x)
 
-sym_function(f4)  # Keyword-only not allowed
+compile(f4)  # Keyword-only not allowed
 
 def f6(x, *params):
     return sum(params) * x
 
-sym_function(f5)  # Variadic args not allowed
+compile(f5)  # Variadic args not allowed
 
 def f6(x, **kwargs):
     return kwargs["A"] * np.sin(kwargs["f"] * x)
 
-sym_function(f6)  # Variadic kwargs not allowed
+compile(f6)  # Variadic kwargs not allowed
 ```
 
 Note that this requirement only applies to the top-level function that is evaluated symbolically.  So for example, the `**kwargs` example `f6` above could be called from another function:
@@ -276,7 +276,7 @@ Note that this requirement only applies to the top-level function that is evalua
 def g(x, A=2.0, f=np.pi):
     return f6(x, A=A, f=f)
 
-sym_function(g)   # OK, all arguments are defined explicitly at top level
+compile(g)   # OK, all arguments are defined explicitly at top level
 ```
 
 <!-- 
