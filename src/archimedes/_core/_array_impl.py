@@ -362,28 +362,81 @@ def sym_like(x, name, dtype=None, kind="SX") -> SymbolicArray:
     return sym(name, x.shape, dtype=dtype or x.dtype, kind=kind)
 
 
-
 def array(x, dtype=None) -> ArrayLike:
-    """Create an array.
+    """
+    Create an array from various input types, supporting both numeric and symbolic computation.
+    
+    This function serves as Archimedes' array creation mechanism, handling both numeric and 
+    symbolic inputs. It creates the appropriate array type (NumPy or SymbolicArray) based on 
+    the input data.
     
     Parameters
     ----------
     x : array_like
-        An array-like object, either a NumPy `ndarray`, a `SymbolicArray`,
-        a CasADi symbolic type (not recommended to use directly), or a list or
-        list-of-lists of scalars.
-    dtype : str, optional
-        The dtype of the array. If not specified, the dtype is inferred from `x`.
-
+        An array-like object, which can be:
+        - NumPy ndarray
+        - SymbolicArray
+        - CasADi symbolic type (SX or MX)
+        - List or nested list of scalars
+        - Scalar value
+    dtype : str or numpy.dtype, optional
+        The desired data type for the array. If not specified, the dtype is inferred from `x`.
+    
     Returns
     -------
-    array : numpy.ndarray | SymbolicArray
-
+    array : numpy.ndarray or SymbolicArray
+        If the input contains symbolic elements, returns a SymbolicArray.
+        Otherwise, returns a NumPy ndarray.
+    
     Notes
     -----
     Array creation using the NumPy dispatch mechanism (`np.array(..., like=...)`) is
-    recommended over calling `array(...)` directly.  This supports a wider range of
-    input types and should better support numerical input types.
+    recommended over calling `array(...)` directly. The dispatch mechanism supports a wider 
+    range of input types and better handles numeric input types.
+    
+    When working with symbolic computation, this function ensures that array creation follows
+    the same patterns as NumPy, allowing for seamless transitions between symbolic and numeric
+    computation.
+    
+    This function currently supports:
+    - Creating arrays from existing arrays (preserving type)
+    - Creating arrays from lists of scalars (1D arrays)
+    - Creating arrays from lists of lists (2D arrays)
+    
+    Limitations and edge cases:
+    - Higher-dimensional arrays (>2D) must be created incrementally
+    - Creating arrays with inconsistent dimensions will raise a ValueError
+    - Complex-valued arrays may have limited symbolic operation support
+    
+    Examples
+    --------
+    >>> import numpy as np
+    >>> import archimedes as arc
+    >>> 
+    >>> # Basic numeric array creation
+    >>> arc.array([1.0, 2.0, 3.0])
+    array([1., 2., 3.])
+    >>> 
+    >>> # Creating a symbolic array
+    >>> x = arc.sym("x", 3)  # Create a symbolic variable
+    >>> arc.array([x[0], 2.0, x[2]])  # Mixed symbolic/numeric content
+    [x_0, 2, x_2]
+    >>> 
+    >>> # 2D array from nested lists
+    >>> arc.array([[1.0, 2.0], [3.0, 4.0]])
+    array([[1., 2.],
+           [3., 4.]])
+    >>>
+    >>> # Using NumPy dispatch (recommended approach)
+    >>> np.array([x[0], 2.0, x[2]], like=x_sym)  # Creates a SymbolicArray
+    [x_0, 2, x_2]
+    
+    See Also
+    --------
+    numpy.array : The NumPy array creation function
+    archimedes.zeros : Create an array of zeros
+    archimedes.ones : Create an array of ones
+    archimedes.sym : Create a symbolic variable
     """
 
     # Case 1. x is already an array
