@@ -769,7 +769,6 @@ def zeros(shape, dtype=np.float64, sparse=True, kind="SX") -> SymbolicArray:
     numpy.zeros : NumPy's array of zeros function
     archimedes.zeros_like : Create an array of zeros with shape and dtype of an input array
     archimedes.ones : Create an array of ones
-    archimedes.empty : Create an uninitialized array
     archimedes.array : Create an array from data
     """
     X = SYM_KINDS[kind]
@@ -806,23 +805,98 @@ def ones(shape, dtype=np.float64, kind="SX"):
 
 
 def zeros_like(x, dtype=None, sparse=True, kind=None):
-    """Construct an array of zeros with the same shape and dtype as `x`.
+    """
+    Create a symbolic array of zeros with the same shape and dtype as an input array.
+
+    This function constructs a symbolic array filled with zeros, matching the dimensions
+    and data type of an existing array. It's particularly useful for creating compatible
+    zero arrays in functions that need to work with both symbolic and numeric inputs.
 
     Parameters
     ----------
+    x : array_like
+        The array whose shape and dtype will be used. Can be a NumPy ndarray, 
+        SymbolicArray, or any array-like object that can be converted to an array.
     dtype : numpy.dtype, optional
-        Data type of the array. Default is np.float64.
+        Data type of the new array. If None (default), uses the dtype of `x`.
     sparse : bool, optional
-        If `True`, then the array will be a sparse array with "structural"
-        zeros.  Otherwise it will be "dense" and full of numerical zeros.
-    kind : str, optional
-        Kind of the symbolic variable (`"SX"` or `"MX"`). Default is `"SX"`.
-        See CasADi documentation for details on the differences between the two.
-
+        If True (default), creates "structural" zeros, which are symbolic
+        placeholders rather than actual numeric values. These are more efficient
+        for building computational graphs.
+        If False, creates numerical zero values.
+    kind : {"SX", "MX"} or None, optional
+        Kind of symbolic variable to create. If None (default), uses the kind
+        of `x` if it's a SymbolicArray, otherwise uses "SX".
+        - "SX": Scalar-based symbolic type. Each element has its own symbolic
+          representation. Generally more efficient for element-wise operations.
+        - "MX": Matrix-based symbolic type. The entire array is represented by 
+          a single symbolic object. Supports a broader range of operations.
+        
     Returns
     -------
     SymbolicArray
-        Array of zeros with the given dtype, and symbolic kind, and with shape of `x`.
+        Symbolic array of zeros with the same shape as `x`, and with the
+        specified dtype and symbolic kind.
+    
+    Notes
+    -----
+    This function is the symbolic counterpart to NumPy's `zeros_like`. While creating
+    a standard NumPy array of zeros requires numeric inputs, this function works with
+    both symbolic and numeric arrays, preserving the symbolic nature when needed.
+
+    When used inside a function decorated with `compile`, this function helps create
+    temporary arrays that match the input's shape, which is particularly important for
+    maintaining compatibility between symbolic and numeric execution paths.
+
+    The `sparse` parameter determines whether the zeros are "structural" (symbolic
+    placeholders) or actual numeric zeros, which can affect memory usage and computational
+    efficiency.
+
+    When the array is not sparse, it is preferred to use `np.zeros_like` or
+    `np.zeros(..., like=x)`, where `x` is either a SymbolicArray or NumPy array. This can
+    provide better compatibility across both numeric and symbolic execution paths.
+    The exception is when you specifically need sparse/structural zeros, which are only
+    available through this direct function call with `sparse=True`.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> import archimedes as arc
+    >>> 
+    >>> # With a symbolic input array
+    >>> x_sym = arc.sym("x", shape=(2, 3))
+    >>> z_sym = arc.zeros_like(x_sym)
+    >>> print(z_sym.shape)
+    (2, 3)
+    >>> 
+    >>> # With a numeric input array
+    >>> x_num = np.array([[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]])
+    >>> z_num = arc.zeros_like(x_num)
+    >>> print(z_num.shape)
+    (3, 2)
+    >>> 
+    >>> # Creating numerical zeros instead of structural zeros
+    >>> z_dense = arc.zeros_like(x_sym, sparse=False)
+    >>> 
+    >>> # Changing the kind of symbolic variable
+    >>> z_mx = arc.zeros_like(x_sym, kind="MX")
+    >>> 
+    >>> # In a function that will be traced symbolically:
+    >>> @arc.compile
+    >>> def process_array(x):
+    >>>     # Create a result array with same shape as input
+    >>>     # Dispatches to this function when x is a SymbolicArray
+    >>>     result = np.zeros_like(x)
+    >>>     for i in range(x.shape[0]):
+    >>>         result[i] = x[i] ** 2
+    >>>     return result
+    
+    See Also
+    --------
+    numpy.zeros_like : NumPy's equivalent function for numeric arrays
+    archimedes.zeros : Create a symbolic array of zeros with specified shape
+    archimedes.ones_like : Create a symbolic array of ones with same shape as input
+    archimedes.array : Create an array from data
     """
     x = array(x)  # Should be SymbolicArray or ndarray
     if kind is None and isinstance(x, SymbolicArray):
