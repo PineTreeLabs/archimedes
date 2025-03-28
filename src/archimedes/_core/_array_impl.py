@@ -418,24 +418,77 @@ def sym(name, shape=None, dtype=np.float64, kind="SX") -> SymbolicArray:
 
 
 def sym_like(x, name, dtype=None, kind="SX") -> SymbolicArray:
-    """Create a symbolic array similar to an existing array
-    
+    """
+    Create a symbolic array with the same shape and dtype as an existing array.
+
     Parameters
     ----------
     x : array_like
-        Array to copy shape and dtype from.
+        Array to copy shape and dtype from. Can be a NumPy ndarray, SymbolicArray, 
+        or any array-like object that can be converted to an ndarray.
     name : str
-        Name of the symbolic variable.
+        Name of the symbolic variable. This name is used for display purposes and 
+        debugging, and appears in symbolic expression representations.
     dtype : numpy.dtype, optional
-        Data type of the array. Default is the dtype of `x`.
-    kind : str, optional
-        Kind of the symbolic variable (`"SX"` or `"MX"`). Default is `"SX"`.
-        See CasADi documentation for details on the differences between the two.
+        Data type of the array. If None (default), uses the dtype of `x`.
+    kind : {"SX", "MX"}, optional
+        Kind of symbolic variable to create. Default is "SX".
+        - "SX": Scalar-based symbolic type. Each element has its own symbolic
+          representation. Generally more efficient for element-wise operations.
+        - "MX": Matrix-based symbolic type. The entire array is represented by 
+          a single symbolic object. Supports a broader range of operations.
 
     Returns
     -------
     SymbolicArray
-        Symbolic array with the given name and kind, and with the shape of `x`.
+        Symbolic array with the given name and kind, matching the shape and 
+        (optionally) dtype of the input array `x`.
+    
+    Notes
+    -----
+    This function is particularly useful when:
+    - Creating symbolic representations of existing numeric data
+    - Building symbolic functions that need to match the structure of numeric inputs
+    - Prototyping symbolic algorithms using existing arrays as templates
+
+    The function automatically converts non-array inputs to NumPy arrays using 
+    `np.asarray()` before extracting their shape information.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> import archimedes as arc
+    >>> 
+    >>> # Create a symbolic variable with the same shape as a numeric array
+    >>> data = np.array([[1.0, 2.0], [3.0, 4.0]])
+    >>> M_sym = arc.sym_like(data, "M")
+    >>> print(M_sym.shape)
+    (2, 2)
+    >>> 
+    >>> # Use with a vector
+    >>> v = np.ones(5)
+    >>> v_sym = arc.sym_like(v, "v")
+    >>> print(v_sym.shape)
+    (5,)
+    >>> 
+    >>> # Works with scalar inputs too
+    >>> scalar = 42.0
+    >>> x = arc.sym_like(scalar, "x")
+    >>> print(x.shape)
+    ()
+    >>> 
+    >>> # Create a symbolic matrix based on another symbolic array
+    >>> original_sym = arc.sym("y", shape=(3, 3))
+    >>> another_sym = arc.sym_like(original_sym, "z", kind="MX")
+    >>> print(another_sym.shape)
+    (3, 3)
+    
+    See Also
+    --------
+    archimedes.sym : Create a symbolic array with explicit shape
+    archimedes.array : Create a regular or symbolic array from data
+    archimedes.zeros_like : Create an array of zeros with shape and dtype of an input array
+    archimedes.ones_like : Create an array of ones with shape and dtype of an input array
     """
     if not isinstance(x, (np.ndarray, SymbolicArray)):
         x = np.asarray(x)
