@@ -16,6 +16,7 @@ dependencies = [
 
 [project.optional-dependencies]
 all = [
+    "ipykernel>=6.29.5",
     "jupyter>=1.1.1",
     "matplotlib>=3.10.1",
 ]

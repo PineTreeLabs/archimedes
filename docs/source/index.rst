@@ -21,3 +21,4 @@ documentation for details.
    under-the-hood
    gotchas
    pytrees
+   modular-design
