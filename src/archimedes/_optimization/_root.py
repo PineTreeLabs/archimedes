@@ -10,7 +10,7 @@ from archimedes._core import (
     sym_like,
     _as_casadi_array,
     SymbolicArray,
-    SymbolicFunction,
+    FunctionCache,
 )
 
 from archimedes.error import ShapeDtypeError
@@ -69,8 +69,8 @@ def implicit(
     # TODO: Inspect function signature to check for consistency
     # TODO: Support constraints on the unknowns (supported via options in CasADi)
 
-    if not isinstance(func, SymbolicFunction):
-        func = SymbolicFunction(func, static_argnames=static_argnames)
+    if not isinstance(func, FunctionCache):
+        func = FunctionCache(func, static_argnames=static_argnames)
 
     # Define a function that will solve the root-finding problem
     # This function will be evaluated with SymbolicArray objects.
@@ -160,7 +160,7 @@ def implicit(
 
     _solve.__name__ = name
 
-    return SymbolicFunction(
+    return FunctionCache(
         _solve,
         arg_names=arg_names,
         static_argnames=static_argnames,

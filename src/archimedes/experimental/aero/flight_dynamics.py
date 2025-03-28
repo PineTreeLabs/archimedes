@@ -5,7 +5,7 @@ import numpy as np
 
 from scipy.special import roots_legendre
 
-from archimedes import tree, struct, sym_function
+from archimedes import tree, struct, compile
 
 
 def quaternion_inverse(q):

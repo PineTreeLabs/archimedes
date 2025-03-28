@@ -4,7 +4,7 @@ from typing import Callable
 
 import numpy as np
 
-from archimedes import sym_function, minimize
+from archimedes import compile, minimize
 from .interpolation import LagrangePolynomial
 from .discretization import SplineDiscretization
 
@@ -166,7 +166,7 @@ class OptimalControlProblem(OCPBase):
 
         # Given a flattened array of decision variables, compute the
         # value of the objective function
-        @sym_function
+        @compile
         def obj(dvs):
             x, u, t0, tf, p = self.unpack_dvs(dvs, domain, order="C")
             
@@ -192,7 +192,7 @@ class OptimalControlProblem(OCPBase):
 
         # Given a flattened array of decision variables, compute the
         # function value of the constraints
-        @sym_function
+        @compile
         def cons(dvs):
             x, u, t0, tf, p = self.unpack_dvs(dvs, domain, order="C")
 
@@ -334,7 +334,7 @@ class MultiStageOptimalControlProblem(OCPBase):
             s.build_objective(d) for (s, d) in zip(self.stages, domain)
         ]
 
-        @sym_function
+        @compile
         def obj(dvs):
             # First split dvs by stage
             split_dvs = self.split_dvs(dvs, domain)
@@ -352,7 +352,7 @@ class MultiStageOptimalControlProblem(OCPBase):
             s.build_constraints(d) for (s, d) in zip(self.stages, domains)
         ]
 
-        @sym_function
+        @compile
         def cons(dvs):
             # First split dvs by stage
             split_dvs = self.split_dvs(dvs, domains)

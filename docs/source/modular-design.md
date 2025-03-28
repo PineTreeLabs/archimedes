@@ -85,7 +85,7 @@ print(unravel(x0_flat))  # MassSpringDamper.State(x=array(1.), v=array(0.))
 The `unravel` function created by `tree.ravel` is specific to the original PyTree argument, so it can be used within ODE functions, for example:
 
 ```python
-@arc.sym_function
+@arc.compile
 def ode_rhs(t, state_flat, system):
     # Unflatten the state vector to our structured state
     state = unravel(state_flat)
@@ -170,7 +170,7 @@ x0 = system.State(
 x0_flat, state_unravel = arc.tree.ravel(x0)
 
 # ODE function that works with flat arrays
-@arc.sym_function
+@arc.compile
 def ode_rhs(t, state_flat, system):
     state = state_unravel(state_flat)
     state_deriv = system.dynamics(t, state)

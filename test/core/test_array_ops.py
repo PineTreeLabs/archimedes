@@ -4,7 +4,7 @@ import numpy as np
 from numpy import exceptions as npex
 import casadi as cs
 
-from archimedes._core import SymbolicArray, sym, sym_function
+from archimedes._core import SymbolicArray, sym, compile
 from archimedes.error import ShapeDtypeError
 
 
@@ -270,7 +270,7 @@ class TestSymbolicArrayFunctions:
         def sym_reshape(x, shape, order="C"):
             return np.reshape(x, shape, order=order)
 
-        _reshape = sym_function(
+        _reshape = compile(
             sym_reshape, static_argnames=("shape", "order")
         )
         
