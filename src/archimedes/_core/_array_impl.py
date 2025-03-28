@@ -952,20 +952,80 @@ def zeros_like(x, dtype=None, sparse=True, kind=None):
 
 
 def ones_like(x, dtype=None, kind=None):
-    """Construct an array of ones with the same shape and dtype as `x`.
+    """
+    Create a symbolic array of ones with the same shape and dtype as an input array.
+    
+    This function constructs a symbolic array filled with ones, matching the dimensions
+    and data type of an existing array. It's useful for creating masks, weights, or 
+    initial values in functions that need to work with both symbolic and numeric inputs.
     
     Parameters
     ----------
+    x : array_like
+        The array whose shape and dtype will be used. Can be a NumPy ndarray, 
+        SymbolicArray, or any array-like object that can be converted to an array.
     dtype : numpy.dtype, optional
-        Data type of the array. Default is np.float64.
-    kind : str, optional
-        Kind of the symbolic variable (`"SX"` or `"MX"`). Default is `"SX"`.
-        See CasADi documentation for details on the differences between the two.
-
+        Data type of the new array. If None (default), uses the dtype of `x`.
+    kind : {"SX", "MX"} or None, optional
+        Kind of symbolic variable to create. If None (default), uses the kind
+        of `x` if it's a SymbolicArray, otherwise uses "SX".
+        - "SX": Scalar-based symbolic type. Each element has its own symbolic
+          representation. Generally more efficient for element-wise operations.
+        - "MX": Matrix-based symbolic type. The entire array is represented by 
+          a single symbolic object. Supports a broader range of operations.
+        
     Returns
     -------
     SymbolicArray
-        Array of ones with the given dtype and symbolic kind, and with shape of `x`.
+        Symbolic array of ones with the same shape as `x`, and with the
+        specified dtype and symbolic kind.
+    
+    Notes
+    -----
+    This function is the symbolic counterpart to NumPy's `ones_like`. While creating
+    a standard NumPy array of ones requires numeric inputs, this function works with
+    both symbolic and numeric arrays, preserving the symbolic nature when needed.
+    
+    When used inside a function decorated with `sym_function`, this function helps create
+    arrays of ones that match the input's shape, which is particularly important for
+    initializing accumulators, creating masks, or setting default values.
+    
+    Examples
+    --------
+    >>> import numpy as np
+    >>> import archimedes as arc
+    >>> 
+    >>> # With a symbolic input array
+    >>> x_sym = arc.sym("x", shape=(2, 3))
+    >>> o_sym = arc.ones_like(x_sym)
+    >>> print(o_sym.shape)
+    (2, 3)
+    >>> 
+    >>> # With a numeric input array
+    >>> x_num = np.array([[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]])
+    >>> o_num = arc.ones_like(x_num)
+    >>> print(o_num.shape)
+    (3, 2)
+    >>> 
+    >>> # Changing the kind of symbolic variable
+    >>> o_mx = arc.ones_like(x_sym, kind="MX")
+    >>> 
+    >>> # In a function that will be traced symbolically:
+    >>> @arc.sym_function
+    >>> def process_array(x):
+    >>>     # Initialize result with ones
+    >>>     # Dispatches to this function when x is a SymbolicArray
+    >>>     result = np.ones_like(x)
+    >>>     for i in range(x.shape[0]):
+    >>>         result[i] *= x[i]
+    >>>     return result
+    
+    See Also
+    --------
+    numpy.ones_like : NumPy's equivalent function for numeric arrays
+    archimedes.ones : Create a symbolic array of ones with specified shape
+    archimedes.zeros_like : Create a symbolic array of zeros with same shape as input
+    archimedes.empty_like : Create an uninitialized array with same shape as input
     """
     x = array(x)  # Should be SymbolicArray or ndarray
     if kind is None and isinstance(x, SymbolicArray):
