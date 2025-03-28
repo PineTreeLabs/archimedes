@@ -1,7 +1,7 @@
 import pytest
 import numpy as np
 
-from archimedes._core import sym, compile, SymbolicFunction, SymbolicArray
+from archimedes._core import sym, compile, FunctionCache, SymbolicArray
 
 
 def f(x):
@@ -12,7 +12,7 @@ def f(x):
 class TestSymFunction:
     def test_construction(self):
         f_sym = compile(f)
-        assert isinstance(f_sym, SymbolicFunction)
+        assert isinstance(f_sym, FunctionCache)
         assert f_sym.name == "f"
         assert f_sym.arg_names == ["x"]
         assert f_sym._compiled == {}

@@ -16,7 +16,7 @@ from archimedes._core import (
     sym_like,
     _as_casadi_array,
     SymbolicArray,
-    SymbolicFunction,
+    FunctionCache,
 )
 
 
@@ -49,14 +49,14 @@ def integrator(
     If evaluation times are specified with `t_eval`, then the ODE solve function
     will close over these times, so that the returned function will instead have the
     signature `forward_map(x0, *args) -> xs`, where `xs` is an array of states at the
-    evaluation times.  In this case the symbolic function must be fully re-created for
-    each set of evaluation times (because the evaluation times are not hashable).
+    evaluation times.  In this case the function must be fully re-compiled for each set
+    of evaluation times (because the evaluation times are not hashable).
     """
     if options is None:
         options = {}
 
-    if not isinstance(func, SymbolicFunction):
-        func = SymbolicFunction(func, static_argnames=static_argnames)
+    if not isinstance(func, FunctionCache):
+        func = FunctionCache(func, static_argnames=static_argnames)
 
     options = {
         **options,
@@ -153,7 +153,7 @@ def integrator(
 
     _wrapped_forward_map.__name__ = name
 
-    return SymbolicFunction(
+    return FunctionCache(
         _wrapped_forward_map,
         arg_names=arg_names,
         static_argnames=static_argnames,

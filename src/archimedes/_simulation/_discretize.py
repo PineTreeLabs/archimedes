@@ -1,6 +1,6 @@
 """Utilities for discretizing a continuous ODE function"""
 import numpy as np
-from archimedes._core import scan, SymbolicFunction
+from archimedes._core import scan, FunctionCache
 from archimedes._optimization import implicit
 
 
@@ -55,8 +55,8 @@ def _discretize_radau5(rhs, h, newton_solver="fast_newton"):
         [(16-np.sqrt(6))/36, (16+np.sqrt(6))/36, 1/9],
     ])
 
-    if not isinstance(rhs, SymbolicFunction):
-        rhs = SymbolicFunction(rhs)
+    if not isinstance(rhs, FunctionCache):
+        rhs = FunctionCache(rhs)
 
     sym_kind = rhs._kind  # TODO: Use a better way to get the kind
 
@@ -76,7 +76,7 @@ def _discretize_radau5(rhs, h, newton_solver="fast_newton"):
         f, k = np.reshape(f, (3*n,)), np.reshape(k, (3*n,))
         return f - k
 
-    F = SymbolicFunction(
+    F = FunctionCache(
         F, kind=sym_kind, arg_names=["k", "t", "y", "p"], ret_names=["r"]
     )
     solve = implicit(F, solver=newton_solver)

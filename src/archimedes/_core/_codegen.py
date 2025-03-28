@@ -1,7 +1,7 @@
 """C code generation"""
 import numpy as np
 
-from ._function import SymbolicFunction
+from ._function import FunctionCache
 
 dtype_to_c = {
     float: "double",
@@ -31,7 +31,7 @@ def codegen(
     with_mem=False,
     indent=4,
 ):
-    """Generate C code from a symbolic function.
+    """Generate C code from a compiled function.
 
     Currently this just calls CasADi's code generation directly, so the generated
     code will have CASADI_* prefixes.
@@ -46,8 +46,8 @@ def codegen(
 
     Parameters
     ----------
-    func : Callable | SymbolicFunction
-        The symbolic function to generate code for.
+    func : Callable | FunctionCache
+        The compiled function to generate code for.
     filename : str
         The file to write the code to.  If None, the code is returned as a string.
     args : tuple
@@ -56,10 +56,10 @@ def codegen(
         expected inputs to the function.
     static_argnums : tuple
         The indices of the static arguments to the function. Will be ignored if the
-        function is already a SymbolicFunction.
+        function is already a FunctionCache.
     static_argnames : tuple
         The names of the static arguments to the function. Will be ignored if the
-        function is already a SymbolicFunction.
+        function is already a FunctionCache.
     verbose : bool
         If True, include comments in the generated code.
     cpp : bool
@@ -83,8 +83,8 @@ def codegen(
     """
     # TODO: Automatic type inference if not specified
 
-    if not isinstance(func, SymbolicFunction):
-        func = SymbolicFunction(
+    if not isinstance(func, FunctionCache):
+        func = FunctionCache(
             func,
             static_argnums=static_argnums,
             static_argnames=static_argnames,

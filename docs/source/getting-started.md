@@ -3,10 +3,10 @@
 This page will walk through some basic functionality and examples to get you started with some of the patterns and conventions of Archimedes.
 Before working through this page, you may want to make sure you have a working [installation](quickstart) and read through ["What is Archimedes?"](about) to understand the basic conceptual framework and terminology.
 
-(creating-symbolic-functions)=
-## Creating symbolic functions
+(compiling-functions)=
+## Compiling functions
 
-The most basic operation in Archimedes is creating a "symbolic function", which is done as follows:
+The most basic operation in Archimedes is creating a "compiled" function, which is done as follows:
 
 1. Write out your computation in NumPy
 2. Encapsulate it into a function
@@ -84,7 +84,7 @@ import numpy as np
 import archimedes as arc
 import matplotlib.pyplot as plt
 
-# Define the system dynamics and convert to a symbolic function
+# Define and compile the system dynamics
 @arc.compile
 def dynamics(t, x):
     a, b, c, d = 1.5, 1.0, 1.0, 3.0
@@ -236,7 +236,7 @@ state = VehicleState(
 # Flatten to a single vector
 flat_state, unravel = arc.tree.ravel(state)
 
-# Pass to/from symbolic functions
+# Pass to/from compiled functions
 @arc.compile
 def euler_dynamics(state, control):
     # Access structured fields naturally
@@ -316,7 +316,7 @@ interp = RectBivariateSpline(xgrid, ygrid, Z)
 print(np.allclose(f(x, y), interp.ev(x, y)))
 ```
 
-The Archimedes interpolant matches the SciPy one, but can be embedded in other symbolic functions, differentiated through, etc.
+The Archimedes interpolant matches the SciPy one, but can be embedded in other functions, differentiated through, etc.
 
 (control-flow)=
 ## Control flow
@@ -342,7 +342,7 @@ def f(x):
 ```
 
 To implement `for` loops, if the length of the loop is known ahead of time it is possible to write a plain Python loop.
-However, it is recommended that you put the contents of the loop in a separate symbolic function to help keep the size of the computational graph small:
+However, it is recommended that you put the contents of the loop in a separately compiled function to help keep the size of the computational graph small by minimizing "call sites":
 
 ```python
 dt = 0.01
@@ -482,7 +482,7 @@ cutoff = 100  # Cutoff frequency in Hz
 order = 4  # Filter order
 b, a = signal.butter(order, cutoff / (fs/2), 'low')
 
-# 2. Create a symbolic function that implements the IIR filter
+# 2. Create a compiled function that implements the IIR filter
 @arc.compile
 def iir_filter_step(x, state, b_coef, a_coef):
     # Calculate output: y = b[0]*x + state[0]

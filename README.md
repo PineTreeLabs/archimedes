@@ -230,7 +230,7 @@ For repeated evaluations of a function, it is recommended to use `arc.scan` to e
 Conversion back and forth between `casadi.DM` and `np.ndarray` is expensive (see ODE example).  For cases where the call will happen many times, conversion should be avoided via CasADi symbolic primitives like `integrator`.
 
 
-### Symbolic function evaluation
+### Function signatures
 
 Keyword arguments are supported, but all function arguments must be allowed to be either positional or keyword.  In addition, all arguments must be defined explicitly.  That is, the following signatures are valid:
 

@@ -74,7 +74,7 @@ state = VehicleState(
 # Flatten to a vector
 flat_state, unravel = arc.tree.ravel(state)
 
-# Use in symbolic functions
+# Use in compiled functions
 @arc.compile
 def dynamics(state, control, dt=0.1):
     # Access fields naturally

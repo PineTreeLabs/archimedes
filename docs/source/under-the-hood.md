@@ -55,15 +55,15 @@ Archimedes aims to create an intuitive interface familiar to NumPy and SciPy use
 The NumPy dispatch interface hasn't been fully implemented yet, although many common functions have been implemented.  If something is missing, feel free to open a feature request (or bump an existing feature request).
 :::
 
-On its own, the NumPy API compatibility is not especially useful; the value comes with the ability to define and manipulate symbolic functions, as we'll see next.
+On its own, the NumPy API compatibility is not especially useful; the value comes with the ability to define and manipulate compiled functions, as we'll see next.
 
-(symbolic-functions)=
-## Symbolic functions
+(symbolic-compilation)=
+## Symbolic compilation
 
-The next building block in Archimedes is _symbolic functions_, which convert plain NumPy code into symbolic computational graphs.
+The next building block in Archimedes is _compiled functions_, which convert plain NumPy code into symbolic computational graphs.
 This is the key abstraction that makes it so you don't have to think about symbolic arrays.
 
-### The mechanics of symbolic functions
+### The mechanics of compilation
 
 The NumPy API compatiblity means that you can write [(almost)](gotchas.md) standard NumPy functions that can be evaluated either symbolically or numerically:
 
@@ -91,7 +91,7 @@ The symbolic arrays are a means to an end: constructing the computational graph,
 In CasADi this is done by converting a symbolic expression into a `Function` object that essentially acts like a new primitive function that can be evaluated numerically or embedded in more symbolic expressions.
 The drawback to this is that the shape of the function arguments must be specified ahead of time and it requires working directly with the symbolic arrays before converting them to a `Function`.
 
-To get around this, Archimedes introduces the `@compile` decorator, which converts a standard function into a `SymbolicFunction`.
+To get around this, Archimedes introduces the `@compile` decorator, which converts a standard function into a `FunctionCache`.
 
 ```python
 @arc.compile
@@ -100,18 +100,18 @@ def f(A, b):
     return np.linalg.solve(A, b)
 ```
 
-At first the `SymbolicFunction` object doesn't do anything except keep a reference to the original code `f`.
-However, when it's called as a function, the `SymbolicFunction` will "trace" the original code as follows:
+At first the `FunctionCache` object doesn't do anything except keep a reference to the original code `f`.
+However, when it's called as a function, the `FunctionCache` will "trace" the original code as follows:
 
 1. Replace all arguments with `SymbolicArray`s that match the shape and dtype
 2. Call the original function `f` with the symbolic arguments and gather the symbolic outputs
 3. Convert the symbolic arguments and returns into a CasADi `Function` and cache for future use
 4. Evaluate the cached `Function` with the original arguments.
 
-If the `SymbolicFunction` is called again with arguments that have the same shape and dtype, the tracing isn't repeated; we can just look up the cached `Function` and evaluate it directly.
+If the `FunctionCache` is called again with arguments that have the same shape and dtype, the tracing isn't repeated; we can just look up the cached `Function` and evaluate it directly.
 
 What this means is that you can write a single generic function like the one above using pure NumPy and without specifying anything about the arguments, and use it with any valid array sizes.
-The `SymbolicFunction` will automatically take care of all of the symbolic processing for you so you never have to actually create or manipulate symbolic variables yourself.
+The `FunctionCache` will automatically take care of all of the symbolic processing for you so you never have to actually create or manipulate symbolic variables yourself.
 
 Now you can forget everything you read until `@compile`.
 
@@ -128,7 +128,7 @@ This also makes it beneficial to embed as much of your program as possible into 
 
 Sometimes functions will take arguments that act as configuration parameters instead of "data".  We call these "static" arguments, since they have a fixed value no matter what data the function is called with.
 If we tell the `compile` decorator about these, they don't get traced with symbolic arrays.
-Instead, whatever value the `SymbolicFunction` gets called with is passed literally to the original function.
+Instead, whatever value the `FunctionCache` gets called with is passed literally to the original function.
 Since this can lead to different computational graphs for any value of the static argument, the static arguments are also used as part of the cache key.
 This means that the function is also re-traced whenever it is called with a static argument that it hasn't seen before.
 
@@ -237,16 +237,14 @@ The final key concept in Archimedes is _function transformations_, which take an
 
 Internally, a function transformation in Archimedes follows these steps:
 
-1. Convert the input function to a symbolic function (if it isn't already)
-2. Trace the function with appropriate symbolic inputs to get a computational graph
-3. Apply transformation-specific operations to this computational graph
-4. Wrap the transformed graph in a new function with an appropriate signature
+1. Compile the input function to a computational graph (if not already done)
+2. Apply transformation-specific operations to this computational graph
+3. Wrap the transformed graph in a new function with an appropriate signature
 
 For example, when you call `arc.grad(f)`, Archimedes:
-1. Ensures `f` is a symbolic function
-2. Traces `f` with symbolic inputs to construct its computational graph
-3. Applies automatic differentiation to the graph to obtain the gradient
-4. Returns a new function that, when called, evaluates this gradient graph
+1. Traces `f` with symbolic inputs to construct its computational graph
+2. Applies automatic differentiation to the graph to obtain the gradient
+3. Returns a new function that, when called, evaluates this gradient graph
 
 This approach allows transformations to be composable - you can apply multiple transformations in sequence:
 
@@ -340,7 +338,7 @@ These function transformations enable complex operations like sensitivity analys
 
 ## Conclusion
 
-Understanding the "under the hood" mechanisms of Archimedes—symbolic arrays, symbolic functions, and function transformations—provides valuable insight into how to use the framework effectively. While you don't need to fully understand these concepts to use Archimedes productively, this knowledge can help you:
+Understanding the "under the hood" mechanisms of Archimedes—symbolic arrays, symbolic compilation, and function transformations—provides valuable insight into how to use the framework effectively. While you don't need to fully understand these concepts to use Archimedes productively, this knowledge can help you:
 
 1. **Debug difficult problems** - When encountering unexpected behavior, knowing how symbolic tracing works can help identify if the issue relates to control flow, array creation, or other common pitfalls.
 

@@ -13,7 +13,7 @@ from archimedes._core import (
     sym_like,
     _as_casadi_array,
     SymbolicArray,
-    SymbolicFunction,
+    FunctionCache,
 )
 
 __all__ = [
@@ -64,12 +64,12 @@ def nlp_solver(
 
     options["ipopt.print_level"] = print_level
 
-    if not isinstance(obj, SymbolicFunction):
-        obj = SymbolicFunction(obj, static_argnames=static_argnames)
+    if not isinstance(obj, FunctionCache):
+        obj = FunctionCache(obj, static_argnames=static_argnames)
 
     if constr is not None:
-        if not isinstance(constr, SymbolicFunction):
-            constr = SymbolicFunction(constr, static_argnames=static_argnames)
+        if not isinstance(constr, FunctionCache):
+            constr = FunctionCache(constr, static_argnames=static_argnames)
 
         # Check that arguments and static arguments are the same for both functions
         if not len(obj.arg_names) == len(constr.arg_names):
@@ -198,7 +198,7 @@ def nlp_solver(
 
     _solve_explicit.__name__ = name
 
-    return SymbolicFunction(
+    return FunctionCache(
         _solve_explicit,
         arg_names=tuple(arg_names),
         static_argnames=static_argnames,

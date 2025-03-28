@@ -23,9 +23,9 @@ CompiledKey = Tuple[Tuple[HashablePartial, ...], Tuple[Hashable, ...]]
 class CompiledFunction(NamedTuple):
     """Container for a CasADi function specialized to particular arg types.
     
-    The SymbolicFunction operates similarly to JAX transformations in that it does
+    The FunctionCache operates similarly to JAX transformations in that it does
     not need to know the shapes and dtypes of the arguments at creation.  Instead,
-    a specialized version of the function is created each time the SymbolicFunction
+    a specialized version of the function is created each time the FunctionCache
     is called with different argument types.  This class stores a single instance
     of each of these specialized functions.
 
@@ -88,7 +88,7 @@ def _resolve_signature(func, arg_names):
         for param in signature.parameters.values():
             if param.kind not in valid_kinds:
                 raise ValueError(
-                    "Currently symbolic functions only support explicit arguments "
+                    "Currently compiled functions only support explicit arguments "
                     "(i.e. no *args, **kwargs, or keyword-only arguments). Found "
                     f"{func} with parameter {param.name} of kind {param.kind}"
                 )
@@ -105,7 +105,7 @@ def _resolve_signature(func, arg_names):
     return signature
 
 
-class SymbolicFunction:
+class FunctionCache:
     def __init__(
         self,
         func,
@@ -299,11 +299,11 @@ class SymbolicFunction:
         return func(*args)
 
 
-# Decorator for transforming functions into SymbolicFunction
+# Decorator for transforming functions into FunctionCache
 def compile(
     func=None, *, static_argnums=None, static_argnames=None, jit=False, kind="SX", name=None
 ):
-    """Create a "symbolic function" from a Python function.
+    """Create a "compiled" function from a Python function.
     
     Parameters
     ----------
@@ -329,8 +329,8 @@ def compile(
 
     Returns
     -------
-    SymbolicFunction
-        A symbolic function that can be called with either symbolic or numeric
+    FunctionCache
+        A compiled function that can be called with either symbolic or numeric
         arguments.
     """
     # TODO: Link to documentation
@@ -338,7 +338,7 @@ def compile(
     # If used as @compile(...)
     if func is None:
         def decorator(f):
-            return SymbolicFunction(
+            return FunctionCache(
                 f,
                 static_argnums=static_argnums,
                 static_argnames=static_argnames,
@@ -349,7 +349,7 @@ def compile(
         return decorator
 
     # If used as @compile
-    return SymbolicFunction(
+    return FunctionCache(
         func,
         static_argnums=static_argnums,
         static_argnames=static_argnames,
@@ -415,8 +415,8 @@ def scan(
         A tuple of the final carry and the values of the loop variable.
     """
 
-    if not isinstance(func, SymbolicFunction):
-        func = SymbolicFunction(func)
+    if not isinstance(func, FunctionCache):
+        func = FunctionCache(func)
 
     # Check the input signature of the function
     if len(func.arg_names) != 2:

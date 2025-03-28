@@ -4,7 +4,7 @@ import numpy as np
 from typing import OrderedDict
 
 import archimedes as arc
-from archimedes._core import SymbolicFunction
+from archimedes._core import FunctionCache
 
 __all__ = [
     "rbf",
@@ -47,8 +47,8 @@ def adam(
     callback=None,
     callback_iters=None,
 ):
-    if not isinstance(obj, SymbolicFunction):
-        obj = SymbolicFunction(obj, static_argnames=static_argnames)
+    if not isinstance(obj, FunctionCache):
+        obj = FunctionCache(obj, static_argnames=static_argnames)
 
     grad = arc.grad(obj)
     x = x0.copy()
@@ -177,7 +177,7 @@ def dense(
 
         return x
     
-    forward = SymbolicFunction(
+    forward = FunctionCache(
         forward,
         arg_names=("x", "p"),
         kind=kind,
