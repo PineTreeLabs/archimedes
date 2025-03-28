@@ -777,28 +777,73 @@ def zeros(shape, dtype=np.float64, sparse=True, kind="SX") -> SymbolicArray:
 
 
 def ones(shape, dtype=np.float64, kind="SX"):
-    """Construct an array of ones with the given shape and dtype.
+    """
+    Construct a symbolic array of ones with the given shape and dtype.
+    
+    This function creates an array filled with the value 1, equivalent to 
+    NumPy's ones function but returning a symbolic array suitable for use 
+    in symbolic computations.
     
     Parameters
     ----------
     shape : int or tuple of ints
-        Shape of the array.
+        Shape of the array. A single integer n creates a vector of length n.
+        A tuple (m, n) creates an m×n matrix.
     dtype : numpy.dtype, optional
         Data type of the array. Default is np.float64.
-    kind : str, optional
-        Kind of the symbolic variable (`"SX"` or `"MX"`). Default is `"SX"`.
-        See CasADi documentation for details on the differences between the two.
-
+    kind : {"SX", "MX"}, optional
+        Kind of symbolic variable to create. Default is "SX".
+        - "SX": Scalar-based symbolic type. Each element has its own symbolic
+          representation. Generally more efficient for element-wise operations.
+        - "MX": Matrix-based symbolic type. The entire array is represented by 
+          a single symbolic object. Supports a broader range of operations.
+        
     Returns
     -------
     SymbolicArray
-        Array of ones with the given shape, dtype, and symbolic kind.
-
+        Symbolic array of ones with the given shape, dtype, and symbolic kind.
+    
     Notes
     -----
-    Prefer using `np.ones_like` or `np.ones(..., like=SymbolicArray)` to directly calling
-    this function where possible, since this may handle dispatch to numeric arrays slightly
-    better.
+    This function is the symbolic counterpart to NumPy's `ones` function. It's useful
+    for initializing arrays with ones in symbolic computation contexts, such as creating
+    weight matrices, mask arrays, or default values for symbolic computation.
+    
+    When working within a function that will be executed with both symbolic and
+    numeric arrays, prefer using `np.ones_like` or `np.ones(..., like=x)` where
+    `x` is either a SymbolicArray or NumPy array. This provides better compatibility
+    across both numeric and symbolic execution paths.
+    
+    Examples
+    --------
+    >>> import archimedes as arc
+    >>> import numpy as np
+    >>> 
+    >>> # Create a vector of ones
+    >>> o1 = arc.ones(5)
+    >>> print(o1)
+    [1, 1, 1, 1, 1]
+    >>> 
+    >>> # Create a matrix of ones
+    >>> o2 = arc.ones((2, 3))
+    >>> print(o2)
+    [[1, 1, 1], [1, 1, 1]]
+    >>> 
+    >>> # Create MX-type ones
+    >>> o3 = arc.ones(4, kind="MX")
+    >>> 
+    >>> # In functions that handle both symbolic and numeric arrays:
+    >>> def example_func(x):
+    >>>     # This will work correctly whether x is symbolic or numeric
+    >>>     return np.ones_like(x) + np.sin(x)
+    
+    See Also
+    --------
+    numpy.ones : NumPy's array of ones function
+    archimedes.ones_like : Create an array of ones with shape and dtype of an input array
+    archimedes.zeros : Create an array of zeros
+    archimedes.eye : Create an identity matrix
+    archimedes.array : Create an array from data
     """
     X = SYM_KINDS[kind]
     return SymbolicArray(X.ones(*_cs_shape(shape)), dtype=dtype, shape=_np_shape(shape))
