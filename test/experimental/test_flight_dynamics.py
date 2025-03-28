@@ -125,7 +125,7 @@ class TestVehicleDynamics:
         x[7:10] = np.array([1, 0, 0])  # Constant velocity in x-direction
         u = np.zeros(4)
 
-        dynamics = arc.sym_function(basic_vehicle.dynamics)
+        dynamics = arc.compile(basic_vehicle.dynamics)
         x_dot = dynamics(t, x, u)
 
         x_dot_ex = np.zeros(13)
@@ -146,7 +146,7 @@ class TestVehicleDynamics:
         x[7:10] = v_B
         u = np.zeros(4)
 
-        dynamics = arc.sym_function(basic_vehicle.dynamics)
+        dynamics = arc.compile(basic_vehicle.dynamics)
         x_dot = dynamics(0.0, x, u)
 
         x_dot_ex = np.zeros(13)
@@ -166,7 +166,7 @@ class TestVehicleDynamics:
             return F_B, M_B, np.array([])
 
         basic_vehicle.net_forces = constant_force
-        dynamics = arc.sym_function(basic_vehicle.dynamics)
+        dynamics = arc.compile(basic_vehicle.dynamics)
         x_dot = dynamics(t, x, u)
 
         x_dot_ex = np.zeros(13)
@@ -180,7 +180,7 @@ class TestVehicleDynamics:
         x[10] = 1.0  # Constant angular velocity around x-axis
         u = np.zeros(4)
 
-        dynamics = arc.sym_function(basic_vehicle.dynamics)
+        dynamics = arc.compile(basic_vehicle.dynamics)
         x_dot = dynamics(t, x, u)
 
         # Check quaternion derivative
@@ -200,7 +200,7 @@ class TestVehicleDynamics:
             return F_B, M_B, np.array([])
 
         basic_vehicle.net_forces = constant_moment
-        dynamics = arc.sym_function(basic_vehicle.dynamics)
+        dynamics = arc.compile(basic_vehicle.dynamics)
         x_dot = dynamics(t, x, u)
 
         x_dot_ex = np.zeros(13)
@@ -221,7 +221,7 @@ class TestVehicleDynamics:
             return F_B, M_B, np.array([])
 
         basic_vehicle.net_forces = constant_force_and_moment
-        dynamics = arc.sym_function(basic_vehicle.dynamics)
+        dynamics = arc.compile(basic_vehicle.dynamics)
         x_dot = dynamics(t, x, u)
 
         # Check linear motion
@@ -247,7 +247,7 @@ class TestVehicleDynamics:
         x[10:13] = np.array([0.1, 0.2, 0.3])  # Angular velocity
         u = np.zeros(4)
 
-        dynamics = arc.sym_function(basic_vehicle.dynamics)
+        dynamics = arc.compile(basic_vehicle.dynamics)
         x_dot = dynamics(t, x, u)
         
         # Verify that quaternion derivative maintains unit norm

@@ -118,7 +118,7 @@ Python's standard control flow constructs like `if/else` and loops with dynamic 
 
 ```python
 # This will NOT work correctly when x is symbolic
-@arc.sym_function
+@arc.compile
 def bad_conditional(x):
     if x > 0:  # Can't evaluate symbolic expression in boolean context
         return np.sin(x)
@@ -129,7 +129,7 @@ def bad_conditional(x):
 Instead, use `np.where` for conditionals:
 
 ```python
-@arc.sym_function
+@arc.compile
 def good_conditional(x):
     return np.where(x > 0, np.sin(x), np.cos(x))
 ```
@@ -140,7 +140,7 @@ For loops:
 
 ```python
 # This will NOT work with symbolic input
-@arc.sym_function
+@arc.compile
 def bad_loop(x):
     y = 0
     for i in range(sum(x)):  # sum(x) is symbolic, can't be used as loop bound
@@ -148,7 +148,7 @@ def bad_loop(x):
     return y
 
 # This will work
-@arc.sym_function
+@arc.compile
 def good_loop(x):
     y = 0
     for i in range(x.shape[0]):  # Fixed shape is fine
@@ -163,7 +163,7 @@ See the [control flow](control-flow)  section of Getting Started for a simple ex
 Some function arguments shouldn't be traced symbolically, but instead treated as fixed configuration parameters. Archimedes provides a way to specify these:
 
 ```python
-@arc.sym_function(static_argnames=("apply_bc",))
+@arc.compile(static_argnames=("apply_bc",))
 def solve_with_optional_bc(A, b, apply_bc=True):
     if apply_bc:  # This works because apply_bc is static
         b[[0, -1]] = 0.0  # Apply boundary conditions
@@ -177,7 +177,7 @@ When a function with static arguments is called, it will be retraced whenever th
 Symbolic functions in Archimedes are cached based on the shapes and dtypes of their arguments, as well as on the values of static parameters. This means the first call to a function with a specific argument shape might be slower (due to tracing), but subsequent calls with the same shape will be faster.
 
 ```python
-@arc.sym_function
+@arc.compile
 def f(x):
     return np.sin(x**2)
 
@@ -199,12 +199,12 @@ numpy_array = np.zeros(3)
 numpy_array[0] = 1.0  # Original array is modified
 
 # In Archimedes - creates new symbolic expression
-@arc.sym_function
+@arc.compile
 def f(x):
     x[0] = 1.0  # This doesn't actually modify x in-place when symbolic
     return x    # Instead, it creates a new expression
 
-# When using arc.sym_function, this becomes pure even if the Python code isn't!
+# When using arc.compile, this becomes pure even if the Python code isn't!
 x = np.zeros(3)
 y = f(x)
 print(x)  # [0., 0., 0.] - original is unchanged
@@ -225,7 +225,7 @@ Debugging symbolic code can be challenging because:
 3. `print` statements in symbolic functions won't execute at runtime
 
 ```python
-@arc.sym_function
+@arc.compile
 def f(x):
     print("This won't print during symbolic tracing")  # Won't execute during tracing
     y = np.sin(x)
@@ -244,7 +244,7 @@ Some tips for debugging:
 - Split complex operations into smaller, testable pieces
 - Test with concrete numeric values before using symbolic evaluation
 
-A reliable workflow is to write small functions in pure NumPy first, validate the NumPy code, and then add the `sym_function` decorator once you're confident in the results.
+A reliable workflow is to write small functions in pure NumPy first, validate the NumPy code, and then add the `compile` decorator once you're confident in the results.
 
 :::{note}
 Aside from specific cases like [in-place operations](#in-place-operations), Archimedes and NumPy results should be consistent.
@@ -273,7 +273,7 @@ def complex_function(x, callback):
     return result
 
 # Works IF the callback is hashable
-traced_function = arc.sym_function(complex_function, static_argnames=("callback",))
+traced_function = arc.compile(complex_function, static_argnames=("callback",))
 ```
 
 ## 🔪 PyTree Handling

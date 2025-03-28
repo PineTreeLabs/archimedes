@@ -59,7 +59,7 @@ import dataclasses
 import numpy as np
 import pytest
 from archimedes import tree, struct
-from archimedes._core import SymbolicArray, sym, sym_function
+from archimedes._core import SymbolicArray, sym, compile
 from archimedes.tree._tree_util import LEAF
 
 
@@ -414,7 +414,7 @@ class TestRavel:
         # Test that the keys of a dictionary are hashed, so
         # changing the keys will force recompilation.
 
-        @sym_function
+        @compile
         def f(x, p):
             a = p.get("a", 0)
             b = p.get("b", 0)

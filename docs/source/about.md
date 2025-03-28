@@ -30,7 +30,7 @@ def f(x, y):
     return x + np.sin(y)
 
 # Convert it into a "symbolic" function
-f_sym = arc.sym_function(f)
+f_sym = arc.compile(f)
 
 # Call the symbolic function with standard arrays
 z = f_sym(1.0, np.array([2.0, 3.0]))
@@ -97,7 +97,7 @@ For example:
 ```python
 import archimedes as arc
 
-@arc.sym_function
+@arc.compile
 def f(x):
     return 100 * (x[1] - x[0] ** 2) ** 2 + (1 - x[0]) ** 2
 
@@ -115,7 +115,7 @@ Engineering problems frequently involve implicit functions (where a relationship
 import numpy as np
 import archimedes as arc
 
-@arc.sym_function
+@arc.compile
 def f(x, y):
     return x ** 2 + x * np.sin(y) - y
 ```

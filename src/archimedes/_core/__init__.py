@@ -17,7 +17,7 @@ from ._array_ops import SymbolicArray
 
 from ._codegen import codegen
 
-from ._function import sym_function, SymbolicFunction, scan
+from ._function import compile, SymbolicFunction, scan
 from ._autodiff import grad, jac, hess, jvp, vjp
 from ._interpolant import interpolant
 
@@ -32,7 +32,7 @@ __all__ = [
     "eye",
     "SymbolicArray",
     "_as_casadi_array",
-    "sym_function",
+    "compile",
     "SymbolicFunction",
     "codegen",
     "grad",

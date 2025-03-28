@@ -75,7 +75,7 @@ state = VehicleState(
 flat_state, unravel = arc.tree.ravel(state)
 
 # Use in symbolic functions
-@arc.sym_function
+@arc.compile
 def dynamics(state, control, dt=0.1):
     # Access fields naturally
     new_position = state.position + dt * state.velocity
@@ -199,7 +199,7 @@ t_eval = np.linspace(*t_span, 100)
 x0, unravel = arc.tree.ravel(initial_state)
 
 # Create flat dynamics wrapper
-@arc.sym_function
+@arc.compile
 def flat_dynamics(t, x):
     state = unravel(x)  # Unflatten to 
     derivatives = state.dynamics(t, state)

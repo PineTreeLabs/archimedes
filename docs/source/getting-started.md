@@ -10,7 +10,7 @@ The most basic operation in Archimedes is creating a "symbolic function", which 
 
 1. Write out your computation in NumPy
 2. Encapsulate it into a function
-3. Decorate the function with `@sym_function`
+3. Decorate the function with `@compile`
 
 For example:
 
@@ -18,7 +18,7 @@ For example:
 import numpy as np
 import archimedes as arc
 
-@arc.sym_function
+@arc.compile
 def rotate(x, theta):
     R = np.array([
         [np.cos(theta), -np.sin(theta)],
@@ -85,7 +85,7 @@ import archimedes as arc
 import matplotlib.pyplot as plt
 
 # Define the system dynamics and convert to a symbolic function
-@arc.sym_function
+@arc.compile
 def dynamics(t, x):
     a, b, c, d = 1.5, 1.0, 1.0, 3.0
     return np.array([
@@ -237,7 +237,7 @@ state = VehicleState(
 flat_state, unravel = arc.tree.ravel(state)
 
 # Pass to/from symbolic functions
-@arc.sym_function
+@arc.compile
 def euler_dynamics(state, control):
     # Access structured fields naturally
     new_position = state.velocity + dt * state.position
@@ -284,7 +284,7 @@ Basic one-dimensional interpolation can be done with the standard NumPy interfac
 xp = np.linspace(1, 6, 6)
 fp = np.array([-1, -1, -2, -3, 0, 2])
 
-@sym_function(kind="MX")
+@compile(kind="MX")
 def f(x):
     return np.interp(x, xp, fp)
 
@@ -329,7 +329,7 @@ When applied to symbolic arrays, these will either throw errors or result in unp
 To implement a conditional like `if`/`else`, a simple workaround is to use `np.where`, which can use NumPy's dispatch mechanism to handle symbolic arguments:
 
 ```python
-@arc.sym_function
+@arc.compile
 def f(x):
     # # Will not work when x is symbolic
     # if x > 0.5:
@@ -348,12 +348,12 @@ However, it is recommended that you put the contents of the loop in a separate s
 dt = 0.01
 g0 = 9.8
 
-@arc.sym_function
+@arc.compile
 def euler_step(x):
     v = np.array([x[1], -g0 * np.cos(x[0])], like=x)
     return x + v * dt
 
-@arc.sym_function(static_argnames=("tf",))
+@arc.compile(static_argnames=("tf",))
 def solve_pendulum(x0, tf):
     n = int(tf // dt)
     x = arc.zeros((n, len(x0)))
@@ -436,8 +436,8 @@ y = f(x)
 print(y)  # [2. 0. 0.]
 print(x)  # [1. 0. 0.]
 
-# The sym_function is forced to be pure
-f_sym = arc.sym_function(f)
+# The compile is forced to be pure
+f_sym = arc.compile(f)
 x = np.zeros(3)
 y = f_sym(x)
 print(y)  # [2. 0. 0.]
@@ -469,7 +469,7 @@ In this case you have three basic options:
 As an example of the first case, you can construct an IIR filter outside of an Archimedes function and then use the filter coefficients as NumPy arrays.  This doesn't require symbolically tracing the IIR filter construction.
 
 ```python
-# Construct an IIR filter and write a `sym_function` stepping it forward
+# Construct an IIR filter and write a `compile` stepping it forward
 import numpy as np
 import scipy.signal as signal
 import archimedes as arc
@@ -483,7 +483,7 @@ order = 4  # Filter order
 b, a = signal.butter(order, cutoff / (fs/2), 'low')
 
 # 2. Create a symbolic function that implements the IIR filter
-@arc.sym_function
+@arc.compile
 def iir_filter_step(x, state, b_coef, a_coef):
     # Calculate output: y = b[0]*x + state[0]
     y = b_coef[0] * x + state[0]
@@ -553,7 +553,7 @@ import archimedes as arc
 from scipy.optimize import minimize
 
 # Solve Rosenbrock problem using BFGS
-@arc.sym_function
+@arc.compile
 def func(x):
     return 100 * (x[1] - x[0]**2)**2 + (1 - x[0])**2
 

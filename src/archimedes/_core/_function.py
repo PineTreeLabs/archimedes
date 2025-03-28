@@ -300,7 +300,7 @@ class SymbolicFunction:
 
 
 # Decorator for transforming functions into SymbolicFunction
-def sym_function(
+def compile(
     func=None, *, static_argnums=None, static_argnames=None, jit=False, kind="SX", name=None
 ):
     """Create a "symbolic function" from a Python function.
@@ -335,7 +335,7 @@ def sym_function(
     """
     # TODO: Link to documentation
 
-    # If used as @sym_function(...)
+    # If used as @compile(...)
     if func is None:
         def decorator(f):
             return SymbolicFunction(
@@ -348,7 +348,7 @@ def sym_function(
             )
         return decorator
 
-    # If used as @sym_function
+    # If used as @compile
     return SymbolicFunction(
         func,
         static_argnums=static_argnums,

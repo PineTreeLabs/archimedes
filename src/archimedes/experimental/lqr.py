@@ -1,6 +1,6 @@
 import numpy as np
 
-from archimedes import jac, sym_function, odeint
+from archimedes import jac, compile, odeint
 
 
 def lqr_design(f, x0, u0, ts, Qf, Q, R):
@@ -47,7 +47,7 @@ def lqr_design(f, x0, u0, ts, Qf, Q, R):
     # integrate from tau = -t0 to tau = -t0
     # In this case we just change the sign of S_t (usually has a negative sign
     # when integrating backwards in time)
-    @sym_function(kind="MX")
+    @compile(kind="MX")
     def riccati_rhs(t, x):
         t = -t  # Transform from tau=-t to t
         A, B = linearize(t)
