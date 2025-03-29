@@ -308,35 +308,125 @@ def compile(
 ):
     """Create a "compiled" function from a Python function.
     
+    Transforms a standard NumPy-based Python function into an efficient computational 
+    graph that can be executed in C++ and supports automatic differentiation, code 
+    generation, and other advanced capabilities. This decorator is the primary entry 
+    point for converting Python functions into Archimedes' symbolic computation system.
+    
     Parameters
     ----------
-    func : callable
-        A Python function to be evaluated symbolically.
-    static_argnums : int or sequence of int
+    func : callable, optional
+        A Python function to be evaluated symbolically. If None, returns a decorator.
+    static_argnums : int or sequence of int, optional
         Indices of arguments to treat as static (constant) in the function.
-        Defaults to None.
-    static_argnames : str or sequence of str
+        Static arguments aren't converted to symbolic variables but are passed directly
+        to the function during tracing.
+    static_argnames : str or sequence of str, optional
         Names of arguments to treat as static (constant) in the function.
-        Defaults to None.
-    jit : bool
-        Whether to compile the function with JIT. Defaults to False.
-    kind : str
-        The type of the symbolic variables. Defaults to "SX". For "plain" math
-        functions, the scalar symbolic type "SX" is generally recommended for
-        efficiency.  When the function includes more general operations like embedded
-        ODE solves, root-finding, interpolation, or optimization problems, the matrix
-        symbolic type "MX" is required.  See the CasADi documentation for more details.
-    name : str
-        The name of the function. Defaults to None (taken from the function name).
+        Alternative to static_argnums when using keyword arguments.
+    jit : bool, default=False
+        Whether to compile the function with JIT for additional performance.
+        Not fully implemented in the current version.
+    kind : str, default="SX"
+        The type of the symbolic variables. Options:
+        - "SX": Trace the function with scalar-valued symbolic type
+        - "MX": Trace the function with array-valued symbolic type
+    name : str, optional
+        The name of the function. If None, taken from the function name.
         Required if the function is a lambda function.
 
     Returns
     -------
     FunctionCache
         A compiled function that can be called with either symbolic or numeric
-        arguments.
+        arguments, while maintaining the same function signature.
+        
+    Notes
+    -----
+    When to use this function:
+    - To accelerate numerical code by converting it to C++
+    - To enable automatic differentiation of your functions
+    - To generate C code from your functions
+    - When embedding functions in optimization problems or ODE solvers
+
+    Choosing a symbolic type:
+    - This option determines the type of symbolic variables used to construct the
+        computational graph.  The choice determines the efficiency and type of
+        supported operations.
+    - `SX` produces scalar symbolic arrays, meaning that every entry in the array has
+        its own scalar symbol. This can produce highly efficient code, but is limited
+        to a subset of possible operations. For example, `SX` symbolics don't support
+        interpolation with lookup tables.
+    - `MX` symbolics are array-valued, meaning that the entire array is represented by
+        a single symbol. This allows for embedding more general operations like
+        interpolation, ODE solves, and optimization solves into the computational
+        graph, but may not be as fast as `SX` for functions that are dominated by
+        scalar operations.
+    - The current default is `MX` and the current recommendation is to use `MX`
+        symbolics unless you want to do targeted performance optimizations and feel
+        comfortable with the symbolic array concepts.
+
+    When a compiled function is called, Archimedes:
+    1. Replaces arguments with symbolic variables of the same shape and dtype
+    2. Traces the execution of your function with these symbolic arguments
+    3. Creates a computational graph representing all operations
+    4. Caches this graph based on input shapes/dtypes and static arguments
+    5. Evaluates the graph with the provided numeric inputs
+
+    The function is only traced once for each unique combination of argument shapes,
+    dtypes, and static argument values. Subsequent calls with the same shapes reuse
+    the cached graph, improving performance.
+    
+    Static arguments:
+    Static arguments aren't converted to symbolic variables. This is useful for:
+    - Configuration flags that affect control flow
+    - Constants that shouldn't be differentiated through
+    - Values that would be inefficient to recalculate symbolically
+    
+    Examples
+    --------
+    Basic usage as a decorator:
+    
+    >>> import numpy as np
+    >>> import archimedes as arc
+    >>> 
+    >>> @arc.compile
+    ... def rotate(x, theta):
+    ...     R = np.array([
+    ...         [np.cos(theta), -np.sin(theta)],
+    ...         [np.sin(theta), np.cos(theta)],
+    ...     ], like=x)
+    ...     return R @ x
+    >>> 
+    >>> x = np.array([1.0, 0.0])
+    >>> rotate(x, 0.5)
+    
+    Using static arguments that modify the function behavior:
+    
+    >>> @arc.compile(static_argnames=("use_boundary_conditions",))
+    ... def solve_system(A, b, use_boundary_conditions=True):
+    ...     if use_boundary_conditions:
+    ...         b[[0, -1]] = 0.0  # Apply boundary conditions
+    ...     return np.linalg.solve(A, b)
+    
+    Different symbolic types:
+    
+    >>> # Simple mathematical function - use SX for efficiency
+    >>> @arc.compile(kind="SX")
+    ... def norm(x):
+    ...     return np.sqrt(np.sum(x**2))
+    >>> 
+    >>> # Function with interpolation - requires MX
+    >>> @arc.compile(kind="MX", static_argnames=("xp", "fp"))
+    ... def interpolate(x, xp, fp):
+    ...     return np.interp(x, xp, fp)
+    
+    See Also
+    --------
+    arc.grad : Compute gradients of compiled functions
+    arc.jac : Compute Jacobians of compiled functions
+    arc.codegen : Generate C code from compiled functions
     """
-    # TODO: Link to documentation
 
     # If used as @compile(...)
     if func is None:
