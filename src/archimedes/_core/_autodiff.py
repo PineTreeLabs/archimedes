@@ -206,6 +206,10 @@ def jac(
     - For sensitivity analysis of vector outputs with respect to input parameters
     - For linearization of nonlinear models around operating points
 
+    In cases where the full Jacobian is not needed, but only the product of the
+    Jacobian with a vector, consider using `jvp` (Jacobian-vector product) or
+    `vjp` (vector-transpose-Jacobian product) for more efficient computation.
+
     Currently this function only supports creating Jacobians for functions
     with a single return value. If the function has multiple return values,
     the function will raise a ValueError.
@@ -477,13 +481,108 @@ def jvp(
     static_argnames=None,
 ):
     """Create a function that evaluates the Jacobian-vector product of `func`.
-
-    This will use forward-mode automatic differentiation to compute the product
-    of the Jacobian of `func` with the given vector. For a function `f(x)` the
-    returned function will have the signature `jvp_fun(x, v) = f'(x) * v`.
-
+    
+    Transforms a function into a new function that efficiently computes the
+    product of the Jacobian matrix of `func` with a given vector, using
+    forward-mode automatic differentiation.
+    
+    Parameters
+    ----------
+    func : callable
+        The function to differentiate. If not already a compiled function,
+        it will be compiled with the specified static arguments.
+    name : str, optional
+        Name for the created JVP function. If None, a name is automatically
+        generated based on the primal function's name.
+    static_argnums : tuple of int, optional
+        Specifies which positional arguments should be treated as static (not
+        differentiated or traced symbolically). Only used if `func` is not already
+        a compiled function.
+    static_argnames : tuple of str, optional
+        Specifies which keyword arguments should be treated as static. Only used
+        if `func` is not already a compiled function.
+    
+    Returns
+    -------
+    callable
+        A function with signature `jvp_fun(x, v)` that computes J(x)·v, where
+        J(x) is the Jacobian of `func` evaluated at `x` and `v` is the vector
+        to multiply with. The function returns a vector with the same shape as
+        the output of `func`.
+    
+    Notes
+    -----
+    When to use this function:
+    - When you need directional derivatives along a specific vector
+    - When computing sensitivities for functions with many outputs and few inputs
+    - When the full Jacobian matrix would be too large to compute or store efficiently
+    - In iterative algorithms that require repeated Jacobian-vector products
+    
+    Conceptual model:
+    The Jacobian-vector product (JVP) computes the directional derivative of a 
+    function in the direction of a given vector, without explicitly forming the
+    full Jacobian matrix. For a function f: R^n → R^m and a vector v ∈ R^n, the 
+    JVP is equivalent to J(x)·v where J(x) is the m×n Jacobian matrix at point x.
+    
+    Forward-mode automatic differentiation computes JVPs very efficiently, with a
+    computational cost similar to that of evaluating the original function,
+    regardless of the output dimension. This makes JVP particularly effective for
+    functions with few inputs but many outputs.
+    
+    The JVP also represents how a small change in the input (in the direction of v)
+    affects the output of the function, making it useful for sensitivity analysis.
+    
+    Edge cases:
+    - Raises ValueError if the function does not return a single vector-valued array
+    - The vector v must have the same shape as the input x
+    
+    Examples
+    --------
+    >>> import numpy as np
+    >>> import archimedes as arc
+    >>> 
+    >>> # Example: JVP of a simple function
+    >>> def f(x):
+    >>>     return np.array([x[0]**2, x[0]*x[1], np.exp(x[1])], like=x)
+    >>> 
+    >>> # Create the JVP function
+    >>> f_jvp = arc.jvp(f)
+    >>> 
+    >>> # Evaluate at a point
+    >>> x = np.array([2.0, 1.0])
+    >>> v = np.array([1.0, 0.5])  # Direction vector
+    >>> 
+    >>> # Compute JVP: J(x)·v
+    >>> auto_jvp = f_jvp(x, v)
+    >>> print(auto_jvp)
+    [4.         2.         1.35914091]
+    >>> 
+    >>> # Compare with direct computation of Jacobian
+    >>> manual_jvp = arc.jac(f)(x) @ v
+    >>> print(np.allclose(auto_jvp, manual_jvp))
+    True
+    >>> 
+    >>> # Example: Efficient sensitivity analysis for a high-dimensional output
+    >>> def high_dim_func(params):
+    >>>     # Function with few inputs but many outputs.
+    >>>     return np.sin(np.sum(np.outer(params, np.arange(1000)), axis=0))
+    >>> 
+    >>> # JVP is much more efficient than computing the full Jacobian
+    >>> sensitivity = arc.jvp(high_dim_func)
+    >>> params = np.array([0.1, 0.2])
+    >>> direction = np.array([1.0, 0.0])  # Sensitivity in first parameter direction
+    >>> 
+    >>> # Compute how output changes in the direction of the first parameter
+    >>> output_sensitivity = sensitivity(params, direction)
+    >>> print(output_sensitivity.shape)
+    (1000,)
+    
+    See Also
+    --------
+    arc.vjp : Compute vector-Jacobian products (reverse-mode AD)
+    arc.jac : Compute the full Jacobian matrix
+    arc.grad : Compute the gradient of a scalar-valued function
     """
-    # TODO: expand docstring
 
     # Note that the interface here differs from JAX, which has the signature
     # `jvp(func, primals, tangents) -> primals, tangents`. In this case the JVP
@@ -501,7 +600,6 @@ def jvp(
     # assuming that the arguments are already symbolic arrays. This can then
     # be used to create the JVP FunctionCache.
     def _jvp(x, v):
-        print(f"primals: {x}, {type(x)}, {x.shape}")
 
         # The return values can be a single SymbolicArray or a tuple of these.
         y = func(x)
