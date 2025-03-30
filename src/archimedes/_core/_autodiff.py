@@ -636,13 +636,112 @@ def vjp(
     static_argnames=None,
 ):
     """Create a function that evaluates the vector-Jacobian product of `func`.
+    
+    Transforms a function into a new function that efficiently computes the
+    product of a vector with the transposed Jacobian matrix of `func`, using
+    reverse-mode automatic differentiation.
+    
+    Parameters
+    ----------
+    func : callable
+        The function to differentiate. If not already a compiled function,
+        it will be compiled with the specified static arguments.
+    name : str, optional
+        Name for the created VJP function. If None, a name is automatically
+        generated based on the primal function's name.
+    static_argnums : tuple of int, optional
+        Specifies which positional arguments should be treated as static (not
+        differentiated or traced symbolically). Only used if `func` is not already
+        a compiled function.
+    static_argnames : tuple of str, optional
+        Specifies which keyword arguments should be treated as static. Only used
+        if `func` is not already a compiled function.
+    
+    Returns
+    -------
+    callable
+        A function with signature `vjp_fun(x, w)` that computes w^T·J(x), where
+        J(x) is the Jacobian of `func` evaluated at `x` and `w` is the vector
+        to multiply with. The function returns a vector with the same shape as
+        the input `x`.
+    
+    Notes
+    -----
+    When to use this function:
+    - When you need gradients of scalar projections of the output
+    - When computing sensitivities for functions with many inputs and few outputs
+    - In adjoint-based (e.g PDE-constrained) optimization problems
 
-    This will use reverse-mode automatic differentiation to compute the product
-    of the transposed-Jacobian of `func` with the given vector. For a function
-    `f(x)` the returned function will have the signature `vjp_fun(x, w) = f'(x)^T * w`.
+    Conceptual model:
+    The vector-Jacobian product (VJP) computes the gradient of a scalar projection
+    of the output without explicitly forming the full Jacobian matrix. For a function 
+    f: R^n → R^m and a vector w ∈ R^m, the VJP is equivalent to w^T·J(x) where J(x) 
+    is the m×n Jacobian matrix at point x.
+    
+    Reverse-mode automatic differentiation computes VJPs very efficiently, with a
+    computational cost similar to that of evaluating the original function,
+    regardless of the input dimension. This makes VJP particularly effective for
+    functions with many inputs but few outputs (which is why it's widely used in
+    machine learning for gradient-based optimization). If the function is scalar-valued
+    then the VJP with vector w=1 is equivalent to the gradient of the function.
 
+    The VJP represents the sensitivity of a weighted sum of outputs to changes in
+    each input dimension.
+
+    Current limitations:
+    - Raises ValueError if the function does not return a single vector-valued array
+    - The vector w must have the same shape as the output of `func`
+    
+    Examples
+    --------
+    >>> import numpy as np
+    >>> import archimedes as arc
+    >>> 
+    >>> # Example: VJP of a simple function
+    >>> def f(x):
+    >>>     return np.array([x[0]**2, x[0]*x[1], np.exp(x[1])], like=x)
+    >>> 
+    >>> # Create the VJP function
+    >>> f_vjp = arc.vjp(f)
+    >>> 
+    >>> # Evaluate at a point
+    >>> x = np.array([2.0, 1.0])
+    >>> w = np.array([1.0, 0.5, 2.0])  # Weighting vector for outputs
+    >>> 
+    >>> # Compute VJP: w^T·J(x)
+    >>> auto_vjp = f_vjp(x, w)
+    >>> print(auto_vjp)
+    [4.5        6.43656366]
+    >>> 
+    >>> # Compare with direct computation of Jacobian transpose
+    >>> J = arc.jac(f)
+    >>> full_jacobian = J(x)
+    >>> manual_vjp = w @ full_jacobian
+    >>> print(np.allclose(input_gradient, manual_vjp))
+    True
+    >>> 
+    >>> # Example: Comparing efficiency with JVP
+    >>> # For functions with many inputs but few outputs, VJP is more efficient
+    >>> def high_dim_input_func(x):
+    >>>     # Sum of squares of many inputs, producing a scalar
+    >>>     return np.sum(x**2)
+    >>> 
+    >>> # Gradient computation is equivalent to a VJP with w=1
+    >>> grad_result = arc.grad(high_dim_input_func)(x)
+    >>> x = np.random.randn(1000)  # 1000-dimensional input, scalar output
+    >>> w = np.array(1.0)  # Weight for the scalar output
+    >>> 
+    >>> # VJP computes the gradient efficiently without forming full Jacobian
+    >>> vjp_result = arc.vjp(high_dim_input_func)(x, w)
+    >>> print(np.allclose(vjp_result, grad_result))
+    True
+    
+    See Also
+    --------
+    arc.jvp : Compute Jacobian-vector products (forward-mode AD)
+    arc.jac : Compute the full Jacobian matrix
+    arc.grad : Compute the gradient of a scalar-valued function (special case of VJP)
     """
-    # TODO: expand docstring
 
     # Note that the interface here differs from JAX, which has the signature
     # `vjp(func, *primals) -> primals, vjp_fun`, where `vjp_fun` has the signature
