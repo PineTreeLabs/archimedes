@@ -166,13 +166,118 @@ def jac(
     static_argnames=None,
 ):
     """Create a function that evaluates the Jacobian of `func`.
+    
+    Transforms a vector-valued function into a new function that computes
+    the Jacobian matrix (matrix of all first-order partial derivatives) with
+    respect to one or more of its input arguments.
+    
+    Parameters
+    ----------
+    func : callable
+        The function to differentiate. Can return a vector or matrix output.
+        If not already a compiled function, it will be compiled with the 
+        specified static arguments.
+    argnums : int or tuple of ints, optional
+        Specifies which positional argument(s) to differentiate with respect to.
+        Default is 0, meaning the first argument.
+    name : str, optional
+        Name for the created Jacobian function. If None, a name is automatically
+        generated based on the primal function's name.
+    static_argnums : tuple of int, optional
+        Specifies which positional arguments should be treated as static (not
+        differentiated or traced symbolically). Only used if `func` is not already
+        a compiled function.
+    static_argnames : tuple of str, optional
+        Specifies which keyword arguments should be treated as static. Only used
+        if `func` is not already a compiled function.
+    
+    Returns
+    -------
+    callable
+        A function that computes the Jacobian of `func` with respect to the
+        specified arguments. If multiple arguments are specified in `argnums`,
+        the function returns a tuple of Jacobians, one for each specified argument.
+    
+    Notes
+    -----
+    When to use this function:
+    - When working with derivatives of vector-valued functions
+    - For constrained optimization problems where Jacobians are needed
+    - For sensitivity analysis of vector outputs with respect to input parameters
+    - For linearization of nonlinear models around operating points
 
-    Similar in spirit to `jax.jacfwd` and `jax.jacrev`.
-
-    Currently only supports functions with a single return value.
+    Currently this function only supports creating Jacobians for functions
+    with a single return value. If the function has multiple return values,
+    the function will raise a ValueError.
+    
+    Internally, CasADi chooses between forward and reverse mode automatic
+    differentiation using a heuristic based on the number of required derivative
+    calculations in either case. For functions with many inputs and few outputs,
+    reverse mode is typically more efficient. For functions with few inputs and 
+    many outputs, forward mode is typically preferred.
+    
+    Conceptual model:
+    The Jacobian matrix represents the best linear approximation to a function 
+    near a given point. For a function f: R^n → R^m, the Jacobian is an m×n matrix
+    where each element (i,j) represents the partial derivative of the i-th output
+    with respect to the j-th input.  Hence, the function returned by `jac` takes the
+    form `J: R^n → R^(m×n)`.
+    
+    Edge cases:
+    - Raises ValueError if `argnums` contains a static argument index
+    - Raises ValueError if the function does not return a single array
+    - Currently only supports functions with a single return value (future versions
+      may support multiple returns)
+    - Differentiating through non-differentiable operations will return a valid but
+      potentially undefined result
+    
+    Examples
+    --------
+    >>> import numpy as np
+    >>> import archimedes as arc
+    >>> 
+    >>> # Example: Jacobian of a simple vector function
+    >>> def f(x):
+    >>>     return np.array([x[0]**2, x[0]*x[1], np.sin(x[1])], like=x)
+    >>> 
+    >>> J = arc.jac(f)
+    >>> x = np.array([2.0, 3.0])
+    >>> print(J(x))
+    [[ 4.         0.       ]
+     [ 3.         2.       ]
+     [ 0.        -0.9899925]]
+    >>> 
+    >>> # Multi-argument function with Jacobian w.r.t. specific argument
+    >>> def dynamics(t, x, u):
+    >>>     # Simple pendulum dynamics with control input.
+    >>>     g = 9.81
+    >>>     L = 1.0
+    >>>     return np.array([
+    >>>         x[1], -(g * np.sin(x[0]) + u) / L
+    >>>     ], like=x)
+    >>> 
+    >>> # Get Jacobian with respect to state (for linearization)
+    >>> Jx = arc.jac(dynamics, argnums=1)
+    >>> t = 0.0
+    >>> x0 = np.array([0.0, 0.0])  # Equilibrium
+    >>> u = 0.0
+    >>> print(Jx(t, x0, u))
+    [[ 0.    1.  ]
+     [-9.81  0.  ]]
+    >>> 
+    >>> # Get Jacobian with respect to control input (for control design)
+    >>> Ju = arc.jac(dynamics, argnums=2)
+    >>> print(Ju(t, x0, u))
+    [0. 1.]
+    
+    See Also
+    --------
+    arc.grad : Compute the gradient of a scalar-valued function
+    arc.hess : Compute the Hessian matrix of a scalar function
+    arc.jvp : Compute Jacobian-vector products
+    arc.vjp : Compute vector-Jacobian products
     """
-    # TODO: expand docstring
-    # TODO: Support multiple returns?
+    # TODO: Support multiple returns using PyTrees?
 
     if not isinstance(func, FunctionCache):
         func = FunctionCache(
