@@ -222,14 +222,12 @@ def jac(
     where each element (i,j) represents the partial derivative of the i-th output
     with respect to the j-th input.  Hence, the function returned by `jac` takes the
     form `J: R^n → R^(m×n)`.
-    
+
     Edge cases:
     - Raises ValueError if `argnums` contains a static argument index
     - Raises ValueError if the function does not return a single array
     - Currently only supports functions with a single return value (future versions
       may support multiple returns)
-    - Differentiating through non-differentiable operations will return a valid but
-      potentially undefined result
     
     Examples
     --------
@@ -334,11 +332,98 @@ def hess(
     static_argnames=None,
 ):
     """Create a function that evaluates the Hessian of `func`.
+    
+    Transforms a scalar-valued function into a new function that computes
+    the Hessian matrix (matrix of all second-order partial derivatives) with
+    respect to one or more of its input arguments.
+    
+    Parameters
+    ----------
+    func : callable
+        The function to differentiate. Must be a scalar-valued function
+        (returns a single value with shape `()`). If not already a compiled
+        function, it will be compiled with the specified static arguments.
+    argnums : int or tuple of ints, optional
+        Specifies which positional argument(s) to differentiate with respect to.
+        Default is 0, meaning the first argument.
+    name : str, optional
+        Name for the created Hessian function. If None, a name is automatically
+        generated based on the primal function's name.
+    static_argnums : tuple of int, optional
+        Specifies which positional arguments should be treated as static (not
+        differentiated or traced symbolically). Only used if `func` is not already
+        a compiled function.
+    static_argnames : tuple of str, optional
+        Specifies which keyword arguments should be treated as static. Only used
+        if `func` is not already a compiled function.
+    
+    Returns
+    -------
+    callable
+        A function that computes the Hessian of `func` with respect to the
+        specified arguments. If multiple arguments are specified in `argnums`,
+        the function returns a tuple of Hessians, one for each specified argument.
+    
+    Notes
+    -----
+    When to use this function:
+    - For optimization problems requiring second-derivative information
+    - For analyzing the local curvature of a cost function
+    - When working with quadratic approximations of nonlinear functions
 
-    The function must have a single scalar return value (i.e. shape ()).
+    Conceptual model:
+    The Hessian matrix represents the local curvature of a function. For a function 
+    f: R^n → R, the Hessian is an n×n symmetric matrix where each element (i,j) 
+    represents the second partial derivative ∂²f/∂x_i∂x_j.
+    
+    The Hessian is computed using automatic differentiation by applying the gradient
+    operation twice. This ensures high numerical accuracy compared to finite 
+    differencing methods, especially for functions with complex computational paths.
+
+    Edge cases:
+    - Raises ValueError if `argnums` contains a static argument index
+    - Raises ValueError if the function does not return a single scalar value
+    - Currently only supports functions with a single return value
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> import archimedes as arc
+    >>> 
+    >>> # Example: Hessian of a simple function
+    >>> def f(x):
+    >>>     return 100 * (x[1] - x[0]**2)**2 + (1 - x[0])**2  # Rosenbrock function
+    >>> 
+    >>> H = arc.hess(f)
+    >>> x = np.array([1.0, 1.0])  # At the minimum
+    >>> print(H(x))
+    [[ 802. -400.]
+    [-400.  200.]]
+    >>> 
+    >>> # Example: Hessian for optimization
+    >>> def loss(x, A, y):
+    >>>     y_pred = x @ A
+    >>>     return np.sum((y_pred - y)**2) / len(y)
+    >>> 
+    >>> # Get Hessian with respect to parameters
+    >>> H_params = arc.hess(loss, argnums=1)
+    >>> 
+    >>> # Create some example data
+    >>> x = np.random.randn(100, 5)  # 100 samples, 5 features
+    >>> y = np.random.randn(100)
+    >>> A = np.zeros(5)  # Initial parameters
+    >>> 
+    >>> # Compute Hessian at initial point (useful for Newton optimization)
+    >>> H = H_params(x, A, y)
+    >>> print(H.shape)  # Should be (5, 5)
+    
+    See Also
+    --------
+    arc.grad : Compute the gradient of a scalar-valued function
+    arc.jac : Compute the Jacobian matrix of a function
+    arc.minimize : Optimization using gradient and Hessian information
     """
-    # TODO: expand docstring
-    # TODO: Support multiple returns?
+    # TODO: Support multiple returns using PyTrees?
     
     if not isinstance(func, FunctionCache):
         func = FunctionCache(
