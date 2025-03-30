@@ -97,7 +97,7 @@ class TestNDInterp:
         Z = np.sin(R) / R
         lut = arc.interpolant(
             [xgrid, ygrid],
-            Z.ravel(order='F'),
+            Z,
             arg_names=("x", "y"),
             ret_name="z",
             name="f",
@@ -140,7 +140,7 @@ class TestNDInterp:
         Z = np.sin(R) / R
         arc.interpolant(
             [xgrid, ygrid],
-            Z.ravel(order='F'),
+            Z,
         )
 
     def test_error_handling(self):
@@ -151,7 +151,7 @@ class TestNDInterp:
         Z = np.sin(R) / R
         lut = arc.interpolant(
             [xgrid, ygrid],
-            Z.ravel(order='F'),
+            Z,
             arg_names=("x", "y"),
             ret_name="z",
             name="f",
@@ -176,28 +176,28 @@ class TestNDInterp:
         with pytest.raises(ValueError, match=r"grid\[1\] must be 1-dimensional.*"):
             lut = arc.interpolant(
                 [xgrid, ygrid[:, None]],
-                Z.ravel(order='F'),
+                Z,
             )
 
         # Too many dimensions for data array
-        with pytest.raises(ValueError, match=r'data must be 1-dimensional.*'):
+        with pytest.raises(ValueError, match=r'data must be 2-dimensional.*'):
             lut = arc.interpolant(
                 [xgrid, ygrid],
-                Z.ravel(order='F')[:, None],
+                Z[:, None],
             )
 
         # Not enough data points
         with pytest.raises(ValueError, match=r'data must have length.*'):
             lut = arc.interpolant(
                 [xgrid, ygrid],
-                Z.ravel(order='F')[:4],
+                Z[:4],
             )
 
         # Invalid method
         with pytest.raises(ValueError, match=r'method must be one of.*'):
             lut = arc.interpolant(
                 [xgrid, ygrid],
-                Z.ravel(order='F'),
+                Z,
                 method="something else",
             )
 
@@ -205,7 +205,7 @@ class TestNDInterp:
         with pytest.raises(ValueError, match=r'arg_names must have length 2.*'):
             lut = arc.interpolant(
                 [xgrid, ygrid],
-                Z.ravel(order='F'),
+                Z,
                 arg_names=["x"],
             )
 
@@ -213,7 +213,7 @@ class TestNDInterp:
         with pytest.raises(ValueError, match=r'arg_names must be a list of strings.*'):
             lut = arc.interpolant(
                 [xgrid, ygrid],
-                Z.ravel(order='F'),
+                Z,
                 arg_names=[0, 1],
             )
         
@@ -222,6 +222,6 @@ class TestNDInterp:
         with pytest.raises(ValueError, match=r'ret_name must be a string.*'):
             lut = arc.interpolant(
                 [xgrid, ygrid],
-                Z.ravel(order='F'),
+                Z,
                 ret_name=0,
             )
