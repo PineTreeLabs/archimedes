@@ -12,12 +12,102 @@ def grad(
     static_argnames=None,
 ):
     """Create a function that evaluates the gradient of `func`.
+    
+    Transforms a scalar-valued function into a new function that computes
+    the gradient (vector of partial derivatives) with respect to one or more
+    of its input arguments.
+    
+    Parameters
+    ----------
+    func : callable
+        The function to differentiate. Should be a scalar-valued function
+        (returns a single value with shape `()`). If not already a compiled
+        function, it will be compiled with specified static arguments.
+    argnums : int or tuple of ints, optional
+        Specifies which positional argument(s) to differentiate with respect to.
+        Default is 0, meaning the first argument.
+    name : str, optional
+        Name for the created gradient function. If None, a name is automatically
+        generated based on the primal function's name.
+    static_argnums : tuple of int, optional
+        Specifies which positional arguments should be treated as static (not
+        differentiated or traced symbolically). Only used if `func` is not already
+        a compiled function.
+    static_argnames : tuple of str, optional
+        Specifies which keyword arguments should be treated as static. Only used
+        if `func` is not already a compiled function.
+    
+    Returns
+    -------
+    callable
+        A function that computes the gradient of `func` with respect to the
+        specified arguments. If multiple arguments are specified in `argnums`,
+        the function returns a tuple of gradients, one for each specified argument.
 
-    This is effectively the same as `jac`, except that it only supports differentiation
-    with respect to a scalar return value.  Whereas the Jacobian of such a function
-    would be a row vector, the gradient is returned as a column.
+    Notes
+    -----
+    When to use this function:
+    - When you need to compute derivatives of a scalar-valued cost or objective function
+    - For sensitivity analysis of scalar model outputs with respect to parameters
+
+    Internally, CasADi chooses between forward and reverse mode automatic
+    differentiation using a heuristic based on the number of required derivative
+    calculations in either case.  For gradient calculations with a scalar output,
+    typically reverse mode will be used.
+    
+    Conceptual model:
+    This function uses automatic differentiation (AD) to efficiently compute exact
+    derivatives, avoiding the numerical errors and computational cost of finite
+    differencing approaches. Unlike numerical differentiation, automatic
+    differentiation computes exact derivatives (to machine precision) by applying the
+    chain rule to the computational graph generated from your function.
+    
+    The `grad` function specifically handles scalar-valued functions, returning the
+    gradient as a column vector with the same shape as the input. For vector-valued 
+    functions, use `jac` (Jacobian) instead.
+    
+    Edge cases:
+    - Raises ValueError if `argnums` contains a static argument index
+    - Raises ValueError if the function does not return a single scalar value
+    - Differentiating through non-differentiable operations (like `abs` at x=0)
+      will return a valid but potentially undefined result
+    
+    Examples
+    --------
+    >>> import numpy as np
+    >>> import archimedes as arc
+    >>> 
+    >>> # Basic example with scalar function
+    >>> def f(x):
+    >>>     return np.sin(x**2)
+    >>> 
+    >>> df = arc.grad(f)
+    >>> print(np.allclose(df(1.0), 2.0 * np.cos(1.0)))
+    True
+    >>> 
+    >>> # Multi-argument function with gradient w.r.t. specific argument
+    >>> def loss(x, A, y):
+    >>>     y_pred = A @ x
+    >>>     return np.sum((y_pred - y)**2) / len(y)
+    >>> 
+    >>> # Get gradient with respect to weights only
+    >>> grad_A = arc.grad(loss, argnums=1)
+    >>>
+    >>> A = np.random.randn(2, 3)
+    >>> x = np.ones(3)
+    >>> y = np.array([1, 2])
+    >>> print(grad_A(x, A, y))  # df/dA
+    >>> 
+    >>> # Alternatively, differentiate with respect to multiple arguments
+    >>> grads = arc.grad(loss, argnums=(0, 1))
+    >>> # Returns a tuple (df/dx, df/dA)
+    >>> print(grads(x, A, y))
+    
+    See Also
+    --------
+    arc.jac : Compute the Jacobian matrix of a function
+    arc.hess : Compute the Hessian matrix of a scalar function
     """
-    # TODO: expand docstring
 
     if not isinstance(func, FunctionCache):
         func = FunctionCache(
