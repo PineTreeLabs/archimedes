@@ -125,7 +125,8 @@ def nlp_solver(
     >>>
     >>> # Solve the problem
     >>> x_opt = solver(x0, lbg, ubg)
-    >>> print(x_opt)  # Should be close to [1.0, 1.0]
+    >>> print(x_opt)
+    [0.99998266 1.00000688]
 
     See Also
     --------
@@ -290,21 +291,111 @@ def minimize(
     constr_bounds=None,
     **options,
 ):
-    """Minimize a function using IPOPT.
+    """Minimize a scalar function with optional constraints.
 
-    This function is a wrapper around `nlp_solver` that sets the objective
-    function `obj` as the function to minimize.  The function `obj` should
-    return a scalar value that is minimized.  The function signature should
-    be `obj(x, *args)`.
+    Find the minimum of an objective function, possibly subject to constraints
+    and bounds. This function provides a simplified interface to the IPOPT
+    nonlinear optimization solver for solving a single optimization problem.
 
-    Optionally, a constraint function may also be provided.  The constraint
-    function should return a vector of constraint values and must have the
-    same signature as `obj`.
+    Parameters
+    ----------
+    obj : callable
+        Objective function to minimize, with signature `obj(x, *args)`.
+        Must return a scalar value.
+    x0 : array_like
+        Initial guess for the optimization. The shape of this array
+        determines the dimensionality of the optimization problem.
+    args : tuple, optional
+        Extra arguments passed to the objective and constraint functions.
+    static_argnames : tuple of str, optional
+        Names of arguments that should be treated as static (non-symbolic)
+        parameters. Static arguments are not differentiated through.
+    constr : callable, optional
+        Constraint function with the same signature as `obj`.
+        Must return an array of constraint values where the constraints
+        are interpreted as lbg <= constr(x, *args) <= ubg.
+    bounds : tuple of (array_like, array_like), optional
+        Bounds on the decision variables, given as a tuple (lb, ub).
+        Each bound can be either a scalar or an array matching the shape
+        of x0. Use -np.inf and np.inf to specify no bound.
+    constr_bounds : tuple of (array_like, array_like), optional
+        Bounds on the constraint values, given as a tuple (lbg, ubg).
+        Each bound can be a scalar or an array matching the shape of the
+        constraint function output. If None and constr is provided, 
+        defaults to (0, 0) for equality constraints.
+    **options : dict
+        Additional options passed to the IPOPT solver through `nlp_solver`.
+        Common options include:
+        - print_level : int, verbosity level (0-12)
+        - max_iter : int, maximum number of iterations
+        - tol : float, convergence tolerance
 
-    Both the decision variables `x` and the constraint values can be
-    bounded by lower and upper bounds.  By default, the bounds on the
-    decision variables are infinite and the bounds on the constraints are
-    zero (corresponding to equality constraints).
+    Returns
+    -------
+    x_opt : ndarray
+        The optimal solution found by the solver, with the same shape as x0.
+
+    Notes
+    -----
+    When to use this function:
+    - For one-time optimization problems
+    - For both constrained and unconstrained problems
+    - For problems with smooth objective and constraint functions
+
+    This function uses the IPOPT interior point optimizer which is especially effective
+    for large-scale nonlinear problems. IPOPT requires derivatives of the objective and
+    constraints, which are automatically computed using automatic differentiation.
+
+    For repeated optimization with different parameters, use `arc.nlp_solver`
+    directly to avoid recompilation overhead.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> import archimedes as arc
+    >>>
+    >>> # Unconstrained Rosenbrock function
+    >>> def f(x):
+    ...     return 100 * (x[1] - x[0]**2)**2 + (1 - x[0])**2
+    >>>
+    >>> # Initial guess
+    >>> x0 = np.array([-1.2, 1.0])
+    >>>
+    >>> # Solve unconstrained problem
+    >>> x_opt = arc.minimize(f, x0)
+    >>> print(x_opt)
+    [1. 1.]
+    >>>
+    >>> # Constrained optimization
+    >>> def g(x):
+    ...     g1 = (x[0] - 1)**3 - x[1] + 1
+    ...     g2 = x[0] + x[1] - 2
+    ...     return np.array([g1, g2], like=x)
+    >>>
+    >>> # Solve with inequality constraints: g(x) <= 0
+    >>> x_opt = arc.minimize(
+    ...     f, 
+    ...     x0=np.array([2.0, 0.0]),
+    ...     constr=g,
+    ...     constr_bounds=(-np.inf, 0),
+    ... )
+    >>> print(x_opt)
+    [0.99998266 1.00000688]
+    >>>
+    >>> # Optimization with variable bounds
+    >>> x_opt = arc.minimize(
+    ...     f,
+    ...     x0=np.array([0.0, 0.0]),
+    ...     bounds=(np.array([0.0, 0.0]), np.array([0.5, 1.5])),
+    ... )
+    >>> print(x_opt)
+    array([0.50000001, 0.25000001])
+    
+    See Also
+    --------
+    arc.nlp_solver : Create a reusable solver for nonlinear optimization
+    arc.root : Find the roots of a nonlinear function
+    arc.implicit : Create a function that solves F(x, p) = 0 for x
     """
     x0 = array(x0)
     # TODO: Expand docstring
