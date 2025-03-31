@@ -27,6 +27,7 @@ limitations under the License.
 """
 
 import warnings
+import inspect
 
 import numpy as np
 
@@ -42,6 +43,26 @@ class HashablePartial:
         self.f = f
         self.args = args
         self.kwargs = kwargs
+        
+        # Create a new call signature that doesn't include any of the provided args
+        signature = inspect.signature(f)
+        parameters = []
+        for (i, (name, param)) in enumerate(signature.parameters.items()):
+            if i < len(args) or name in kwargs:
+                continue
+            parameters.append(param)
+
+        self.__signature__ = inspect.Signature(
+            parameters=parameters,
+            return_annotation=signature.return_annotation,
+        )
+        self._name = f.__name__
+        if self._name.startswith("_"):
+            self._name = self._name[1:]
+
+    @property
+    def __name__(self):
+        return self._name
 
     def __eq__(self, other):
         return (

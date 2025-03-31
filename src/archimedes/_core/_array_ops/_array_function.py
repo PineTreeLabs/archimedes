@@ -513,6 +513,17 @@ def _cross(a, b, axisa=-1, axisb=-1, axisc=-1, axis=None):
     return SymbolicArray(res, dtype=dtype, shape=shape)
 
 
+def _swapaxes(a, axis1, axis2):
+    axis1 = normalize_axis_index(axis1, a.ndim, "axis1")
+    axis2 = normalize_axis_index(axis2, a.ndim, "axis2")
+    if axis1 == axis2:
+        return a
+    
+    # Since we're only supporting up to 2D arrays, the only possibilities
+    # are that axis1 == axis2 or that we need to transpose the array
+    return a.T
+
+
 # List from numpy.testing.overrides.get_overridable_numpy_array_functions()
 SUPPORTED_FUNCTIONS = {
     "array": _dispatch_array,
@@ -593,7 +604,7 @@ SUPPORTED_FUNCTIONS = {
     "add": SUPPORTED_UFUNCS["add"],
     "polysub": NotImplemented,
     "put": NotImplemented,
-    "swapaxes": NotImplemented,
+    "swapaxes": _swapaxes,
     "multiply": binary_op(cs.times),
     "ediff1d": NotImplemented,
     "round": NotImplemented,

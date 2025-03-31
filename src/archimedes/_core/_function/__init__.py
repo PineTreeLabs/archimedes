@@ -1,5 +1,5 @@
 from ._compile import compile, FunctionCache
-from ._control_flow import scan
+from ._control_flow import scan, vmap
 from ._codegen import codegen
 
 __all__ = [
@@ -7,4 +7,5 @@ __all__ = [
     "FunctionCache",
     "codegen",
     "scan",
+    "vmap",
 ]

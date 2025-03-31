@@ -1,9 +1,42 @@
+"""
+This code modifies code from JAX:
+- vmap: https://github.com/jax-ml/jax/blob/main/jax/_src/api.py#L831-L1033
+
+Copyright (c) 2021 The JAX Authors
+Licensed under Apache License 2.0
+https://github.com/jax-ml/jax
+
+Modifications and additions to the original code:
+Copyright (c) 2025 Jared Callaham
+Licensed under the GNU General Public License v3.0
+
+As a combined work, use of this code requires compliance with the GNU GPL v3.0.
+The original license terms are included below for attribution:
+
+=== Apache License 2.0 ===
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    https://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+"""
+
 from __future__ import annotations
+from collections import OrderedDict
 
 import numpy as np
 
 from archimedes import tree
-from archimedes._core._array_impl import array, _as_casadi_array
+from archimedes._core._array_impl import array, zeros, _as_casadi_array
+from ._compile import FunctionCache
+from .._array_ops._array_ops import normalize_axis_index
+from ... import tree
 
 
 __all__ = [
@@ -16,7 +49,8 @@ def scan(
     xs=None,
     length=None,
 ):
-    """Apply a function repeatedly while carrying state between iterations.
+    """
+    Apply a function repeatedly while carrying state between iterations.
     
     Efficiently implements a loop that accumulates state and collects outputs at each 
     iteration. Similar to functional fold/reduce operations but also accumulates the 
@@ -201,3 +235,289 @@ def scan(
 
     # Return the CasADi outputs as NumPy or SymbolicArray types
     return carry, ys
+
+
+def normalize_vmap_index(axis, data, insert=False):
+    if isinstance(axis, int):
+        axis = tree.map(lambda x: axis, data)
+    # Create a PyTree of normalized axis indices
+    def _normalize_leaf_index(axis, leaf):
+        ndim = leaf.ndim
+        if insert:
+            ndim += 1
+        return normalize_axis_index(axis, ndim)
+    return tree.map(_normalize_leaf_index, axis, data)
+
+
+def vmap(func, in_axes=0, out_axes=0, name=None):
+    """
+    Vectorize a function along specified argument axes.
+    
+    The `vmap` transformation takes a function that operates on individual elements
+    and transforms it into one that operates on batches of elements in a vectorized
+    manner. This enables efficient computation without writing explicit loops or
+    broadcasting logic.
+
+    Parameters
+    ----------
+    func : callable
+        Function to be vectorized. The function can accept ordinary NumPy arrays
+        or PyTree-structured data.
+    in_axes : int, None, or tuple of ints/None, optional
+        Specifies which axis of each input argument should be mapped over.
+        - int: Use the same axis for all arguments (e.g., 0 for the first dimension)
+        - None: Don't map this argument (broadcast it to all mapped elements)
+        - tuple: Specify a different axis for each argument
+        Default is 0 (map over the first axis of each argument).
+    out_axes : int, None, or PyTree of ints/None matching the output structure, optional
+        Specifies where the mapped axis should appear in the output.
+        - int: Place the mapped axis at this position in all outputs
+        - PyTree: Specify different axes for different parts of a structured output
+        Default is 0 (mapped axis is the first dimension of the output).
+    name : str, optional
+        Name for the transformed function. If None, derives a name from the
+        original function.
+
+    Returns
+    -------
+    vectorized_func : callable
+        A function with the same signature as `func` that operates on batches of inputs.
+
+    Notes
+    -----
+    When to use this function:
+    - When you need to apply the same operation to many inputs efficiently
+    - To convert a single-example function into one that handles batches
+    - To selectively vectorize over some arguments while broadcasting others
+    - To "unflatten" tree-structured data by mapping the unravel function
+
+    Conceptual model:
+    `vmap` transforms functions to operate along array axes. For example, a function
+    f(x) that takes a vector and returns a scalar can be transformed into one that
+    takes a batch of vectors (an array) and returns a batch of scalars (a vector),
+    without explicitly writing loops.
+
+    Each argument can be mapped differently:
+    - Mapped arguments (in_axes is an int): Batched processing along the specified axis
+    - Broadcasted arguments (in_axes is None): Same value used for all batch elements
+
+    The vectorized function ensures that all mapped arguments have the same size
+    along their mapped dimensions.
+
+    Examples
+    --------
+    Basic vectorization of a dot product:
+    
+    >>> import numpy as np
+    >>> import archimedes as arc
+    >>> 
+    >>> def dot(a, b):
+    ...     return np.dot(a, b)
+    >>> 
+    >>> # Vectorize to compute multiple dot products at once
+    >>> batched_dot = arc.vmap(dot)
+    >>> 
+    >>> # Input: batch of vectors (3 vectors of length 2)
+    >>> x = np.array([[1, 2], [3, 4], [5, 6]])
+    >>> y = np.array([[7, 8], [9, 10], [11, 12]])
+    >>> 
+    >>> # Output: batch of scalars (3 dot products)
+    >>> batched_dot(x, y)
+    array([ 23,  67, 127])
+
+    Working with structured data (PyTrees):
+
+    >>> from archimedes import struct
+    >>> 
+    >>> @struct.pytree_node
+    >>> class Particle:
+    ...     x: np.ndarray
+    ...     v: np.ndarray
+    >>> 
+    >>> def update(p, dt):
+    ...     return p.replace(x=p.x + dt * p.v)
+    >>> 
+    >>> # Vectorize to update multiple particles at once
+    >>> map_update = arc.vmap(update, in_axes=(0, None))
+    >>> 
+    >>> # Batch of 10 particles
+    >>> x = np.random.randn(10, 3)  # 10 particles in 3D space
+    >>> v = np.random.randn(10, 3)
+    >>> particles = Particle(x=x, v=v)
+    >>> 
+    >>> # Update all 10 particles at once
+    >>> new_particles = map_update(particles)
+    
+    See Also
+    --------
+    scan : Transform that applies a function sequentially to array elements
+    """
+
+    if not isinstance(func, FunctionCache):
+        func = FunctionCache(func)
+
+    num_args = len(func.arg_names)
+
+    if isinstance(in_axes, list):
+        in_axes = tuple(in_axes)
+
+    if not (in_axes is None or type(in_axes) in {int, tuple}):
+        raise TypeError("vmap in_axes must be an int, None, or a tuple of entries corresponding "
+                        f"to the positional arguments passed to the function, but got {in_axes}.")
+    
+    if in_axes is None or isinstance(in_axes, int):
+        in_axes = (in_axes,) * num_args
+
+    if not all(isinstance(l, int) for l in tree.leaves(in_axes)):
+        raise TypeError("vmap in_axes must be an int, None, or (nested) container "
+                        f"with those types as leaves, but got {in_axes}.")
+    if not all(isinstance(l, int) for l in tree.leaves(out_axes)):
+        raise TypeError("vmap out_axes must be an int, None, or (nested) container "
+                        f"with those types as leaves, but got {out_axes}.")
+    
+    if isinstance(out_axes, list):
+        out_axes = tuple(out_axes)
+
+    def _vmap_func(*args):
+        if isinstance(in_axes, tuple) and len(in_axes) != len(args):
+            raise ValueError(
+                "vmap in_axes must be an int, None, or a tuple of entries corresponding "
+                "to the positional arguments passed to the function, "
+                f"but got {len(in_axes)=}, {len(args)=}")
+
+        # Split the arguments into fixed (in_axes = None) and mapped (in_axes != None)
+        # This way we don't have to scan over the fixed data, only the mapped args
+        fixed_kwargs = OrderedDict()
+        mapped_args = OrderedDict()
+        for (ax, key, arg) in zip(
+            in_axes, func.signature.parameters.keys(), args
+        ):
+            if ax is None:
+                fixed_kwargs[key] = arg
+            else:
+                mapped_args[key] = arg
+
+        # The logic here is complicated, because we need to do two levels of
+        # "flattening":
+        # 1. flatten/unflatten: this can handle data with an additional axis, as long
+        #    as it has the right number of leaves.  Basically, this "puts the leaves
+        #    back in the container".  However, this isn't compatible with `scan`.
+        # 2. ravel/unravel: this requires that the data has exactly the same number of
+        #    elements, so we can't flexibly pack/unpack the PyTree containers. However,
+        #    when the arrays are "raveled" we can scan over inputs/outputs efficiently
+        #
+        # The "outer" step therefore flattens the PyTree to leaves (a list of arrays),
+        # and the "inner" steps stack the arguments and then splits the outputs.
+
+        # Outer step: PyTree -> leaves
+        args_flat, in_tree = tree.flatten(mapped_args)
+
+        # Wrap to (0, ndim) and construct PyTrees of the mapped indices
+        # This will be a tuple of one PyTree for each argument, with each
+        # leaf corresponding to the normalized index for that leaf
+        in_axes_normalized = tuple(
+            normalize_vmap_index(a, arg)
+            for a, arg in zip(in_axes, args) if a is not None
+        )
+
+        # Swap axes so that the mapped axis is the leading axis
+        args_flat = tuple(
+            np.swapaxes(arg, 0, a)
+            for a, arg in zip(tree.leaves(in_axes_normalized), args_flat)
+            if a is not None
+        )
+
+        # Check that the leading axis of all mapped args is the same
+        leading_axes = [arg.shape[0] for arg in args_flat]
+        if len(set(leading_axes)) != 1:
+            raise ValueError(
+                "vmap requires that all mapped arguments have the same leading axis "
+                f"length, but got {leading_axes}."
+            )
+
+        init_args = tuple(arg[0] for arg in args_flat)
+
+        # Inner step: leaves -> vectors (for scanning)
+        # Also note that the "fixed vec" has to be passed to the scan function
+        # or there is an error about a dangling symbolic variable (because we're
+        # doing nested traced functions, which is a little dicey).
+        init_args_vec, unravel_mapped_args = tree.ravel(init_args)
+        fixed_args_vec, unravel_fixed_args = tree.ravel(fixed_kwargs)
+    
+        def flat_func(args_vec, fixed_vec):
+            args_leaves = unravel_mapped_args(args_vec)  # vec -> leaves
+            fixed_args = unravel_fixed_args(fixed_vec)  # vec -> leaves
+            _kwargs = {**fixed_args, **tree.unflatten(in_tree, args_leaves)}
+            return tree.flatten(func(**_kwargs))
+
+        # Call once to determine output structure
+        out_template_leaves, out_tree = flat_func(init_args_vec, fixed_args_vec)
+        out_template = out_tree.unflatten(out_template_leaves)
+
+        # Wrap out axes to (0, ndim)
+        if isinstance(out_axes, int):
+            out_axes_normalized = normalize_vmap_index(out_axes, out_template, True)
+
+        else:
+            out_axes_treedef = tree.structure(out_axes)
+            if out_tree != out_axes_treedef:
+                raise TypeError(
+                    "out_axes must be an int, None, or a PyTree structure matching "
+                    f"the output structure, but got {out_tree} and {out_axes_treedef}"
+                )
+            
+            out_axes_normalized = tree.map(
+                lambda a, arr: normalize_axis_index(a, arr.ndim), out_axes, out_template
+            )
+
+        # Another inner step: manually "ravel"/"unravel" the arguments to/from a
+        # 2D array for passing to/from `scan`.
+        #
+        # Ensure that all arrays are 2D, with the mapped axis in front
+        # Since we have ensured that the mapped axis is consistent, the
+        # only possibilities are 2D (do nothing) and 1D (expand and transpose)
+        stacked_args = np.concatenate([
+            arg if arg.ndim == 2 else arg[:, None] for arg in args_flat
+        ], axis=1)
+
+        # Determine the indices of the output arrays to split to get the leaves
+        # after calling `scan`.
+        split_idx = np.cumsum([out.size for out in out_template_leaves])
+
+        # Here is the main work: `scan` will loop over the 2D stacked inputs and
+        # return 2D stacked outputs
+        def scan_func(carry, x):
+            result, _ = flat_func(x, carry)
+            return carry, tree.ravel(result)[0]
+
+        _, out_array = scan(scan_func, fixed_args_vec, stacked_args)
+
+        # Inner step: split the array to have the right number of leaves
+        out_leaves = np.split(out_array, split_idx, axis=1)[:-1]
+
+        # Make sure that the leaves are the same as the input plus
+        # the additional axis
+        map_length = leading_axes[0]
+        out_leaves = [
+            np.reshape(leaf, (map_length,) + template.shape)
+            for leaf, template in zip(out_leaves, out_template_leaves)
+        ]
+
+        # Outer step: recreate the PyTree structure with the output leaves
+        out = out_tree.unflatten(out_leaves)
+
+        # Swap axes again according to out_axes
+        return tree.map(
+            lambda a, arg: np.swapaxes(arg, 0, a), out_axes_normalized, out,
+        )
+
+    if name is None:
+        name = f"vmap_{func.name}"
+
+    _vmap_func.__name__ = name
+
+    return FunctionCache(
+        _vmap_func,
+        arg_names=func.arg_names,
+        kind=func._kind,
+    )

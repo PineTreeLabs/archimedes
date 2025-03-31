@@ -19,6 +19,7 @@ from ._function import (
     compile,
     FunctionCache,
     scan,
+    vmap,
     codegen,
 )
 from ._autodiff import grad, jac, hess, jvp, vjp
@@ -44,5 +45,6 @@ __all__ = [
     "jvp",
     "vjp",
     "scan",
+    "vmap",
     "interpolant",
 ]
