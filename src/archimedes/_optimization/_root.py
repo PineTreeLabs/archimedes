@@ -174,43 +174,113 @@ def root(
     args=(),
     static_argnames=None,
     method="newton",
+    tol=None,
     **options,
 ):
-    """Find a root of a function.
-
+    """Find a root of a nonlinear function.
+    
+    Solves the equation f(x) = 0 for x, where f is a vector function of 
+    vector x. This function provides a simple interface to various root-finding
+    algorithms suitable for different types of problems.
+    
     Parameters
     ----------
     func : callable
-        The function whose root to find. It must be a function of the form
-        `func(x, *args)`, where `x` is the input and `args` are additional
-        arguments.
+        The function whose root to find, with signature `func(x, *args)`.
+        The function should return an array of the same shape as `x`.
+        For systems of equations, `func` should return a vector of residuals.
     x0 : array_like
-        The initial guess for the root.
+        Initial guess for the solution. The shape of this array determines
+        the dimensionality of the problem to be solved.
     args : tuple, optional
-        Additional arguments to pass to the function.
-    static_argnames : list, optional
-        The names of the static arguments to the function. These will not be
-        evaluated symbolically and will be passed directly to the implicit function.
-        All such arguments must be hashable.
+        Extra arguments passed to the function.
+    static_argnames : tuple of str, optional
+        Names of arguments that should be treated as static (non-symbolic)
+        parameters. Static arguments are not differentiated through and 
+        the solver will be recompiled when their values change.
     method : str, optional
-        The root-finding method to use. One of "newton", "kinsol", or "nlpsol".
-    options : dict, optional
-        Additional options to pass to the root-finding solver. See CasADi documentation
-        for more information.
+        The root-finding method to use. Options are:
+        - 'newton': Newton's method (default), best for general problems
+        - 'fast_newton': Simple Newton iterations with no line search
+        - 'kinsol': KINSOL solver from SUNDIALS, robust for large systems
+    **options : dict, optional
+        Common additional options specific to the chosen method:
 
+        For 'newton' and 'fast_newton':
+        - max_iter : int, maximum iterations (default: 100)
+
+        For 'kinsol':
+        - max_iter : int, maximum iterations
+        - strategy : str, globalization strategy ('none', 'linesearch', 'picard', 'fp')
+
+        See the [CasADi documentation](https://web.casadi.org/python-api/#rootfinding)
+        for more details on the available options for each method.
+    
     Returns
     -------
-    x : array_like
-        The root of the function.
+    x : ndarray
+        The solution found, with the same shape as the initial guess x0.
+        If the algorithm fails to converge, the best estimate is returned.
+
+    Notes
+    -----
+    When to use this function:
+    - For solving systems of nonlinear equations
+
+    This function leverages Archimedes' automatic differentiation to compute
+    the Jacobian matrix required by most root-finding methods. For repeated 
+    solving with different parameters, use `arc.implicit` directly to create
+    a reusable solver function.
 
     Examples
     --------
-    >>> def f(x):
-    ...     return x**2 - 1
-    >>> root(f, x0=2.0)
-    1.0
+    >>> import numpy as np
+    >>> import archimedes as arc
+    >>>
+    >>> # Simple scalar equation: x^2 = 2
+    >>> def f1(x):
+    ...     return x**2 - 2
+    >>>
+    >>> sol = arc.root(f1, x0=1.0)
+    >>> print(f"Solution: {sol:.10f}")  # Should be close to sqrt(2)
+    Solution: 1.4142135624
+    >>>
+    >>> # System of nonlinear equations
+    >>> def f2(x):
+    ...     return np.array([
+    ...         x[0] + 0.5 * (x[0] - x[1])**3 - 1.0,
+    ...         0.5 * (x[1] - x[0])**3 + x[1],
+    ...     ], like=x)
+    >>>
+    >>> sol = arc.root(f2, x0=np.array([0.0, 0.0]))
+    >>> print(sol)  # Should be close to [0.8411639, 0.1588361]
+    [0.8411639 0.1588361]
+    >>>
+    >>> # Using a different method with options
+    >>> def f3(x):
+    ...     return np.exp(x) - 2
+    >>>
+    >>> sol = arc.root(f3, x0=1.0, method='kinsol', max_iter=20, tol=1e-10)
+    >>> print(f"Solution: {sol:.10f}")  # Should be close to ln(2)
+    Solution: 0.6931471806
+    >>>
+    >>> # With additional parameters
+    >>> def f4(x, a, b):
+    ...     return x**2 - a*x + b
+    >>>
+    >>> sol = arc.root(f4, x0=2.5, args=(3, 2))
+    >>> print(f"Solution: {sol:.10f}")  # Should be close to 2
+    Solution: 2.0000000000
+    
+    See Also
+    --------
+    arc.implicit : Create a function that solves F(x, p) = 0 for x given p
+    arc.minimize : Find the minimum of a scalar function
+    arc.jac : Compute the Jacobian of a function
     """
     # TODO: Better documentation of common options
+    if tol is not None:
+        options["abstol"] = tol
 
     g = implicit(
         func,
