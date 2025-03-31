@@ -51,6 +51,81 @@ _T = TypeVar('_T')
 
 
 def field(static=False, *, metadata=None, **kwargs):
+    """
+    Create a field specification with pytree-related metadata.
+    
+    This function extends dataclasses.field() with additional metadata to control
+    how fields are treated in pytree operations. Fields can be marked as static
+    (metadata) or dynamic (data).
+    Except for the `static` argument, all other arguments are passed directly to
+    `dataclasses.field()`; see documentation for the dataclasses module for details.
+
+    Parameters
+    ----------
+    static : bool, default=False
+        If True, the field is treated as static metadata rather than dynamic data.
+        Static fields are preserved during pytree transformations but not included
+        in the flattened representation.
+    metadata : dict, optional
+        Additional metadata to include in the field specification. This will be
+        merged with the 'static' setting.
+    **kwargs : dict
+        Additional keyword arguments passed to dataclasses.field().
+    
+    Returns
+    -------
+    field_object : dataclasses.Field
+        A field specification with the appropriate metadata.
+
+    Notes
+    -----
+    When to use:
+    - To mark configuration parameters that shouldn't change during operations
+    - To define default values or constructors for fields
+
+    Static fields are not included when you flatten a pytree or apply transformations
+    like `map`, but they are preserved in the structure and included when you
+    reconstruct the object.
+
+    Examples
+    --------
+    >>> import archimedes as arc
+    >>> from archimedes import struct
+    >>> import numpy as np
+    >>> 
+    >>> @struct.pytree_node
+    >>> class Vehicle:
+    ...     # Dynamic state variables (included in flattening)
+    ...     position: np.ndarray
+    ...     velocity: np.ndarray
+    ...     
+    ...     # Static configuration parameters (excluded from flattening)
+    ...     mass: float = struct.field(static=True, default=1000.0)
+    ...     drag_coef: float = struct.field(static=True, default=0.3)
+    ...     
+    ...     # With additional metadata
+    ...     name: str = struct.field(
+    ...         static=True,
+    ...         default="vehicle",
+    ...         metadata={"description": "Vehicle identifier"}
+    ...     )
+    >>> 
+    >>> # Create an instance
+    >>> car = Vehicle(
+    ...     position=np.array([0.0, 0.0]),
+    ...     velocity=np.array([10.0, 0.0]),
+    ... )
+    >>> 
+    >>> # When flattened, only dynamic fields are included
+    >>> flat, _ = arc.tree.flatten(car)
+    >>> print(len(flat))  # Only position and velocity are included
+    2
+    
+    See Also
+    --------
+    struct.pytree_node : Decorator for creating pytree-compatible classes
+    register_dataclass : Register a dataclass as a pytree node
+    """
     return dataclasses.field(
         metadata=(metadata or {}) | {'static': static},
         **kwargs,
