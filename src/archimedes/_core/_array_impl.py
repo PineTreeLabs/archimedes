@@ -358,10 +358,9 @@ def sym(name, shape=None, dtype=np.float64, kind=DEFAULT_SYM_NAME) -> SymbolicAr
       operations and gradients of scalar functions.
     - MX types represent entire matrices as single symbolic objects and support a wider range
       of operations, including those that cannot be easily represented element-wise.
-    
+
     Current limitations:
     - Only supports up to 2D arrays (scalars, vectors, and matrices)
-    - Some operations may behave differently between SX and MX types
     
     Examples
     --------
@@ -1087,12 +1086,12 @@ def eye(n, dtype=np.float64, kind=DEFAULT_SYM_NAME):
     >>> import numpy as np
     >>> 
     >>> # Create a 3×3 identity matrix
-    >>> I = arc.eye(3)
+    >>> I = arc.eye(3, kind="SX")
     >>> print(I)
     [[1, 0, 0], [0, 1, 0], [0, 0, 1]]
     >>> 
-    >>> # Create an MX-type identity matrix
-    >>> I_mx = arc.eye(4, kind="MX")
+    >>> # Create an MX-type identity matrix (default)
+    >>> I_mx = arc.eye(4)
     >>> 
     >>> # Use in matrix operations
     >>> x = arc.sym("x", shape=(3, 3))
