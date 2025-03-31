@@ -24,8 +24,25 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""
+Utilities for defining custom classes that can be used with pytree transformations.
 
-"""Utilities for defining custom classes that can be used with pytree transformations."""
+This module provides tools for creating structured data types that work seamlessly
+with Archimedes' pytree functions. These tools are built on Python's dataclasses
+with extensions for pytree-specific behavior.
+
+The module re-exports several names from the dataclasses module:
+    
+InitVar : Type annotation for init-only variables in dataclasses
+    Used to mark fields that should be passed to __post_init__ but not stored.
+
+fields : Function to retrieve fields of a dataclass
+    Returns a list of Field objects representing the fields of the dataclass.
+    This is useful for introspection and validation of dataclass instances.
+    
+replace : Function to create a new dataclass instance with updated fields
+    For pytree nodes created with @pytree_node, use the .replace() method instead.
+"""
 
 from collections.abc import Callable
 import dataclasses
