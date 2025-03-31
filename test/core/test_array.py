@@ -4,11 +4,21 @@ import numpy as np
 import casadi as cs
 
 import archimedes as arc
-from archimedes._core import SymbolicArray, sym
+from archimedes._core import SymbolicArray, sym as _sym
 from archimedes.error import ShapeDtypeError
+
+# NOTE: Most tests here use SX instead of the default MX, since the is_equal
+# tests struggle with the array-valued MX type.  This doesn't indicate an error
+# in the MX representation, just a difficulty of checking for equality between
+# array-valued symbolic expressions
 
 # TODO:
 # - Split this file up
+
+
+# Override the default symbolic kind to use SX
+def sym(*args, kind="SX", **kwargs):
+    return _sym(*args, kind=kind, **kwargs)
 
 
 @pytest.fixture
@@ -67,7 +77,7 @@ class TestSymbolicArrayCreate:
     @pytest.mark.parametrize("dtype", (bool, np.int32, np.float32, np.float64))
     @pytest.mark.parametrize("sparse", [True, False])
     def test_zeros(self, shape, dtype, sparse):
-        x = arc.zeros(shape, sparse=sparse, dtype=dtype)
+        x = arc.zeros(shape, sparse=sparse, dtype=dtype, kind="SX")
         assert x.shape == (shape if isinstance(shape, tuple) else (shape,))
         assert x.dtype == dtype
         if sparse:

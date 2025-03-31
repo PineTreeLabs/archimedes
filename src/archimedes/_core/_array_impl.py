@@ -11,6 +11,9 @@ from ._type_inference import shape_inference, type_inference
 SYM_KINDS = {"MX": cs.MX, "SX": cs.SX, "DM": cs.DM, "ndarray": np.ndarray}
 SYM_NAMES = {cs.MX: "MX", cs.SX: "SX", cs.DM: "DM", np.ndarray: "ndarray"}
 
+DEFAULT_SYM_TYPE = cs.MX
+DEFAULT_SYM_NAME = "MX"
+
 
 __all__ = [
     "array",
@@ -37,12 +40,12 @@ def _as_casadi_array(x):
 
 
 class SymbolicArray:
-    def __init__(self, sx: cs.SX | cs.MX, dtype=None, shape=None):
+    def __init__(self, sym: cs.SX | cs.MX, dtype=None, shape=None):
         # Occasionally CasADi operations will return NotImplemented instead
         # of throwing an error. Ideally we would be able to provide a more
         # helpful error message, but at the very least this should be caught
         # immediately.
-        if sx is NotImplemented:
+        if sym is NotImplemented:
             raise ValueError("SymbolicArray cannot be initialized with NotImplemented")
 
         if dtype is None:
@@ -50,17 +53,17 @@ class SymbolicArray:
         self.dtype = np.dtype(dtype)
 
         if shape is None:
-            shape = sx.shape
+            shape = sym.shape
         self.shape = shape
 
         # Consistent handling of vector shapes
-        if len(shape) == 1 and sx.shape[0] == 1:
-            sx = sx.T
+        if len(shape) == 1 and sym.shape[0] == 1:
+            sym = sym.T
         elif len(shape) == 2:
-            sx = cs.reshape(sx, *shape)
+            sym = cs.reshape(sym, *shape)
 
-        self._sym = sx
-        self.kind = SYM_NAMES[type(sx)]
+        self._sym = sym
+        self.kind = SYM_NAMES[type(sym)]
 
     def __repr__(self):
         return f"{self._sym}"
@@ -306,7 +309,7 @@ ArrayLike = np.ndarray | SymbolicArray
 # Factory functions for constructing SymbolicArrays
 #
 
-def sym(name, shape=None, dtype=np.float64, kind="SX") -> SymbolicArray:
+def sym(name, shape=None, dtype=np.float64, kind=DEFAULT_SYM_NAME) -> SymbolicArray:
     """
     Create a symbolic array for use in symbolic computations.
     
@@ -329,7 +332,7 @@ def sym(name, shape=None, dtype=np.float64, kind="SX") -> SymbolicArray:
         NumPy and will be used for better type control in C code generation in the
         future.
     kind : {"SX", "MX"}, optional
-        Kind of symbolic variable to create. Default is "SX".
+        Kind of symbolic variable to create. Default is "MX".
         - "SX": Scalar-based symbolic type. Each element of the array has its own 
           symbolic representation. Generally more efficient for element-wise operations
           and when computing gradients of scalar functions.
@@ -373,22 +376,26 @@ def sym(name, shape=None, dtype=np.float64, kind="SX") -> SymbolicArray:
     >>> # Create a vector (1D array)
     >>> v = arc.sym("v", shape=3)
     >>> print(v)
-    [v[0], v[1], v[2]]
+    v
+    >>> print(v.shape)
+    (3,)
     >>> 
     >>> # Create a matrix (2D array)
     >>> M = arc.sym("M", shape=(2, 2))
     >>> print(M)
-    [[M[0,0], M[0,1]], [M[1,0], M[1,1]]]
+    M
+    >>> print(M.shape)
+    >>> (2, 2)
+    >>> 
+    >>> # Create an SX-type symbolic variable
+    >>> y = arc.sym("y", shape=2, kind="SX")
+    >>> print(y)
+    [y_0, y_1]
     >>> 
     >>> # Use in symbolic computations
     >>> f = np.sin(x) + np.cos(x)
     >>> print(f)
-    sin(x) + cos(x)
-    >>> 
-    >>> # Create an MX-type symbolic variable
-    >>> y = arc.sym("y", shape=2, kind="MX")
-    >>> print(y)
-    [y[0], y[1]]
+    (sin(x)+cos(x))
     
     See Also
     --------
@@ -417,7 +424,7 @@ def sym(name, shape=None, dtype=np.float64, kind="SX") -> SymbolicArray:
     return SymbolicArray(_sym, dtype=dtype, shape=shape)
 
 
-def sym_like(x, name, dtype=None, kind="SX") -> SymbolicArray:
+def sym_like(x, name, dtype=None, kind=DEFAULT_SYM_NAME) -> SymbolicArray:
     """
     Create a symbolic array with the same shape and dtype as an existing array.
 
@@ -432,7 +439,7 @@ def sym_like(x, name, dtype=None, kind="SX") -> SymbolicArray:
     dtype : numpy.dtype, optional
         Data type of the array. If None (default), uses the dtype of `x`.
     kind : {"SX", "MX"}, optional
-        Kind of symbolic variable to create. Default is "SX".
+        Kind of symbolic variable to create. Default is "MX".
         - "SX": Scalar-based symbolic type. Each element has its own symbolic
           representation. Generally more efficient for element-wise operations.
         - "MX": Matrix-based symbolic type. The entire array is represented by 
@@ -479,7 +486,7 @@ def sym_like(x, name, dtype=None, kind="SX") -> SymbolicArray:
     >>> 
     >>> # Create a symbolic matrix based on another symbolic array
     >>> original_sym = arc.sym("y", shape=(3, 3))
-    >>> another_sym = arc.sym_like(original_sym, "z", kind="MX")
+    >>> another_sym = arc.sym_like(original_sym, "z", kind="SX")
     >>> print(another_sym.shape)
     (3, 3)
     
@@ -695,7 +702,7 @@ def _cs_shape(shape):
     return cs_shape
 
 
-def zeros(shape, dtype=np.float64, sparse=True, kind="SX") -> SymbolicArray:
+def zeros(shape, dtype=np.float64, sparse=True, kind=DEFAULT_SYM_NAME) -> SymbolicArray:
 
     """
     Construct a symbolic array of zeros with the given shape and dtype.
