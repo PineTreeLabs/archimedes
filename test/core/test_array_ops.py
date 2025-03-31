@@ -4,8 +4,17 @@ import numpy as np
 from numpy import exceptions as npex
 import casadi as cs
 
-from archimedes._core import SymbolicArray, sym, compile
+from archimedes._core import SymbolicArray, compile, sym as _sym
 from archimedes.error import ShapeDtypeError
+
+# NOTE: Most tests here use SX instead of the default MX, since the is_equal
+# tests struggle with the array-valued MX type.  This doesn't indicate an error
+# in the MX representation, just a difficulty of checking for equality between
+# array-valued symbolic expressions
+
+# Override the default symbolic kind to use SX
+def sym(*args, kind="SX", **kwargs):
+    return _sym(*args, kind=kind, **kwargs)
 
 
 @pytest.fixture

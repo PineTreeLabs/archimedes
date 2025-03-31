@@ -10,7 +10,7 @@ from archimedes import tree
 from archimedes.tree._flatten_util import HashablePartial
 
 from . import sym_like
-from ._array_impl import array, _as_casadi_array
+from ._array_impl import array, _as_casadi_array, DEFAULT_SYM_NAME
 
 
 # Type alias for the key in the compiled dictionary
@@ -114,7 +114,7 @@ class FunctionCache:
         static_argnums=None,
         static_argnames=None,
         jit=False,
-        kind="SX",
+        kind=DEFAULT_SYM_NAME,
         name=None,
     ):
         self._func = func  # The original Python function
@@ -304,7 +304,7 @@ class FunctionCache:
 
 # Decorator for transforming functions into FunctionCache
 def compile(
-    func=None, *, static_argnums=None, static_argnames=None, jit=False, kind="SX", name=None
+    func=None, *, static_argnums=None, static_argnames=None, jit=False, kind=DEFAULT_SYM_NAME, name=None
 ):
     """Create a "compiled" function from a Python function.
     
@@ -327,7 +327,7 @@ def compile(
     jit : bool, default=False
         Whether to compile the function with JIT for additional performance.
         Not fully implemented in the current version.
-    kind : str, default="SX"
+    kind : str, default="MX"
         The type of the symbolic variables. Options:
         - "SX": Trace the function with scalar-valued symbolic type
         - "MX": Trace the function with array-valued symbolic type

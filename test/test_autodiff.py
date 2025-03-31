@@ -4,7 +4,7 @@ import numpy as np
 import casadi as cs
 
 from archimedes import (
-    sym,
+    sym as _sym,
     compile,
     jac,
     grad,
@@ -12,6 +12,15 @@ from archimedes import (
     jvp,
     vjp,
 )
+
+# NOTE: Most tests here use SX instead of the default MX, since the is_equal
+# tests struggle with the array-valued MX type.  This doesn't indicate an error
+# in the MX representation, just a difficulty of checking for equality between
+# array-valued symbolic expressions
+
+# Override the default symbolic kind to use SX
+def sym(*args, kind="SX", **kwargs):
+    return _sym(*args, kind=kind, **kwargs)
 
 
 class TestGrad:
