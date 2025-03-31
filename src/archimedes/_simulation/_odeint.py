@@ -31,7 +31,7 @@ def integrator(
     static_argnames=(),
     t_eval=None,
     name=None,
-    options=None,
+    **options,
 ):
     """Create an ODE solver function from a dynamics function.
     
@@ -65,7 +65,7 @@ def integrator(
     name : str, optional
         Name for the created integrator function. If None, a name is
         automatically generated based on the dynamics function's name.
-    options : dict, optional
+    **options : dict
         Additional options to pass to the CasADi integrator.
     
     Returns
@@ -171,8 +171,6 @@ def integrator(
     --------
     arc.odeint : One-time ODE solution for a specific initial value problem
     """
-    if options is None:
-        options = {}
 
     if not isinstance(func, FunctionCache):
         func = FunctionCache(func, static_argnames=static_argnames)
@@ -290,7 +288,7 @@ def odeint(
     rtol=1e-3,
     args=None,
     static_argnames=(),
-    options=None,
+    **options,
 ):
     """Integrate a system of ordinary differential equations.
     
@@ -323,7 +321,7 @@ def odeint(
     static_argnames : tuple of str, optional
         Names of arguments to `func` that should be treated as static
         (not traced symbolically).
-    options : dict, optional
+    **options : dict
         Additional options to pass to the CasADi integrator.
     
     Returns
@@ -416,7 +414,7 @@ def odeint(
         rtol=rtol,
         t_eval=t_eval,
         static_argnames=static_argnames,
-        options=options,
+        **options,
     )
     if args is None:
         args = ()
