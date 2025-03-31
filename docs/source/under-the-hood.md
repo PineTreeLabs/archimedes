@@ -223,13 +223,13 @@ For example, `SX` symbolics don't support interpolation with lookup tables.
 `MX` symbolics are array-valued, meaning that the entire array is represented by a single symbol.
 This allows for embedding much more general operations like interpolation, ODE solves, and optimization solves into the computational graph, but may not be as fast as `SX` for functions that are dominated by scalar operations.
 
-<!-- TODO: Don't publish until the default is actually MX -->
 Using both `SX` and `MX` can be done to a limited extent, but can be error-prone and should be done with caution.
 The current default is `MX` and the current recommendation is to use `MX` symbolics unless you want to do targeted performance optimizations and feel comfortable with the symbolic array concepts.
+In this case the most reliable approach is to create compiled `SX` functions that use only supported mathematical operations and then call them from inside any more complex functions using general operations.
+For example, you may be able to define an ODE function using `SX` and then do parameter estimation in a more general function traced with `MX` symbolics.
 
 (function-transformations)=
 ## Function transformations
-
 
 The final key concept in Archimedes is _function transformations_, which take an existing function and produce a new function with modified behavior.
 
