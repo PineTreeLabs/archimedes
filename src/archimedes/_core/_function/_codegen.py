@@ -1,7 +1,7 @@
 """C code generation"""
 import numpy as np
 
-from ._function import FunctionCache
+from ._compile import FunctionCache
 
 dtype_to_c = {
     float: "double",
