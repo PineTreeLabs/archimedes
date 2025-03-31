@@ -269,5 +269,65 @@ def pytree_node(
 
 
 def is_pytree_node(obj):
-    """Returns True if the object is a pytree node."""
+    """
+    Check if an object is a registered pytree node created with pytree_node decorator.
+    
+    This function determines whether an object was created using the 
+    `struct.pytree_node` decorator, which indicates it has special handling
+    for pytree operations.
+    
+    Parameters
+    ----------
+    obj : Any
+        The object to check.
+    
+    Returns
+    -------
+    is_node : bool
+        True if the object is a pytree node created with the decorator, False otherwise.
+    
+    Notes
+    -----
+    When to use:
+    - To check if an object will be handled specially by pytree operations
+    - For conditional logic based on whether an object is a custom pytree node
+    - For debugging pytree-related functionality
+    
+    This function specifically checks for objects created with the `pytree_node`
+    decorator, not built-in pytree containers like lists, tuples, and dictionaries.
+    
+    Examples
+    --------
+    >>> import archimedes as arc
+    >>> import numpy as np
+    >>> 
+    >>> @arc.struct.pytree_node
+    >>> class State:
+    ...     x: np.ndarray
+    ...     v: np.ndarray
+    >>> 
+    >>> state = State(np.zeros(3), np.ones(3))
+    >>> print(arc.struct.is_pytree_node(state))
+    True
+    >>> 
+    >>> # Regular dataclass is not a pytree node
+    >>> from dataclasses import dataclass
+    >>> 
+    >>> @dataclass
+    >>> class RegularState:
+    ...     x: np.ndarray
+    ...     v: np.ndarray
+    >>> 
+    >>> regular_state = RegularState(np.zeros(3), np.ones(3))
+    >>> print(arc.struct.is_pytree_node(regular_state))
+    False
+    >>> 
+    >>> # Built-in containers aren't custom pytree nodes
+    >>> print(arc.struct.is_pytree_node({"x": np.zeros(3)}))
+    False
+    
+    See Also
+    --------
+    pytree_node : Decorator for creating pytree-compatible classes
+    """
     return hasattr(obj, '_arc_dataclass')
