@@ -119,7 +119,6 @@ def test_flatten_with_is_leaf(example_tree):
 
 def test_unflatten(example_flat, example_treedef, example_tree):
     unflat = tree.unflatten(example_treedef, example_flat)
-
     assert tree_equal(unflat, example_tree)
 
 

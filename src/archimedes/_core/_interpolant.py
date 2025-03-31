@@ -44,6 +44,7 @@ def _eval_interpolant(x, cs_interp, grid, data, name):
 
 # TODO:
 # - extrapolation handling?
+# - Flatten data inside the function - should accept the grid-structured data
 def interpolant(
     grid: list[np.ndarray],
     data: np.ndarray,
@@ -52,34 +53,118 @@ def interpolant(
     ret_name: str = None,
     name: str = "interpolant",
 ):
-    """Create a callable N-dimensional interpolant
+    """Create a callable N-dimensional interpolant function.
     
-    Args:
-        grid: List of 1D arrays defining the grid
-        data: Array of data values
-        method: Interpolation method (one of "linear", "bspline")
-        arg_names: Names of the arguments to the interpolant
-        ret_name: Name of the return value of the interpolant
-        name: Name of the interpolant
+    Constructs an efficient interpolation function from grid data that can be
+    evaluated at arbitrary points and embedded in Archimedes computational graphs.
+    
+    Parameters
+    ----------
+    grid : list of array_like
+        List of N 1D arrays defining the grid points in each dimension.
+        Each array must be strictly monotonic (increasing or decreasing).
+    data : array_like
+        N-D array containing the function values at all grid points.
+    method : str, optional
+        Interpolation method to use. Options are:
+        - "linear": Piecewise linear interpolation (default)
+        - "bspline": Cubic B-spline interpolation (smoother)
+    arg_names : list of str, optional
+        Names for the input arguments to the interpolant function.
+        Default is ["x_0", "x_1", ...].
+    ret_name : str, optional
+        Name for the output of the interpolant function.
+        Default is "f".
+    name : str, optional
+        Name for the interpolant function itself.
+        Default is "interpolant".
+    
+    Returns
+    -------
+    callable
+        A callable function that interpolates values at specified points.
+        The function takes N arguments corresponding to each dimension
+        and returns the interpolated value.
+    
+    Notes
+    -----
+    When to use this function:
+    - To create smooth approximations of complex functions from tabular data
+    - To incorporate lookup tables into optimization or simulation workflows
+    - To evaluate experimental or simulation data at arbitrary points
+    - When embedding interpolation within other Archimedes functions
 
-    Returns:
-        Interpolant
+    Data organization:
+    For a 2D example with grid arrays `xgrid` and `ygrid`, organize the data into
+    a 2D data array `Z` where `Z[i,j] = f(xgrid[i], ygrid[j])`.  Corresponding 2D
+    grid arrays may be created using `np.meshgrid(xgrid, ygrid, indexing='ij')`.
 
-    The `data` array should be a 1D array with length equal to the product of the
-    lengths of the grid arrays.  For instance, in 2D with grid arrays `xgrid` and
-    `ygrid`, if the grid arrays are extended to 2D with
+    This function creates a CasADi interpolant internally, which can be used with
+    both numeric and symbolic inputs. It supports gradient computation through
+    automatic differentiation for both interpolation methods, but only with respect
+    to the input arguments (not the data).
 
-    ```python
-    X, Y = np.meshgrid(xgrid, ygrid, indexing="ij")
-    ```
+    Edge cases:
+    - Evaluating outside the grid boundaries will return the nearest grid value
+    - For multi-dimensional grids with N > 1, the interpolant expects N separate arguments
 
-    and the data array is a function `F = f(X, Y)`, then the data array is
-
-    ```python
-    data = F.ravel(order='F')
-    ```
-
-    The interpolant can then be created with `interpolant([X, Y], data)`.
+    Examples
+    --------
+    >>> import numpy as np
+    >>> import archimedes as arc
+    >>> import matplotlib.pyplot as plt
+    >>> 
+    >>> # 1D interpolation example
+    >>> x = np.linspace(0, 10, 11)
+    >>> y = np.sin(x)
+    >>> 
+    >>> # Create an interpolant
+    >>> sin_interp = arc.interpolant([x], y, method="bspline")
+    >>> 
+    >>> # Evaluate at new points
+    >>> x_fine = np.linspace(0, 10, 101)
+    >>> y_interp = np.array([sin_interp(xi) for xi in x_fine])
+    >>> plt.figure()
+    >>> plt.plot(x_fine, y_interp)
+    >>> plt.plot(x, y, 'k.')
+    >>> plt.plot(x_fine, np.sin(x_fine), 'k--')
+    >>> plt.show()
+    >>> 
+    >>> # 2D interpolation example
+    >>> xgrid = np.linspace(-5, 5, 11)
+    >>> ygrid = np.linspace(-4, 4, 9)
+    >>> X, Y = np.meshgrid(xgrid, ygrid, indexing='ij')
+    >>> 
+    >>> # Create a 2D function to interpolate
+    >>> R = np.sqrt(X**2 + Y**2) + 1
+    >>> Z = np.sin(R) / R
+    >>> 
+    >>> # Create the interpolant
+    >>> f = arc.interpolant(
+    >>>     [xgrid, ygrid],
+    >>>     Z,
+    >>>     method="bspline",
+    >>>     arg_names=["x", "y"],
+    >>>     ret_name="z"
+    >>> )
+    >>> 
+    >>> # Use in optimization or with automatic differentiation
+    >>> df_dx = arc.grad(f, argnums=0)  # Gradient with respect to x
+    >>> print(df_dx(0.5, 1.0))
+    -0.19490596565158205
+    >>> 
+    >>> # Combining with other Archimedes functions
+    >>> @arc.compile
+    >>> def combined_func(x, y):
+    >>>     interp_value = f(x, y)
+    >>>     return interp_value**2 + np.sin(x * y)
+    
+    See Also
+    --------
+    arc.compile : Compile a function for use with symbolic arrays
+    arc.grad : Compute the gradient of a function
+    numpy.interp : 1D interpolation in NumPy (non-symbolic)
+    scipy.interpolate : SciPy's interpolation package
     """
     # Convert inputs to NumPy arrays
     grid = [np.asarray(grid_i) for grid_i in grid]
@@ -88,10 +173,15 @@ def interpolant(
     # Check for invalid input
     for i, grid_i in enumerate(grid):
         if grid_i.ndim != 1:
-            raise ValueError(f"grid[{i}] must be 1-dimensional but has shape {grid_i.shape}")
+            raise ValueError(
+                f"grid[{i}] must be 1-dimensional but has shape {grid_i.shape}"
+            )
 
-    if data.ndim != 1:
-        raise ValueError(f"data must be 1-dimensional but has shape {data.shape}")
+    ndim = len(grid)
+    if data.ndim != ndim:
+        raise ValueError(f"data must be {ndim}-dimensional but has shape {data.shape}")
+
+    data = data.flatten(order="F")  # Fortran order (column-major), expected by CasADi
 
     N = np.prod([len(grid_i) for grid_i in grid])
     if data.size != N:

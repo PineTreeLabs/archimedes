@@ -308,35 +308,125 @@ def compile(
 ):
     """Create a "compiled" function from a Python function.
     
+    Transforms a standard NumPy-based Python function into an efficient computational 
+    graph that can be executed in C++ and supports automatic differentiation, code 
+    generation, and other advanced capabilities. This decorator is the primary entry 
+    point for converting Python functions into Archimedes' symbolic computation system.
+    
     Parameters
     ----------
-    func : callable
-        A Python function to be evaluated symbolically.
-    static_argnums : int or sequence of int
+    func : callable, optional
+        A Python function to be evaluated symbolically. If None, returns a decorator.
+    static_argnums : int or sequence of int, optional
         Indices of arguments to treat as static (constant) in the function.
-        Defaults to None.
-    static_argnames : str or sequence of str
+        Static arguments aren't converted to symbolic variables but are passed directly
+        to the function during tracing.
+    static_argnames : str or sequence of str, optional
         Names of arguments to treat as static (constant) in the function.
-        Defaults to None.
-    jit : bool
-        Whether to compile the function with JIT. Defaults to False.
-    kind : str
-        The type of the symbolic variables. Defaults to "SX". For "plain" math
-        functions, the scalar symbolic type "SX" is generally recommended for
-        efficiency.  When the function includes more general operations like embedded
-        ODE solves, root-finding, interpolation, or optimization problems, the matrix
-        symbolic type "MX" is required.  See the CasADi documentation for more details.
-    name : str
-        The name of the function. Defaults to None (taken from the function name).
+        Alternative to static_argnums when using keyword arguments.
+    jit : bool, default=False
+        Whether to compile the function with JIT for additional performance.
+        Not fully implemented in the current version.
+    kind : str, default="SX"
+        The type of the symbolic variables. Options:
+        - "SX": Trace the function with scalar-valued symbolic type
+        - "MX": Trace the function with array-valued symbolic type
+    name : str, optional
+        The name of the function. If None, taken from the function name.
         Required if the function is a lambda function.
 
     Returns
     -------
     FunctionCache
         A compiled function that can be called with either symbolic or numeric
-        arguments.
+        arguments, while maintaining the same function signature.
+        
+    Notes
+    -----
+    When to use this function:
+    - To accelerate numerical code by converting it to C++
+    - To enable automatic differentiation of your functions
+    - To generate C code from your functions
+    - When embedding functions in optimization problems or ODE solvers
+
+    Choosing a symbolic type:
+    - This option determines the type of symbolic variables used to construct the
+        computational graph.  The choice determines the efficiency and type of
+        supported operations.
+    - `SX` produces scalar symbolic arrays, meaning that every entry in the array has
+        its own scalar symbol. This can produce highly efficient code, but is limited
+        to a subset of possible operations. For example, `SX` symbolics don't support
+        interpolation with lookup tables.
+    - `MX` symbolics are array-valued, meaning that the entire array is represented by
+        a single symbol. This allows for embedding more general operations like
+        interpolation, ODE solves, and optimization solves into the computational
+        graph, but may not be as fast as `SX` for functions that are dominated by
+        scalar operations.
+    - The current default is `MX` and the current recommendation is to use `MX`
+        symbolics unless you want to do targeted performance optimizations and feel
+        comfortable with the symbolic array concepts.
+
+    When a compiled function is called, Archimedes:
+    1. Replaces arguments with symbolic variables of the same shape and dtype
+    2. Traces the execution of your function with these symbolic arguments
+    3. Creates a computational graph representing all operations
+    4. Caches this graph based on input shapes/dtypes and static arguments
+    5. Evaluates the graph with the provided numeric inputs
+
+    The function is only traced once for each unique combination of argument shapes,
+    dtypes, and static argument values. Subsequent calls with the same shapes reuse
+    the cached graph, improving performance.
+    
+    Static arguments:
+    Static arguments aren't converted to symbolic variables. This is useful for:
+    - Configuration flags that affect control flow
+    - Constants that shouldn't be differentiated through
+    - Values that would be inefficient to recalculate symbolically
+    
+    Examples
+    --------
+    Basic usage as a decorator:
+    
+    >>> import numpy as np
+    >>> import archimedes as arc
+    >>> 
+    >>> @arc.compile
+    ... def rotate(x, theta):
+    ...     R = np.array([
+    ...         [np.cos(theta), -np.sin(theta)],
+    ...         [np.sin(theta), np.cos(theta)],
+    ...     ], like=x)
+    ...     return R @ x
+    >>> 
+    >>> x = np.array([1.0, 0.0])
+    >>> rotate(x, 0.5)
+    
+    Using static arguments that modify the function behavior:
+    
+    >>> @arc.compile(static_argnames=("use_boundary_conditions",))
+    ... def solve_system(A, b, use_boundary_conditions=True):
+    ...     if use_boundary_conditions:
+    ...         b[[0, -1]] = 0.0  # Apply boundary conditions
+    ...     return np.linalg.solve(A, b)
+    
+    Different symbolic types:
+    
+    >>> # Simple mathematical function - use SX for efficiency
+    >>> @arc.compile(kind="SX")
+    ... def norm(x):
+    ...     return np.sqrt(np.sum(x**2))
+    >>> 
+    >>> # Function with interpolation - requires MX
+    >>> @arc.compile(kind="MX", static_argnames=("xp", "fp"))
+    ... def interpolate(x, xp, fp):
+    ...     return np.interp(x, xp, fp)
+    
+    See Also
+    --------
+    arc.grad : Compute gradients of compiled functions
+    arc.jac : Compute Jacobians of compiled functions
+    arc.codegen : Generate C code from compiled functions
     """
-    # TODO: Link to documentation
 
     # If used as @compile(...)
     if func is None:
@@ -367,15 +457,58 @@ def scan(
     init_carry,
     xs=None,
     length=None,
-    unroll=10,
 ):
-    """Loop evaluation of a function while carrying the previous result.
-
-    Roughly similar to `jax.lax.scan`, or the following pure Python code:
-
+    """Apply a function repeatedly while carrying state between iterations.
+    
+    Efficiently implements a loop that accumulates state and collects outputs at each 
+    iteration. Similar to functional fold/reduce operations but also accumulates the 
+    intermediate outputs. This provides a structured way to express iterative algorithms 
+    in a functional style that can be efficiently compiled and differentiated.
+    
+    Parameters
+    ----------
+    func : callable
+        A function with signature f(carry, x) -> (new_carry, y) to be applied at each 
+        loop iteration. The function must:
+        - Accept exactly two arguments: the current carry value and loop variable
+        - Return exactly two values: the updated carry value and an output for this step
+        - Return a carry with the same structure as the input carry
+    init_carry : array_like or PyTree
+        The initial value of the carry state. Can be a scalar, array, or nested PyTree.
+        The structure of this value defines what func must return as its first output.
+    xs : array_like, optional
+        The values to loop over, with shape (length, ...). Each value is passed as the 
+        second argument to func. Required unless length is provided.
+    length : int, optional
+        The number of iterations to run. Required if xs is None. If both are provided, 
+        xs.shape[0] must equal length.
+    
+    Returns
+    -------
+    final_carry : same type as init_carry
+        The final carry value after all iterations.
+    ys : array
+        The stacked outputs from each iteration, with shape (length, ...).
+        
+    Notes
+    -----
+    When to use this function:
+    - To keep computational graph size manageable for large loops
+    - For implementing recurrent computations (filters, RNNs, etc.)
+    - For iterative numerical methods (e.g., fixed-point iterations)
+    
+    Conceptual model:
+    Each iteration applies func to the current carry value and the current loop value:
+    (carry, y) = func(carry, x)
+    
+    The carry is threaded through all iterations, while each y output is collected.
+    This pattern is common in many iterative algorithms and can be more efficient 
+    than explicit Python loops because it creates a single node in the computational 
+    graph regardless of the number of iterations.
+    
+    The standard Python equivalent would be:
     ```python
-
-    def scan(func, init_carry, xs, length):
+    def scan_equivalent(func, init_carry, xs=None, length=None):
         if xs is None:
             xs = range(length)
         carry = init_carry
@@ -385,37 +518,59 @@ def scan(
             ys.append(y)
         return carry, np.stack(ys)
     ```
-
-    Either `xs` or `length` must be provided, and if both are provided, `xs.shape[0]`
-    must be equal to `length`.  `xs` can be a symbolic or numeric array, but `length`
-    must be a known integer value.
-
-    While the pure Python code above is valid, it generates computational graphs
-    that grow linearly with the length of the loop, increasing compile time and memory
-    usage.  On the other hand, `scan` will "roll up" the loop, resulting in much
-    smaller computational graphs.  The number of iterations that are combined into a
-    single node in the graph is controlled by the `unroll` argument, which effectively
-    trades off faster compile times and less memory usage (larger `unroll`) against
-    somewhat slower execution times (smaller `unroll`).  A value of `-1` will fully
-    unroll the loop.
-
-    Parameters
-    ----------
-    func :
-        A function f(carry, x) -> (carry, y) applied at each loop iteration.
-    init_carry :
-        The initial value of the "carry".
-    xs :
-        The values of the loop variable (optional if `length` is provided).
-    length :
-        The length of the loop (optional if `xs` is provided).
-    unroll :
-        The number of iterations to combine into a single node in the graph.
-
-    Returns
-    -------
-    carry :
-        A tuple of the final carry and the values of the loop variable.
+    
+    However, the compiled `scan` is more efficient for long loops because it creates a 
+    fixed-size computational graph regardless of loop length.
+    
+    Examples
+    --------
+    Basic summation:
+    
+    >>> import numpy as np
+    >>> import archimedes as arc
+    >>> 
+    >>> @arc.compile
+    ... def sum_func(carry, x):
+    ...     new_carry = carry + x
+    ...     return new_carry, new_carry
+    >>> 
+    >>> xs = np.array([1, 2, 3, 4, 5])
+    >>> final_sum, intermediates = arc.scan(sum_func, 0, xs)
+    >>> print(final_sum)  # 15
+    >>> print(intermediates)  # [1, 3, 6, 10, 15]
+    
+    Implementing a discrete-time IIR filter:
+    
+    >>> @arc.compile
+    ... def iir_step(state, x):
+    ...     # Simple first-order IIR filter: y[n] = 0.9*y[n-1] + 0.1*x[n]
+    ...     new_state = 0.9 * state + 0.1 * x
+    ...     return new_state, new_state
+    >>> 
+    >>> # Apply to a step input
+    >>> input_signal = np.ones(50)
+    >>> initial_state = 0.0
+    >>> final_state, filtered = arc.scan(iir_step, initial_state, input_signal)
+    
+    Implementing Euler's method for ODE integration:
+    
+    >>> @arc.compile
+    ... def euler_step(state, t):
+    ...     # Simple harmonic oscillator: d²x/dt² = -x
+    ...     dt = 0.001
+    ...     x, v = state
+    ...     new_x = x + dt * v
+    ...     new_v = v - dt * x
+    ...     return (new_x, new_v), new_x
+    >>> 
+    >>> ts = np.linspace(0, 1.0, 1001)
+    >>> initial_state = (1.0, 0.0)  # x=1, v=0
+    >>> final_state, trajectory = arc.scan(euler_step, initial_state, ts)
+    
+    See Also
+    --------
+    jax.lax.scan : JAX equivalent function
+    arc.tree : Module for working with structured data in scan loops
     """
 
     if not isinstance(func, FunctionCache):
@@ -454,6 +609,8 @@ def scan(
         )
 
     carry_out, x_out = specialized_func(init_carry, xs[0])
+    _, unravel = tree.ravel(carry_out)
+
     carry_in_treedef = tree.structure(init_carry)
     carry_out_treedef = tree.structure(carry_out)
     if carry_in_treedef != carry_out_treedef:
@@ -479,7 +636,8 @@ def scan(
     cs_carry, cs_ys = scan_func(*cs_args)
 
     # Ensure that the return has shape and dtype consistent with the inputs
-    carry = array(cs_carry, carry_out.dtype).reshape(carry_out.shape)
+    carry = unravel(array(cs_carry))
+
     # Reshape so that the shape is (length, ...) (note transposing the CasADi result)
     ys = array(cs_ys.T, x_out.dtype).reshape((length,) + x_out.shape)
 

@@ -31,29 +31,146 @@ def integrator(
     static_argnames=(),
     t_eval=None,
     name=None,
-    options=None,
+    **options,
 ):
-    """Create a "forward map" for the given function.
+    """Create an ODE solver function from a dynamics function.
+    
+    Transforms a function defining an ODE into a function that propagates the ODE
+    system forward in time. The resulting function can be used repeatedly with
+    different initial conditions and parameters, and supports automatic differentiation
+    through the solution.
+    
+    Parameters
+    ----------
+    func : callable
+        The function defining the ODE dynamics. Must have the signature 
+        `func(t, x, *args) -> x_dot`, where `t` is the current time, 
+        `x` is the current state, and `x_dot` is the derivative of 
+        the state with respect to time.
+    method : str, optional
+        Integration method to use. Default is 'cvodes', which uses the
+        SUNDIALS CVODES solver (suitable for both stiff and non-stiff systems).
+        See CasADi documentation for other available methods.
+    atol : float, optional
+        Absolute tolerance for the solver. Default is 1e-6.
+    rtol : float, optional
+        Relative tolerance for the solver. Default is 1e-3.
+    static_argnames : tuple of str, optional
+        Names of arguments to `func` that should be treated as static
+        (not traced symbolically).
+    t_eval : array_like, optional
+        Times at which to evaluate the solution. If provided, the integrator
+        will return states at these times. If None, the integrator will
+        only return the final state.
+    name : str, optional
+        Name for the created integrator function. If None, a name is
+        automatically generated based on the dynamics function's name.
+    **options : dict
+        Additional options to pass to the CasADi integrator.
+    
+    Returns
+    -------
+    callable
+        If `t_eval` is None, a function with signature `solver(x0, t_span, *args) -> xf`,
+        where `x0` is the initial state, `t_span` is a tuple (t0, tf) giving the
+        integration time span, and `xf` is the final state.
+        
+        If `t_eval` is provided, a function with signature `solver(x0, *args) -> xs`,
+        where `xs` is an array of states at the times in `t_eval`.
+    
+    Notes
+    -----
+    When to use this function:
+    - For repeated ODE solves with different initial conditions or parameters
+    - When embedding ODE solutions in optimization problems or larger models
+    - When sensitivity analysis requires derivatives of the solution
+    - For improved performance over loop-based ODE integration
 
-    Transform the function `func` into a function that integrates the ODE
-    defined by `func`. The resulting function will return the state of the
-    system at the end of the integration.
+    The ODE solver is specified by the `method` argument. The default is 'cvodes',
+    which uses the SUNDIALS CVODES solver and is suitable for both stiff and non-stiff
+    systems. This is the recommended choice for most applications.
 
-    The function should have the signature `func(t, x, *args) -> x_dot`, where
-    `t` is the current time, `x` is the current state, and `x_dot` is the
-    derivative of the state with respect to time.
+    See the [CasADi](https://web.casadi.org/python-api/#integrator) documentation for a
+    complete list of available configuration options to pass to the `options` argument.
 
-    The returned function will have the signature
-    `forward_map(x0, t_span, *args) -> xf`.
+    Conceptual model:
+    This function constructs a computational graph representation of the entire
+    ODE solve operation. The resulting function is more efficient than repeatedly
+    calling `odeint` because:
+    - It pre-compiles the solver for a specific state dimension and parameter structure
+    - It leverages CasADi's compiled C++ implementation for high-performance integration
+    - It enables automatic differentiation through the entire solution
+    
+    Edge cases:
+    - Only scalar and vector states are supported (shapes like (n,) or (n,1))
+    - If `t_eval` is provided, the function caches the evaluation times internally,
+      meaning new evaluation times require recompiling the function
+    - For tree-structured arguments, the function automatically flattens and
+      reconstructs the tree structure
+    
+    Examples
+    --------
+    >>> import numpy as np
+    >>> import archimedes as arc
+    >>> 
+    >>> # Example 1: Simple pendulum
+    >>> def pendulum(t, x):
+    >>>     # Simple pendulum dynamics.
+    >>>     theta, omega = x
+    >>>     return np.array([omega, -9.81 * np.sin(theta)], like=x)
+    >>> 
+    >>> # Create an integrator
+    >>> solver = arc.integrator(pendulum)
+    >>> 
+    >>> # Solve for multiple initial conditions
+    >>> x0_1 = np.array([0.1, 0.0])  # Small angle
+    >>> x0_2 = np.array([1.5, 0.0])  # Large angle
+    >>> t_span = (0.0, 10.0)
+    >>> 
+    >>> x1_final = solver(x0_1, t_span)
+    >>> x2_final = solver(x0_2, t_span)
+    >>> 
+    >>> # Example 2: Parameterized system
+    >>> def lotka_volterra(t, x, params):
+    >>>     # Lotka-Volterra predator-prey model with parameters.
+    >>>     a, b, c, d = params
+    >>>     prey, predator = x
+    >>>     return np.array([
+    >>>         a * prey - b * prey * predator,      # prey growth rate
+    >>>         c * prey * predator - d * predator   # predator growth rate
+    >>>     ], like=x)
+    >>> 
+    >>> # Create an integrator with evaluation times
+    >>> t_eval = np.linspace(0, 20, 100)
+    >>> solver = arc.integrator(lotka_volterra, t_eval=t_eval, method="cvodes")
+    >>> 
+    >>> # Solve with different parameters
+    >>> x0 = np.array([10.0, 5.0])  # Initial population
+    >>> params1 = np.array([1.5, 0.3, 0.2, 0.8])
+    >>> params2 = np.array([1.2, 0.2, 0.3, 1.0])
+    >>> 
+    >>> solution1 = solver(x0, params1)  # Shape: (2, 100)
+    >>> solution2 = solver(x0, params2)
+    >>> 
+    >>> # Example 3: Differentiating through ODE solutions
+    >>> target = solution1
+    >>> @arc.compile(kind="MX")
+    >>> def cost(x0, params):
+    >>>     # Cost function based on final state after integration.
+    >>>     final_state = solver(x0, params)
+    >>>     return np.sum((final_state - target)**2)
+    >>> 
+    >>> # Compute gradient of cost with respect to parameters
+    >>> dJ_dp = arc.grad(cost, argnums=1)
+    >>> print(dJ_dp(x0, params1))
+    [0. 0. 0. 0.]
+    >>> print(dJ_dp(x0, params2))
+    [-11757.72435691 -32985.03384074  43301.00963694 -27677.60203032]
 
-    If evaluation times are specified with `t_eval`, then the ODE solve function
-    will close over these times, so that the returned function will instead have the
-    signature `forward_map(x0, *args) -> xs`, where `xs` is an array of states at the
-    evaluation times.  In this case the function must be fully re-compiled for each set
-    of evaluation times (because the evaluation times are not hashable).
+    See Also
+    --------
+    arc.odeint : One-time ODE solution for a specific initial value problem
     """
-    if options is None:
-        options = {}
 
     if not isinstance(func, FunctionCache):
         func = FunctionCache(func, static_argnames=static_argnames)
@@ -171,14 +288,124 @@ def odeint(
     rtol=1e-3,
     args=None,
     static_argnames=(),
-    options=None,
+    **options,
 ):
-    """Integrate the ODE defined by `func` with initial state `x0`.
+    """Integrate a system of ordinary differential equations.
+    
+    Solves the initial value problem defined by the ODE system:
+        dx/dt = func(t, x, *args)
+    from t=t_span[0] to t=t_span[1] with initial conditions x0.
+    
+    Parameters
+    ----------
+    func : callable
+        Right-hand side of the ODE system. The calling signature is 
+        func(t, x, *args), where t is a scalar and x is an ndarray with 
+        shape (n,). func must return an array_like with shape (n,).
+    t_span : tuple of float
+        Interval of integration (t0, tf).
+    x0 : array_like
+        Initial state. Can be a vector or a PyTree structure.
+    method : str, optional
+        Integration method to use. Default is 'cvodes', which uses the
+        SUNDIALS CVODES solver (suitable for both stiff and non-stiff systems).
+    t_eval : array_like or None, optional
+        Times at which to store the computed solution. If None, the solver 
+        only returns the final state.
+    atol : float, optional
+        Absolute tolerance for the solver. Default is 1e-6.
+    rtol : float, optional
+        Relative tolerance for the solver. Default is 1e-3.
+    args : tuple, optional
+        Additional arguments to pass to the ODE function.
+    static_argnames : tuple of str, optional
+        Names of arguments to `func` that should be treated as static
+        (not traced symbolically).
+    **options : dict
+        Additional options to pass to the CasADi integrator.
+    
+    Returns
+    -------
+    array_like
+        If t_eval is None, the state at the final time t_span[1].
+        If t_eval is provided, an array containing the solution evaluated at t_eval
+        with shape (n, len(t_eval)).
+    
+    Notes
+    -----
+    When to use this function:
+    - For one-time solution of an ODE initial value problem
 
-    This is a simple wrapper around the `integrator` function that calls the generated
-    forward map with the given initial state and time span.
+    Evaluation times:
+    The underlying SUNDIALS solvers use adaptive step size control to balance
+    accuracy and computational efficiency.  However, unlike SciPy's `solve_ivp`
+    function and many other ODE solver interfaces, it is not possible to output
+    the solution at the times actually used by the solver (or to create a "dense"
+    output using an interpolant). This is because of the requirement that all input
+    and output arrays be a fixed size in order to construct the symbolic graph. The
+    solution at output times specified by `t_eval` is computed by interpolating the
+    solution at the times used by the solver.
+
+    The ODE solver is specified by the `method` argument. The default is 'cvodes',
+    which uses the SUNDIALS CVODES solver and is suitable for both stiff and non-stiff
+    systems. This is the recommended choice for most applications.
+
+    See the [CasADi](https://web.casadi.org/python-api/#integrator) documentation for a
+    complete list of available configuration options to pass to the `options` argument.
+
+    Conceptual model:
+    This function is a wrapper around the `integrator` function that creates
+    and immediately calls an ODE solver for the given initial conditions and
+    parameters. It provides a simple interface similar to SciPy's solve_ivp
+    but leverages CasADi's efficient symbolic implementation and interface to
+    SUNDIALS solvers.
+
+    Unlike `integrator`, which creates a reusable solver function, `odeint`
+    performs a single solve operation. If you need to solve the same ODE system
+    repeatedly with different initial conditions or parameters, it's more
+    efficient to create an `integrator` once and reuse it.
+
+    Edge cases:
+    - Only scalar and vector states are supported (shapes like (n,) or (n,1))
+    - For tree-structured states, currently the user must define a wrapper function
+      to flatten and reconstruct the tree structure
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> import archimedes as arc
+    >>> import matplotlib.pyplot as plt
+    >>> 
+    >>> # Example 1: Simple harmonic oscillator
+    >>> def f(t, y):
+    >>>     return np.array([y[1], -y[0]], like=y)  # y'' = -y
+    >>> 
+    >>> t_span = (0, 10)
+    >>> y0 = np.array([1.0, 0.0])  # Initial displacement and velocity
+    >>> ts = np.linspace(*t_span, 100)
+    >>> 
+    >>> # Solve ODE
+    >>> ys = arc.odeint(f, t_span, y0, t_eval=ts)
+    >>> 
+    >>> plt.figure()
+    >>> plt.plot(ts, ys[0, :], label='position')
+    >>> plt.plot(ts, ys[1, :], label='velocity')
+    >>> plt.legend()
+    >>> plt.show()
+    >>> 
+    >>> # Example 2: Parametrized dynamics
+    >>> def pendulum(t, y, g, L):
+    >>>     theta, omega = y
+    >>>     return np.array([omega, -(g/L) * np.sin(theta)])
+    >>> 
+    >>> y0 = np.array([np.pi/6, 0.0])  # 30 degrees initial angle
+    >>> t_span = (0, 5)
+    >>> ys = arc.odeint(pendulum, t_span, y0, args=(9.81, 1.0))
+    
+    See Also
+    --------
+    arc.integrator : Create a reusable ODE solver function
     """
-    # TODO: Expand docstring
 
     solver = integrator(
         func,
@@ -187,7 +414,7 @@ def odeint(
         rtol=rtol,
         t_eval=t_eval,
         static_argnames=static_argnames,
-        options=options,
+        **options,
     )
     if args is None:
         args = ()

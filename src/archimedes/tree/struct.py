@@ -24,8 +24,25 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""
+Utilities for defining custom classes that can be used with pytree transformations.
 
-"""Utilities for defining custom classes that can be used with pytree transformations."""
+This module provides tools for creating structured data types that work seamlessly
+with Archimedes' pytree functions. These tools are built on Python's dataclasses
+with extensions for pytree-specific behavior.
+
+The module re-exports several names from the dataclasses module:
+    
+InitVar : Type annotation for init-only variables in dataclasses
+    Used to mark fields that should be passed to __post_init__ but not stored.
+
+fields : Function to retrieve fields of a dataclass
+    Returns a list of Field objects representing the fields of the dataclass.
+    This is useful for introspection and validation of dataclass instances.
+    
+replace : Function to create a new dataclass instance with updated fields
+    For pytree nodes created with @pytree_node, use the .replace() method instead.
+"""
 
 from collections.abc import Callable
 import dataclasses
@@ -51,6 +68,81 @@ _T = TypeVar('_T')
 
 
 def field(static=False, *, metadata=None, **kwargs):
+    """
+    Create a field specification with pytree-related metadata.
+    
+    This function extends dataclasses.field() with additional metadata to control
+    how fields are treated in pytree operations. Fields can be marked as static
+    (metadata) or dynamic (data).
+    Except for the `static` argument, all other arguments are passed directly to
+    `dataclasses.field()`; see documentation for the dataclasses module for details.
+
+    Parameters
+    ----------
+    static : bool, default=False
+        If True, the field is treated as static metadata rather than dynamic data.
+        Static fields are preserved during pytree transformations but not included
+        in the flattened representation.
+    metadata : dict, optional
+        Additional metadata to include in the field specification. This will be
+        merged with the 'static' setting.
+    **kwargs : dict
+        Additional keyword arguments passed to dataclasses.field().
+    
+    Returns
+    -------
+    field_object : dataclasses.Field
+        A field specification with the appropriate metadata.
+
+    Notes
+    -----
+    When to use:
+    - To mark configuration parameters that shouldn't change during operations
+    - To define default values or constructors for fields
+
+    Static fields are not included when you flatten a pytree or apply transformations
+    like `map`, but they are preserved in the structure and included when you
+    reconstruct the object.
+
+    Examples
+    --------
+    >>> import archimedes as arc
+    >>> from archimedes import struct
+    >>> import numpy as np
+    >>> 
+    >>> @struct.pytree_node
+    >>> class Vehicle:
+    ...     # Dynamic state variables (included in flattening)
+    ...     position: np.ndarray
+    ...     velocity: np.ndarray
+    ...     
+    ...     # Static configuration parameters (excluded from flattening)
+    ...     mass: float = struct.field(static=True, default=1000.0)
+    ...     drag_coef: float = struct.field(static=True, default=0.3)
+    ...     
+    ...     # With additional metadata
+    ...     name: str = struct.field(
+    ...         static=True,
+    ...         default="vehicle",
+    ...         metadata={"description": "Vehicle identifier"}
+    ...     )
+    >>> 
+    >>> # Create an instance
+    >>> car = Vehicle(
+    ...     position=np.array([0.0, 0.0]),
+    ...     velocity=np.array([10.0, 0.0]),
+    ... )
+    >>> 
+    >>> # When flattened, only dynamic fields are included
+    >>> flat, _ = arc.tree.flatten(car)
+    >>> print(len(flat))  # Only position and velocity are included
+    2
+    
+    See Also
+    --------
+    struct.pytree_node : Decorator for creating pytree-compatible classes
+    register_dataclass : Register a dataclass as a pytree node
+    """
     return dataclasses.field(
         metadata=(metadata or {}) | {'static': static},
         **kwargs,
@@ -62,7 +154,101 @@ def pytree_node(
     cls: _T | None = None,
     **kwargs,
 ) -> _T | Callable[[_T], _T]:
-    """Construct a frozen dataclass registered as a pytree node"""
+    """
+    Decorator to convert a class into a frozen dataclass registered as a pytree node.
+
+    This decorator creates a dataclass that can be seamlessly used with Archimedes'
+    pytree functions. The class will be registered with the pytree system, allowing
+    its instances to be flattened, mapped over, and transformed while preserving
+    its structure.
+
+    Parameters
+    ----------
+    cls : type, optional
+        The class to decorate. If None, returns a decorator function.
+    **kwargs : dict
+        Additional keyword arguments passed to dataclasses.dataclass().
+        By default, `frozen=True` is set unless explicitly overridden.
+
+    Returns
+    -------
+    decorated_class : type
+        The decorated class, now a frozen dataclass registered as a pytree node.
+
+    Notes
+    -----
+    When to use:
+    - To create structured data objects for use in Archimedes models and simulations
+    - To define state containers that work with pytree-based transformations
+    - To create modular, composable model components with clear interfaces
+    - To define parameter structures for optimization problems
+
+    The "frozen" attribute makes the class immutable, meaning that once an instance
+    is created, its fields cannot be modified. This is useful for ensuring that
+    the state of the object remains consistent during operations. The `replace()`
+    method allows you to create modified copies of the object with new values for
+    specific fields.
+
+    Fields are automatically classified as either "data" (dynamic values that 
+    change during operations) or "static" (configuration parameters). By default,
+    all fields are treated as data unless marked with `field(static=True)`.
+    
+    The decorated class:
+    - Is frozen (immutable) by default
+    - Has a `replace()` method for creating modified copies
+    - Will be properly handled by `tree.flatten()`, `tree.map()`, etc.
+    - Can be nested within other pytree nodes
+    
+    Examples
+    --------
+    >>> import archimedes as arc
+    >>> import numpy as np
+    >>> 
+    >>> @arc.struct.pytree_node
+    >>> class Vehicle:
+    ...     # Dynamic state variables (included in transformations)
+    ...     position: np.ndarray
+    ...     velocity: np.ndarray
+    ...     
+    ...     # Static configuration parameters (preserved during transformations)
+    ...     mass: float = arc.struct.field(static=True, default=1000.0)
+    ...     drag_coef: float = arc.struct.field(static=True, default=0.3)
+    ...     
+    ...     def kinetic_energy(self):
+    ...         return 0.5 * self.mass * np.sum(self.velocity**2)
+    >>> 
+    >>> # Create an instance
+    >>> car = Vehicle(
+    ...     position=np.array([0.0, 0.0]),
+    ...     velocity=np.array([10.0, 0.0]),
+    ... )
+    >>> 
+    >>> # Create a modified copy
+    >>> car2 = car.replace(position=np.array([5.0, 0.0]))
+    >>> 
+    >>> # Apply a transformation (only to dynamic fields)
+    >>> scaled = arc.tree.map(lambda x: x * 2, car)
+    >>> print(scaled.position)    # [0. 0.] -> [0. 0.]
+    >>> print(scaled.velocity)    # [10. 0.] -> [20. 0.]
+    >>> print(scaled.mass)        # 1000.0 (unchanged)
+    >>> 
+    >>> # Nested pytree nodes
+    >>> @arc.struct.pytree_node
+    >>> class System:
+    ...     vehicle1: Vehicle
+    ...     vehicle2: Vehicle
+    ...     
+    ...     def total_energy(self):
+    ...         return self.vehicle1.kinetic_energy() + self.vehicle2.kinetic_energy()
+    >>> 
+    >>> system = System(car, car2)
+    >>> # This transformation applies to all dynamic fields in the entire hierarchy
+    >>> scaled_system = arc.tree.map(lambda x: x * 0.5, system)
+    
+    See Also
+    --------
+    field : Define fields with pytree-specific metadata
+    """
     # Support passing arguments to the decorator (e.g. @dataclass(kw_only=True))
     if cls is None:
         return functools.partial(pytree_node, **kwargs)
@@ -100,5 +286,65 @@ def pytree_node(
 
 
 def is_pytree_node(obj):
-    """Returns True if the object is a pytree node."""
+    """
+    Check if an object is a registered pytree node created with pytree_node decorator.
+    
+    This function determines whether an object was created using the 
+    `struct.pytree_node` decorator, which indicates it has special handling
+    for pytree operations.
+    
+    Parameters
+    ----------
+    obj : Any
+        The object to check.
+    
+    Returns
+    -------
+    is_node : bool
+        True if the object is a pytree node created with the decorator, False otherwise.
+    
+    Notes
+    -----
+    When to use:
+    - To check if an object will be handled specially by pytree operations
+    - For conditional logic based on whether an object is a custom pytree node
+    - For debugging pytree-related functionality
+    
+    This function specifically checks for objects created with the `pytree_node`
+    decorator, not built-in pytree containers like lists, tuples, and dictionaries.
+    
+    Examples
+    --------
+    >>> import archimedes as arc
+    >>> import numpy as np
+    >>> 
+    >>> @arc.struct.pytree_node
+    >>> class State:
+    ...     x: np.ndarray
+    ...     v: np.ndarray
+    >>> 
+    >>> state = State(np.zeros(3), np.ones(3))
+    >>> print(arc.struct.is_pytree_node(state))
+    True
+    >>> 
+    >>> # Regular dataclass is not a pytree node
+    >>> from dataclasses import dataclass
+    >>> 
+    >>> @dataclass
+    >>> class RegularState:
+    ...     x: np.ndarray
+    ...     v: np.ndarray
+    >>> 
+    >>> regular_state = RegularState(np.zeros(3), np.ones(3))
+    >>> print(arc.struct.is_pytree_node(regular_state))
+    False
+    >>> 
+    >>> # Built-in containers aren't custom pytree nodes
+    >>> print(arc.struct.is_pytree_node({"x": np.zeros(3)}))
+    False
+    
+    See Also
+    --------
+    pytree_node : Decorator for creating pytree-compatible classes
+    """
     return hasattr(obj, '_arc_dataclass')
