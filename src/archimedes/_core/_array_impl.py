@@ -724,7 +724,7 @@ def zeros(shape, dtype=np.float64, sparse=True, kind=DEFAULT_SYM_NAME) -> Symbol
         efficient in memory and computation.
         If False, the array will contain actual numeric zero values.
     kind : {"SX", "MX"}, optional
-        Kind of symbolic variable to create. Default is "SX".
+        Kind of symbolic variable to create. Default is "MX".
         - "SX": Scalar-based symbolic type. Each element has its own symbolic
           representation. Generally more efficient for element-wise operations.
         - "MX": Matrix-based symbolic type. The entire array is represented by 
@@ -783,7 +783,7 @@ def zeros(shape, dtype=np.float64, sparse=True, kind=DEFAULT_SYM_NAME) -> Symbol
     return SymbolicArray(_zeros(*_cs_shape(shape)), dtype=dtype, shape=_np_shape(shape))
 
 
-def ones(shape, dtype=np.float64, kind="SX"):
+def ones(shape, dtype=np.float64, kind="MX"):
     """
     Construct a symbolic array of ones with the given shape and dtype.
     
@@ -799,7 +799,7 @@ def ones(shape, dtype=np.float64, kind="SX"):
     dtype : numpy.dtype, optional
         Data type of the array. Default is np.float64.
     kind : {"SX", "MX"}, optional
-        Kind of symbolic variable to create. Default is "SX".
+        Kind of symbolic variable to create. Default is "MX".
         - "SX": Scalar-based symbolic type. Each element has its own symbolic
           representation. Generally more efficient for element-wise operations.
         - "MX": Matrix-based symbolic type. The entire array is represented by 
@@ -873,7 +873,7 @@ def zeros_like(x, dtype=None, sparse=True, kind=None):
         If False, creates numerical zero values.
     kind : {"SX", "MX"} or None, optional
         Kind of symbolic variable to create. If None (default), uses the kind
-        of `x` if it's a SymbolicArray, otherwise uses "SX".
+        of `x` if it's a SymbolicArray, otherwise uses "MX".
         - "SX": Scalar-based symbolic type. Each element has its own symbolic
           representation. Generally more efficient for element-wise operations.
         - "MX": Matrix-based symbolic type. The entire array is represented by 
@@ -946,10 +946,11 @@ def zeros_like(x, dtype=None, sparse=True, kind=None):
     archimedes.array : Create an array from data
     """
     x = array(x)  # Should be SymbolicArray or ndarray
-    if kind is None and isinstance(x, SymbolicArray):
-        kind = x.kind
-    else:
-        kind = "SX"
+    if kind is None:
+        if isinstance(x, SymbolicArray):
+            kind = x.kind
+        else:
+            kind = DEFAULT_SYM_NAME
     return zeros(x.shape, dtype=dtype or x.dtype, sparse=sparse, kind=kind)
 
 
@@ -970,7 +971,7 @@ def ones_like(x, dtype=None, kind=None):
         Data type of the new array. If None (default), uses the dtype of `x`.
     kind : {"SX", "MX"} or None, optional
         Kind of symbolic variable to create. If None (default), uses the kind
-        of `x` if it's a SymbolicArray, otherwise uses "SX".
+        of `x` if it's a SymbolicArray, otherwise uses "MX".
         - "SX": Scalar-based symbolic type. Each element has its own symbolic
           representation. Generally more efficient for element-wise operations.
         - "MX": Matrix-based symbolic type. The entire array is represented by 
@@ -998,7 +999,7 @@ def ones_like(x, dtype=None, kind=None):
     >>> import archimedes as arc
     >>> 
     >>> # With a symbolic input array
-    >>> x_sym = arc.sym("x", shape=(2, 3))
+    >>> x_sym = arc.sym("x", shape=(2, 3), kind="SX")
     >>> o_sym = arc.ones_like(x_sym)
     >>> print(o_sym.shape)
     (2, 3)
@@ -1033,11 +1034,11 @@ def ones_like(x, dtype=None, kind=None):
     if kind is None and isinstance(x, SymbolicArray):
         kind = x.kind
     else:
-        kind = "SX"
+        kind = DEFAULT_SYM_NAME
     return ones(x.shape, dtype=dtype or x.dtype, kind=kind)
 
 
-def eye(n, dtype=np.float64, kind="SX"):
+def eye(n, dtype=np.float64, kind=DEFAULT_SYM_NAME):
     """
     Construct a symbolic identity matrix of size `n` with the given dtype.
 
@@ -1052,7 +1053,7 @@ def eye(n, dtype=np.float64, kind="SX"):
     dtype : numpy.dtype, optional
         Data type of the array. Default is np.float64.
     kind : {"SX", "MX"}, optional
-        Kind of symbolic variable to create. Default is "SX".
+        Kind of symbolic variable to create. Default is "MX".
         - "SX": Scalar-based symbolic type. Each element has its own symbolic
           representation. Generally more efficient for element-wise operations.
         - "MX": Matrix-based symbolic type. The entire array is represented by 

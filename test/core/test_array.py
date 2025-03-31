@@ -89,7 +89,7 @@ class TestSymbolicArrayCreate:
     @pytest.mark.parametrize("shape", (0, 2, (), 3, (3, 1), (3, 2)))    
     @pytest.mark.parametrize("dtype", (bool, np.int32, np.float32, np.float64))
     def test_ones(self, shape, dtype):
-        x = arc.ones(shape, dtype=dtype)
+        x = arc.ones(shape, dtype=dtype, kind="SX")
         assert x.shape == (shape if isinstance(shape, tuple) else (shape,))
         assert x.dtype == dtype
         assert cs.is_equal(x._sym, np.ones(shape, dtype=dtype), 1)
@@ -104,7 +104,7 @@ class TestSymbolicArrayCreate:
             [[0, 0], [0, 0], [0, 0]],
         ]:
             # Test numpy array
-            y = arc.zeros_like(x, dtype=dtype)
+            y = arc.zeros_like(x, dtype=dtype, kind="SX")
             assert y.shape == shape
             assert y.dtype == dtype
             assert cs.is_equal(y._sym, np.zeros(shape), 1)
@@ -153,7 +153,7 @@ class TestSymbolicArrayCreate:
             SymbolicArray(NotImplemented)
 
     def test_eye(self):
-        x = arc.eye(3)
+        x = arc.eye(3, kind="SX")
         assert x.shape == (3, 3)
         assert x.dtype == np.float64
         assert cs.is_equal(x._sym, np.eye(3), 1)
