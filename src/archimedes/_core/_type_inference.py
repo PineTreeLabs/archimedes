@@ -1,9 +1,11 @@
-from typing import Tuple, Callable
+from typing import Tuple, Callable, TYPE_CHECKING
 import numpy as np
 
-from ..typing import DTypeLike
-
 from archimedes.error import ShapeDtypeError
+
+if TYPE_CHECKING:
+    from ..typing import DTypeLike
+
 ShapeLike = Tuple[int, ...]
 
 __all__ = ["shape_inference", "type_inference", "ShapeLike", "DTypeLike"]

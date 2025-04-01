@@ -1,12 +1,16 @@
 from __future__ import annotations
+from typing import TYPE_CHECKING
+
 import numpy as np
 import casadi as cs
 
-
-DEFAULT_FLOAT = np.float64
-
 from ._type_inference import shape_inference, type_inference
 
+if TYPE_CHECKING:
+    from ..typing import ArrayLike
+
+
+DEFAULT_FLOAT = np.float64
 
 SYM_KINDS = {"MX": cs.MX, "SX": cs.SX, "DM": cs.DM, "ndarray": np.ndarray}
 SYM_NAMES = {cs.MX: "MX", cs.SX: "SX", cs.DM: "DM", np.ndarray: "ndarray"}
@@ -302,8 +306,6 @@ class SymbolicArray:
         shape = shape_inference("vjp", self, x, v)
         return SymbolicArray(cs.jtimes(self._sym, x._sym, v._sym, True), dtype=dtype, shape=shape)
 
-
-ArrayLike = np.ndarray | SymbolicArray
 
 #
 # Factory functions for constructing SymbolicArrays

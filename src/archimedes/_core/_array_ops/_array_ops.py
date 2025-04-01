@@ -45,8 +45,8 @@ def binary_op(function=None, result_type=None, shape_inference="broadcast"):
 
 
 class SymbolicOp:
-    shape_inference_rule = NotImplemented
-    type_inference_rule = "default"
+    shape_inference_rule: str = "none"
+    type_inference_rule: str = "default"
 
     def __init__(
         self,
@@ -90,9 +90,9 @@ class BroadcastOp(SymbolicOp):
     shape_inference_rule = "broadcast"
 
     def _compute_result(self, op, inputs, result_shape):
-        cs_inputs = map(_as_casadi_array, inputs)
-        shapes = map(np.shape, inputs)  # Original shapes
-        return _broadcast_binary_operation(op, *cs_inputs, *shapes, result_shape)
+        arr1, arr2 = map(_as_casadi_array, inputs)
+        shape1, shape2 = map(np.shape, inputs)  # Original shapes
+        return _broadcast_binary_operation(op, arr1, arr2, shape1, shape2, result_shape)
 
 
 def _repmat(x, reps):
