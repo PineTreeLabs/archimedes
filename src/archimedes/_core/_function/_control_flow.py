@@ -41,6 +41,7 @@ from ... import tree
 
 __all__ = [
     "scan",
+    "vmap",
 ]
 
 def scan(
