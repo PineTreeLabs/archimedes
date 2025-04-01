@@ -413,9 +413,9 @@ def vmap(
         fixed_kwargs = OrderedDict()
         mapped_args = OrderedDict()
         for ax, key, arg in zip(
-            in_axes,
-            func.signature.parameters.keys(),
-            args,  # type: ignore
+            in_axes,  # type: ignore
+            func.signature.parameters.keys(),   # type: ignore
+            args,
         ):
             if ax is None:
                 fixed_kwargs[key] = arg
@@ -442,7 +442,7 @@ def vmap(
         # leaf corresponding to the normalized index for that leaf
         in_axes_normalized = tuple(
             normalize_vmap_index(a, arg)
-            for a, arg in zip(in_axes, args)
+            for a, arg in zip(in_axes, args)  # type: ignore
             if a is not None  # type: ignore
         )
 
