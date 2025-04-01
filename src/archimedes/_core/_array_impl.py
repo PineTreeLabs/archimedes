@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Union, Iterator, TypeVar, Callable, cast, overload
 
 import numpy as np
 import casadi as cs
@@ -8,15 +8,22 @@ from ._type_inference import shape_inference, type_inference
 
 if TYPE_CHECKING:
     from ..typing import ArrayLike
+    from numpy.typing import DTypeLike, NDArray
+    from typing_extensions import TypeAlias
 
 
 DEFAULT_FLOAT = np.float64
 
-SYM_KINDS = {"MX": cs.MX, "SX": cs.SX, "DM": cs.DM, "ndarray": np.ndarray}
-SYM_NAMES = {cs.MX: "MX", cs.SX: "SX", cs.DM: "DM", np.ndarray: "ndarray"}
+SYM_KINDS: Dict[str, Any] = {"MX": cs.MX, "SX": cs.SX, "DM": cs.DM, "ndarray": np.ndarray}
+SYM_NAMES: Dict[Any, str] = {cs.MX: "MX", cs.SX: "SX", cs.DM: "DM", np.ndarray: "ndarray"}
 
 DEFAULT_SYM_TYPE = cs.MX
 DEFAULT_SYM_NAME = "MX"
+
+# Type aliases for common types
+CasadiMatrix: TypeAlias = "Union[cs.SX, cs.MX, cs.DM]"
+ShapeType: TypeAlias = "Union[int, Tuple[int, ...]]"
+ScalarType: TypeAlias = "Union[int, float]"
 
 
 __all__ = [
@@ -30,7 +37,7 @@ __all__ = [
 ]
 
 
-def _as_casadi_array(x):
+def _as_casadi_array(x: Any) -> Union[CasadiMatrix, np.ndarray]:
     """Convert to a CasADi type (SX, MX, or ndarray)"""
     if isinstance(x, SymbolicArray):
         return x._sym
@@ -44,7 +51,7 @@ def _as_casadi_array(x):
 
 
 class SymbolicArray:
-    def __init__(self, sym: cs.SX | cs.MX, dtype=None, shape=None):
+    def __init__(self, sym: Union[cs.SX, cs.MX], dtype: Optional[DTypeLike] = None, shape: Optional[Tuple[int, ...]] = None):
         # Occasionally CasADi operations will return NotImplemented instead
         # of throwing an error. Ideally we would be able to provide a more
         # helpful error message, but at the very least this should be caught
@@ -54,25 +61,25 @@ class SymbolicArray:
 
         if dtype is None:
             dtype = DEFAULT_FLOAT
-        self.dtype = np.dtype(dtype)
+        self.dtype: np.dtype = np.dtype(dtype)
 
         if shape is None:
-            shape = sym.shape
-        self.shape = shape
+            shape = sym.shape  # type: ignore
+        self.shape: Tuple[int, ...] = shape
 
         # Consistent handling of vector shapes
-        if len(shape) == 1 and sym.shape[0] == 1:
-            sym = sym.T
+        if len(shape) == 1 and sym.shape[0] == 1:  # type: ignore
+            sym = sym.T  # type: ignore
         elif len(shape) == 2:
             sym = cs.reshape(sym, *shape)
 
-        self._sym = sym
-        self.kind = SYM_NAMES[type(sym)]
+        self._sym: Union[cs.SX, cs.MX] = sym
+        self.kind: str = SYM_NAMES[type(sym)]
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"{self._sym}"
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[SymbolicArray]:
         if len(self.shape) == 0:
             yield self
 
@@ -80,7 +87,7 @@ class SymbolicArray:
             for i in range(self.shape[0]):
                 yield self[i]
 
-    def __getitem__(self, index):
+    def __getitem__(self, index: Any) -> SymbolicArray:
         # This relies on using numpy's indexing and slicing machinery to do
         # shape inference and then applying the same indexing and slicing to
         # the symbolic array.  Probably there will be edge cases where some
@@ -97,7 +104,7 @@ class SymbolicArray:
 
         # Do this before handling the expand_dims cases, because it will make
         # the indices correspond to CasADi rather than numpy.
-        result_shape = np.empty(self.shape)[index].shape
+        result_shape = np.empty(self.shape)[index].shape  # type: ignore
 
         # Since all CasADi SX objects are 2D, CasADi doesn't recognize the idioms
         # x[:, None] or x[None, :] as a way of adding a new dimension to x, so we
@@ -123,7 +130,7 @@ class SymbolicArray:
 
         return SymbolicArray(self._sym[index], dtype=self.dtype, shape=result_shape)
 
-    def __setitem__(self, index, value):
+    def __setitem__(self, index: Any, value: Any) -> None:
         # This assumes that whatever is passed in as `index` will work with
         # CasADi's indexing and slicing machinery.  Probably there will be
         # edge cases where some preprocessing needs to be done on the index
@@ -138,170 +145,169 @@ class SymbolicArray:
 
             # Now the problem is that if `value`` is a CasADi SX, then its shape will
             # be (:, index), while `self._sym[index]` will be (index, :).
-            value = value.reshape(self._sym[index].shape)
+            value = value.reshape(self._sym[index].shape)  # type: ignore
 
         self._sym[index] = value
 
-    def __len__(self):
+    def __len__(self) -> int:
         if len(self.shape) == 0:
             return 0
         return self.shape[0]
     
     @property
-    def ndim(self):
+    def ndim(self) -> int:
         return len(self.shape)
     
     @property
-    def size(self):
+    def size(self) -> int:
         return int(np.prod(self.shape))
 
-    def __add__(self, other):
-        return np.add(self, other)
+    def __add__(self, other: Any) -> SymbolicArray:
+        return np.add(self, other)  # type: ignore
 
-    def __radd__(self, other):
+    def __radd__(self, other: Any) -> SymbolicArray:
         return self + other
 
-    def __sub__(self, other):
-        return np.subtract(self, other)
+    def __sub__(self, other: Any) -> SymbolicArray:
+        return np.subtract(self, other)  # type: ignore
 
-    def __rsub__(self, other):
+    def __rsub__(self, other: Any) -> SymbolicArray:
         return -self + other
 
-    def __mul__(self, other):
-        return np.multiply(self, other)
+    def __mul__(self, other: Any) -> SymbolicArray:
+        return np.multiply(self, other)  # type: ignore
 
-    def __rmul__(self, other):
+    def __rmul__(self, other: Any) -> SymbolicArray:
         return self * other
 
-    def __truediv__(self, other):
-        return np.divide(self, other)
+    def __truediv__(self, other: Any) -> SymbolicArray:
+        return np.divide(self, other)  # type: ignore
     
-    def __rtruediv__(self, other):
-        return np.divide(other, self)
+    def __rtruediv__(self, other: Any) -> SymbolicArray:
+        return np.divide(other, self)  # type: ignore
 
-    def __pow__(self, other):
-        return np.power(self, other)
+    def __pow__(self, other: Any) -> SymbolicArray:
+        return np.power(self, other)  # type: ignore
 
-    def __rpow__(self, other):
-        return np.power(other, self)
+    def __rpow__(self, other: Any) -> SymbolicArray:
+        return np.power(other, self)  # type: ignore
 
-    def __mod__(self, other):
-        return np.mod(self, other)
+    def __mod__(self, other: Any) -> SymbolicArray:
+        return np.mod(self, other)  # type: ignore
 
-    def __rmod__(self, other):
-        return np.mod(other, self)
+    def __rmod__(self, other: Any) -> SymbolicArray:
+        return np.mod(other, self)  # type: ignore
 
-    def __floordiv__(self, other):
-        return np.floor_divide(self, other)
+    def __floordiv__(self, other: Any) -> SymbolicArray:
+        return np.floor_divide(self, other)  # type: ignore
     
-    def __rfloordiv__(self, other):
-        return np.floor_divide(other, self)
+    def __rfloordiv__(self, other: Any) -> SymbolicArray:
+        return np.floor_divide(other, self)  # type: ignore
     
-    def __divmod__(self, other):
-        return np.divmod(self, other)
+    def __divmod__(self, other: Any) -> Tuple[SymbolicArray, SymbolicArray]:
+        return np.divmod(self, other)  # type: ignore
     
-    def __rdivmod__(self, other):
-        return np.divmod(other, self)
+    def __rdivmod__(self, other: Any) -> Tuple[SymbolicArray, SymbolicArray]:
+        return np.divmod(other, self)  # type: ignore
 
-    def __neg__(self):
-        return np.negative(self)
+    def __neg__(self) -> SymbolicArray:
+        return np.negative(self)  # type: ignore
 
-    def __abs__(self):
-        return np.fabs(self)
+    def __abs__(self) -> SymbolicArray:
+        return np.fabs(self)  # type: ignore
 
-    def __matmul__(self, other):
-        return np.matmul(self, other)
+    def __matmul__(self, other: Any) -> SymbolicArray:
+        return np.matmul(self, other)  # type: ignore
     
-    def __gt__(self, other):
-        return np.greater(self, other)
+    def __gt__(self, other: Any) -> SymbolicArray:
+        return np.greater(self, other)  # type: ignore
     
-    def __ge__(self, other):
-        return np.greater_equal(self, other)
+    def __ge__(self, other: Any) -> SymbolicArray:
+        return np.greater_equal(self, other)  # type: ignore
     
-    def __lt__(self, other):
-        return np.less(self, other)
+    def __lt__(self, other: Any) -> SymbolicArray:
+        return np.less(self, other)  # type: ignore
     
-    def __le__(self, other):
-        return np.less_equal(self, other)
+    def __le__(self, other: Any) -> SymbolicArray:
+        return np.less_equal(self, other)  # type: ignore
     
-    def __eq__(self, other):
-        return np.equal(self, other)
+    def __eq__(self, other: Any) -> SymbolicArray:  # type: ignore
+        return np.equal(self, other)  # type: ignore
     
-    def __ne__(self, other):
-        return np.not_equal(self, other)
+    def __ne__(self, other: Any) -> SymbolicArray:  # type: ignore
+        return np.not_equal(self, other)  # type: ignore
     
-    def __and__(self, other):
-        return np.logical_and(self, other)
+    def __and__(self, other: Any) -> SymbolicArray:
+        return np.logical_and(self, other)  # type: ignore
     
-    def __rand__(self, other):
-        return np.logical_and(other, self)
+    def __rand__(self, other: Any) -> SymbolicArray:
+        return np.logical_and(other, self)  # type: ignore
     
-    def __or__(self, other):
-        return np.logical_or(self, other)
+    def __or__(self, other: Any) -> SymbolicArray:
+        return np.logical_or(self, other)  # type: ignore
     
-    def __ror__(self, other):
-        return np.logical_or(other, self)
+    def __ror__(self, other: Any) -> SymbolicArray:
+        return np.logical_or(other, self)  # type: ignore
     
-    def __xor__(self, other):
-        return np.logical_xor(self, other)
+    def __xor__(self, other: Any) -> SymbolicArray:
+        return np.logical_xor(self, other)  # type: ignore
     
-    def __rxor__(self, other):
-        return np.logical_xor(other, self)
+    def __rxor__(self, other: Any) -> SymbolicArray:
+        return np.logical_xor(other, self)  # type: ignore
     
-    def __invert__(self):
-        return np.logical_not(self)
+    def __invert__(self) -> SymbolicArray:
+        return np.logical_not(self)  # type: ignore
 
     @property
-    def T(self):
-        return np.transpose(self)
+    def T(self) -> SymbolicArray:
+        return np.transpose(self)  # type: ignore
 
-    def simplify(self):
+    def simplify(self) -> SymbolicArray:
         return SymbolicArray(cs.simplify(self._sym), dtype=self.dtype, shape=self.shape)
     
     #
     # Other common NumPy array methods
     #
-    def flatten(self, order='C'):
-        return np.ravel(self, order=order)
+    def flatten(self, order: str = 'C') -> SymbolicArray:
+        return np.ravel(self, order=order)  # type: ignore
 
-    def ravel(self, order='C'):
-        return np.ravel(self, order=order)
+    def ravel(self, order: str = 'C') -> SymbolicArray:
+        return np.ravel(self, order=order)  # type: ignore
 
-    def squeeze(self, axis=None):
-        return np.squeeze(self, axis=axis)
+    def squeeze(self, axis: Optional[Union[int, Tuple[int, ...]]] = None) -> SymbolicArray:
+        return np.squeeze(self, axis=axis)  # type: ignore
 
-    def reshape(self, shape, order='C'):
-        return np.reshape(self, shape, order=order)
+    def reshape(self, shape: ShapeType, order: str = 'C') -> SymbolicArray:
+        return np.reshape(self, shape, order=order)  # type: ignore
     
-    def astype(self, dtype):
-        return np.astype(self, dtype)
+    def astype(self, dtype: DTypeLike) -> SymbolicArray:
+        return np.astype(self, dtype)  # type: ignore
 
     #
     # Autodiff operations not supported by NumPy
     #
-    def grad(self, x: SymbolicArray):
+    def grad(self, x: SymbolicArray) -> SymbolicArray:
         dtype = type_inference("default", self, x)
         shape = shape_inference("gradient", self, x)
         return SymbolicArray(cs.gradient(self._sym, x._sym), dtype=dtype, shape=shape)
 
-    def jac(self, x: SymbolicArray):
+    def jac(self, x: SymbolicArray) -> SymbolicArray:
         dtype = type_inference("default", self, x)
         shape = shape_inference("jacobian", self, x)
         return SymbolicArray(cs.jacobian(self._sym, x._sym), dtype=dtype, shape=shape)
 
-
-    def hess(self, x: SymbolicArray):
+    def hess(self, x: SymbolicArray) -> SymbolicArray:
         dtype = type_inference("default", self, x)
         shape = shape_inference("hessian", self, x)
         H, _g = cs.hessian(self._sym, x._sym)
         return SymbolicArray(H, dtype=dtype, shape=shape)
 
-    def jvp(self, x: SymbolicArray, v: SymbolicArray):
+    def jvp(self, x: SymbolicArray, v: SymbolicArray) -> SymbolicArray:
         dtype = type_inference("default", self, x, v)
         shape = shape_inference("jvp", self, x, v)
         return SymbolicArray(cs.jtimes(self._sym, x._sym, v._sym), dtype=dtype, shape=shape)
 
-    def vjp(self, x: SymbolicArray, v: SymbolicArray):
+    def vjp(self, x: SymbolicArray, v: SymbolicArray) -> SymbolicArray:
         dtype = type_inference("default", self, x, v)
         shape = shape_inference("vjp", self, x, v)
         return SymbolicArray(cs.jtimes(self._sym, x._sym, v._sym, True), dtype=dtype, shape=shape)
@@ -311,7 +317,12 @@ class SymbolicArray:
 # Factory functions for constructing SymbolicArrays
 #
 
-def sym(name, shape=None, dtype=np.float64, kind=DEFAULT_SYM_NAME) -> SymbolicArray:
+def sym(
+    name: str, 
+    shape: Optional[ShapeType] = None, 
+    dtype: DTypeLike = np.float64, 
+    kind: str = DEFAULT_SYM_NAME
+) -> SymbolicArray:
     """
     Create a symbolic array for use in symbolic computations.
     
@@ -425,7 +436,12 @@ def sym(name, shape=None, dtype=np.float64, kind=DEFAULT_SYM_NAME) -> SymbolicAr
     return SymbolicArray(_sym, dtype=dtype, shape=shape)
 
 
-def sym_like(x, name, dtype=None, kind=DEFAULT_SYM_NAME) -> SymbolicArray:
+def sym_like(
+    x: Union[SymbolicArray, np.ndarray, Any], 
+    name: str, 
+    dtype: Optional[DTypeLike] = None, 
+    kind: str = DEFAULT_SYM_NAME
+) -> SymbolicArray:
     """
     Create a symbolic array with the same shape and dtype as an existing array.
 
@@ -503,7 +519,7 @@ def sym_like(x, name, dtype=None, kind=DEFAULT_SYM_NAME) -> SymbolicArray:
     return sym(name, x.shape, dtype=dtype or x.dtype, kind=kind)
 
 
-def array(x, dtype=None) -> ArrayLike:
+def array(x: Any, dtype: Optional[DTypeLike] = None) -> Union[SymbolicArray, np.ndarray]:
     """
     Create an array from various input types, supporting both numeric and symbolic computation.
     
@@ -595,24 +611,24 @@ def array(x, dtype=None) -> ArrayLike:
     return _dispatch_array(x, dtype=dtype)
 
 
-def _empty_like(x):
+def _empty_like(x: Union[SymbolicArray, np.ndarray, Any]) -> np.ndarray:
     if isinstance(x, SymbolicArray):
         return np.empty(x.shape, dtype=x.dtype)
     else:
-        return x
+        return x  # type: ignore
 
 
-def _result_type(*inputs):
+def _result_type(*inputs: Any) -> np.dtype:
     np_inputs = tuple(map(_empty_like, inputs))
-    return np.result_type(*np_inputs)
+    return np.result_type(*np_inputs)  # type: ignore
 
 
-def _is_list_of_scalars(x):
-    return all(isinstance(xi, (int, float)) or len(xi) <= 1 for xi in x)
+def _is_list_of_scalars(x: List[Any]) -> bool:
+    return all(isinstance(xi, (int, float)) or len(xi) <= 1 for xi in x)  # type: ignore
 
 
 
-def _dispatch_array(x, dtype=None) -> ArrayLike:
+def _dispatch_array(x: Any, dtype: Optional[DTypeLike] = None) -> Union[SymbolicArray, np.ndarray]:
     """`array` function dispatched from np.array(..., like=[SymbolicArray])"""
     # For now, support three cases:
     # 1. x is already an array (do nothing)
@@ -632,12 +648,12 @@ def _dispatch_array(x, dtype=None) -> ArrayLike:
         # Case 2. x is a list of scalars
         if not all(isinstance(xi, (list, tuple, np.ndarray, SymbolicArray)) for xi in x):
             # Check that everything is a scalar
-            if not _is_list_of_scalars(x):
+            if not _is_list_of_scalars(x):  # type: ignore
                 raise ValueError(f"Creating array with inconsistent data: {x}")
             result_shape = (len(x),)
             result_dtype = dtype or _result_type(*x)
             cs_x = list(map(_as_casadi_array, x))
-            arr = cs.vcat(cs_x)
+            arr = cs.vcat(cs_x)  # type: ignore
             if isinstance(arr, cs.DM):
                 return np.array(arr, dtype=result_dtype).reshape(result_shape)
             return SymbolicArray(arr, dtype=result_dtype, shape=result_shape)
@@ -645,7 +661,7 @@ def _dispatch_array(x, dtype=None) -> ArrayLike:
         # Case 3. x is a list of lists, arrays, etc
         # check that all lists are only scalars
         if not all(
-            _is_list_of_scalars(xi) for xi in x
+            _is_list_of_scalars(xi) for xi in x  # type: ignore
         ):
             raise ValueError(
                 "Can only create array from list of scalars or list of "
@@ -657,11 +673,11 @@ def _dispatch_array(x, dtype=None) -> ArrayLike:
         if len(len_set) != 1:
             raise ValueError(f"Inconsistent lengths in list of lists: {len_set}")
 
-        result_shape = (len(x),) if len(x[0]) == 0 else (len(x), len(x[0]))
-        result_dtype = dtype or _result_type(*[_result_type(*xi) for xi in x])
+        result_shape = (len(x),) if len(x[0]) == 0 else (len(x), len(x[0]))  # type: ignore
+        result_dtype = dtype or _result_type(*[_result_type(*xi) for xi in x])  # type: ignore
         cs_x = [list(map(_as_casadi_array, xi)) for xi in x]
 
-        arr = cs.vcat([cs.hcat(xi) for xi in cs_x])
+        arr = cs.vcat([cs.hcat(xi) for xi in cs_x])  # type: ignore
         if isinstance(arr, cs.DM):
             return np.array(arr, dtype=result_dtype).reshape(result_shape)
         return SymbolicArray(
@@ -673,7 +689,7 @@ def _dispatch_array(x, dtype=None) -> ArrayLike:
     raise NotImplementedError(f"Converting {x} (type={type(x)}) to array is not supported")
 
 
-def _np_shape(shape):
+def _np_shape(shape: ShapeType) -> Tuple[int, ...]:
     # Check that the shape is valid and return a tuple of ints.
     if isinstance(shape, int):
         return (shape,)
@@ -686,7 +702,7 @@ def _np_shape(shape):
 
 
 # zeros, ones, zeros_like, eye, diag
-def _cs_shape(shape):
+def _cs_shape(shape: ShapeType) -> Tuple[int, int]:
     # The shape of the CasADi object is always 2D, so we need to handle the
     # cases where the specified shape is () or (n,) separately.
     cs_shape = _np_shape(shape)
@@ -695,15 +711,20 @@ def _cs_shape(shape):
         raise ValueError("Only scalars, vectors, and matrices are supported for now")
 
     if len(cs_shape) == 0:
-        cs_shape = (1, 1)
+        cs_shape = (1, 1)  # type: ignore
 
     elif len(cs_shape) == 1:
-        cs_shape = (cs_shape[0], 1)
+        cs_shape = (cs_shape[0], 1)  # type: ignore
 
-    return cs_shape
+    return cs_shape  # type: ignore
 
 
-def zeros(shape, dtype=np.float64, sparse=True, kind=DEFAULT_SYM_NAME) -> SymbolicArray:
+def zeros(
+    shape: ShapeType, 
+    dtype: DTypeLike = np.float64, 
+    sparse: bool = True, 
+    kind: str = DEFAULT_SYM_NAME
+) -> SymbolicArray:
 
     """
     Construct a symbolic array of zeros with the given shape and dtype.
@@ -784,7 +805,11 @@ def zeros(shape, dtype=np.float64, sparse=True, kind=DEFAULT_SYM_NAME) -> Symbol
     return SymbolicArray(_zeros(*_cs_shape(shape)), dtype=dtype, shape=_np_shape(shape))
 
 
-def ones(shape, dtype=np.float64, kind="MX"):
+def ones(
+    shape: ShapeType, 
+    dtype: DTypeLike = np.float64, 
+    kind: str = "MX"
+) -> SymbolicArray:
     """
     Construct a symbolic array of ones with the given shape and dtype.
     
@@ -852,7 +877,12 @@ def ones(shape, dtype=np.float64, kind="MX"):
     return SymbolicArray(X.ones(*_cs_shape(shape)), dtype=dtype, shape=_np_shape(shape))
 
 
-def zeros_like(x, dtype=None, sparse=True, kind=None):
+def zeros_like(
+    x: Union[SymbolicArray, np.ndarray, Any], 
+    dtype: Optional[DTypeLike] = None, 
+    sparse: bool = True, 
+    kind: Optional[str] = None
+) -> SymbolicArray:
     """
     Create a symbolic array of zeros with the same shape and dtype as an input array.
 
@@ -955,7 +985,11 @@ def zeros_like(x, dtype=None, sparse=True, kind=None):
     return zeros(x.shape, dtype=dtype or x.dtype, sparse=sparse, kind=kind)
 
 
-def ones_like(x, dtype=None, kind=None):
+def ones_like(
+    x: Union[SymbolicArray, np.ndarray, Any], 
+    dtype: Optional[DTypeLike] = None, 
+    kind: Optional[str] = None
+) -> SymbolicArray:
     """
     Create a symbolic array of ones with the same shape and dtype as an input array.
     
@@ -1039,7 +1073,7 @@ def ones_like(x, dtype=None, kind=None):
     return ones(x.shape, dtype=dtype or x.dtype, kind=kind)
 
 
-def eye(n, dtype=np.float64, kind=DEFAULT_SYM_NAME):
+def eye(n: int, dtype: DTypeLike = np.float64, kind: str = DEFAULT_SYM_NAME) -> SymbolicArray:
     """
     Construct a symbolic identity matrix of size `n` with the given dtype.
 
