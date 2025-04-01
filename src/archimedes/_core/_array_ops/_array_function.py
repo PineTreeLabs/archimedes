@@ -1,31 +1,35 @@
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
+import casadi as cs
 import numpy as np
 import numpy.exceptions as npex
-import casadi as cs
 
 from .._array_impl import (
-    array,
-    _as_casadi_array,
     SymbolicArray,
-    _result_type,
+    _as_casadi_array,
     _dispatch_array,
     _empty_like,
-    zeros,
-    ones,
-    zeros_like,
-    ones_like,
+    _result_type,
+    array,
     eye,
+    ones,
+    ones_like,
+    zeros,
+    zeros_like,
 )
-
-from .._type_inference import type_inference, shape_inference
+from .._type_inference import shape_inference, type_inference
 from ._array_ops import (
-    unary_op,
+    _cs_reshape,
     binary_op,
     normalize_axis_index,
-    _cs_reshape,
+    unary_op,
 )
 from ._array_ufunc import SUPPORTED_UFUNCS, _dot
+
+if TYPE_CHECKING:
+    from ...typing import ShapeLike
 
 
 # Do not call directly - this should be called by NumPy's array
@@ -77,7 +81,7 @@ def _append(arr, values, axis=None):
     # If axis is None, both `arr` and `values` are flattened
     if axis not in {None, 0, 1}:
         raise ValueError("Only 2D arrays are supported")
-    
+
     arr, values = map(array, (arr, values))
     shape = None
 
@@ -154,17 +158,17 @@ def _concatenate(arrs, axis=0, dtype=None):
                     f"the array at index 0 has {ndim} dimensions and the array "
                     f"at index {i} has {arr.ndim} dimensions."
                 )
-            
+
     # Check that the axis is in bounds
     arrs = np.atleast_1d(*arrs)
     if not isinstance(arrs, tuple):
         arrs = (arrs,)
     axis = normalize_axis_index(axis, ndim, "axis")
-    
+
     # The arrays must have the same shape except for the `axis` dimension
     arr0_shape = arrs[0].shape
     match_axes = [i for i in range(ndim) if i != axis]
-    for (j, arr) in enumerate(arrs[1:]):
+    for j, arr in enumerate(arrs[1:]):
         if not all(arr.shape[i] == arr0_shape[i] for i in match_axes):
             # Find the differing array
             for i in match_axes:
@@ -177,6 +181,7 @@ def _concatenate(arrs, axis=0, dtype=None):
                     )
 
     args = [_as_casadi_array(arr) for arr in arrs]
+    shape: ShapeLike = ()
 
     # If all arrays are 1D, then use cs.vcat
     if ndim == 1:
@@ -193,7 +198,7 @@ def _concatenate(arrs, axis=0, dtype=None):
         result = cs.hcat(args)
 
     return SymbolicArray(result, dtype=dtype, shape=shape)
-    
+
 
 def _hstack(arrs, dtype=None):
     # From NumPy docs:
@@ -206,7 +211,7 @@ def _hstack(arrs, dtype=None):
         return np.concatenate(arrs, 0, dtype=dtype)
     else:
         return np.concatenate(arrs, 1, dtype=dtype)
-    
+
 
 def _vstack(arrs, dtype=None):
     # From NumPy docs:
@@ -246,9 +251,8 @@ def _array_split(arr, indices_or_sections, axis=0):
         indices = indices_or_sections
     except TypeError:
         sections = indices_or_sections
-        N = arr.shape[axis]
         # Split into equal sections
-        section_length = int(N // sections)
+        section_length = int(arr.shape[axis] // sections)
         indices = section_length * np.arange(1, sections)
 
     ndim = arr.ndim
@@ -265,12 +269,13 @@ def _array_split(arr, indices_or_sections, axis=0):
 
     # Check non-decreasing indices
     ax_sizes = []
-    for (ix1, ix2) in zip(indices[:-1], indices[1:]):
+    for ix1, ix2 in zip(indices[:-1], indices[1:]):
         if ix1 > ix2:
             raise IndexError("indices to split must be non-decreasing")
         ax_sizes.append(ix2 - ix1)
 
     arr = _as_casadi_array(arr)
+    shapes: list[ShapeLike] = []
 
     if ndim == 1:
         shapes = [(s,) for s in ax_sizes]
@@ -288,8 +293,7 @@ def _array_split(arr, indices_or_sections, axis=0):
             results = cs.horzsplit(arr, indices)
 
     return tuple(
-        SymbolicArray(r, dtype=dtype, shape=s)
-        for (r, s) in zip(results, shapes)
+        SymbolicArray(r, dtype=dtype, shape=s) for (r, s) in zip(results, shapes)
     )
 
 
@@ -307,10 +311,9 @@ def _split(ary, indices_or_sections, axis=0):
         len(indices_or_sections)
     except TypeError:
         sections = indices_or_sections
-        N = ary.shape[axis]
-        if N % sections:
+        if ary.shape[axis] % sections != 0:
             raise ValueError(
-                'array split does not result in an equal division'
+                "array split does not result in an equal division"
             ) from None
     return np.array_split(ary, indices_or_sections, axis)
 
@@ -330,7 +333,7 @@ def _squeeze(a, axis=None):
 def _where(condition, x=None, y=None):
     if x is None or y is None:
         raise ValueError("Calling where with only one argument is not supported")
-    
+
     condition, x, y = map(array, (condition, x, y))
 
     shape = shape_inference("broadcast", condition, x, y)
@@ -338,7 +341,9 @@ def _where(condition, x=None, y=None):
 
     # CasADi will broadcast scalars, otherwise we need to reshape manually
     # TODO: Use broadcast_to instead of manual reshaping
-    condition = condition if np.prod(condition.shape) <= 1 else np.reshape(condition, shape)
+    condition = (
+        condition if np.prod(condition.shape) <= 1 else np.reshape(condition, shape)
+    )
     x = x if np.prod(x.shape) <= 1 else np.reshape(x, shape)
     y = y if np.prod(y.shape) <= 1 else np.reshape(y, shape)
 
@@ -356,7 +361,7 @@ def _norm(x, ord=None, axis=None, keepdims=False):
 
     if ord not in {None, 1, 2, np.inf, "fro"}:
         raise ValueError("Invalid norm order")
-    
+
     # CasADi will throw an error for 2-norm applied to a matrix,
     # whereas NumPy will assume the Frobenius norm if axis is None.
     # Since we don't support axis, we will just use the Frobenius norm
@@ -396,9 +401,7 @@ def _interp1d(x, xp, fp, left=None, right=None, period=None, method="linear"):
     x, xp, fp = map(array, (x, xp, fp))
 
     if isinstance(x, SymbolicArray) and not isinstance(x._sym, cs.MX):
-        raise ValueError(
-            "SymbolicArray must use 'kind=\"MX\"' to use interp function"
-        )
+        raise ValueError("SymbolicArray must use 'kind=\"MX\"' to use interp function")
 
     # Check for invalid input
     if xp.ndim != 1:
@@ -415,18 +418,19 @@ def _interp1d(x, xp, fp, left=None, right=None, period=None, method="linear"):
 
     if period is not None:
         raise NotImplementedError("period argument not yet implemented")
-    
+
     # CasAdi does not suppoert interpolating symbolic data; only numeric
     if not isinstance(xp, np.ndarray) or not isinstance(fp, np.ndarray):
         raise ValueError(
             f"xp and fp must be NumPy arrays, but have type {type(xp)} and {type(fp)}"
         )
-    
+
     if not np.isscalar(left) or not np.isscalar(right):
         raise ValueError(
-            f"left and right must be scalars, but have type {type(left)} and {type(right)}"
+            f"left and right must be scalars, but have type {type(left)} and "
+            f"{type(right)}"
         )
-    
+
     # Output shape is the same as the input shape, dtype is the promotion of
     # the input dtypes
     shape = x.shape
@@ -439,11 +443,10 @@ def _interp1d(x, xp, fp, left=None, right=None, period=None, method="linear"):
     f = SymbolicArray(lut(x_cs), shape=shape, dtype=dtype)
 
     # Limit the ends to the left/right values
-    f = np.where(x < xp[0], left, f)
-    f = np.where(x > xp[-1], right, f)
+    f = np.where(x < xp[0], left, f)  # type: ignore
+    f = np.where(x > xp[-1], right, f)  # type: ignore
 
     return f
-
 
 
 def _sum(x, axis=None, dtype=None):
@@ -452,13 +455,14 @@ def _sum(x, axis=None, dtype=None):
 
     if np.isscalar(x) or len(x.shape) == 0:
         return x
-    
+
     if axis is not None and axis >= len(x.shape):
         raise npex.AxisError(
             f"axis {axis} is out of bounds for array of dimension {len(x.shape)}"
         )
 
     dtype = x.dtype
+    shape: tuple[int, ...] = ()
     arg = x._sym if isinstance(x, SymbolicArray) else x
 
     if axis is None or len(x.shape) == 1:
@@ -479,7 +483,6 @@ def _sum(x, axis=None, dtype=None):
 
 # https://github.com/numpy/numpy/blob/v2.1.0/numpy/_core/numeric.py#L1528-L1747
 def _cross(a, b, axisa=-1, axisb=-1, axisc=-1, axis=None):
-
     if axis is not None:
         axisa, axisb, axisc = (axis,) * 3
 
@@ -497,7 +500,7 @@ def _cross(a, b, axisa=-1, axisb=-1, axisc=-1, axis=None):
         raise NotImplementedError(
             "cross product along different axes not yet supported"
         )
-    
+
     arg1 = a._sym if isinstance(a, SymbolicArray) else a
     arg2 = b._sym if isinstance(b, SymbolicArray) else b
 
@@ -518,7 +521,7 @@ def _swapaxes(a, axis1, axis2):
     axis2 = normalize_axis_index(axis2, a.ndim, "axis2")
     if axis1 == axis2:
         return a
-    
+
     # Since we're only supporting up to 2D arrays, the only possibilities
     # are that axis1 == axis2 or that we need to transpose the array
     return a.T
@@ -656,7 +659,6 @@ SUPPORTED_FUNCTIONS = {
     "rfft": NotImplemented,
     "broadcast_arrays": NotImplemented,
     "expandtabs": NotImplemented,
-    "split": NotImplemented,
     "round_": NotImplemented,
     "argsort": NotImplemented,
     "irfft": NotImplemented,
@@ -769,7 +771,6 @@ SUPPORTED_FUNCTIONS = {
     "arctanh": NotImplemented,
     "eigvals": NotImplemented,
     "nanargmax": NotImplemented,
-    "partition": NotImplemented,
     "select": NotImplemented,
     "dot": _dot,
     "triu_indices_from": NotImplemented,

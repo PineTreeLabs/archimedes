@@ -1,9 +1,9 @@
-import pytest
 import os
 
 import numpy as np
-import archimedes as arc
+import pytest
 
+import archimedes as arc
 
 # TODO:
 # - Test data type explicit specification
@@ -11,13 +11,14 @@ import archimedes as arc
 # - Test with static args
 # - Test re-importing with casadi extern
 
+
 class TestCodegen:
     def _gen_code(self, file):
         # https://web.casadi.org/docs/#syntax-for-generating-code
-        
+
         def myfunc(x, y):
             return x, np.sin(y) * x
-        
+
         # Create arrays of the right shape and dtype
         x_type = np.empty((2,), dtype=float)
         y_type = np.empty((), dtype=float)
@@ -52,10 +53,9 @@ class TestCodegen:
         # Create temporary directory
         if not os.path.exists("tmp"):
             os.mkdir("tmp")
-    
+
         with pytest.raises(RuntimeError):
             self._gen_code("tmp/gen")
 
         # Clean up
         os.rmdir("tmp")
-

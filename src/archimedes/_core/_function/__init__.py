@@ -1,6 +1,6 @@
-from ._compile import compile, FunctionCache
-from ._control_flow import scan, vmap
 from ._codegen import codegen
+from ._compile import FunctionCache, compile
+from ._control_flow import scan, vmap
 
 __all__ = [
     "compile",

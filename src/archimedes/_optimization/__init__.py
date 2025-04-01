@@ -1,4 +1,4 @@
-from ._minimize import nlp_solver, minimize
+from ._minimize import minimize, nlp_solver
 from ._root import implicit, root
 
 __all__ = [

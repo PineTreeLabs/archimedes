@@ -1,17 +1,17 @@
 """Interface to casadi.interpolant for N-dimensional interpolation."""
+
 from __future__ import annotations
+
 from typing import TYPE_CHECKING, Callable
 
 import casadi as cs
 import numpy as np
 
-from ._array_impl import array, SymbolicArray, type_inference, _as_casadi_array
+from ._array_impl import SymbolicArray, _as_casadi_array, array, type_inference
 from ._function import FunctionCache
 
 if TYPE_CHECKING:
     from ..typing import ArrayLike
-    # from numpy.typing import ArrayLike
-
 
 
 # Wrap as a FunctionCache with an input for each grid dimension
@@ -25,7 +25,8 @@ def _eval_interpolant(x, cs_interp, grid, data, name) -> ArrayLike:
 
     if not all(x_i.ndim < 2 for x_i in x):
         raise ValueError(
-            f"All arguments to {name} must be 0- or 1-dimensional but input shapes are {tuple(x_i.shape for x_i in x)}"
+            f"All arguments to {name} must be 0- or 1-dimensional but input shapes are "
+            f"{tuple(x_i.shape for x_i in x)}"
         )
 
     # The lengths of the arguments must be consistent with each other
@@ -41,7 +42,7 @@ def _eval_interpolant(x, cs_interp, grid, data, name) -> ArrayLike:
 
     # The output shape is the input shape with leading dimension removed
     shape = () if x.shape[1] == 1 else x.shape[1:]
-    
+
     # The output dtype is the promotion of the data and input dtypes
     dtype = type_inference("default", data, x)
 
@@ -61,10 +62,10 @@ def interpolant(
     name: str = "interpolant",
 ) -> Callable:
     """Create a callable N-dimensional interpolant function.
-    
+
     Constructs an efficient interpolation function from grid data that can be
     evaluated at arbitrary points and embedded in Archimedes computational graphs.
-    
+
     Parameters
     ----------
     grid : list of array_like
@@ -85,14 +86,14 @@ def interpolant(
     name : str, optional
         Name for the interpolant function itself.
         Default is "interpolant".
-    
+
     Returns
     -------
     callable
         A callable function that interpolates values at specified points.
         The function takes N arguments corresponding to each dimension
         and returns the interpolated value.
-    
+
     Notes
     -----
     When to use this function:
@@ -113,21 +114,21 @@ def interpolant(
 
     Edge cases:
     - Evaluating outside the grid boundaries will return the nearest grid value
-    - For multi-dimensional grids with N > 1, the interpolant expects N separate arguments
+    - For multi-dimensional grids with N > 1, the interpolant expects N separate args
 
     Examples
     --------
     >>> import numpy as np
     >>> import archimedes as arc
     >>> import matplotlib.pyplot as plt
-    >>> 
+    >>>
     >>> # 1D interpolation example
     >>> x = np.linspace(0, 10, 11)
     >>> y = np.sin(x)
-    >>> 
+    >>>
     >>> # Create an interpolant
     >>> sin_interp = arc.interpolant([x], y, method="bspline")
-    >>> 
+    >>>
     >>> # Evaluate at new points
     >>> x_fine = np.linspace(0, 10, 101)
     >>> y_interp = np.array([sin_interp(xi) for xi in x_fine])
@@ -136,16 +137,16 @@ def interpolant(
     >>> plt.plot(x, y, 'k.')
     >>> plt.plot(x_fine, np.sin(x_fine), 'k--')
     >>> plt.show()
-    >>> 
+    >>>
     >>> # 2D interpolation example
     >>> xgrid = np.linspace(-5, 5, 11)
     >>> ygrid = np.linspace(-4, 4, 9)
     >>> X, Y = np.meshgrid(xgrid, ygrid, indexing='ij')
-    >>> 
+    >>>
     >>> # Create a 2D function to interpolate
     >>> R = np.sqrt(X**2 + Y**2) + 1
     >>> Z = np.sin(R) / R
-    >>> 
+    >>>
     >>> # Create the interpolant
     >>> f = arc.interpolant(
     >>>     [xgrid, ygrid],
@@ -154,18 +155,18 @@ def interpolant(
     >>>     arg_names=["x", "y"],
     >>>     ret_name="z"
     >>> )
-    >>> 
+    >>>
     >>> # Use in optimization or with automatic differentiation
     >>> df_dx = arc.grad(f, argnums=0)  # Gradient with respect to x
     >>> print(df_dx(0.5, 1.0))
     -0.19490596565158205
-    >>> 
+    >>>
     >>> # Combining with other Archimedes functions
     >>> @arc.compile
     >>> def combined_func(x, y):
     >>>     interp_value = f(x, y)
     >>>     return interp_value**2 + np.sin(x * y)
-    
+
     See Also
     --------
     arc.compile : Compile a function for use with symbolic arrays
@@ -190,22 +191,21 @@ def interpolant(
 
     data = data.flatten(order="F")  # Fortran order (column-major), expected by CasADi
 
-    N = np.prod([len(grid_i) for grid_i in grid])
-    if data.size != N:
-        raise ValueError(
-            f"data must have length {N} but has length {data.size}"
-        )
+    n = np.prod([len(grid_i) for grid_i in grid])
+    if data.size != n:
+        raise ValueError(f"data must have length {n} but has length {data.size}")
 
     if method not in ("linear", "bspline"):
         raise ValueError(f"method must be one of 'linear', 'bspline' but is {method}")
-    
+
     if arg_names is None:
         arg_names = [f"x_{i}" for i in range(len(grid))]
 
     else:
         if len(arg_names) != len(grid):
             raise ValueError(
-                f"arg_names must have length {len(grid)} but has length {len(arg_names)}"
+                f"arg_names must have length {len(grid)} but has length "
+                f"{len(arg_names)}"
             )
         if not all([isinstance(arg_name, str) for arg_name in arg_names]):
             raise ValueError(
@@ -216,9 +216,7 @@ def interpolant(
         ret_name = "f"
 
     elif not isinstance(ret_name, str):
-            raise ValueError(
-                f"ret_name must be a string but has type {type(ret_name)}"
-            )
+        raise ValueError(f"ret_name must be a string but has type {type(ret_name)}")
 
     # Create CasADi interpolant
     cs_interp = cs.interpolant(name, method, grid, data)

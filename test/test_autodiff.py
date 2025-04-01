@@ -1,22 +1,27 @@
+# ruff: noqa: N806
+# ruff: noqa: N803
+
+import casadi as cs
+import numpy as np
 import pytest
 
-import numpy as np
-import casadi as cs
-
 from archimedes import (
-    sym as _sym,
     compile,
-    jac,
     grad,
     hess,
+    jac,
     jvp,
     vjp,
+)
+from archimedes import (
+    sym as _sym,
 )
 
 # NOTE: Most tests here use SX instead of the default MX, since the is_equal
 # tests struggle with the array-valued MX type.  This doesn't indicate an error
 # in the MX representation, just a difficulty of checking for equality between
 # array-valued symbolic expressions
+
 
 # Override the default symbolic kind to use SX
 def sym(*args, kind="SX", **kwargs):
@@ -103,7 +108,7 @@ class TestGrad:
         # Test with invalid return type (multiple returns not supported)
         def f(x):
             return x, 3 * x
-        
+
         x = sym("x", shape=(3,))
         df = grad(f)
         with pytest.raises(ValueError):
@@ -194,7 +199,7 @@ class TestHess:
     def test_error_handling(self):
         def f(x):
             return 0.5 * x.T @ x
-        
+
         # Test with invalid argnums
         with pytest.raises(ValueError):
             hess(f, argnums=(0.5,))
@@ -202,7 +207,7 @@ class TestHess:
         # Differentiation with respect to static arg
         def f(a, x):
             return a * x.T @ x
-        
+
         f = compile(f, static_argnames=("a",))
         with pytest.raises(ValueError):
             hess(f, argnums=0)
@@ -210,7 +215,7 @@ class TestHess:
         # Test with invalid return type (multiple returns not supported)
         def f(Q, x):
             return 0.5 * x.T @ x, x.T @ Q @ x
-        
+
         Q = np.random.randn(3, 3)
         x = sym("x", shape=(3,))
         hess_fun = hess(f, argnums=1)
@@ -220,11 +225,12 @@ class TestHess:
         # Test with invalid return type (vector-valued)
         def f(x):
             return x
-        
+
         x = sym("x", shape=(3,))
         hess_fun = hess(f)
         with pytest.raises(ValueError):
             hess_fun(x)
+
 
 class TestJVP:
     def test_jvp(self):
@@ -269,7 +275,7 @@ class TestJVP:
         # Invalid return types
         def f(x):
             return x, 3 * x
-        
+
         x = sym("x", shape=(3,))
         jvp_fun = jvp(f)
         with pytest.raises(ValueError):
@@ -326,7 +332,7 @@ class TestVJP:
         # Invalid return types
         def f(x):
             return x, 3 * x
-        
+
         x = sym("x", shape=(3,))
         vjp_fun = vjp(f)
         with pytest.raises(ValueError):

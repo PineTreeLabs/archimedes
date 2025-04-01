@@ -27,11 +27,11 @@
 """Creation and management of types recognized as pytree nodes"""
 
 from __future__ import annotations
-from typing import NamedTuple, Any, TypeVar, Sequence
+
+import dataclasses
 from collections import OrderedDict
 from collections.abc import Callable
-import dataclasses
-
+from typing import Any, NamedTuple, Sequence, TypeVar
 
 Typ = TypeVar("Typ", bound=type[Any])
 
@@ -52,9 +52,7 @@ def unzip2(pairs):
     return lst1, lst2
 
 
-def register_pytree_node(
-    ty: type, to_iter: Callable, from_iter: Callable
-) -> None:
+def register_pytree_node(ty: Any, to_iter: Callable, from_iter: Callable) -> None:
     """
     Register a custom type as a pytree node.
 
@@ -75,11 +73,11 @@ def register_pytree_node(
     from_iter : callable
         A function that accepts `aux_data` and an iterable of children and returns
         a reconstructed instance of type `ty`.
-    
+
     Returns
     -------
     None
-    
+
     Notes
     -----
     When to use:
@@ -87,7 +85,7 @@ def register_pytree_node(
     - To enable pytree transformations on your own data structures
     - When creating reusable components that need to be compatible with Archimedes'
       pytree-based operations
-    
+
     The `to_iter` function should extract the relevant parts of your data structure,
     and the `from_iter` function should be able to reconstruct it exactly.
 
@@ -102,36 +100,36 @@ def register_pytree_node(
     --------
     >>> import archimedes as arc
     >>> import numpy as np
-    >>> 
+    >>>
     >>> # Define a custom container class
     >>> class Point3D:
     ...     def __init__(self, x, y, z):
     ...         self.x = x
     ...         self.y = y
     ...         self.z = z
-    ...     
+    ...
     ...     def __repr__(self):
     ...         return f"Point3D({self.x}, {self.y}, {self.z})"
-    >>> 
+    >>>
     >>> # Define functions to convert to/from iterables
     >>> def point_to_iter(point):
     ...     children = (point.x, point.y, point.z)
     ...     aux_data = None  # No static auxiliary data needed
     ...     return children, aux_data
-    >>> 
+    >>>
     >>> def point_from_iter(aux_data, children):
     ...     x, y, z = children
     ...     return Point3D(x, y, z)
-    >>> 
+    >>>
     >>> # Register the class as a pytree node
     >>> arc.tree.register_pytree_node(Point3D, point_to_iter, point_from_iter)
-    >>> 
+    >>>
     >>> # Now Point3D works with pytree operations
     >>> p = Point3D(np.array([1.0]), np.array([2.0]), np.array([3.0]))
     >>> doubled = arc.tree.map(lambda x: x * 2, p)
     >>> print(doubled)
     Point3D([2.], [4.], [6.])
-    
+
     See Also
     --------
     struct.pytree_node : Decorator for creating pytree-compatible classes
@@ -142,21 +140,26 @@ def register_pytree_node(
 
 register_pytree_node(None, lambda x: (None, None), lambda _, xs: None)
 register_pytree_node(tuple, lambda t: (t, None), lambda _, xs: tuple(xs))
-register_pytree_node(list, lambda l: (l, None), lambda _, xs:  list(xs))
+register_pytree_node(list, lambda lst: (lst, None), lambda _, xs: list(xs))
+
 
 # dict
 def _dict_to_iter(d: dict):
     keys, vals = unzip2(sorted(d.items()))
     return map(tuple, (vals, keys))
 
+
 def _dict_from_iter(keys, vals):
     return dict(zip(keys, vals))
 
+
 register_pytree_node(dict, _dict_to_iter, _dict_from_iter)
+
 
 # OrderedDict
 def _od_from_iter(keys, vals):
     return OrderedDict(zip(keys, vals))
+
 
 register_pytree_node(OrderedDict, _dict_to_iter, _od_from_iter)
 
@@ -181,7 +184,7 @@ def register_dataclass(
     data_fields : sequence of str, optional
         Names of fields that should be treated as data (leaf values). If None and
         the type is a dataclass, fields are inferred based on metadata.
-    meta_fields : sequence of str, optional 
+    meta_fields : sequence of str, optional
         Names of fields that should be treated as metadata. If None and the type
         is a dataclass, fields are inferred based on metadata.
     drop_fields : sequence of str, optional
@@ -191,11 +194,11 @@ def register_dataclass(
     -------
     nodetype : type
         The input type, now registered as a pytree node.
-    
+
     Notes
     -----
     When to use:
-    - For fine-grained control over how dataclass fields are handled in pytree operations
+    - For fine-grained control over how dataclass fields are handled in pytree ops
     - When you need some fields to be treated as static configuration rather than data
     - For advanced customization of pytree behavior for complex data models
 
@@ -207,7 +210,7 @@ def register_dataclass(
     Data fields are included when flattening a pytree and are considered leaf values
     that can be transformed. Meta fields are static configuration not included in
     transformations but preserved during reconstruction.
-    
+
     Raises
     ------
     TypeError
@@ -221,7 +224,7 @@ def register_dataclass(
     >>> import archimedes as arc
     >>> from dataclasses import dataclass
     >>> import numpy as np
-    >>> 
+    >>>
     >>> # Define a dataclass
     >>> @dataclass
     >>> class Vehicle:
@@ -229,14 +232,14 @@ def register_dataclass(
     ...     velocity: np.ndarray  # Data field - changes during simulation
     ...     mass: float           # Metadata - configuration parameter
     ...     name: str             # Metadata - configuration parameter
-    >>> 
+    >>>
     >>> # Register with explicit field classification
     >>> arc.tree.register_dataclass(
     ...     Vehicle,
     ...     data_fields=["position", "velocity"],
     ...     meta_fields=["mass", "name"]
     ... )
-    >>> 
+    >>>
     >>> # Create an instance
     >>> car = Vehicle(
     ...     position=np.array([0.0, 0.0]),
@@ -244,12 +247,12 @@ def register_dataclass(
     ...     mass=1500.0,
     ...     name="sedan"
     ... )
-    >>> 
+    >>>
     >>> # Flatten - only data fields are included in leaves
     >>> leaves, treedef = arc.tree.flatten(car)
     >>> print(leaves)
     [array([0., 0.]), array([10., 0.])]
-    >>> 
+    >>>
     >>> # When unflattening, metadata is preserved
     >>> doubled_leaves = [leaf * 2 for leaf in leaves]
     >>> new_car = arc.tree.unflatten(treedef, doubled_leaves)
@@ -257,7 +260,7 @@ def register_dataclass(
     [20., 0.]
     >>> print(new_car.mass)      # Metadata preserved
     1500.0
-    
+
     See Also
     --------
     struct.pytree_node : Decorator for creating pytree-compatible classes
@@ -266,16 +269,26 @@ def register_dataclass(
     """
     if data_fields is None or meta_fields is None:
         if (data_fields is None) != (meta_fields is None):
-            raise TypeError("register_dataclass: data_fields and meta_fields must both be specified"
-                            f" when either is specified. Got {data_fields=} {meta_fields=}.")
+            raise TypeError(
+                "register_dataclass: data_fields and meta_fields must both be "
+                f"specified when either is specified. Got {data_fields=} and "
+                f"{meta_fields=}."
+            )
         if not dataclasses.is_dataclass(nodetype):
-            raise TypeError("register_dataclass: data_fields and meta_fields are required when"
-                            f" nodetype is not a dataclass. Got {nodetype=}.")
-        data_fields = [f.name for f in dataclasses.fields(nodetype)
-                    if not f.metadata.get('static', False)]
-        meta_fields = [f.name for f in dataclasses.fields(nodetype)
-                    if f.metadata.get('static', False)]
-
+            raise TypeError(
+                "register_dataclass: data_fields and meta_fields are required when"
+                f" nodetype is not a dataclass. Got {nodetype=}."
+            )
+        data_fields = [
+            f.name
+            for f in dataclasses.fields(nodetype)
+            if not f.metadata.get("static", False)
+        ]
+        meta_fields = [
+            f.name
+            for f in dataclasses.fields(nodetype)
+            if f.metadata.get("static", False)
+        ]
 
     assert meta_fields is not None
     assert data_fields is not None
@@ -313,7 +326,6 @@ def register_dataclass(
         meta = tuple(getattr(x, name) for name in meta_fields)
         data = tuple(getattr(x, name) for name in data_fields)
         return data, meta
-    
+
     register_pytree_node(nodetype, flatten_func, unflatten_func)
     return nodetype
-

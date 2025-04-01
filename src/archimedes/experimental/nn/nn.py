@@ -1,7 +1,6 @@
-
+from typing import OrderedDict
 
 import numpy as np
-from typing import OrderedDict
 
 import archimedes as arc
 from archimedes._core import FunctionCache
@@ -18,16 +17,20 @@ __all__ = [
 
 
 def rbf(x):
-    return np.exp(-x**2)
+    return np.exp(-(x**2))
+
 
 def relu(x):
     return np.maximum(x, 0)
 
+
 def elu(x, alpha=1.0):
     return np.where(x > 0, x, alpha * (np.exp(x) - 1))
 
+
 def sigmoid(x):
     return 1 / (1 + np.exp(-x))
+
 
 def swish(x):
     return x * sigmoid(x)
@@ -56,6 +59,7 @@ def adam(
     v = np.zeros_like(x0)
 
     if callback_iters is not None and callback is None:
+
         def callback(i, x, J):
             return J
 
@@ -66,17 +70,17 @@ def adam(
         if weight_decay != 0:
             g = g + weight_decay * x
         m = betas[0] * m + (1 - betas[0]) * g
-        v = betas[1] * v + (1 - betas[1]) * g ** 2
+        v = betas[1] * v + (1 - betas[1]) * g**2
         mhat = m / (1 - betas[0] ** (i + 1))
         vhat = v / (1 - betas[1] ** (i + 1))
-        x = x - lr * mhat / (vhat ** 0.5 + eps)
+        x = x - lr * mhat / (vhat**0.5 + eps)
 
         if print_every is not None and (i + 1) % print_every == 0:
-            print(f"Iter {i+1}/{iters}: {obj(x, *args)}")
+            print(f"Iter {i + 1}/{iters}: {obj(x, *args)}")
 
         if callback_iters is not None and (i + 1) % callback_iters == 0:
             J = obj(x, *args)
-            history[i+1] = callback(i+1, x, J)
+            history[i + 1] = callback(i + 1, x, J)
 
     return x, history
 
@@ -88,6 +92,7 @@ def glorot_normal(rng, n_in, n_out):
 
 def zero_initialization(rng, n_in, n_out):
     return np.zeros((n_out, n_in))
+
 
 INITIALIZATIONS = {
     "glorot_normal": glorot_normal,
@@ -126,6 +131,7 @@ def dense(
     p = np.concatenate([W.ravel() for W in weights] + biases)
 
     if activation is None:
+
         def activation(x):
             return x
 
@@ -145,9 +151,7 @@ def dense(
         # Cannot call with scalar inputs, even if num_inputs==1
         # Support vectorization by calling with (n_in, n_samples) arrays
         if x.ndim == 0:
-            raise ValueError(
-                f"Cannot evaluate dense network with scalar input."
-            )
+            raise ValueError("Cannot evaluate dense network with scalar input.")
 
         # Either (n_in,) or (n_in, n_samples,)
         if x.shape[0] != num_inputs:
@@ -176,7 +180,7 @@ def dense(
             x = np.reshape(x, (num_outputs,))
 
         return x
-    
+
     forward = FunctionCache(
         forward,
         arg_names=("x", "p"),

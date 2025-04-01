@@ -1,8 +1,9 @@
 """Utilities for discretizing a continuous ODE function"""
-import numpy as np
-from archimedes._core import scan, FunctionCache
-from archimedes._optimization import implicit
 
+import numpy as np
+
+from archimedes._core import FunctionCache
+from archimedes._optimization import implicit
 
 # # NOTE: This implementation fails because alpha[i] is not allowed
 # # when i is symbolic.  In theory this would be a better way to do it
@@ -42,18 +43,28 @@ def _discretize_rk4(f, h):
         k3 = f(t0 + h / 2, x0 + h * k2 / 2, p)
         k4 = f(t0 + h, x0 + h * k3, p)
         return x0 + h * (k1 + 2 * k2 + 2 * k3 + k4) / 6
-    
+
     return step
 
 
 def _discretize_radau5(rhs, h, newton_solver="fast_newton"):
-    c = np.array([(4 - np.sqrt(6))/10, (4 + np.sqrt(6))/10, 1])
-    b = np.array([(16 - np.sqrt(6))/36, (16 + np.sqrt(6))/36, 1/9])
-    a = np.array([
-        [(88-7*np.sqrt(6))/360, (296-169*np.sqrt(6))/1800, (-2+3*np.sqrt(6))/225],
-        [(296+169*np.sqrt(6))/1800, (88+7*np.sqrt(6))/360, (-2-3*np.sqrt(6))/225],
-        [(16-np.sqrt(6))/36, (16+np.sqrt(6))/36, 1/9],
-    ])
+    c = np.array([(4 - np.sqrt(6)) / 10, (4 + np.sqrt(6)) / 10, 1])
+    b = np.array([(16 - np.sqrt(6)) / 36, (16 + np.sqrt(6)) / 36, 1 / 9])
+    a = np.array(
+        [
+            [
+                (88 - 7 * np.sqrt(6)) / 360,
+                (296 - 169 * np.sqrt(6)) / 1800,
+                (-2 + 3 * np.sqrt(6)) / 225,
+            ],
+            [
+                (296 + 169 * np.sqrt(6)) / 1800,
+                (88 + 7 * np.sqrt(6)) / 360,
+                (-2 - 3 * np.sqrt(6)) / 225,
+            ],
+            [(16 - np.sqrt(6)) / 36, (16 + np.sqrt(6)) / 36, 1 / 9],
+        ]
+    )
 
     if not isinstance(rhs, FunctionCache):
         rhs = FunctionCache(rhs)
@@ -73,12 +84,10 @@ def _discretize_radau5(rhs, h, newton_solver="fast_newton"):
         for i in range(3):
             f[i] = rhs(ts[i], ys[i], p)
 
-        f, k = np.reshape(f, (3*n,)), np.reshape(k, (3*n,))
+        f, k = np.reshape(f, (3 * n,)), np.reshape(k, (3 * n,))
         return f - k
 
-    F = FunctionCache(
-        F, kind=sym_kind, arg_names=["k", "t", "y", "p"], ret_names=["r"]
-    )
+    F = FunctionCache(F, kind=sym_kind, arg_names=["k", "t", "y", "p"], ret_names=["r"])
     solve = implicit(F, solver=newton_solver)
 
     def step(t, y, p):

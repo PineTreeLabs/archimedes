@@ -1,6 +1,10 @@
+# ruff: noqa: N802
+# ruff: noqa: N803
+# ruff: noqa: N806
+
 import numpy as np
 
-from archimedes._optimization import root, implicit
+from archimedes._optimization import implicit, root
 from archimedes.error import ShapeDtypeError
 
 
@@ -29,11 +33,10 @@ class TestImplicitFunction:
         assert np.allclose(x, 2.0)
 
     def test_implicit_static_args(self):
-
         # An implicit function with additional arguments
         def F(x, z, a=1.0):
             return a * x**2 - z
-        
+
         g = implicit(F, static_argnames=["a"])
         z = 4.0
         x = g(z=z, a=2.0, x0=1.0)
@@ -72,11 +75,11 @@ class TestRoot:
 
     def test_root_static_args(self):
         def f(x, shift=True):
-            res = x ** 2
+            res = x**2
             if shift:
                 res -= 1
             return res
-        
+
         for shift in [True, False]:
             x = root(
                 f,
@@ -91,7 +94,7 @@ class TestRoot:
     def test_root_error_handling(self):
         def f(x):
             return np.dot(x, x)
-        
+
         with np.testing.assert_raises(ShapeDtypeError):
             root(f, x0=np.ones(2))
 

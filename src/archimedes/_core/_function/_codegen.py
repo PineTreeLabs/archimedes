@@ -1,7 +1,13 @@
 """C code generation"""
+
+from typing import TYPE_CHECKING, Any, Callable, Sequence
+
 import numpy as np
 
 from ._compile import FunctionCache
+
+if TYPE_CHECKING:
+    pass
 
 dtype_to_c = {
     float: "double",
@@ -15,29 +21,30 @@ dtype_to_c = {
     np.int32: "int",
 }
 
+
 def codegen(
-    func,
-    filename,
-    args,
-    static_argnums=None,
-    static_argnames=None,
-    kwargs=None,
-    verbose=False,
-    cpp=False,
-    main=False,
-    float_type=float,
-    int_type=int,
-    header=True,
-    with_mem=False,
-    indent=4,
-):
+    func: Callable | FunctionCache,
+    filename: str,
+    args: Sequence[Any],
+    static_argnums: int | Sequence[int] | None = None,
+    static_argnames: str | Sequence[str] | None = None,
+    kwargs: dict[str, Any] | None = None,
+    verbose: bool = False,
+    cpp: bool = False,
+    main: bool = False,
+    float_type: type = float,
+    int_type: type = int,
+    header: bool = True,
+    with_mem: bool = False,
+    indent: int = 4,
+) -> None:
     """Generate C/C++ code from a compiled function.
-    
-    Creates standalone C or C++ code that implements the computational graph 
-    defined by the function. This allows Archimedes models to be deployed on 
-    embedded systems, integrated into C/C++ codebases, or compiled to native 
+
+    Creates standalone C or C++ code that implements the computational graph
+    defined by the function. This allows Archimedes models to be deployed on
+    embedded systems, integrated into C/C++ codebases, or compiled to native
     executables for maximum performance.
-    
+
     Parameters
     ----------
     func : Callable | FunctionCache
@@ -53,10 +60,10 @@ def codegen(
         - The actual values for static arguments
         Note: For dynamic arguments, the numeric values are ignored.
     static_argnums : tuple, optional
-        The indices of the static arguments to the function. Will be ignored if 
+        The indices of the static arguments to the function. Will be ignored if
         `func` is already a FunctionCache.
     static_argnames : tuple, optional
-        The names of the static arguments to the function. Will be ignored if 
+        The names of the static arguments to the function. Will be ignored if
         `func` is already a FunctionCache.
     kwargs : dict, optional
         Keyword arguments to pass to the function during specialization.
@@ -76,12 +83,12 @@ def codegen(
         If True, generate a simplified C API with memory management helpers.
     indent : int, default=4
         The number of spaces to use for indentation in the generated code.
-    
+
     Returns
     -------
     None
         The function writes the generated code to the specified file(s).
-    
+
     Notes
     -----
     When to use this function:
@@ -89,25 +96,25 @@ def codegen(
     - For integrating Archimedes algorithms into C/C++ applications
     - For maximum runtime performance by removing Python interpretation overhead
     - For creating standalone, portable implementations of your algorithm
-    
+
     Conceptual model:
-    This function specializes your computational graph to specific input shapes 
-    and types, then uses CasADi's code generation capabilities to produce C code 
-    that implements the same computation. The generated code has no dependencies 
+    This function specializes your computational graph to specific input shapes
+    and types, then uses CasADi's code generation capabilities to produce C code
+    that implements the same computation. The generated code has no dependencies
     on Archimedes, CasADi, or Python.
-    
-    Currently, this function uses CasADi's code generation directly, so the 
+
+    Currently, this function uses CasADi's code generation directly, so the
     generated code will contain CASADI_* prefixes and follow CasADi's conventions.
-    
+
     To store numerical constants in the generated code, either:
     1. "Close over" the values in your function definition, or
     2. Pass them as hashable static arguments
-    
+
     Examples
     --------
     >>> import numpy as np
     >>> import archimedes as arc
-    >>> 
+    >>>
     >>> # Define a simple function
     >>> @arc.compile
     ... def rotate(x, theta):
@@ -116,15 +123,15 @@ def codegen(
     ...         [np.sin(theta), np.cos(theta)],
     ...     ], like=x)
     ...     return R @ x
-    >>> 
+    >>>
     >>> # Create templates with appropriate shapes and dtypes
     >>> x_type = np.zeros((2,), dtype=float)
     >>> theta_type = np.array(0.0, dtype=float)
-    >>> 
+    >>>
     >>> # Generate C code
-    >>> arc.codegen(rotate, "rotate_function.c", (x_type, theta_type), 
+    >>> arc.codegen(rotate, "rotate_function.c", (x_type, theta_type),
     ...            header=True, verbose=True)
-    
+
     The above code will generate 'rotate_function.c' and 'rotate_function.h'
     files that implement the rotation function in C.
 
@@ -138,10 +145,10 @@ def codegen(
     ...         [np.sin(theta), np.cos(theta)],
     ...     ], like=x)
     ...     return scale * (R @ x)
-    >>> 
-    >>> arc.codegen(scaled_rotation, "scaled_rotation.c", 
+    >>>
+    >>> arc.codegen(scaled_rotation, "scaled_rotation.c",
     ...            (x_type, theta_type, 5.0))
-    
+
     See Also
     --------
     arc.compile : Create a compiled function for use with codegen
@@ -159,7 +166,7 @@ def codegen(
         raise ValueError(
             "Must provide filename. Returning code as a string is not yet supported"
         )
-    
+
     options = {
         "verbose": verbose,
         "cpp": cpp,

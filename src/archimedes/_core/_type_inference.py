@@ -1,4 +1,5 @@
-from typing import Tuple, Callable, TYPE_CHECKING
+from typing import TYPE_CHECKING, Callable, Tuple
+
 import numpy as np
 
 from archimedes.error import ShapeDtypeError
@@ -22,12 +23,11 @@ def _type_inference_default(*inputs):
     # The result type is the result type of the scalar types and the vector types
     return np.result_type(*scalar_types, *vector_types)
 
+
 def type_inference(rule, *inputs):
     return {
         "default": _type_inference_default,
-    }[
-        rule
-    ](*inputs)
+    }[rule](*inputs)
 
 
 def shape_inference(rule, *inputs):
@@ -65,8 +65,8 @@ def _shape_inference_broadcast(*shapes: Tuple[ShapeLike, ...]) -> ShapeLike:
     # https://numpy.org/doc/stable/user/basics.broadcasting.html#general-broadcasting-rules
     #
     # When operating on two arrays, NumPy compares their shapes element-wise. It starts
-    # with the trailing (i.e. rightmost) dimension and works its way left. Two dimensions
-    # are compatible when
+    # with the trailing (i.e. rightmost) dimension and works its way left. Two
+    # dimensions are compatible when
     #
     #   1. they are equal, or
     #   2. one of them is 1.
@@ -85,7 +85,8 @@ def _shape_inference_matmul(shape1: ShapeLike, shape2: ShapeLike) -> ShapeLike:
     # eliminated axes
     if shape1[-1] != shape2[0]:
         raise ShapeDtypeError(
-            f"shapes {shape1} and {shape2} not aligned: {shape1[-1]} (dim 0) != {shape2[0]} (dim 1)"
+            f"shapes {shape1} and {shape2} not aligned: {shape1[-1]} (dim 0) != "
+            f"{shape2[0]} (dim 1)"
         )
 
     return shape1[:-1] + shape2[1:]
@@ -96,9 +97,10 @@ def _shape_inference_solve(shape1: ShapeLike, shape2: ShapeLike) -> ShapeLike:
     # For now, x2 must also be a vector
     if shape1[0] != shape2[0]:
         raise ShapeDtypeError(
-            f"shapes {shape1} and {shape2} not aligned: {shape1[-1]} (dim 0) != {shape2[0]} (dim 1)"
+            f"shapes {shape1} and {shape2} not aligned: {shape1[-1]} (dim 0) != "
+            f"{shape2[0]} (dim 1)"
         )
-    
+
     if len(shape2) != 1:
         raise ShapeDtypeError(f"shape {shape2} is not a vector")
 
@@ -110,7 +112,9 @@ def _shape_inference_gradient(expr: ShapeLike, arg: ShapeLike) -> ShapeLike:
     # The expression here must be a scalar.  The gradient will then
     # have the shape of the argument.
     if np.prod(expr) > 1:
-        raise ShapeDtypeError(f"Gradient expression must be a scalar, but got shape {expr}")
+        raise ShapeDtypeError(
+            f"Gradient expression must be a scalar, but got shape {expr}"
+        )
     return arg
 
 

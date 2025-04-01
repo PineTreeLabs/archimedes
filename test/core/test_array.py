@@ -1,10 +1,14 @@
+# ruff: noqa: N802
+# ruff: noqa: N803
+# ruff: noqa: N806
+
+import casadi as cs
+import numpy as np
 import pytest
 
-import numpy as np
-import casadi as cs
-
 import archimedes as arc
-from archimedes._core import SymbolicArray, sym as _sym
+from archimedes._core import SymbolicArray
+from archimedes._core import sym as _sym
 from archimedes.error import ShapeDtypeError
 
 # NOTE: Most tests here use SX instead of the default MX, since the is_equal
@@ -73,7 +77,7 @@ class TestSymbolicArrayCreate:
         with pytest.raises(NotImplementedError):
             arc.array({"x": 2})
 
-    @pytest.mark.parametrize("shape", (0, 2, (), 3, (3, 1), (3, 2)))    
+    @pytest.mark.parametrize("shape", (0, 2, (), 3, (3, 1), (3, 2)))
     @pytest.mark.parametrize("dtype", (bool, np.int32, np.float32, np.float64))
     @pytest.mark.parametrize("sparse", [True, False])
     def test_zeros(self, shape, dtype, sparse):
@@ -86,7 +90,7 @@ class TestSymbolicArrayCreate:
             assert x._sym.nnz() == np.prod(shape)
         assert cs.is_equal(x._sym, np.zeros(shape, dtype=dtype), 1)
 
-    @pytest.mark.parametrize("shape", (0, 2, (), 3, (3, 1), (3, 2)))    
+    @pytest.mark.parametrize("shape", (0, 2, (), 3, (3, 1), (3, 2)))
     @pytest.mark.parametrize("dtype", (bool, np.int32, np.float32, np.float64))
     def test_ones(self, shape, dtype):
         x = arc.ones(shape, dtype=dtype, kind="SX")
@@ -94,7 +98,7 @@ class TestSymbolicArrayCreate:
         assert x.dtype == dtype
         assert cs.is_equal(x._sym, np.ones(shape, dtype=dtype), 1)
 
-    @pytest.mark.parametrize("dtype", (bool, np.int32, np.float32, np.float64)) 
+    @pytest.mark.parametrize("dtype", (bool, np.int32, np.float32, np.float64))
     def test_zeros_like(self, dtype):
         shape = (3, 2)
 
@@ -109,7 +113,7 @@ class TestSymbolicArrayCreate:
             assert y.dtype == dtype
             assert cs.is_equal(y._sym, np.zeros(shape), 1)
 
-    @pytest.mark.parametrize("dtype", (bool, np.int32, np.float32, np.float64)) 
+    @pytest.mark.parametrize("dtype", (bool, np.int32, np.float32, np.float64))
     def test_ones_like(self, dtype):
         shape = (3, 2)
 
@@ -125,9 +129,9 @@ class TestSymbolicArrayCreate:
             assert cs.is_equal(y._sym, np.ones(shape), 1)
 
     def test_error_handling(self):
-        with pytest.raises(ValueError, match=r'Unknown symbolic kind.*'):
+        with pytest.raises(ValueError, match=r"Unknown symbolic kind.*"):
             sym("x", kind="abc")
-    
+
         with pytest.raises(ValueError):
             arc.zeros(shape=(2, 3, 4))
 
@@ -164,6 +168,7 @@ class TestSymbolicArrayCreate:
         assert isinstance(y, SymbolicArray)
         assert y.shape == (3,)
         assert y.dtype == int
+
 
 class TestSymbolicArrayNotImplemented:
     def test_unsupported_ufunc(self):
@@ -922,10 +927,10 @@ class TestSymbolicArrayArithmetic:
         assert cs.is_equal(result._sym, array._sym ** np.array([1, 2, 3]), 2)
 
     def test_rpow(self, array):
-        result = 2 ** array
+        result = 2**array
         assert isinstance(result, SymbolicArray)
         assert result.dtype == np.int32
-        assert cs.is_equal(result._sym, 2 ** array._sym, 1)
+        assert cs.is_equal(result._sym, 2**array._sym, 1)
 
     def test_mod(self, array):
         # Direct call function with type cast
@@ -945,7 +950,7 @@ class TestSymbolicArrayArithmetic:
         assert isinstance(result2, SymbolicArray)
         assert result2.dtype == np.float64
         assert cs.is_equal(result2._sym, result._sym, 2)
-        
+
         # Modulo operator with array
         x = np.array([1, 2, 3], dtype=np.int64)
         result = array % x
@@ -1117,8 +1122,7 @@ class TestSymbolicArrayArithmetic:
         result = a ^ b
         # (a and not b) or (not a and b)
         expected = cs.logic_or(
-            cs.logic_and(a._sym, cs.logic_not(b)),
-            cs.logic_and(cs.logic_not(a._sym), b)
+            cs.logic_and(a._sym, cs.logic_not(b)), cs.logic_and(cs.logic_not(a._sym), b)
         )
         assert isinstance(result, SymbolicArray)
         assert cs.is_equal(result._sym, expected, 3)
@@ -1188,7 +1192,7 @@ class TestSymbolicArrayArithmetic:
         y = sym("y", (), dtype=dtype)
         with pytest.raises(ValueError):
             result = x @ y
-        
+
         with pytest.raises(ValueError):
             result = y @ x
 
@@ -1276,7 +1280,7 @@ class TestSymbolicArrayDifferentiation:
         # Error handling
         with pytest.raises(ShapeDtypeError):
             A_sym.jac(x)
-        
+
         with pytest.raises(ShapeDtypeError):
             x.jac(A_sym)
 

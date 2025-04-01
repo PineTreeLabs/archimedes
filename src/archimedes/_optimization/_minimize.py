@@ -2,19 +2,27 @@
 
 This interface is patterned after the `scipy.optimize` module, but with
 additional functionality for solving nonlinear problems symbolically. It
-also dispatches to IPOPT rather than the L-BFGS-B algorithm used in SciPy.
+also dispatches to IPOPT rather than solvers available in SciPy.
 """
-import numpy as np
+
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Callable, Sequence, cast
+
 import casadi as cs
+import numpy as np
 
 from archimedes import tree
 from archimedes._core import (
+    FunctionCache,
+    SymbolicArray,
+    _as_casadi_array,
     array,
     sym_like,
-    _as_casadi_array,
-    SymbolicArray,
-    FunctionCache,
 )
+
+if TYPE_CHECKING:
+    from ..typing import ArrayLike
 
 __all__ = [
     "nlp_solver",
@@ -23,25 +31,25 @@ __all__ = [
 
 
 def nlp_solver(
-    obj,
-    constr=None,
-    static_argnames=None,
-    constrain_x=False,
-    name=None,
-    print_level=5,
+    obj: Callable,
+    constr: Callable | None = None,
+    static_argnames: str | Sequence[str] | None = None,
+    constrain_x: bool = False,
+    name: str | None = None,
+    print_level: int = 5,
     **options,
-):
+) -> FunctionCache:
     """Create a reusable solver for a nonlinear optimization problem.
 
-    This function transforms an objective function and optional constraint function 
+    This function transforms an objective function and optional constraint function
     into an efficient solver for nonlinear programming problems of the form:
-    
+
     minimize        f(x, p)
     subject to      lbx <= x <= ubx
                     lbg <= g(x, p) <= ubg
-    
+
     where x represents decision variables and p represents parameters.
-    
+
     Parameters
     ----------
     obj : callable
@@ -52,7 +60,7 @@ def nlp_solver(
         Must return an array of constraint values where the constraints
         are interpreted as lbg <= constr(x, *args) <= ubg.
     static_argnames : tuple of str, optional
-        Names of arguments in `obj` and `constr` that should be treated 
+        Names of arguments in `obj` and `constr` that should be treated
         as static parameters rather than symbolic variables. Static arguments
         are not differentiated through and the solver will be recompiled when
         their values change.
@@ -60,10 +68,10 @@ def nlp_solver(
         If True, the solver will accept bounds on decision variables (lbx, ubx).
         If False, no bounds on x will be applied (equivalent to -∞ <= x <= ∞).
     name : str, optional
-        Name for the resulting solver function. If None, a name will be 
+        Name for the resulting solver function. If None, a name will be
         generated based on the objective function name.
     print_level : int, default=5
-        Verbosity level for the IPOPT solver (0-12). Higher values produce 
+        Verbosity level for the IPOPT solver (0-12). Higher values produce
         more detailed output. Set to 0 to suppress all output.
     **options : dict
         Additional options passed to the underlying IPOPT solver.
@@ -75,19 +83,19 @@ def nlp_solver(
         A callable function that solves the nonlinear optimization problem.
         The signature of this function depends on the values of `constrain_x`
         and whether a constraint function was provided:
-        
+
         - With constraints and x bounds: `solver(x0, lbx, ubx, lbg, ubg, *args)`
         - With constraints, no x bounds: `solver(x0, lbg, ubg, *args)`
         - With x bounds, no constraints: `solver(x0, lbx, ubx, *args)`
         - No constraints or x bounds: `solver(x0, *args)`
-        
+
         The returned solver can be evaluated both numerically and symbolically.
 
     Notes
     -----
     When to use this function:
-    - For solving optimization problems with smooth, differentiable objectives and constraints
-    - When you need to solve similar optimization problems repeatedly with different parameters
+    - For solving optimization problems with differentiable objectives and constraints
+    - When you need to solve similar optimization problems with different parameters
     - As part of larger computational graphs that include optimization steps
     - For nonlinear model predictive control applications
 
@@ -149,17 +157,19 @@ def nlp_solver(
         # Check that arguments and static arguments are the same for both functions
         if not len(obj.arg_names) == len(constr.arg_names):
             raise ValueError(
-                "Objective and constraint functions must have the same number of arguments"
+                "Objective and constraint functions must have the same number of "
+                "arguments"
             )
 
         if not len(obj.static_argnums) == len(constr.static_argnums):
             raise ValueError(
-                "Objective and constraint functions must have the same number of static arguments"
+                "Objective and constraint functions must have the same number of "
+                "static arguments"
             )
 
     # Define a function that will solve the NLP
     # This function will be evaluated with SymbolicArray objects.
-    def _solve(x0, lbx, ubx, lbg, ubg, *args):
+    def _solve(x0, lbx, ubx, lbg, ubg, *args) -> ArrayLike:
         x0 = array(x0)
         ret_shape = x0.shape
         ret_dtype = x0.dtype
@@ -179,7 +189,7 @@ def nlp_solver(
             # for static arguments.
             static_argnums = [i - 1 for i in obj.static_argnums]
             _static_args, sym_args, _arg_types = obj.split_args(static_argnums, *args)
-        
+
         else:
             # No static data - all arguments can be treated symbolically
             sym_args = args
@@ -192,16 +202,21 @@ def nlp_solver(
         x = sym_like(x0, name="x", kind="MX")
         f = obj(x, *args)
 
+        # For type checing
+        f = cast(SymbolicArray, f)
+
         nlp = {
             "x": x._sym,
             "f": f._sym,
         }
 
         if p.size != 0:
+            p = cast(SymbolicArray, p)
             nlp["p"] = p._sym
 
         if constr is not None:
             g = constr(x, *args)
+            g = cast(SymbolicArray, g)
             nlp["g"] = g._sym
 
         solver = cs.nlpsol("solver", "ipopt", nlp, options)
@@ -243,14 +258,16 @@ def nlp_solver(
     constrain_g = constr is not None
     if not constrain_x:
         if not constrain_g:
-            def _solve_explicit(x0, *args):
+
+            def _solve_explicit(x0, *args):  # type: ignore[misc]
                 return _solve(x0, -np.inf, np.inf, -np.inf, np.inf, *args)
-            
+
             arg_names.remove("lbg")
             arg_names.remove("ubg")
 
         else:
-            def _solve_explicit(x0, lbg, ubg, *args):
+
+            def _solve_explicit(x0, lbg, ubg, *args):  # type: ignore[misc]
                 return _solve(x0, -np.inf, np.inf, lbg, ubg, *args)
 
         arg_names.remove("lbx")
@@ -258,14 +275,16 @@ def nlp_solver(
 
     else:
         if not constrain_g:
-            def _solve_explicit(x0, lbx, ubx, *args):
+
+            def _solve_explicit(x0, lbx, ubx, *args):  # type: ignore[misc]
                 return _solve(x0, lbx, ubx, -np.inf, np.inf, *args)
 
             arg_names.remove("lbg")
             arg_names.remove("ubg")
 
         else:
-            def _solve_explicit(x0, lbx, ubx, lbg, ubg, *args):
+
+            def _solve_explicit(x0, lbx, ubx, lbg, ubg, *args):  # type: ignore[misc]
                 return _solve(x0, lbx, ubx, lbg, ubg, *args)
 
     if name is None:
@@ -321,7 +340,7 @@ def minimize(
     constr_bounds : tuple of (array_like, array_like), optional
         Bounds on the constraint values, given as a tuple (lbg, ubg).
         Each bound can be a scalar or an array matching the shape of the
-        constraint function output. If None and constr is provided, 
+        constraint function output. If None and constr is provided,
         defaults to (0, 0) for equality constraints.
     **options : dict
         Additional options passed to the IPOPT solver through `nlp_solver`.
@@ -374,7 +393,7 @@ def minimize(
     >>>
     >>> # Solve with inequality constraints: g(x) <= 0
     >>> x_opt = arc.minimize(
-    ...     f, 
+    ...     f,
     ...     x0=np.array([2.0, 0.0]),
     ...     constr=g,
     ...     constr_bounds=(-np.inf, 0),
@@ -390,7 +409,7 @@ def minimize(
     ... )
     >>> print(x_opt)
     array([0.50000001, 0.25000001])
-    
+
     See Also
     --------
     arc.nlp_solver : Create a reusable solver for nonlinear optimization
@@ -429,4 +448,3 @@ def minimize(
     arg_names = [name for name in solver.arg_names if name not in solver_args]
     solver_args = {**solver_args, **dict(zip(arg_names, args))}
     return solver(**solver_args)
-

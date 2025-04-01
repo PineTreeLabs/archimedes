@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-import numpy as np
 import casadi as cs
+import numpy as np
 
-from .._array_impl import _as_casadi_array, SymbolicArray, DEFAULT_FLOAT
-from .._type_inference import type_inference, shape_inference
-from ._array_ops import unary_op, binary_op, array
+from .._array_impl import DEFAULT_FLOAT, SymbolicArray, _as_casadi_array
+from .._type_inference import shape_inference, type_inference
+from ._array_ops import array, binary_op, unary_op
 
 
 def _dot(x1, x2):
@@ -30,7 +30,7 @@ def _dot(x1, x2):
     # acts as a flattened vector dot product. However, for NumPy it is equivalent to
     # matrix multiplication.  Hence, we should only use `cs.dot` if both are column
     # vectors.
-    if len(x1.shape) == 1 and  len(x2.shape) == 1:
+    if len(x1.shape) == 1 and len(x2.shape) == 1:
         result = cs.dot(arg1, arg2)
 
     else:
@@ -56,14 +56,10 @@ def _matmul(x1, x2):
     # If either x1 or x2 are scalars, then use element-wise multiplication.
     x1_is_scalar = np.isscalar(x1) or len(x1.shape) == 0
     if x1_is_scalar:
-        raise ValueError(
-            "Matmul input 0 does not have enough dimensions (requires 1)"
-        )
+        raise ValueError("Matmul input 0 does not have enough dimensions (requires 1)")
     x2_is_scalar = np.isscalar(x2) or len(x2.shape) == 0
     if x2_is_scalar:
-        raise ValueError(
-            "Matmul input 1 does not have enough dimensions (requires 1)"
-        )
+        raise ValueError("Matmul input 1 does not have enough dimensions (requires 1)")
     # NumPy matmul is the same as dot for 2D arrays
     return _dot(x1, x2)
 
@@ -81,8 +77,7 @@ def _divmod(x1, x2, dtype=None):
 
 def _xor(a, b):
     return cs.logic_or(
-        cs.logic_and(a, cs.logic_not(b)),
-        cs.logic_and(cs.logic_not(a), b)
+        cs.logic_and(a, cs.logic_not(b)), cs.logic_and(cs.logic_not(a), b)
     )
 
 

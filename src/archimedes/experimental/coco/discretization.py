@@ -1,9 +1,9 @@
 import abc
-import numpy as np
 import dataclasses
-from functools import partial
 
-from .interpolation import gauss_radau, LagrangePolynomial
+import numpy as np
+
+from .interpolation import LagrangePolynomial, gauss_radau
 
 
 # Base class for finite element discretization?
@@ -17,7 +17,7 @@ class SplineDiscretization:
     def time_nodes(self, t0, tf):
         τ = self.nodes
         return 0.5 * (tf + t0) + 0.5 * (tf - t0) * τ
-    
+
     @abc.abstractmethod
     def create_interpolants(self, x, u, t0, tf):
         """Create interpolating functions for the state and control"""
@@ -39,7 +39,7 @@ class RadauInterval(SplineDiscretization):
         self.poly = p
         self.diff_matrix = D
         self.diff_inv = np.linalg.inv(D[:, 1:])  # Integration matrix
-    
+
     def create_interpolant(self, x, t0, tf):
         p = self.poly
 
@@ -61,7 +61,7 @@ class RadauInterval(SplineDiscretization):
         uf = p_radau.interpolate(u, τ[-1])
         # u = np.append(u, np.atleast_2d(uf), axis=0)
         u = np.vstack([u, uf])
-    
+
         x_fn = self.create_interpolant(x, t0, tf)
         u_fn = self.create_interpolant(u, t0, tf)
 
@@ -105,14 +105,16 @@ class RadauFiniteElements(SplineDiscretization):
         if n >= self.n_elements:
             raise ValueError("Element index out of range")
         x = self.elements[n].nodes
-        return 0.5 * (k[n+1] - k[n]) * x + 0.5 * (k[n+1] + k[n])
+        return 0.5 * (k[n + 1] - k[n]) * x + 0.5 * (k[n + 1] + k[n])
 
     def _get_nodes(self):
         # Exclude the non-collocated end point of each interval here except the last
         x = np.array([])
-        for k in range(self.n_elements-1):
+        for k in range(self.n_elements - 1):
             x = np.append(x, self.local_to_global(k)[:-1])
-        return np.append(x, self.local_to_global(self.n_elements-1))  # Keep the final node
+        return np.append(
+            x, self.local_to_global(self.n_elements - 1)
+        )  # Keep the final node
 
     def _get_weights(self):
         # Quadrature weights
@@ -120,7 +122,7 @@ class RadauFiniteElements(SplineDiscretization):
         w = np.array([])
         for k in range(self.n_elements):
             w_k = self.elements[k].weights
-            tscale = 0.5 * (knots[k+1] - knots[k])
+            tscale = 0.5 * (knots[k + 1] - knots[k])
             w = np.append(w, w_k * tscale)
         return w
 
@@ -128,15 +130,15 @@ class RadauFiniteElements(SplineDiscretization):
         # Block-diagonal differentiation matrix
         N = self.n_nodes
         knots = self.knots
-        D = np.zeros((N, N+1))
+        D = np.zeros((N, N + 1))
         idx = 0
 
         for k in range(self.n_elements):
             N_k = self.elements[k].n_nodes
             D_k = self.elements[k].diff_matrix
             # Scale time according to (local) interval
-            tscale = 0.5 * (knots[k+1] - knots[k])
-            D[idx:idx+N_k, idx:idx+N_k+1] = D_k / tscale
+            tscale = 0.5 * (knots[k + 1] - knots[k])
+            D[idx : idx + N_k, idx : idx + N_k + 1] = D_k / tscale
             idx += N_k
 
         return D
@@ -149,7 +151,6 @@ class RadauFiniteElements(SplineDiscretization):
         kt = self.knots * 0.5 * (tf - t0) + 0.5 * (tf + t0)  # Global knots
 
         def global_interp(t):
-
             t = np.atleast_1d(t)
             n = len(t)
             m = x.shape[1]
@@ -158,12 +159,12 @@ class RadauFiniteElements(SplineDiscretization):
             # the element interpolant
             out = np.zeros((n, m))
             for k in range(self.n_elements):
-                idx = np.where(np.logical_and(t >= kt[k], t <= kt[k+1]))[0]
+                idx = np.where(np.logical_and(t >= kt[k], t <= kt[k + 1]))[0]
                 out[idx] = np.reshape(x_fns[k](t[idx]), (len(idx), m))
 
             lo_idx = np.where(t < τ[0])[0]
             hi_idx = np.where(t > τ[-1])[0]
-    
+
             if extrapolation == "flat":
                 out[lo_idx] = x[0]
                 out[hi_idx] = x[-1]
@@ -176,7 +177,6 @@ class RadauFiniteElements(SplineDiscretization):
 
         return global_interp
 
-
     def create_interpolants(self, x, u, t0, tf, extrapolation="flat"):
         # Extract the collocation points for each interval
         x_fns = []
@@ -186,11 +186,11 @@ class RadauFiniteElements(SplineDiscretization):
 
         # Construct interpolating functions for each interval
         idx = 0
-        for (k, el) in enumerate(self.elements):
+        for k, el in enumerate(self.elements):
             N = el.n_nodes
-            x_k = x[idx:idx+N+1]
-            u_k = u[idx:idx+N]
-            x_fn, u_fn = el.create_interpolants(x_k, u_k, kt[k], kt[k+1])
+            x_k = x[idx : idx + N + 1]
+            u_k = u[idx : idx + N]
+            x_fn, u_fn = el.create_interpolants(x_k, u_k, kt[k], kt[k + 1])
             x_fns.append(x_fn)
             u_fns.append(u_fn)
             idx += N

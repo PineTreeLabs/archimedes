@@ -2,10 +2,11 @@
 
 https://people.clas.ufl.edu/hager/files/RaoDarbyGridRefineJournal.pdf
 """
+
 import numpy as np
 
-from .interpolation import LagrangePolynomial
 from .discretization import RadauFiniteElements
+
 
 def midpoint_residuals(ocp, domain, sol):
     # Differentiate then interpolate
@@ -14,10 +15,10 @@ def midpoint_residuals(ocp, domain, sol):
     for k in range(domain.n_elements):
         element = domain.elements[k]
         N = element.n_nodes
-        xp = sol.xp[idx:idx + N + 1]
-        tp = sol.tp[idx:idx + N + 1]
+        xp = sol.xp[idx : idx + N + 1]
+        tp = sol.tp[idx : idx + N + 1]
         idx += N
-        
+
         res_fn = ocp.dynamics_residual(sol, element, xp, tp[0], tp[-1])
 
         # Midpoint residuals
@@ -28,7 +29,9 @@ def midpoint_residuals(ocp, domain, sol):
     return r
 
 
-def refine_mesh_bisection(domain, residuals, eps=1e-4, incr=10, max_nodes=50, rho=3, verbose=False):
+def refine_mesh_bisection(
+    domain, residuals, eps=1e-4, incr=10, max_nodes=50, rho=3, verbose=False
+):
     next_N = []
     next_knots = []
     all_converged = True
@@ -41,7 +44,9 @@ def refine_mesh_bisection(domain, residuals, eps=1e-4, incr=10, max_nodes=50, rh
         beta = r / np.mean(r)  # Scaled residual
 
         if verbose:
-            print(f"Element {k}: residual (max/avg) = {np.max(r):.2e}/{np.mean(r):.2e}, max scaled = {np.max(beta):.2e}")
+            print(
+                f"Element {k}: residual (max/avg) = {np.max(r):.2e}/{np.mean(r):.2e}, max scaled = {np.max(beta):.2e}"
+            )
 
         # Check for convergence (all residuals < eps)
         if np.all(r < eps):
@@ -67,7 +72,7 @@ def refine_mesh_bisection(domain, residuals, eps=1e-4, incr=10, max_nodes=50, rh
                 next_N.append(N + incr)
 
         if k < domain.n_elements - 1:
-            next_knots.append(domain.knots[k+1])
+            next_knots.append(domain.knots[k + 1])
 
     if verbose:
         print(f"New domain: {next_N}, knots={next_knots}")

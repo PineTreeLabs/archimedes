@@ -1,7 +1,7 @@
-import pytest
 import numpy as np
+import pytest
 
-from archimedes._core import sym, compile, FunctionCache, SymbolicArray
+from archimedes._core import FunctionCache, SymbolicArray, compile, sym
 
 
 def f(x):
@@ -100,9 +100,10 @@ class TestSymFunction:
 
     def test_kwargs(self):
         a0 = 2.0
+
         def f(x, a=a0):
             return a * x
-        
+
         f_sym = compile(f)
         x = 3.0
 
@@ -128,7 +129,7 @@ class TestSymFunction:
         @compile
         def f(x):
             return x, np.array([3.0, 4.0]), True, 3
-        
+
         x = np.array(2.0, dtype=np.float64)
         y1, y2, y3, y4 = f(x)
 
@@ -137,7 +138,7 @@ class TestSymFunction:
         assert y1 == x
         assert np.all(y2 == np.array([3.0, 4.0]))
         assert y3.dtype == np.bool_
-        assert y3 == True
+        assert y3
         assert y4.dtype == int
         assert y4 == 3
 
@@ -145,14 +146,14 @@ class TestSymFunction:
         # Test function with varargs
         def f(x, *args):
             return x + sum(args)
-        
+
         with pytest.raises(ValueError):
             compile(f)
 
         # Specify both static_argnums and static_argnames
         def f(a, x):
             return a * x
-        
+
         with pytest.raises(ValueError):
             compile(f, static_argnums=(0,), static_argnames=("a",))
 
@@ -168,7 +169,7 @@ class TestSymFunction:
         # Return something besides an array
         def f(x):
             return "abc"
-        
+
         with pytest.raises(TypeError):
             compile(f)(0.0)
 
@@ -178,7 +179,7 @@ class TestSymFunction:
                 return 2 * x
             else:
                 return 2 * x, 3 * x
-        
+
         f = compile(f, static_argnames=("flag",))
         f(2.0, True)  # OK the first time
         with pytest.raises(ValueError):
@@ -201,7 +202,7 @@ class TestSymFunction:
         def f(x):
             x[0] = x[0] + 1.0
             return x
-    
+
         y = f(x)
         assert np.allclose(x, 0.0)
         assert np.allclose(y[0], 1.0)

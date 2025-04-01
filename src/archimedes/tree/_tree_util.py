@@ -25,16 +25,31 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 """
+
 from __future__ import annotations
-from typing import Any, Callable, TypeVar, Hashable, Iterable, Iterator, NamedTuple
-from functools import reduce, partial
+
 import itertools as it
+from functools import partial, reduce
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Callable,
+    Hashable,
+    Iterable,
+    Iterator,
+    NamedTuple,
+    TypeVar,
+)
 
 import numpy as np
 
 from ._registry import _registry, unzip2
 
-T = TypeVar("T")
+if TYPE_CHECKING:
+    from ..typing import ArrayLike, PyTree
+
+    T = TypeVar("T", bound=PyTree)
+    V = TypeVar("V")
 
 
 class PyTreeDef(NamedTuple):
@@ -44,7 +59,7 @@ class PyTreeDef(NamedTuple):
 
     def unflatten(self, xs: list[Any]) -> Any:
         return tree_unflatten(self, xs)
-    
+
     def __repr__(self) -> str:
         stars = ["*"] * self.num_leaves
         star_tree = self.unflatten(stars)
@@ -58,8 +73,8 @@ LEAF = PyTreeDef(None, (), 1)
 # Flatten/unflatten functions
 #
 def tree_flatten(
-    x: Any, is_leaf: Callable[[Any], bool] | None = None
-) -> tuple[list[Any], PyTreeDef]:
+    x: PyTree, is_leaf: Callable[[Any], bool] | None = None
+) -> tuple[list[ArrayLike], PyTreeDef]:
     """
     Flatten a pytree into a list of leaves and a treedef.
 
@@ -69,7 +84,7 @@ def tree_flatten(
 
     Parameters
     ----------
-    x : Any
+    x : PyTree
         A pytree to be flattened. A pytree is a nested structure of containers
         (lists, tuples, dicts, etc) and leaves (arrays, scalars, objects not registered
         as pytrees).
@@ -103,15 +118,15 @@ def tree_flatten(
     --------
     >>> import archimedes as arc
     >>> import numpy as np
-    >>> 
+    >>>
     >>> # Simple pytree with nested containers
     >>> data = {"a": np.array([1.0, 2.0]), "b": {"c": np.array([3.0])}}
-    >>> 
+    >>>
     >>> # Flatten the pytree
     >>> leaves, treedef = arc.tree.flatten(data)
     >>> print(leaves)
     [array([1., 2.]), array([3.])]
-    >>> 
+    >>>
     >>> # Use treedef to reconstruct the pytree
     >>> reconstructed = arc.tree.unflatten(treedef, leaves)
     >>> print(reconstructed)
@@ -129,7 +144,7 @@ def tree_flatten(
 
 
 def _tree_flatten(
-    x: Any, is_leaf: Callable[[Any], bool] | None
+    x: PyTree, is_leaf: Callable[[Any], bool] | None
 ) -> tuple[Iterable, PyTreeDef]:
     if x is None:
         return [], LEAF
@@ -138,7 +153,7 @@ def _tree_flatten(
 
     node_type = type(x)
     # If the node is a namedtuple, use the tuple flatten/unflatten functions
-    if isinstance(x, tuple) and hasattr(x, '_fields'):
+    if isinstance(x, tuple) and hasattr(x, "_fields"):
         node_type = tuple
     if node_type not in _registry or (is_leaf is not None and is_leaf(x)):
         return [x], LEAF
@@ -156,7 +171,7 @@ def _tree_flatten(
     return flattened, treedef
 
 
-def tree_unflatten(treedef: PyTreeDef, xs: list[Any]) -> Any:
+def tree_unflatten(treedef: PyTreeDef, xs: list[ArrayLike]) -> PyTree:
     """
     Reconstruct a pytree from a list of leaves and a treedef.
 
@@ -167,21 +182,21 @@ def tree_unflatten(treedef: PyTreeDef, xs: list[Any]) -> Any:
     ----------
     treedef : PyTreeDef
         A tree definition, typically produced by `flatten` or `structure`.
-    xs : list
+    xs : list[ArrayLike]
         A list of leaf values to be placed in the reconstructed pytree.
         The length must match the number of leaves in the treedef.
-    
+
     Returns
     -------
-    pytree : Any
+    pytree : PyTree
         The reconstructed pytree with the same structure as defined by treedef
         and with leaf values from xs.
-    
+
     Notes
     -----
     When to use:
     - To reconstruct a structured data object after operating on flattened values
-    
+
     When converting to/from a flat vector it will typically be more convenient to
     use `tree.ravel` instead of this function.
 
@@ -189,26 +204,26 @@ def tree_unflatten(treedef: PyTreeDef, xs: list[Any]) -> Any:
     ------
     ValueError
         If the number of leaves in xs doesn't match the expected number in treedef.
-    
+
     Examples
     --------
     >>> import archimedes as arc
     >>> import numpy as np
-    >>> 
+    >>>
     >>> # Original pytree
     >>> data = {"positions": np.array([1.0, 2.0]), "velocities": np.array([3.0, 4.0])}
-    >>> 
+    >>>
     >>> # Flatten the pytree
     >>> leaves, treedef = arc.tree.flatten(data)
-    >>> 
+    >>>
     >>> # Transform the leaves (e.g., multiply by 2)
     >>> new_leaves = [leaf * 2 for leaf in leaves]
-    >>> 
+    >>>
     >>> # Reconstruct the pytree with the new leaves
     >>> new_data = arc.tree.unflatten(treedef, new_leaves)
     >>> print(new_data)
     {'positions': array([2., 4.]), 'velocities': array([6., 8.])}
-    
+
     See Also
     --------
     flatten : Flatten a pytree into a list of leaves and a treedef
@@ -218,14 +233,14 @@ def tree_unflatten(treedef: PyTreeDef, xs: list[Any]) -> Any:
     return _tree_unflatten(treedef, iter(xs))
 
 
-def _tree_unflatten(treedef: PyTreeDef, xs: Iterator) -> Any:
+def _tree_unflatten(treedef: PyTreeDef, xs: Iterator) -> PyTree:
     if treedef.node_data is None:
         try:
             return next(xs)
         except StopIteration:
             return None
     else:
-        children = (_tree_unflatten(t, xs) for t in treedef.children)
+        children = tuple(_tree_unflatten(t, xs) for t in treedef.children)
         node_type, node_metadata = treedef.node_data
 
         # Special logic for NamedTuple classes
@@ -239,29 +254,30 @@ def _tree_unflatten(treedef: PyTreeDef, xs: Iterator) -> Any:
 # Other utility functions
 #
 
+
 def tree_structure(
-    tree: Any, is_leaf: Callable[[Any], bool] | None = None
+    tree: PyTree, is_leaf: Callable[[Any], bool] | None = None
 ) -> PyTreeDef:
     """
     Extract the structure of a pytree without the leaf values.
-    
+
     This function returns a PyTreeDef that describes the structure of the pytree,
     which can be used with `unflatten` to reconstruct a pytree with new leaf values.
-    
+
     Parameters
     ----------
-    tree : Any
+    tree : PyTree
         A pytree whose structure is to be determined.
     is_leaf : callable, optional
         A function that takes a pytree node as input and returns a boolean
         indicating whether it should be considered a leaf. If not provided,
         the default leaf types (arrays and scalars) are used.
-    
+
     Returns
     -------
     treedef : PyTreeDef
         A tree definition that describes the structure of the input pytree.
-    
+
     Notes
     -----
     When to use:
@@ -269,26 +285,26 @@ def tree_structure(
     - When you want to create a template structure that can be filled with
       different leaf values
     - When you need to compare the structures of two pytrees
-    
+
     Examples
     --------
     >>> import archimedes as arc
     >>> import numpy as np
-    >>> 
+    >>>
     >>> # Create a structured state
     >>> state = {"pos": np.array([0.0, 1.0]), "vel": np.array([2.0, 3.0])}
-    >>> 
+    >>>
     >>> # Extract the structure
     >>> treedef = arc.tree.structure(state)
     >>> print(treedef)
     PyTreeDef({'pos': *, 'vel': *})
-    >>> 
+    >>>
     >>> # Create a new state with the same structure but different values
     >>> zeros = [np.zeros_like(leaf) for leaf in arc.tree.leaves(state)]
     >>> initial_state = arc.tree.unflatten(treedef, zeros)
     >>> print(initial_state)
     {'pos': array([0., 0.]), 'vel': array([0., 0.])}
-    
+
     See Also
     --------
     flatten : Flatten a pytree into a list of leaves and a treedef
@@ -300,17 +316,17 @@ def tree_structure(
 
 
 def tree_leaves(
-    tree: Any, is_leaf: Callable[[Any], bool] | None = None
-) -> list[Any]:
+    tree: PyTree, is_leaf: Callable[[Any], bool] | None = None
+) -> list[ArrayLike]:
     """
     Extract all leaf values from a pytree.
-    
+
     This function traverses the pytree and returns a list of all leaf values
     without the structure information.
-    
+
     Parameters
     ----------
-    tree : Any
+    tree : PyTree
         A pytree from which to extract leaves. A pytree is a nested structure of
         containers (lists, tuples, dicts, etc) and leaves (arrays, scalars, objects
         not registered as pytrees).
@@ -318,7 +334,7 @@ def tree_leaves(
         A function that takes a pytree node as input and returns a boolean
         indicating whether it should be considered a leaf. If not provided,
         the default leaf types (arrays and scalars) are used.
-    
+
     Returns
     -------
     leaves : list
@@ -329,16 +345,16 @@ def tree_leaves(
     When to use:
     - For quick access to all data in a nested structure when you don't need
       to reconstruct the data structure later
-    
+
     Examples
     --------
     >>> import archimedes as arc
     >>> import numpy as np
-    >>> 
+    >>>
     >>> # Create a structured data object
     >>> data = {"params": {"w": np.array([1.0, 2.0]), "b": 0.5},
     ...         "state": np.array([3.0, 4.0])}
-    >>> 
+    >>>
     >>> # Extract all leaf values
     >>> leaf_values = arc.tree.leaves(data)
     >>> print(leaf_values)
@@ -354,19 +370,17 @@ def tree_leaves(
     return flat
 
 
-def tree_all(
-    tree: Any, is_leaf: Callable[[Any], bool] | None = None
-) -> bool:
+def tree_all(tree: PyTree, is_leaf: Callable[[Any], bool] | None = None) -> bool:
     """
     Check if all leaves in the pytree evaluate to True.
-    
+
     This function traverses the pytree and checks if all leaf values are truthy,
     similar to Python's built-in `all()` function but operating on all leaves
     of a pytree.
-    
+
     Parameters
     ----------
-    tree : Any
+    tree : PyTree
         A pytree to check. A pytree is a nested structure of containers
         (lists, tuples, dicts) and leaves (arrays, scalars, objects
         not registered as pytrees).
@@ -374,12 +388,12 @@ def tree_all(
         A function that takes a pytree node as input and returns a boolean
         indicating whether it should be considered a leaf. If not provided,
         the default leaf types (arrays and scalars) are used.
-    
+
     Returns
     -------
     result : bool
         True if all leaves in the pytree evaluate to True, False otherwise.
-    
+
     Notes
     -----
     When to use:
@@ -392,35 +406,35 @@ def tree_all(
     --------
     >>> import archimedes as arc
     >>> import numpy as np
-    >>> 
+    >>>
     >>> # Check if all values are positive
     >>> data = {"a": np.array([1.0, 2.0]), "b": {"c": np.array([3.0])}}
     >>> is_positive = arc.tree.map(lambda x: x > 0, data)
     >>> all_positive = arc.tree.all(is_positive)
     >>> print(all_positive)
     True
-    >>> 
+    >>>
     >>> # Check if all values are greater than 1.5
     >>> is_greater = arc.tree.map(lambda x: x > 1.5, data)
     >>> all_greater = arc.tree.all(is_greater)
     >>> print(all_greater)
     False
-    
+
     See Also
     --------
     map : Apply a function to each leaf in a pytree
     leaves : Extract just the leaf values from a pytree
     """
     flat, treedef = tree_flatten(tree, is_leaf)
-    return np.all(map(np.all, flat))
+    return np.all(map(np.all, flat))  # type: ignore
 
 
 def tree_map(
     f: Callable,
-    tree: Any,
-    *rest: Any,
-    is_leaf: Callable[[Any], bool] | None = None
-) -> Any:
+    tree: T,
+    *rest: tuple[T, ...],
+    is_leaf: Callable[[Any], bool] | None = None,
+) -> T:
     """
     Apply a function to each leaf in a pytree.
 
@@ -432,7 +446,7 @@ def tree_map(
     Parameters
     ----------
     f : callable
-        A function to apply to each leaf. When multiple trees are provided, 
+        A function to apply to each leaf. When multiple trees are provided,
         this function should accept as many arguments as there are trees.
     tree : Any
         The main pytree whose structure will be followed.
@@ -442,13 +456,13 @@ def tree_map(
         A function that takes a pytree node as input and returns a boolean
         indicating whether it should be considered a leaf. If not provided,
         the default leaf types (arrays and scalars) are used.
-    
+
     Returns
     -------
     mapped_tree : Any
         A new pytree with the same structure as `tree` but with leaf values
         transformed by function `f`.
-    
+
     Notes
     -----
     When to use:
@@ -466,31 +480,31 @@ def tree_map(
     --------
     >>> import archimedes as arc
     >>> import numpy as np
-    >>> 
+    >>>
     >>> # Single pytree example
     >>> state = {"pos": np.array([1.0, 2.0]), "vel": np.array([3.0, 4.0])}
-    >>> 
+    >>>
     >>> # Double all values
     >>> doubled = arc.tree.map(lambda x: x * 2, state)
     >>> print(doubled)
     {'pos': array([2., 4.]), 'vel': array([6., 8.])}
-    >>> 
+    >>>
     >>> # Multiple pytrees example
     >>> state1 = {"pos": np.array([1.0, 2.0]), "vel": np.array([3.0, 4.0])}
     >>> state2 = {"pos": np.array([5.0, 6.0]), "vel": np.array([7.0, 8.0])}
-    >>> 
+    >>>
     >>> # Add corresponding leaves
     >>> combined = arc.tree.map(lambda x, y: x + y, state1, state2)
     >>> print(combined)
     {'pos': array([6., 8.]), 'vel': array([10., 12.])}
-    
+
     See Also
     --------
     flatten : Flatten a pytree into a list of leaves and a treedef
     leaves : Extract just the leaf values from a pytree
     """
-    flat, treedef = tree_flatten(tree, is_leaf)
-    flat = [flat]
+    leaves, treedef = tree_flatten(tree, is_leaf)
+    flat = [leaves]
     for r in rest:
         r_flat, r_treedef = tree_flatten(r, is_leaf)
         if treedef != r_treedef:
@@ -501,29 +515,30 @@ def tree_map(
         flat.append(r_flat)
 
     flat = [f(*args) for args in zip(*flat)]
-    return tree_unflatten(treedef, flat)
+    tree_out: T = tree_unflatten(treedef, flat)  # type: ignore
+    return tree_out
 
 
 def tree_reduce(
-    function: Callable[[T, Any], T],
-    tree: Any,
-    initializer: T,
+    function: Callable[[V, ArrayLike], V],
+    tree: PyTree,
+    initializer: V,
     is_leaf: Callable[[Any], bool] | None = None,
-) -> T:
+) -> V:
     """
     Reduce a pytree to a single value using a function and initializer.
 
-    This function traverses the pytree, applying the reduction function to 
-    each leaf and an accumulator, similar to Python's built-in `reduce()` 
+    This function traverses the pytree, applying the reduction function to
+    each leaf and an accumulator, similar to Python's built-in `reduce()`
     but operating on all leaves of a pytree.
 
     Parameters
     ----------
     function : callable
-        A function of two arguments: (accumulated_result, leaf_value) that 
+        A function of two arguments: (accumulated_result, leaf_value) that
         returns a new accumulated result. The function should be commutative
         and associative to ensure results are independent of traversal order.
-    tree : Any
+    tree : PyTree
         A pytree to reduce. A pytree is a nested structure of containers
         (lists, tuples, dicts) and leaves (arrays or scalars).
     initializer : Any
@@ -532,27 +547,27 @@ def tree_reduce(
         A function that takes a pytree node as input and returns a boolean
         indicating whether it should be considered a leaf. If not provided,
         the default leaf types (arrays and scalars) are used.
-    
+
     Returns
     -------
     result : Any
         The final accumulated value after applying the function to all leaves.
-    
+
     Notes
     -----
     When to use:
     - To compute aggregate values (sum, product, etc.) across all leaf values
     - To collect statistics from a structured model
     - To implement custom reduction operations on complex data structures
-    
+
     Examples
     --------
     >>> import archimedes as arc
     >>> import numpy as np
-    >>> 
+    >>>
     >>> # Sum all values in a nested structure
     >>> data = {"a": np.array([1.0, 2.0]), "b": {"c": np.array([3.0])}}
-    >>> 
+    >>>
     >>> # Compute the sum
     >>> def sum_leaf(acc, leaf):
     ...     return acc + sum(leaf)
@@ -560,11 +575,11 @@ def tree_reduce(
     >>> total = arc.tree.reduce(sum_leaf, data, 0.0)
     >>> print(total)
     6.0
-    >>> 
+    >>>
     >>> # Find the maximum value
     >>> def max_leaf(acc, leaf):
     ...     return np.fmax(acc, np.max(leaf))
-    >>> 
+    >>>
     >>> maximum = arc.tree.reduce(max_leaf, data, -np.inf)
     >>> print(maximum)
     3.0
@@ -576,4 +591,3 @@ def tree_reduce(
     """
     flat, _treedef = tree_flatten(tree, is_leaf)
     return reduce(function, flat, initializer)
-

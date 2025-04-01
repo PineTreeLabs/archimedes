@@ -5,7 +5,7 @@ from archimedes import jac
 
 def ekf_step(f, h, t, x, z, P, Q, R, args=None):
     """Perform one step of the extended Kalman filter
-    
+
     Args:
         f: function of (t, x, *args) that computes the state transition function
         h: function of (t, x, *args) that computes the measurement function
@@ -32,7 +32,7 @@ def ekf_step(f, h, t, x, z, P, Q, R, args=None):
     x = f(t, x, *args)
 
     P = F @ P @ F.T + Q
-    
+
     # Update step
     e = z - h(t, x, *args)  # Innovation or measurement residual
     S = H @ P @ H.T + R  # Innovation covariance
@@ -45,7 +45,7 @@ def ekf_step(f, h, t, x, z, P, Q, R, args=None):
 
 def ukf_step(f, h, t, x, z, P, Q, R, *args):
     """Perform one step of the unscented Kalman filter
-    
+
     Args:
         f: function of (t, x, *args) that computes the state transition function
         h: function of (t, x, *args) that computes the measurement function
@@ -84,11 +84,15 @@ def ukf_step(f, h, t, x, z, P, Q, R, *args):
         x_pred.append(f(t, s[i], *args))
 
     x_hat = sum([w_a[i] * x_pred[i] for i in range(n)])
-    P = Q + sum([w_c[i] * np.outer(x_pred[i] - x_hat, x_pred[i] - x_hat) for i in range(n)])
+    P = Q + sum(
+        [w_c[i] * np.outer(x_pred[i] - x_hat, x_pred[i] - x_hat) for i in range(n)]
+    )
 
     # Update step
     z_pred = [h(t, s[i], *args) for i in range(n)]
-    z_hat = sum([w_a[i] * z_pred[i] for i in range(n)])  # Empirical mean of measurements
+    z_hat = sum(
+        [w_a[i] * z_pred[i] for i in range(n)]
+    )  # Empirical mean of measurements
     S_hat = R + sum(
         [w_c[i] * np.outer(z_pred[i] - z_hat, z_pred[i] - z_hat) for i in range(n)]
     )  # Empirical covariance
@@ -102,4 +106,3 @@ def ukf_step(f, h, t, x, z, P, Q, R, *args):
     P = P - K @ S_hat @ K.T  # Updated state covariance
 
     return x, P, e
-

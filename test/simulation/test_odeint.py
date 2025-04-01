@@ -1,10 +1,11 @@
-import pytest
+# ruff: noqa: N806
+# ruff: noqa: N803
 
 import numpy as np
+import pytest
 
+from archimedes._core import SymbolicArray, jac, sym
 from archimedes._simulation import integrator, odeint
-from archimedes._core import sym, jac, SymbolicArray
-
 
 RTOL = 1e-10
 ATOL = 1e-12
@@ -115,7 +116,6 @@ class TestOdeint:
 
         xf = odeint(f, t_span, x0, args=(a, b), rtol=RTOL, atol=ATOL)
         assert isinstance(xf, SymbolicArray)
-
 
     def test_odeint_t_eval(self):
         # Simple scalar integration

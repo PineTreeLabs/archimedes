@@ -1,17 +1,18 @@
-import pytest
 import numpy as np
+import pytest
+
 from archimedes.experimental.coco.ocp import (
     BoundaryData,
     Constraint,
-    initial_condition,
-    final_condition,
-    start_time,
-    end_time,
-    state_bounds,
-    control_bounds,
-    parameter_bounds,
+    MultiStageOptimalControlProblem,
     OptimalControlProblem,
-    MultiStageOptimalControlProblem
+    control_bounds,
+    end_time,
+    final_condition,
+    initial_condition,
+    parameter_bounds,
+    start_time,
+    state_bounds,
 )
 
 
@@ -30,6 +31,7 @@ def test_boundary_data():
 def test_constraint():
     def func(x):
         return x**2
+
     nc = 1
     c = Constraint(func, nc, lower_bound=np.array([0.0]), upper_bound=np.array([1.0]))
     assert c.func(2.0) == 4.0
@@ -78,9 +80,7 @@ def test_parameter_bounds():
     lb, ub = np.array([-1.0]), np.array([1.0])
     c = parameter_bounds(lb, ub)
     p = np.array([0.5])
-    data = BoundaryData(
-        0.0, np.array([1.0, 2.0]), 1.0, np.array([3.0, 4.0]), p
-    )
+    data = BoundaryData(0.0, np.array([1.0, 2.0]), 1.0, np.array([3.0, 4.0]), p)
     assert np.array_equal(c(data), p)
     assert np.array_equal(c.lower_bound, lb)
     assert np.array_equal(c.upper_bound, ub)
@@ -121,9 +121,16 @@ def test_control_bounds():
 
 def test_optimal_control_problem():
     nx, nu = 2, 1
-    ode = lambda t, x, u, p: np.array([x[1], u[0]])
-    quad = lambda t, x, u, p: x[0]**2 + u[0]**2
-    cost = lambda x0, t0, xf, tf, q, p: q
+
+    def ode(t, x, u, p):
+        return np.array([x[1], u[0]], like=x)
+
+    def quad(t, x, u, p):
+        return x[0] ** 2 + u[0] ** 2
+
+    def cost(x0, t0, xf, tf, q, p):
+        return q
+
     boundary_constraints = [initial_condition(np.zeros(2)), final_condition(np.ones(2))]
     path_constraints = [state_bounds(np.array([-1.0, -1.0]), np.array([1.0, 1.0]))]
 
@@ -141,21 +148,28 @@ def test_optimal_control_problem():
     assert ocp.nu == nu
     assert ocp.np == 0
     p = np.array([])
-    assert np.allclose(ocp.ode(0.0, np.array([1.0, 2.0]), np.array([3.0]), p), np.array([2.0, 3.0]))
+    assert np.allclose(
+        ocp.ode(0.0, np.array([1.0, 2.0]), np.array([3.0]), p), np.array([2.0, 3.0])
+    )
     assert ocp.quad(0.0, np.array([1.0, 2.0]), np.array([3.0]), p) == 10.0
     assert ocp.cost(np.array([1.0, 2.0]), 0.0, np.array([3.0, 4.0]), 1.0, 5.0, p) == 5.0
     assert len(ocp.boundary_constraints) == 2
     assert len(ocp.path_constraints) == 1
 
 
-
 def test_multistage():
     # Construct a multistage problem
     nx, nu = 2, 1
-    ode = lambda t, x, u, p: np.array([x[1], u[0]])
-    quad = lambda t, x, u, p: x[0]**2 + u[0]**2
-    cost = lambda x0, t0, xf, tf, q, p: q
-    
+
+    def ode(t, x, u, p):
+        return np.array([x[1], u[0]], like=x)
+
+    def quad(t, x, u, p):
+        return x[0] ** 2 + u[0] ** 2
+
+    def cost(x0, t0, xf, tf, q, p):
+        return q
+
     stage1 = OptimalControlProblem(
         nx,
         nu,

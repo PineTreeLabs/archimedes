@@ -5,8 +5,9 @@ from typing import Callable
 import numpy as np
 
 from archimedes import compile, minimize
-from .interpolation import LagrangePolynomial
+
 from .discretization import SplineDiscretization
+from .interpolation import LagrangePolynomial
 
 
 @dataclasses.dataclass
@@ -33,6 +34,7 @@ class Constraint:
 
     def __call__(self, *args, **kwargs):
         return self.func(*args, **kwargs)
+
 
 #
 # Convenience functions for boundary conditions
@@ -100,7 +102,7 @@ class OCPBase(metaclass=abc.ABCMeta):
     @abc.abstractmethod
     def build_constraints(self, domain):
         """Construct the constraint functions"""
-    
+
     @abc.abstractmethod
     def initialize(self, domain, t0, tf, x_guess=None, u_guess=None):
         """Initialize the decision variables and bounds"""
@@ -114,12 +116,10 @@ class OCPBase(metaclass=abc.ABCMeta):
         """Compute the residual of the dynamics for a given solution"""
 
     def solve(self, domain, t_guess=None, x_guess=None, u_guess=None, **options):
-        initial_guess, lower, upper = self.initialize(
-            domain, t_guess, x_guess, u_guess
-        )
+        initial_guess, lower, upper = self.initialize(domain, t_guess, x_guess, u_guess)
         obj = self.build_objective(domain)
         cons = self.build_constraints(domain)
-        opt_dvs =  minimize(
+        opt_dvs = minimize(
             obj, initial_guess, constr=cons, constr_bounds=(lower, upper), **options
         )
         return self.postprocess(opt_dvs, domain)
@@ -149,14 +149,14 @@ class OptimalControlProblem(OCPBase):
         N = domain.n_nodes
         nx, nu = self.nx, self.nu
         i0, i1 = 0, (N + 1) * nx
-        x = np.reshape(dvs[i0:i1], (N+1, nx), order=order)
+        x = np.reshape(dvs[i0:i1], (N + 1, nx), order=order)
         i0, i1 = i1, i1 + N * nu
         u = np.reshape(dvs[i0:i1], (N, nu), order=order)
         i0, i1 = i1, i1 + self.np
         p = dvs[i0:i1]
         t0, tf = dvs[-2:]  # Time knots
         return x, u, t0, tf, p
-    
+
     def boundary_data(self, dvs, domain):
         x, u, t0, tf, p = self.unpack_dvs(dvs, domain, order="C")
         return BoundaryData(t0, x[0, :].T, tf, x[-1, :].T, p)
@@ -169,7 +169,7 @@ class OptimalControlProblem(OCPBase):
         @compile
         def obj(dvs):
             x, u, t0, tf, p = self.unpack_dvs(dvs, domain, order="C")
-            
+
             tscale = 0.5 * (tf - t0)
             t = domain.time_nodes(t0, tf)
 
@@ -185,7 +185,6 @@ class OptimalControlProblem(OCPBase):
             return J
 
         return obj
-    
 
     def build_constraints(self, domain):
         N, D = domain.n_nodes, domain.diff_matrix
@@ -199,7 +198,9 @@ class OptimalControlProblem(OCPBase):
             t = domain.time_nodes(t0, tf)
             tscale = 0.5 * (tf - t0)
 
-            x_dot = D @ x  # Numerically differentiate with Lagrange differentiation matrix
+            x_dot = (
+                D @ x
+            )  # Numerically differentiate with Lagrange differentiation matrix
 
             # Dynamical constraints
             # TODO: Support mass matrix here for DAEs
@@ -228,14 +229,8 @@ class OptimalControlProblem(OCPBase):
 
         return cons
 
-
     def initialize(
-        self,
-        domain,
-        t_guess=None,
-        x_guess=None,
-        u_guess=None,
-        p_guess=None
+        self, domain, t_guess=None, x_guess=None, u_guess=None, p_guess=None
     ):
         N = domain.n_nodes
         nx, nu = self.nx, self.nu
@@ -258,9 +253,9 @@ class OptimalControlProblem(OCPBase):
         x0 = np.vstack([x_guess(t[i]) for i in range(N + 1)])
         u0 = np.vstack([u_guess(t[i]) for i in range(N)])
 
-        initial_guess = np.hstack([
-            x0.flatten(), u0.flatten(), p_guess.flatten(), t0, tf
-        ])
+        initial_guess = np.hstack(
+            [x0.flatten(), u0.flatten(), p_guess.flatten(), t0, tf]
+        )
 
         # Initialize constraint vectors for dynamic constraints
         # lb = np.zeros(nx * (N + 1))
@@ -309,6 +304,7 @@ class OptimalControlProblem(OCPBase):
 
         return _res
 
+
 @dataclasses.dataclass
 class MultiStageOptimalControlProblem(OCPBase):
     stages: list[OptimalControlProblem]
@@ -316,23 +312,19 @@ class MultiStageOptimalControlProblem(OCPBase):
 
     def split_dvs(self, dvs, domain):
         num_dvs = [s.num_dvs(d) for (s, d) in zip(self.stages, domain)]
-       
+
         # TODO: Implement np.split for symbolic arrays
         # return np.split(dvs, np.cumsum(num_dvs)[:-1])
 
         split_dvs = []
         idx = 0
         for n in num_dvs:
-            split_dvs.append(dvs[idx:idx + n])
+            split_dvs.append(dvs[idx : idx + n])
             idx += n
         return split_dvs
 
-
     def build_objective(self, domain: list[SplineDiscretization]):
-
-        sub_objectives = [
-            s.build_objective(d) for (s, d) in zip(self.stages, domain)
-        ]
+        sub_objectives = [s.build_objective(d) for (s, d) in zip(self.stages, domain)]
 
         @compile
         def obj(dvs):
@@ -340,14 +332,11 @@ class MultiStageOptimalControlProblem(OCPBase):
             split_dvs = self.split_dvs(dvs, domain)
 
             # Sum the objectives of each stage
-            return sum(
-                _obj(x) for (_obj, x) in zip(sub_objectives, split_dvs)
-            )
-        
-        return obj
-    
-    def build_constraints(self, domains: list[SplineDiscretization]):
+            return sum(_obj(x) for (_obj, x) in zip(sub_objectives, split_dvs))
 
+        return obj
+
+    def build_constraints(self, domains: list[SplineDiscretization]):
         sub_constraints = [
             s.build_constraints(d) for (s, d) in zip(self.stages, domains)
         ]
@@ -359,12 +348,12 @@ class MultiStageOptimalControlProblem(OCPBase):
 
             # Concatenate the constraints of each stage
             res = []
-            for (_cons, x) in zip(sub_constraints, split_dvs):
+            for _cons, x in zip(sub_constraints, split_dvs):
                 res = np.append(res, _cons(x))
 
             # Then add the multi-stage constraints
             boundary_data = []
-            for (s, d, x) in zip(self.stages, domains, split_dvs):
+            for s, d, x in zip(self.stages, domains, split_dvs):
                 boundary_data.append(s.boundary_data(x, d))
 
             for sc in self.stage_constraints:
@@ -379,7 +368,7 @@ class MultiStageOptimalControlProblem(OCPBase):
             return res
 
         return cons
-    
+
     def initialize(
         self,
         domain: list[SplineDiscretization],
@@ -395,7 +384,7 @@ class MultiStageOptimalControlProblem(OCPBase):
             t_guess = np.linspace(0, 1, len(self.stages) + 1)
 
         # Initial guess, lower bound, and upper bound for each stage
-        for (i, (s, d)) in enumerate(zip(self.stages, domain)):
+        for i, (s, d) in enumerate(zip(self.stages, domain)):
             t0, tf = t_guess[i], t_guess[i + 1]
             (ig, lb, ub) = s.initialize(
                 d, t_guess=(t0, tf), x_guess=x_guess, u_guess=u_guess
@@ -415,7 +404,7 @@ class MultiStageOptimalControlProblem(OCPBase):
             upper_bound = np.append(upper_bound, 0)
 
         return (initial_guess, lower_bound, upper_bound)
-    
+
     def postprocess(self, sol, domain):
         split_dvs = self.split_dvs(sol, domain)
         stage_solns = []
