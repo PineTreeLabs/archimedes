@@ -363,6 +363,32 @@ def solve_pendulum(x0, tf):
     return x
 ```
 
+When repeatedly applying a function across an axis of inputs, a more efficient approach is to create a "vectorized map" of the function using `vmap`, which provides similar functionality to [`jax.vmap`](https://docs.jax.dev/en/latest/_autosummary/jax.vmap.html) or [`numpy.vectorize`](https://numpy.org/doc/stable/reference/generated/numpy.vectorize.html). This allows you to write a function as if it acted on a single example of input and then map across a set of inputs.
+
+For example, here we write a function that takes the dot product of two vectors, and then apply it across a "batch" of vectors:
+
+```python
+def dot(a, b):
+    return np.dot(a, b)
+
+# Vectorize to compute multiple dot products at once
+batched_dot = arc.vmap(dot)
+
+# Input: batch of vectors (3 vectors of length 2)
+x = np.array([[1, 2], [3, 4], [5, 6]])
+y = np.array([[7, 8], [9, 10], [11, 12]])
+
+# Output: batch of scalars (3 dot products)
+batched_dot(x, y)
+```
+
+The axes to map the function along can be specified by the `in_axes` keyword argument:
+
+```python
+batched_dot = arc.vmap(dot, in_axes=(0, 1))
+batched_dot(x, y.T)  # Map along the second axis of y.T
+```
+
 For more complex loops or improved compilation times, Archimedes also provides a `scan` function similar to [`jax.lax.scan`](https://docs.jax.dev/en/latest/_autosummary/jax.lax.scan.html), which creates a single call site for the loop body function and does something similar to the following pure Python code:
 
 ```python

@@ -15,9 +15,13 @@ from ._array_impl import (
 # imported from there.
 from ._array_ops import SymbolicArray
 
-from ._codegen import codegen
-
-from ._function import compile, FunctionCache, scan
+from ._function import (
+    compile,
+    FunctionCache,
+    scan,
+    vmap,
+    codegen,
+)
 from ._autodiff import grad, jac, hess, jvp, vjp
 from ._interpolant import interpolant
 
@@ -41,5 +45,6 @@ __all__ = [
     "jvp",
     "vjp",
     "scan",
+    "vmap",
     "interpolant",
 ]
