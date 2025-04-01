@@ -1,4 +1,6 @@
 """Interface to casadi.interpolant for N-dimensional interpolation."""
+from __future__ import annotations
+from typing import TYPE_CHECKING, Callable
 
 import casadi as cs
 import numpy as np
@@ -6,9 +8,14 @@ import numpy as np
 from ._array_impl import array, SymbolicArray, type_inference, _as_casadi_array
 from ._function import FunctionCache
 
+if TYPE_CHECKING:
+    from ..typing import ArrayLike
+    # from numpy.typing import ArrayLike
+
+
 
 # Wrap as a FunctionCache with an input for each grid dimension
-def _eval_interpolant(x, cs_interp, grid, data, name):
+def _eval_interpolant(x, cs_interp, grid, data, name) -> ArrayLike:
     x = map(array, x)  # Convert any lists, tuples, etc to arrays
     x = np.atleast_1d(*x)
 
@@ -49,10 +56,10 @@ def interpolant(
     grid: list[np.ndarray],
     data: np.ndarray,
     method: str = "linear",
-    arg_names: list[str] = None,
-    ret_name: str = None,
+    arg_names: str | list[str] | None = None,
+    ret_name: str | None = None,
     name: str = "interpolant",
-):
+) -> Callable:
     """Create a callable N-dimensional interpolant function.
     
     Constructs an efficient interpolation function from grid data that can be
@@ -217,14 +224,8 @@ def interpolant(
     cs_interp = cs.interpolant(name, method, grid, data)
     args = (cs_interp, grid, data, name)
 
-    # Wrap the interpolant in an evaluation function with the right number of args
-    if len(grid) == 1:
-        def _interp(x):
-            return _eval_interpolant((x,), *args)
-        
-    else:
-        def _interp(*x):
-            return _eval_interpolant(x, *args)
+    def _interp(*x: ArrayLike) -> ArrayLike:
+        return _eval_interpolant(x, *args)
 
     _interp.__name__ = name
 

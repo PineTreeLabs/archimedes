@@ -8,9 +8,9 @@ from . import SymbolicArray
 def grad(
     func: Callable,
     argnums: int | Sequence[int] = 0,
-    name: str = None,
-    static_argnums: int | Sequence[int] = None,
-    static_argnames: str | Sequence[str] = None,
+    name: str | None = None,
+    static_argnums: int | Sequence[int] | None = None,
+    static_argnames: str | Sequence[str] | None = None,
 ) -> Callable:
     """Create a function that evaluates the gradient of `func`.
     
@@ -162,9 +162,9 @@ def grad(
 def jac(
     func: Callable,
     argnums: int | Sequence[int] = 0,
-    name: str = None,
-    static_argnums: int | Sequence[int] = None,
-    static_argnames: str | Sequence[str] = None,
+    name: str | None = None,
+    static_argnums: int | Sequence[int] | None = None,
+    static_argnames: str | Sequence[str] | None = None,
 ) -> Callable:
     """Create a function that evaluates the Jacobian of `func`.
     
@@ -332,9 +332,9 @@ def jac(
 def hess(
     func: Callable,
     argnums: int | Sequence[int] = 0,
-    name: str = None,
-    static_argnums: int | Sequence[int] = None,
-    static_argnames: str | Sequence[str] = None,
+    name: str | None = None,
+    static_argnums: int | Sequence[int] | None = None,
+    static_argnames: str | Sequence[str] | None = None,
 ) -> Callable:
     """Create a function that evaluates the Hessian of `func`.
     
@@ -477,9 +477,9 @@ def hess(
 
 def jvp(
     func: Callable,
-    name: str = None,
-    static_argnums: int | Sequence[int] = None,
-    static_argnames: str | Sequence[str] = None,
+    name: str | None = None,
+    static_argnums: int | Sequence[int] | None = None,
+    static_argnames: str | Sequence[str] | None = None,
 ) -> Callable:
     """Create a function that evaluates the Jacobian-vector product of `func`.
     
@@ -632,9 +632,9 @@ def jvp(
 
 def vjp(
     func: Callable,
-    name: str = None,
-    static_argnums: int | Sequence[int] = None,
-    static_argnames: str | Sequence[str] = None,
+    name: str | None = None,
+    static_argnums: int | Sequence[int] | None = None,
+    static_argnames: str | Sequence[str] | None = None,
 ) -> Callable:
     """Create a function that evaluates the vector-Jacobian product of `func`.
     
