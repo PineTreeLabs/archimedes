@@ -1,7 +1,8 @@
 """Implementation of a nonlinear prediction error method"""
+
 import numpy as np
 
-from archimedes import tree, scan, compile
+from archimedes import compile, scan, tree
 from archimedes.experimental.state_estimation import ekf_step, ukf_step
 
 

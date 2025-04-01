@@ -1,5 +1,7 @@
 import numpy as np
-from archimedes._simulation._discretize import _discretize_rk4, _discretize_radau5
+
+from archimedes.experimental._discretize import _discretize_radau5, _discretize_rk4
+
 
 def rk4_step(f, t, x, p, h):
     k1 = f(t, x, p)
@@ -24,13 +26,14 @@ class TestRK4:
         x_ex = np.stack([np.cos(t_eval), -np.sin(t_eval)], axis=1)
         x_arc = np.zeros((len(t_eval), 2))
         x_arc[0] = x0
-        for i in range(len(t_eval)-1):
-            x_arc[i+1] = step(t_eval[i], x_arc[i], 0)
+        for i in range(len(t_eval) - 1):
+            x_arc[i + 1] = step(t_eval[i], x_arc[i], 0)
 
         if plot:
             import matplotlib.pyplot as plt
-            plt.plot(t_eval, x_arc, label='arc')
-            plt.plot(t_eval, x_ex, '--', label='exact')
+
+            plt.plot(t_eval, x_arc, label="arc")
+            plt.plot(t_eval, x_ex, "--", label="exact")
             plt.show()
 
         assert np.allclose(x_arc, x_ex)
@@ -51,14 +54,14 @@ class TestRadau5:
         x_ex = np.stack([np.cos(t_eval), -np.sin(t_eval)], axis=1)
         x_arc = np.zeros((len(t_eval), 2))
         x_arc[0] = x0
-        for i in range(len(t_eval)-1):
-            x_arc[i+1] = step(t_eval[i], x_arc[i], 0)
+        for i in range(len(t_eval) - 1):
+            x_arc[i + 1] = step(t_eval[i], x_arc[i], 0)
 
         if plot:
             import matplotlib.pyplot as plt
-            plt.plot(t_eval, x_arc, label='arc')
-            plt.plot(t_eval, x_ex, '--', label='exact')
+
+            plt.plot(t_eval, x_arc, label="arc")
+            plt.plot(t_eval, x_ex, "--", label="exact")
             plt.show()
 
         assert np.allclose(x_arc, x_ex)
-        

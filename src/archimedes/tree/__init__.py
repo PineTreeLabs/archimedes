@@ -32,24 +32,33 @@ OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
 OTHER DEALINGS IN THE SOFTWARE.
 """
 
+from . import struct
+from ._flatten_util import ravel_pytree as ravel
 from ._registry import (
-    register_pytree_node,
     register_dataclass,
+    register_pytree_node,
 )
-
+from ._tree_util import (
+    tree_all as all,
+)
 from ._tree_util import (
     tree_flatten as flatten,
-    tree_unflatten as unflatten,
-    tree_structure as structure,
+)
+from ._tree_util import (
     tree_leaves as leaves,
+)
+from ._tree_util import (
     tree_map as map,
-    tree_all as all,
+)
+from ._tree_util import (
     tree_reduce as reduce,
 )
-
-from ._flatten_util import ravel_pytree as ravel
-
-from . import struct
+from ._tree_util import (
+    tree_structure as structure,
+)
+from ._tree_util import (
+    tree_unflatten as unflatten,
+)
 
 __all__ = [
     "register_pytree_node",

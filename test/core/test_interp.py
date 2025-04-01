@@ -1,11 +1,15 @@
 """Test N-dimensional interpolation"""
-import pytest
+
+# ruff: noqa: N802
+# ruff: noqa: N803
+# ruff: noqa: N806
 
 import numpy as np
+import pytest
 from scipy.interpolate import RectBivariateSpline
 
 import archimedes as arc
-from archimedes._core import SymbolicArray, sym, compile
+from archimedes._core import SymbolicArray, compile, sym
 
 
 class TestNumPyInterp:
@@ -41,7 +45,7 @@ class TestNumPyInterp:
         fp = np.array([-1, -1, -2, -3, 0, 2])
 
         # Test with SX (should through an error)
-        with pytest.raises(ValueError, match=r'.*MX.*'):
+        with pytest.raises(ValueError, match=r".*MX.*"):
             x = sym("x", kind="SX")
             np.interp(x, xp, fp)
 
@@ -67,8 +71,12 @@ class TestNDInterp:
         f_lut = arc.interpolant([xp], fp, arg_names=("x",), ret_name="y", name="f")
 
         # Check names
-        assert f_lut.arg_names == ["x",]
-        assert f_lut.ret_names == ["y",]
+        assert f_lut.arg_names == [
+            "x",
+        ]
+        assert f_lut.ret_names == [
+            "y",
+        ]
         assert f_lut.name == "f"
 
         # Test evaluating symbolically (note must be "MX")
@@ -92,8 +100,8 @@ class TestNDInterp:
         # https://web.casadi.org/docs/#using-lookup-tables
         xgrid = np.linspace(-5, 5, 11)
         ygrid = np.linspace(-4, 4, 9)
-        X, Y = np.meshgrid(xgrid, ygrid, indexing='ij')
-        R = np.sqrt(5 * X ** 2 + Y ** 2)+ 1
+        X, Y = np.meshgrid(xgrid, ygrid, indexing="ij")
+        R = np.sqrt(5 * X**2 + Y**2) + 1
         Z = np.sin(R) / R
         lut = arc.interpolant(
             [xgrid, ygrid],
@@ -106,7 +114,9 @@ class TestNDInterp:
 
         # Check names
         assert lut.arg_names == ["x", "y"]
-        assert lut.ret_names == ["z",]
+        assert lut.ret_names == [
+            "z",
+        ]
         assert lut.name == "f"
 
         # Test numeric scalar evaluation
@@ -135,8 +145,8 @@ class TestNDInterp:
         # https://web.casadi.org/docs/#using-lookup-tables
         xgrid = np.linspace(-5, 5, 11)
         ygrid = np.linspace(-4, 4, 9)
-        X, Y = np.meshgrid(xgrid, ygrid, indexing='ij')
-        R = np.sqrt(5 * X ** 2 + Y ** 2)+ 1
+        X, Y = np.meshgrid(xgrid, ygrid, indexing="ij")
+        R = np.sqrt(5 * X**2 + Y**2) + 1
         Z = np.sin(R) / R
         arc.interpolant(
             [xgrid, ygrid],
@@ -146,8 +156,8 @@ class TestNDInterp:
     def test_error_handling(self):
         xgrid = np.linspace(-5, 5, 11)
         ygrid = np.linspace(-4, 4, 9)
-        X, Y = np.meshgrid(xgrid, ygrid, indexing='ij')
-        R = np.sqrt(5 * X ** 2 + Y ** 2)+ 1
+        X, Y = np.meshgrid(xgrid, ygrid, indexing="ij")
+        R = np.sqrt(5 * X**2 + Y**2) + 1
         Z = np.sin(R) / R
         lut = arc.interpolant(
             [xgrid, ygrid],
@@ -159,7 +169,7 @@ class TestNDInterp:
         )
 
         # Wrong number of arguments
-        with pytest.raises(TypeError, match=r'.*too many positional arguments.*'):
+        with pytest.raises(TypeError, match=r".*too many positional arguments.*"):
             x = 0.5
             lut(x, x, x)
 
@@ -180,21 +190,21 @@ class TestNDInterp:
             )
 
         # Too many dimensions for data array
-        with pytest.raises(ValueError, match=r'data must be 2-dimensional.*'):
+        with pytest.raises(ValueError, match=r"data must be 2-dimensional.*"):
             lut = arc.interpolant(
                 [xgrid, ygrid],
                 Z[:, None],
             )
 
         # Not enough data points
-        with pytest.raises(ValueError, match=r'data must have length.*'):
+        with pytest.raises(ValueError, match=r"data must have length.*"):
             lut = arc.interpolant(
                 [xgrid, ygrid],
                 Z[:4],
             )
 
         # Invalid method
-        with pytest.raises(ValueError, match=r'method must be one of.*'):
+        with pytest.raises(ValueError, match=r"method must be one of.*"):
             lut = arc.interpolant(
                 [xgrid, ygrid],
                 Z,
@@ -202,7 +212,7 @@ class TestNDInterp:
             )
 
         # Not enough arg names
-        with pytest.raises(ValueError, match=r'arg_names must have length 2.*'):
+        with pytest.raises(ValueError, match=r"arg_names must have length 2.*"):
             lut = arc.interpolant(
                 [xgrid, ygrid],
                 Z,
@@ -210,16 +220,15 @@ class TestNDInterp:
             )
 
         # Non-string arg names
-        with pytest.raises(ValueError, match=r'arg_names must be a list of strings.*'):
+        with pytest.raises(ValueError, match=r"arg_names must be a list of strings.*"):
             lut = arc.interpolant(
                 [xgrid, ygrid],
                 Z,
                 arg_names=[0, 1],
             )
-        
 
         # Non-string return names
-        with pytest.raises(ValueError, match=r'ret_name must be a string.*'):
+        with pytest.raises(ValueError, match=r"ret_name must be a string.*"):
             lut = arc.interpolant(
                 [xgrid, ygrid],
                 Z,

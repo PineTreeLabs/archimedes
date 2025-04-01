@@ -3,24 +3,36 @@
 https://docs.scipy.org/doc/scipy/reference/generated/scipy.optimize.root.html
 https://web.casadi.org/docs/#nonlinear-root-finding-problems
 """
+
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Any, Callable, Sequence, cast
+
 import casadi as cs
 
 from archimedes import tree
 from archimedes._core import (
-    sym_like,
-    _as_casadi_array,
-    SymbolicArray,
     FunctionCache,
+    SymbolicArray,
+    _as_casadi_array,
+    sym_like,
 )
-
 from archimedes.error import ShapeDtypeError
 
 __all__ = ["implicit", "root"]
 
 
+if TYPE_CHECKING:
+    from ..typing import ArrayLike
+
+
 def implicit(
-    func, static_argnames=None, solver="newton", name=None, **options
-):
+    func: Callable,
+    static_argnames: str | Sequence[str] | None = None,
+    solver: str = "newton",
+    name: str | None = None,
+    **options,
+) -> FunctionCache:
     """Construct an explicit function from an implicit relation.
 
     Given an implicit relation F(x, p) = 0 that defines x as a function of p,
@@ -36,7 +48,7 @@ def implicit(
         dtype as the input `x`.
     static_argnames : tuple of str, optional
         Names of arguments that should be treated as static (non-symbolic)
-        parameters. Static arguments are not differentiated through and 
+        parameters. Static arguments are not differentiated through and
         the solver will be recompiled when their values change.
     solver : str, default="newton"
         The root-finding method to use. Options are:
@@ -128,7 +140,7 @@ def implicit(
     >>>
     >>> # Create solver with more iterations and higher accuracy
     >>> kepler_solver = arc.implicit(
-    ...     kepler, 
+    ...     kepler,
     ...     solver="newton",
     ...     max_iter=50,
     ...     tol=1e-12
@@ -152,7 +164,7 @@ def implicit(
 
     # Define a function that will solve the root-finding problem
     # This function will be evaluated with SymbolicArray objects.
-    def _solve(x0, *args):
+    def _solve(x0: ArrayLike, *args) -> ArrayLike:
         ret_shape = x0.shape
         ret_dtype = x0.dtype
 
@@ -190,6 +202,10 @@ def implicit(
         x = sym_like(x0, name="x", kind="MX")
         g = func(x, *args)  # Evaluate the residual symbolically
 
+        # For type checking
+        g = cast(SymbolicArray, g)
+        z = cast(SymbolicArray, z)
+
         if g.shape != ret_shape or g.dtype != ret_dtype:
             raise ShapeDtypeError(
                 f"Expected shape {ret_shape} and dtype {ret_dtype}, "
@@ -201,19 +217,19 @@ def implicit(
         # but since the `rootfinder` will have the same signature, we'll name
         # the output of the residual `x` in anticipation that we will be
         # enclosing it in the `rootfinder`.
-        args = [x._sym]
+        sym_args = [x._sym]
         arg_names = ["x0"]
         if has_aux:
-            args.append(z._sym)
+            sym_args.append(z._sym)
             arg_names.append("z")
 
-        F = cs.Function("F", args, [g._sym], arg_names, ["x"])
-        root_solver = cs.rootfinder("solver", solver, F, options)
+        cs_func = cs.Function("F", sym_args, [g._sym], arg_names, ["x"])
+        root_solver = cs.rootfinder("solver", solver, cs_func, options)
 
         # Before calling the CasADi rootfinder, we have to make sure
         # the input data is either a CasADi symbol or a NumPy array
         z_arg = False if z is None else z
-        x0, z_arg = map(_as_casadi_array, (x0, z_arg))
+        x0, z_arg = map(_as_casadi_array, (x0, z_arg))  # type: ignore[assignment]
 
         # The return is a dict with keys for the outputs of the residual
         # function.  The key "x" will contain the root of the function.
@@ -247,20 +263,20 @@ def implicit(
 
 
 def root(
-    func,
-    x0,
-    args=(),
-    static_argnames=None,
-    method="newton",
-    tol=None,
+    func: Callable,
+    x0: ArrayLike,
+    args: Sequence[Any] = (),
+    static_argnames: str | Sequence[str] | None = None,
+    method: str = "newton",
+    tol: float | None = None,
     **options,
-):
+) -> ArrayLike:
     """Find a root of a nonlinear function.
-    
-    Solves the equation f(x) = 0 for x, where f is a vector function of 
+
+    Solves the equation f(x) = 0 for x, where f is a vector function of
     vector x. This function provides a simple interface to various root-finding
     algorithms suitable for different types of problems.
-    
+
     Parameters
     ----------
     func : callable
@@ -274,7 +290,7 @@ def root(
         Extra arguments passed to the function.
     static_argnames : tuple of str, optional
         Names of arguments that should be treated as static (non-symbolic)
-        parameters. Static arguments are not differentiated through and 
+        parameters. Static arguments are not differentiated through and
         the solver will be recompiled when their values change.
     method : str, optional
         The root-finding method to use. Options are:
@@ -299,7 +315,7 @@ def root(
 
     Returns
     -------
-    x : ndarray
+    x : array_like
         The solution found, with the same shape as the initial guess x0.
         If the algorithm fails to converge, the best estimate is returned.
 
@@ -309,7 +325,7 @@ def root(
     - For solving systems of nonlinear equations
 
     This function leverages Archimedes' automatic differentiation to compute
-    the Jacobian matrix required by most root-finding methods. For repeated 
+    the Jacobian matrix required by most root-finding methods. For repeated
     solving with different parameters, use `arc.implicit` directly to create
     a reusable solver function.
 
@@ -352,7 +368,7 @@ def root(
     >>> sol = arc.root(f4, x0=2.5, args=(3, 2))
     >>> print(f"Solution: {sol:.10f}")  # Should be close to 2
     Solution: 2.0000000000
-    
+
     See Also
     --------
     arc.implicit : Create a function that solves F(x, p) = 0 for x given p
@@ -369,4 +385,6 @@ def root(
         static_argnames=static_argnames,
         **options,
     )
-    return g(x0, *args)
+    x: ArrayLike = g(x0, *args)
+
+    return x

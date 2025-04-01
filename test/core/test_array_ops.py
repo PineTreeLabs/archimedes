@@ -1,16 +1,21 @@
-import pytest
+# ruff: noqa: N802
+# ruff: noqa: N803
+# ruff: noqa: N806
 
-import numpy as np
-from numpy import exceptions as npex
 import casadi as cs
+import numpy as np
+import pytest
+from numpy import exceptions as npex
 
-from archimedes._core import SymbolicArray, compile, sym as _sym
+from archimedes._core import SymbolicArray, compile
+from archimedes._core import sym as _sym
 from archimedes.error import ShapeDtypeError
 
 # NOTE: Most tests here use SX instead of the default MX, since the is_equal
 # tests struggle with the array-valued MX type.  This doesn't indicate an error
 # in the MX representation, just a difficulty of checking for equality between
 # array-valued symbolic expressions
+
 
 # Override the default symbolic kind to use SX
 def sym(*args, kind="SX", **kwargs):
@@ -279,10 +284,8 @@ class TestSymbolicArrayFunctions:
         def sym_reshape(x, shape, order="C"):
             return np.reshape(x, shape, order=order)
 
-        _reshape = compile(
-            sym_reshape, static_argnames=("shape", "order")
-        )
-        
+        _reshape = compile(sym_reshape, static_argnames=("shape", "order"))
+
         x = np.arange(0, 6)
         assert np.allclose(
             _reshape(x, (3, 2)),
@@ -318,6 +321,7 @@ class TestSymbolicArrayFunctions:
 
         # Test some edge cases by calling directly
         from archimedes._core._array_ops._array_ops import _cs_reshape
+
         x = cs.SX.sym("x", 6, 1)
         y = _cs_reshape(x, (3, 2), order="F")
         assert y.shape == (3, 2)
@@ -474,8 +478,8 @@ class TestSymbolicArrayFunctions:
         x_split = np.split(x, ix)
         assert all(arr.dtype == dtype for arr in x_split)
         assert cs.is_equal(x_split[0]._sym, x._sym[:0], 1)  # Empty section
-        assert cs.is_equal(x_split[1]._sym, x._sym[:ix[1]], 1)
-        assert cs.is_equal(x_split[2]._sym, x._sym[ix[1]:], 1)
+        assert cs.is_equal(x_split[1]._sym, x._sym[: ix[1]], 1)
+        assert cs.is_equal(x_split[2]._sym, x._sym[ix[1] :], 1)
         assert cs.is_equal(x_split[3]._sym, x._sym[:0], 1)  # Empty section
 
         # Test row split 2D with sections
@@ -487,7 +491,7 @@ class TestSymbolicArrayFunctions:
 
         # Check vsplit
         x_vsplit = np.vsplit(x, 2)
-        for (xs, xv) in zip(x_split, x_vsplit):
+        for xs, xv in zip(x_split, x_vsplit):
             assert cs.is_equal(xs._sym, xv._sym, 1)
 
         # Test row split 2D with indices
@@ -495,13 +499,13 @@ class TestSymbolicArrayFunctions:
         x_split = np.split(x, ix, axis=0)
         assert all(arr.dtype == dtype for arr in x_split)
         assert cs.is_equal(x_split[0]._sym, x._sym[:0, :], 1)  # Empty section
-        assert cs.is_equal(x_split[1]._sym, x._sym[:ix[1], :], 1)
-        assert cs.is_equal(x_split[2]._sym, x._sym[ix[1]:, :], 1)
+        assert cs.is_equal(x_split[1]._sym, x._sym[: ix[1], :], 1)
+        assert cs.is_equal(x_split[2]._sym, x._sym[ix[1] :, :], 1)
         assert cs.is_equal(x_split[3]._sym, x._sym[:0, :], 1)  # Empty section
 
         # Check vsplit
         x_vsplit = np.vsplit(x, ix)
-        for (xs, xv) in zip(x_split, x_vsplit):
+        for xs, xv in zip(x_split, x_vsplit):
             assert cs.is_equal(xs._sym, xv._sym, 1)
 
         # Test col split 2D with sections
@@ -517,7 +521,7 @@ class TestSymbolicArrayFunctions:
 
         # Check hsplit
         x_vsplit = np.hsplit(x, 2)
-        for (xs, xv) in zip(x_split, x_vsplit):
+        for xs, xv in zip(x_split, x_vsplit):
             assert cs.is_equal(xs._sym, xv._sym, 1)
 
         # Test col split 2D with indices
@@ -525,13 +529,13 @@ class TestSymbolicArrayFunctions:
         x_split = np.split(x, ix, axis=1)
         assert all(arr.dtype == dtype for arr in x_split)
         assert cs.is_equal(x_split[0]._sym, x._sym[:, :0], 1)  # Empty section
-        assert cs.is_equal(x_split[1]._sym, x._sym[:, :ix[1]], 1)
-        assert cs.is_equal(x_split[2]._sym, x._sym[:, ix[1]:], 1)
+        assert cs.is_equal(x_split[1]._sym, x._sym[:, : ix[1]], 1)
+        assert cs.is_equal(x_split[2]._sym, x._sym[:, ix[1] :], 1)
         assert cs.is_equal(x_split[3]._sym, x._sym[:, :0], 1)  # Empty section
 
         # Check hsplit
         x_vsplit = np.hsplit(x, ix)
-        for (xs, xv) in zip(x_split, x_vsplit):
+        for xs, xv in zip(x_split, x_vsplit):
             assert cs.is_equal(xs._sym, xv._sym, 1)
 
         # Error for decreasing indices
@@ -774,10 +778,10 @@ class TestSymbolicArrayFunctions:
         assert cs.is_equal(x._sym, cs.solve(A._sym, b._sym), 5)
 
         # Error handling
-        with pytest.raises(ShapeDtypeError, match=r'.*not aligned.*'):
+        with pytest.raises(ShapeDtypeError, match=r".*not aligned.*"):
             b = sym("b", shape=(3,))
             np.linalg.solve(A, b)
 
-        with pytest.raises(ShapeDtypeError, match=r'.*not a vector.*'):
+        with pytest.raises(ShapeDtypeError, match=r".*not a vector.*"):
             b = sym("b", shape=(2, 3))
             np.linalg.solve(A, b)

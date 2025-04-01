@@ -1,8 +1,12 @@
-from typing import Tuple
+from typing import TYPE_CHECKING, Callable, Tuple
+
 import numpy as np
-from numpy.typing import DTypeLike
 
 from archimedes.error import ShapeDtypeError
+
+if TYPE_CHECKING:
+    from ..typing import DTypeLike
+
 ShapeLike = Tuple[int, ...]
 
 __all__ = ["shape_inference", "type_inference", "ShapeLike", "DTypeLike"]
@@ -19,21 +23,20 @@ def _type_inference_default(*inputs):
     # The result type is the result type of the scalar types and the vector types
     return np.result_type(*scalar_types, *vector_types)
 
+
 def type_inference(rule, *inputs):
     return {
         "default": _type_inference_default,
-    }[
-        rule
-    ](*inputs)
+    }[rule](*inputs)
 
 
 def shape_inference(rule, *inputs):
     shapes = list(map(np.shape, inputs))
-    return {
+    inference_fn: Callable[..., ShapeLike] = {  # type: ignore
         "unary": _shape_inference_unary,
         "transpose": _shape_inference_transpose,
         "broadcast": _shape_inference_broadcast,
-        "unary_to_scalar": lambda x: (),
+        "unary_to_scalar": _shape_inference_scalar,
         "matmul": _shape_inference_matmul,
         "solve": _shape_inference_solve,
         # "array": _shape_inference_array,
@@ -42,23 +45,28 @@ def shape_inference(rule, *inputs):
         "hessian": _shape_inference_hessian,
         "jvp": _shape_inference_jvp,
         "vjp": _shape_inference_vjp,
-    }[rule](*shapes)
+    }[rule]
+    return inference_fn(*shapes)
 
 
-def _shape_inference_unary(*shapes: Tuple[ShapeLike, ...]):
-    return shapes[0]
+def _shape_inference_scalar(*shapes: Tuple[ShapeLike, ...]) -> ShapeLike:
+    return ()
 
 
-def _shape_inference_transpose(*shapes: Tuple[ShapeLike, ...]):
-    return shapes[0][::-1]
+def _shape_inference_unary(*shapes: Tuple[ShapeLike, ...]) -> ShapeLike:
+    return shapes[0]  # type: ignore
 
 
-def _shape_inference_broadcast(*shapes: Tuple[ShapeLike, ...]):
+def _shape_inference_transpose(*shapes: Tuple[ShapeLike, ...]) -> ShapeLike:
+    return shapes[0][::-1]  # type: ignore
+
+
+def _shape_inference_broadcast(*shapes: Tuple[ShapeLike, ...]) -> ShapeLike:
     # https://numpy.org/doc/stable/user/basics.broadcasting.html#general-broadcasting-rules
     #
     # When operating on two arrays, NumPy compares their shapes element-wise. It starts
-    # with the trailing (i.e. rightmost) dimension and works its way left. Two dimensions
-    # are compatible when
+    # with the trailing (i.e. rightmost) dimension and works its way left. Two
+    # dimensions are compatible when
     #
     #   1. they are equal, or
     #   2. one of them is 1.
@@ -68,29 +76,31 @@ def _shape_inference_broadcast(*shapes: Tuple[ShapeLike, ...]):
     # greatest number of dimensions, where the size of each dimension is the largest
     # size of the corresponding dimension among the input arrays. Note that missing
     # dimensions are assumed to have size one.
-    return np.broadcast_shapes(*shapes)
+    return np.broadcast_shapes(*shapes)  # type: ignore
 
 
-def _shape_inference_matmul(shape1: ShapeLike, shape2: ShapeLike):
+def _shape_inference_matmul(shape1: ShapeLike, shape2: ShapeLike) -> ShapeLike:
     # The rule is that the operation is over the trailing axis of x1 and
     # the leading axis of x2.  Hence, the resulting shape is all but the
     # eliminated axes
     if shape1[-1] != shape2[0]:
         raise ShapeDtypeError(
-            f"shapes {shape1} and {shape2} not aligned: {shape1[-1]} (dim 0) != {shape2[0]} (dim 1)"
+            f"shapes {shape1} and {shape2} not aligned: {shape1[-1]} (dim 0) != "
+            f"{shape2[0]} (dim 1)"
         )
 
     return shape1[:-1] + shape2[1:]
 
 
-def _shape_inference_solve(shape1: ShapeLike, shape2: ShapeLike):
+def _shape_inference_solve(shape1: ShapeLike, shape2: ShapeLike) -> ShapeLike:
     # The leading axis of x1 must be the same as the leading axis of x2
     # For now, x2 must also be a vector
     if shape1[0] != shape2[0]:
         raise ShapeDtypeError(
-            f"shapes {shape1} and {shape2} not aligned: {shape1[-1]} (dim 0) != {shape2[0]} (dim 1)"
+            f"shapes {shape1} and {shape2} not aligned: {shape1[-1]} (dim 0) != "
+            f"{shape2[0]} (dim 1)"
         )
-    
+
     if len(shape2) != 1:
         raise ShapeDtypeError(f"shape {shape2} is not a vector")
 
@@ -98,15 +108,17 @@ def _shape_inference_solve(shape1: ShapeLike, shape2: ShapeLike):
     return (shape1[-1],)
 
 
-def _shape_inference_gradient(expr: ShapeLike, arg: ShapeLike):
+def _shape_inference_gradient(expr: ShapeLike, arg: ShapeLike) -> ShapeLike:
     # The expression here must be a scalar.  The gradient will then
     # have the shape of the argument.
     if np.prod(expr) > 1:
-        raise ShapeDtypeError(f"Gradient expression must be a scalar, but got shape {expr}")
+        raise ShapeDtypeError(
+            f"Gradient expression must be a scalar, but got shape {expr}"
+        )
     return arg
 
 
-def _shape_inference_jacobian(expr: ShapeLike, arg: ShapeLike):
+def _shape_inference_jacobian(expr: ShapeLike, arg: ShapeLike) -> ShapeLike:
     # Assuming that the shape of the expression is (n,) and the shape of the
     # argument is (m,), the shape of the Jacobian will be (n, m). This should
     # also work for column vectors (n, 1) and (m, 1). The special case is when
@@ -135,7 +147,7 @@ def _shape_inference_jacobian(expr: ShapeLike, arg: ShapeLike):
     return (n, m)
 
 
-def _shape_inference_hessian(expr: ShapeLike, arg: ShapeLike):
+def _shape_inference_hessian(expr: ShapeLike, arg: ShapeLike) -> ShapeLike:
     if len(expr) != 0:
         raise ShapeDtypeError("Hessian expression must be a scalar")
     if len(arg) != 1:
@@ -143,7 +155,7 @@ def _shape_inference_hessian(expr: ShapeLike, arg: ShapeLike):
     return (arg[0], arg[0])
 
 
-def _shape_inference_jvp(f: ShapeLike, x: ShapeLike, _v: ShapeLike):
+def _shape_inference_jvp(f: ShapeLike, x: ShapeLike, _v: ShapeLike) -> ShapeLike:
     """Shape inference for Jacobian-vector product f'(x) * v."""
     # For a Jacobian-vector product, the expression `f` must be "vector-like",
     # i.e. with shape (), (m,), or (m, 1), with a dependence on the vector-like
@@ -161,7 +173,7 @@ def _shape_inference_jvp(f: ShapeLike, x: ShapeLike, _v: ShapeLike):
     return f
 
 
-def _shape_inference_vjp(f: ShapeLike, x: ShapeLike, _w: ShapeLike):
+def _shape_inference_vjp(f: ShapeLike, x: ShapeLike, _w: ShapeLike) -> ShapeLike:
     """Shape inference for transposed-Jacobian-vector product w * f'(x)."""
     # For a vector-Jacobian product, the expression `f` must be "vector-like",
     # i.e. with shape (), (m,), or (m, 1), with a dependence on the vector-like

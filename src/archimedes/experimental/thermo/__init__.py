@@ -1,14 +1,13 @@
 from .eos import (
-    FluidState,
     FluidEoS,
+    FluidState,
     ThermalFluidEoS,
 )
-
 from .perfect_gas import (
-    PerfectGasEoS,
-    TabulatedPerfectGas,
-    PerfectGasMixture,
     PERFECT_GASES,
+    PerfectGasEoS,
+    PerfectGasMixture,
+    TabulatedPerfectGas,
 )
 
 __all__ = [

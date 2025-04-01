@@ -1,9 +1,8 @@
-import pytest
 import numpy as np
+import pytest
 
-from archimedes._core import array, sym, compile, SymbolicArray
-from archimedes._optimization import minimize, root, implicit
-from archimedes.error import ShapeDtypeError
+from archimedes._core import SymbolicArray, array, compile, sym
+from archimedes._optimization import minimize
 
 
 class TestMinimize:
@@ -81,21 +80,21 @@ class TestMinimize:
     def test_error_handling(self):
         # Inconsistent arguments
         def f(x):
-            return x ** 2
-        
+            return x**2
+
         def g(x, y):
             return x + y
-        
+
         with pytest.raises(ValueError):
             minimize(f, constr=g, x0=1.0)
 
         # Inconsistent static arguments
         def f(a, x):
-            return a * x ** 2
-        
+            return a * x**2
+
         def g(a, x):
             return a * x
-        
+
         f = compile(f, static_argnames=["a"])
         g = compile(g)
 
@@ -105,7 +104,6 @@ class TestMinimize:
         # Matrix-valued decision variables
         def f(x):
             return np.dot(x, x)
-        
+
         with pytest.raises(ValueError):
             minimize(f, x0=np.ones((2, 2)))
-

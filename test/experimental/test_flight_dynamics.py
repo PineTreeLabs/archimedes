@@ -1,18 +1,20 @@
-from functools import partial
-import pytest
+# ruff: noqa: N802
+# ruff: noqa: N803
+# ruff: noqa: N806
+
 import numpy as np
 import numpy.testing as npt
-
+import pytest
 from scipy.spatial.transform import Rotation
 
 import archimedes as arc
 from archimedes.experimental.aero import (
     FlightVehicle,
-    quaternion_multiply,
-    quaternion_derivative,
-    dcm_from_quaternion,
     dcm_from_euler,
+    dcm_from_quaternion,
     euler_to_quaternion,
+    quaternion_derivative,
+    quaternion_multiply,
 )
 
 m = 1.7  # Arbitrary mass
@@ -44,7 +46,7 @@ class TestQuaternionOperations:
         q1 = np.array([0.7071, 0.7071, 0, 0])  # 90-degree rotation around x
         q2 = np.array([0.7071, 0, 0.7071, 0])  # 90-degree rotation around y
         result = quaternion_multiply(q1, q2)
-        
+
         # Compare with scipy's rotation composition
         r1 = Rotation.from_quat([0.7071, 0, 0, 0.7071])  # Note: scipy uses [x,y,z,w]
         r2 = Rotation.from_quat([0, 0.7071, 0, 0.7071])
@@ -69,27 +71,34 @@ class TestQuaternionOperations:
     def test_dcm_from_quaternion(self):
         test_angles = [
             np.array([0, 0, 0]),  # Identity
-            np.array([np.pi/4, 0, 0]),  # 45 degree roll
-            np.array([0, np.pi/4, 0]),  # 45 degree pitch
-            np.array([0, 0, np.pi/4]),  # 45 degree yaw
-            np.array([np.pi/6, np.pi/4, np.pi/3]),  # Arbitrary rotation
+            np.array([np.pi / 4, 0, 0]),  # 45 degree roll
+            np.array([0, np.pi / 4, 0]),  # 45 degree pitch
+            np.array([0, 0, np.pi / 4]),  # 45 degree yaw
+            np.array([np.pi / 6, np.pi / 4, np.pi / 3]),  # Arbitrary rotation
         ]
 
         for angles in test_angles:
             # Convert Euler angles to quaternion
             q = euler_to_quaternion(angles)
             C_BN_custom = dcm_from_quaternion(q)
-            
+
             # Compare with scipy's rotation
-            r = Rotation.from_euler('ZYX', angles[::-1])
+            r = Rotation.from_euler("ZYX", angles[::-1])
             C_BN_scipy = r.as_matrix().T
-            
-            npt.assert_allclose(C_BN_custom, C_BN_scipy, rtol=1e-6, atol=1e-6,
-                              err_msg=f"Mismatch for angles {angles}")
+
+            npt.assert_allclose(
+                C_BN_custom,
+                C_BN_scipy,
+                rtol=1e-6,
+                atol=1e-6,
+                err_msg=f"Mismatch for angles {angles}",
+            )
 
             # Verify orthogonality
             identity = np.eye(3)
-            npt.assert_allclose(C_BN_custom @ C_BN_custom.T, identity, rtol=1e-6, atol=1e-8)
+            npt.assert_allclose(
+                C_BN_custom @ C_BN_custom.T, identity, rtol=1e-6, atol=1e-8
+            )
 
             # Verify determinant is 1
             npt.assert_allclose(np.linalg.det(C_BN_custom), 1.0, rtol=1e-6, atol=1e-8)
@@ -97,23 +106,23 @@ class TestQuaternionOperations:
     def test_euler_to_quaternion(self):
         test_angles = [
             np.array([0, 0, 0]),
-            np.array([np.pi/4, 0, 0]),
-            np.array([0, np.pi/4, 0]),
-            np.array([0, 0, np.pi/4]),
-            np.array([np.pi/6, np.pi/4, np.pi/3]),
+            np.array([np.pi / 4, 0, 0]),
+            np.array([0, np.pi / 4, 0]),
+            np.array([0, 0, np.pi / 4]),
+            np.array([np.pi / 6, np.pi / 4, np.pi / 3]),
         ]
 
         for angles in test_angles:
             q_custom = euler_to_quaternion(angles)
-            
+
             # Compare with scipy's conversion
-            r = Rotation.from_euler('ZYX', angles[::-1])
+            r = Rotation.from_euler("ZYX", angles[::-1])
             q_scipy = np.roll(r.as_quat(), 1)  # Convert to [w,x,y,z]
-            
+
             # Note: quaternions q and -q represent the same rotation
             if np.sign(q_custom[0]) != np.sign(q_scipy[0]):
                 q_scipy = -q_scipy
-                
+
             npt.assert_allclose(q_custom, q_scipy, rtol=1e-6)
 
 
@@ -226,12 +235,12 @@ class TestVehicleDynamics:
 
         # Check linear motion
         npt.assert_allclose(x_dot[0], 1.0)  # Velocity in x-direction
-        npt.assert_allclose(x_dot[7], 1/m)  # Acceleration in x-direction
+        npt.assert_allclose(x_dot[7], 1 / m)  # Acceleration in x-direction
 
         # Check quaternion derivative
         expected_qdot = quaternion_derivative(x[3:7], x[10:13])
         npt.assert_allclose(x_dot[3:7], expected_qdot)
-        
+
         # Check Coriolis effect
         expected_z_velocity = 0.1  # ω_y * v_x
         npt.assert_allclose(x_dot[9], expected_z_velocity)
@@ -239,9 +248,9 @@ class TestVehicleDynamics:
     def test_quaternion_normalization(self, basic_vehicle):
         # Test that quaternion remains normalized under dynamics
         t = 0
-        angles = np.array([np.pi/6, np.pi/4, np.pi/3])
+        angles = np.array([np.pi / 6, np.pi / 4, np.pi / 3])
         q = euler_to_quaternion(angles)
-        
+
         x = np.zeros(13)
         x[3:7] = q
         x[10:13] = np.array([0.1, 0.2, 0.3])  # Angular velocity
@@ -249,7 +258,7 @@ class TestVehicleDynamics:
 
         dynamics = arc.compile(basic_vehicle.dynamics)
         x_dot = dynamics(t, x, u)
-        
+
         # Verify that quaternion derivative maintains unit norm
         # q·q̇ should be zero for unit quaternion
         q_dot = x_dot[3:7]

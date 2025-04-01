@@ -1,13 +1,13 @@
 from __future__ import annotations
-from typing import TYPE_CHECKING
 
 from functools import wraps
+
+import casadi as cs
 import numpy as np
 from numpy import exceptions as npex
-import casadi as cs
 
-from .._array_impl import array, _as_casadi_array, SymbolicArray
-from .._type_inference import type_inference, shape_inference
+from .._array_impl import SymbolicArray, _as_casadi_array, array
+from .._type_inference import shape_inference, type_inference
 
 
 def normalize_axis_index(axis, ndim, msg_prefix="axis"):
@@ -17,7 +17,8 @@ def normalize_axis_index(axis, ndim, msg_prefix="axis"):
         raise npex.AxisError(
             f"{msg_prefix} {axis} is out of bounds for array of dimension {ndim}"
         )
-    if axis < 0: axis += ndim
+    if axis < 0:
+        axis += ndim
     return axis
 
 
@@ -45,8 +46,8 @@ def binary_op(function=None, result_type=None, shape_inference="broadcast"):
 
 
 class SymbolicOp:
-    shape_inference_rule = NotImplemented
-    type_inference_rule = "default"
+    shape_inference_rule: str = "none"
+    type_inference_rule: str = "default"
 
     def __init__(
         self,
@@ -90,9 +91,9 @@ class BroadcastOp(SymbolicOp):
     shape_inference_rule = "broadcast"
 
     def _compute_result(self, op, inputs, result_shape):
-        cs_inputs = map(_as_casadi_array, inputs)
-        shapes = map(np.shape, inputs)  # Original shapes
-        return _broadcast_binary_operation(op, *cs_inputs, *shapes, result_shape)
+        arr1, arr2 = map(_as_casadi_array, inputs)
+        shape1, shape2 = map(np.shape, inputs)  # Original shapes
+        return _broadcast_binary_operation(op, arr1, arr2, shape1, shape2, result_shape)
 
 
 def _repmat(x, reps):
@@ -108,7 +109,7 @@ def _repmat(x, reps):
 
 def _cs_reshape(x, shape, order="C"):
     """Reshape CasADi types consistent with NumPy API"""
-    
+
     # Ensure that the "shape" argument to casadi.reshape has exactly two
     # elements, since CasADi always uses 2D arrays.
     if len(shape) == 0:
@@ -212,4 +213,3 @@ def _broadcast_binary_operation(operation, arr1, arr2, shape1, shape2, common_sh
     raise NotImplementedError(
         f"Unhandled broadcasting case with shapes {shape1} and {shape2}"
     )
-

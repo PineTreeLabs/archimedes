@@ -46,6 +46,7 @@ select = [
     "I",  # isort
     "N",  # pep8-naming
 ]
+exclude = ["src/archimedes/experimental/*"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["archimedes"]
@@ -57,6 +58,10 @@ warn_return_any = true
 disallow_untyped_defs = false
 ignore_missing_imports = true
 check_untyped_defs = true
+
+[[tool.mypy.overrides]]
+module = "archimedes.experimental.*"
+ignore_errors = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

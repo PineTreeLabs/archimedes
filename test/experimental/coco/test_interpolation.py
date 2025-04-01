@@ -1,17 +1,25 @@
-import pytest
+# ruff: noqa: N802
+# ruff: noqa: N803
+# ruff: noqa: N806
+
 import numpy as np
+import pytest
 
 from archimedes.experimental import coco as cc
+from archimedes.experimental.coco.interpolation import (
+    LagrangePolynomial,
+    gauss_legendre,
+    gauss_lobatto,
+    gauss_radau,
+)
 
-import numpy as np
-
-from archimedes.experimental.coco.interpolation import gauss_legendre, gauss_radau, gauss_lobatto, LagrangePolynomial
 
 def test_gauss_legendre():
     x, w = gauss_legendre(5)
     assert len(x) == 5
     assert len(w) == 5
     assert np.isclose(np.sum(w), 2.0)
+
 
 def test_gauss_radau():
     with pytest.raises(ValueError):
@@ -22,6 +30,7 @@ def test_gauss_radau():
     assert len(w) == 5
     assert x[0] == -1.0
     assert np.isclose(np.sum(w), 2.0)
+
 
 def test_gauss_lobatto():
     with pytest.raises(ValueError):
@@ -34,6 +43,7 @@ def test_gauss_lobatto():
     assert x[-1] == 1.0
     assert np.isclose(np.sum(w), 2.0)
 
+
 def test_lagrange_polynomial_interpolate():
     nodes = np.array([-1.0, 0.0, 1.0])
     poly = LagrangePolynomial(nodes)
@@ -45,6 +55,7 @@ def test_lagrange_polynomial_interpolate():
     assert np.isclose(y[0], 1.0)
     assert np.isclose(y[5], 0.0)
     assert np.isclose(y[-1], 1.0)
+
 
 def test_lagrange_polynomial_diff_matrix():
     nodes = np.array([-1.0, 0.0, 1.0])
@@ -114,7 +125,7 @@ def test_interpolation():
     N = 16
     nodes, _weights = cc.gauss_legendre(N)
     p = cc.LagrangePolynomial(nodes)
-    
+
     f = np.cos
     y0 = f(nodes)
 

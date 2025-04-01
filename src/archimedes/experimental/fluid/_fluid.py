@@ -1,11 +1,11 @@
 from __future__ import annotations
+
 import abc
 
 import numpy as np
 
 from archimedes import struct
 from archimedes.experimental import thermo
-
 
 
 @struct.pytree_node
@@ -17,7 +17,6 @@ class ControlVolume:
         rho: float
         T: float
 
-
     def dynamics(self, x: thermo.FluidState, dm: float, dh: float) -> State:
         vol = self.vol
         rho, T, p, h = x.rho, x.T, x.p, x.h
@@ -26,7 +25,7 @@ class ControlVolume:
         # Equation of state calculations
 
         rho_t = dm / vol  # [kg/m³-s]
-        T_t = ((dh - h * dm) / (rho * vol) + (p / rho ** 2 - du_drho) * rho_t) / cv
+        T_t = ((dh - h * dm) / (rho * vol) + (p / rho**2 - du_drho) * rho_t) / cv
         return self.State(rho_t, T_t)
 
 
@@ -43,12 +42,12 @@ class FlowPath:
         self,
         x: FlowPath.State,
         fluid_up: thermo.FluidState,
-        fluid_dn: thermo.FluidState
+        fluid_dn: thermo.FluidState,
     ) -> float:
         pass
 
     def _calc_dynamics(self, dm: float, dp: float, rho: float, CdA: float) -> State:
-        return FlowPath.State(dm=(dp - dm ** 2 / (2 * rho * CdA ** 2)) / self.I)
+        return FlowPath.State(dm=(dp - dm**2 / (2 * rho * CdA**2)) / self.I)
 
 
 @struct.pytree_node
@@ -56,10 +55,7 @@ class Orifice(FlowPath):
     CdA: float  # Discharge coefficient * area [m²]
 
     def dynamics(
-        self,
-        x: Orifice.State,
-        fluid_up: thermo.FluidState,
-        fluid_dn: thermo.FluidState
+        self, x: Orifice.State, fluid_up: thermo.FluidState, fluid_dn: thermo.FluidState
     ) -> Orifice.State:
         dp = fluid_up.p - fluid_dn.p
         rho = fluid_up.rho
@@ -84,24 +80,25 @@ class Valve(FlowPath):
         x: Valve.State,
         fluid_up: thermo.FluidState,
         fluid_dn: thermo.FluidState,
-        pos: float
+        pos: float,
     ) -> Valve.State:
         CdA = self.CdA(pos)
         dp = fluid_up.p - fluid_dn.p
         rho = fluid_up.rho
         return self._calc_dynamics(x.dm, dp, rho, CdA)
-    
+
 
 @struct.pytree_node
 class Nozzle(FlowPath):
     """Choked flow model
-    
-    
+
+
     dm = Cq * Cm * At * sqrt(2 * p * rho)
 
     with Cm = sqrt(2 * gamma / (gamma + 1)) * (2 / (gamma + 1)) ** (1 / (gamma - 1))
-    
+
     """
+
     At: float  # Throat area [m²]
     Cq: float  # Flow coefficient [-]
 
@@ -117,4 +114,3 @@ class Nozzle(FlowPath):
         Cm = np.sqrt(2 * gamma / (gamma + 1)) * (2 / (gamma + 1)) ** (1 / (gamma - 1))
         CdA = self.Cq * Cm * self.At / np.sqrt(2)
         return self._calc_dynamics(x.dm, dp, rho, CdA)
-

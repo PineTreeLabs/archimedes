@@ -26,15 +26,20 @@ See the License for the specific language governing permissions and
 limitations under the License.
 """
 
-import warnings
+from __future__ import annotations
+
 import inspect
+import warnings
+from typing import TYPE_CHECKING
 
 import numpy as np
-
 
 from archimedes._core._array_impl import _result_type, array
 from archimedes.tree._registry import unzip2
 from archimedes.tree._tree_util import tree_flatten, tree_unflatten
+
+if TYPE_CHECKING:
+    from archimedes.typing import ArrayLike, PyTree
 
 
 # Original: jax._src.util.HashablePartial
@@ -43,11 +48,11 @@ class HashablePartial:
         self.f = f
         self.args = args
         self.kwargs = kwargs
-        
+
         # Create a new call signature that doesn't include any of the provided args
         signature = inspect.signature(f)
         parameters = []
-        for (i, (name, param)) in enumerate(signature.parameters.items()):
+        for i, (name, param) in enumerate(signature.parameters.items()):
             if i < len(args) or name in kwargs:
                 continue
             parameters.append(param)
@@ -66,17 +71,18 @@ class HashablePartial:
 
     def __eq__(self, other):
         return (
-           type(other) is HashablePartial and
-            self.f.__code__ == other.f.__code__ and
-            self.args == other.args and self.kwargs == other.kwargs
+            type(other) is HashablePartial
+            and self.f.__code__ == other.f.__code__
+            and self.args == other.args
+            and self.kwargs == other.kwargs
         )
 
     def __hash__(self):
         return hash(
             (
-            self.f.__code__,
-            self.args,
-            tuple(sorted(self.kwargs.items(), key=lambda kv: kv[0])),
+                self.f.__code__,
+                self.args,
+                tuple(sorted(self.kwargs.items(), key=lambda kv: kv[0])),
             ),
         )
 
@@ -84,7 +90,7 @@ class HashablePartial:
         return self.f(*self.args, *args, **self.kwargs, **kwargs)
 
 
-def ravel_pytree(pytree):
+def ravel_pytree(pytree: PyTree) -> tuple[ArrayLike, HashablePartial]:
     """
     Flatten a pytree to a single 1D array.
 
@@ -125,38 +131,38 @@ def ravel_pytree(pytree):
     --------
     >>> import archimedes as arc
     >>> import numpy as np
-    >>> 
+    >>>
     >>> # Create a structured state
     >>> state = {"pos": np.array([0.0, 1.0, 2.0]), "vel": np.array([3.0, 4.0, 5.0])}
-    >>> 
+    >>>
     >>> # Flatten to a single vector
     >>> flat_state, unravel = arc.tree.ravel(state)
     >>> print(flat_state)
     [0. 1. 2. 3. 4. 5.]
-    >>> 
+    >>>
     >>> # Modify the flat array
     >>> flat_state = flat_state * 2
-    >>> 
+    >>>
     >>> # Reconstruct the original structure with modified values
     >>> new_state = unravel(flat_state)
     >>> print(new_state)
     {'pos': array([0., 2., 4.]), 'vel': array([6., 8., 10.])}
-    >>> 
+    >>>
     >>> # Use with ODE solvers that expect flat vectors
     >>> @arc.compile
     >>> def ode_rhs(t, state_flat):
     ...     # Unflatten the state vector to our structured state
     ...     state = unravel(state_flat)
-    ...     
+    ...
     ...     # Compute state derivatives using structured data
     ...     pos_dot = state["vel"]
     ...     vel_dot = -state["pos"]  # Simple harmonic oscillator
-    ...     
+    ...
     ...     # Return flattened derivatives
     ...     state_deriv = {"pos": pos_dot, "vel": vel_dot}
     ...     state_deriv_flat, _ = arc.tree.ravel(state_deriv)
     ...     return state_deriv_flat
-    
+
     See Also
     --------
     flatten : Flatten a pytree into a list of leaves and a treedef
@@ -167,11 +173,12 @@ def ravel_pytree(pytree):
 
 
 def unravel_pytree(treedef, unravel_list, flat):
-  return tree_unflatten(treedef, unravel_list(flat))
+    return tree_unflatten(treedef, unravel_list(flat))
 
 
 def _ravel_list(lst):
-    if not lst: return np.array([], np.float32), lambda _: []
+    if not lst:
+        return np.array([], np.float32), lambda _: []
     from_dtypes = tuple(map(_result_type, lst))
     to_dtype = _result_type(*from_dtypes)
     sizes, shapes = unzip2((np.size(x), np.shape(x)) for x in lst)
@@ -180,8 +187,10 @@ def _ravel_list(lst):
 
     # When there is more than one distinct input dtype, we perform type
     # conversions and produce a dtype-specific unravel function.
-    ravel = lambda e: np.ravel(array(e, dtype=to_dtype))
-    raveled = np.atleast_1d(np.concatenate([ravel(e) for e in lst]))
+    def _ravel(e):
+        return np.ravel(array(e, dtype=to_dtype))  # type: ignore
+
+    raveled = np.atleast_1d(np.concatenate([_ravel(e) for e in lst]))
     unrav = HashablePartial(_unravel_list, indices, shapes, from_dtypes, to_dtype)
     return raveled, unrav
 

@@ -1,15 +1,11 @@
 """Base classes for equaation of state models."""
 
 from __future__ import annotations
+
 import abc
-from functools import cached_property, partial
-from typing import ClassVar, Callable, Any
+from typing import Any
 
-import numpy as np
-
-import archimedes as arc
 from archimedes import struct
-
 
 R_IDEAL = 8.31446261815324  # J/mol-K
 
@@ -27,7 +23,6 @@ class FluidState:
     @property
     def gamma(self):
         return self.cp / self.cv
-
 
 
 class EoSMeta(abc.ABCMeta):
@@ -53,11 +48,13 @@ class EoSMeta(abc.ABCMeta):
         #             " a property or class variable"
         #         )
         # Check for property or class variable
-        if not any([
-            isinstance(getattr(cls, attr, None), property),  # Property
-            attr in namespace,  # Class variable
-            attr in annotations,  # Dataclass field
-        ]):
+        if not any(
+            [
+                isinstance(getattr(cls, attr, None), property),  # Property
+                attr in namespace,  # Class variable
+                attr in annotations,  # Dataclass field
+            ]
+        ):
             raise TypeError(
                 f"Class {name} must define {description} '{attr}' as either "
                 "a dataclass field, property, or class variable"
@@ -67,37 +64,38 @@ class EoSMeta(abc.ABCMeta):
         cls = super().__new__(mcs, name, bases, namespace)
 
         # Skip validation for abstract classes
-        if hasattr(cls, '__abstractmethods__') and cls.__abstractmethods__:
+        if hasattr(cls, "__abstractmethods__") and cls.__abstractmethods__:
             return cls
-        
+
         # Require that the class has a standard enthalpy of formation and
         # molar mass
         required = {
             ("h0_f", "standard enthalpy of formation", float),
             ("M", "molar mass", float),
         }
-        if name != 'FluidEoS':  # Don't validate the base class itself
+        if name != "FluidEoS":  # Don't validate the base class itself
             # Collect annotations for dataclass-style classes
-            annotations = getattr(cls, '__annotations__', {})
+            annotations = getattr(cls, "__annotations__", {})
             for base in bases:
-                annotations.update(getattr(base, '__annotations__', {}))
+                annotations.update(getattr(base, "__annotations__", {}))
 
-            for (attr, description, _) in required:
-                if not any([
-                    isinstance(getattr(cls, attr, None), property),  # Property
-                    attr in namespace,  # Class variable
-                    attr in annotations,  # Dataclass field
-                ]):
+            for attr, description, _ in required:
+                if not any(
+                    [
+                        isinstance(getattr(cls, attr, None), property),  # Property
+                        attr in namespace,  # Class variable
+                        attr in annotations,  # Dataclass field
+                    ]
+                ):
                     raise TypeError(
                         f"Class {name} must define {description} `{attr}' as either "
                         "a dataclass field, property, or class variable"
                     )
-                
+
         # Add annotated fields to the class
-        for (attr, _, T) in required:
+        for attr, _, T in required:
             cls.__annotations__[attr] = T
 
-        
         return cls
 
 
@@ -149,7 +147,7 @@ class FluidEoS(metaclass=EoSMeta):
         p = self.p(**kwargs)
         T = self.T(**kwargs)
         return self._calc_rho(p, T)
-    
+
     # @abc.abstractmethod
     # def _calc_T(self, p: float, rho: float) -> float:
     #     """Specific enthalpy [J/kg] from pressure [Pa] and density [kg/m³]."""
@@ -223,12 +221,13 @@ class FluidEoS(metaclass=EoSMeta):
 
 class ThermalFluidEoS(FluidEoS):
     """Equation of state for a thermal fluid.
-    
+
     A thermal fluid is defined as one whose internal energy is a function of
     temperature only; specifically, the partial derivative (∂u/∂ρ)|T = 0.
 
     This is true for ideal gases and incompressible, variable-density fluids,
     for example.
     """
+
     def _calc_du_drho(self, rho: float, T: float) -> float:
         return 0.0

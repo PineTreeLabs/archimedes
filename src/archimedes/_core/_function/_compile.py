@@ -1,28 +1,30 @@
 from __future__ import annotations
-from functools import partial
-import inspect
-from typing import NamedTuple, Hashable, Tuple, Any
 
-import numpy as np
+import inspect
+from functools import partial
+from typing import TYPE_CHECKING, Any, Callable, Hashable, NamedTuple, Sequence, Tuple
+
 import casadi as cs
+import numpy as np
 
 from archimedes import tree
-from archimedes.tree._flatten_util import HashablePartial
+from archimedes._core._array_impl import DEFAULT_SYM_NAME, _as_casadi_array, array
 
 from .. import sym_like
-from archimedes._core._array_impl import array, _as_casadi_array, DEFAULT_SYM_NAME
 
+if TYPE_CHECKING:
+    from archimedes.tree._flatten_util import HashablePartial
 
-# Type alias for the key in the compiled dictionary
-# This will be first the shape/dtype of all arguments and then a tuple
-# of the static arguments, which are restricted only by the requirement
-# that they be hashable.
-CompiledKey = Tuple[Tuple[HashablePartial, ...], Tuple[Hashable, ...]]
+    # Type alias for the key in the compiled dictionary
+    # This will be first the shape/dtype of all arguments and then a tuple
+    # of the static arguments, which are restricted only by the requirement
+    # that they be hashable.
+    CompiledKey = Tuple[Tuple[HashablePartial, ...], Tuple[Hashable, ...]]
 
 
 class CompiledFunction(NamedTuple):
     """Container for a CasADi function specialized to particular arg types.
-    
+
     The FunctionCache operates similarly to JAX transformations in that it does
     not need to know the shapes and dtypes of the arguments at creation.  Instead,
     a specialized version of the function is created each time the FunctionCache
@@ -31,6 +33,7 @@ class CompiledFunction(NamedTuple):
 
     This class is not intended to be used directly by the user.
     """
+
     func: cs.Function
     results_unravel: tuple[HashablePartial, ...]
 
@@ -128,7 +131,7 @@ class FunctionCache:
         self._jit = jit
 
         self._compiled: dict[CompiledKey, CompiledFunction] = {}
-    
+
         # Determine the signature of the original function.  If not
         # specified explicitly, it will be inferred using `inspect.signature`
         self.signature = _resolve_signature(func, arg_names)
@@ -157,7 +160,7 @@ class FunctionCache:
     @property
     def arg_names(self):
         return list(self.signature.parameters.keys())
-    
+
     def __repr__(self):
         return f"{self.name}({', '.join(self.arg_names)})"
 
@@ -280,7 +283,9 @@ class FunctionCache:
         # Map the arguments to their shape and data types
         # For static arguments, add to a separate list for the purpose
         # of constructing the key in the hash table of compiled variants
-        static_args, dynamic_args, args_unravel = self.split_args(self.static_argnums, *pos_args)
+        static_args, dynamic_args, args_unravel = self.split_args(
+            self.static_argnums, *pos_args
+        )
 
         # The key is a tuple of the argument types and the static arguments
         # Only hashable objects and NumPy arrays are allowed as static arguments
@@ -304,15 +309,21 @@ class FunctionCache:
 
 # Decorator for transforming functions into FunctionCache
 def compile(
-    func=None, *, static_argnums=None, static_argnames=None, jit=False, kind=DEFAULT_SYM_NAME, name=None
-):
+    func: Callable | None = None,
+    *,
+    static_argnums: int | Sequence[int] | None = None,
+    static_argnames: str | Sequence[str] | None = None,
+    jit: bool = False,
+    kind: str = DEFAULT_SYM_NAME,
+    name: str | None = None,
+) -> Callable:
     """Create a "compiled" function from a Python function.
-    
-    Transforms a standard NumPy-based Python function into an efficient computational 
-    graph that can be executed in C++ and supports automatic differentiation, code 
-    generation, and other advanced capabilities. This decorator is the primary entry 
+
+    Transforms a standard NumPy-based Python function into an efficient computational
+    graph that can be executed in C++ and supports automatic differentiation, code
+    generation, and other advanced capabilities. This decorator is the primary entry
     point for converting Python functions into Archimedes' symbolic computation system.
-    
+
     Parameters
     ----------
     func : callable, optional
@@ -340,7 +351,7 @@ def compile(
     FunctionCache
         A compiled function that can be called with either symbolic or numeric
         arguments, while maintaining the same function signature.
-        
+
     Notes
     -----
     When to use this function:
@@ -376,20 +387,20 @@ def compile(
     The function is only traced once for each unique combination of argument shapes,
     dtypes, and static argument values. Subsequent calls with the same shapes reuse
     the cached graph, improving performance.
-    
+
     Static arguments:
     Static arguments aren't converted to symbolic variables. This is useful for:
     - Configuration flags that affect control flow
     - Constants that shouldn't be differentiated through
     - Values that would be inefficient to recalculate symbolically
-    
+
     Examples
     --------
     Basic usage as a decorator:
-    
+
     >>> import numpy as np
     >>> import archimedes as arc
-    >>> 
+    >>>
     >>> @arc.compile
     ... def rotate(x, theta):
     ...     R = np.array([
@@ -397,30 +408,30 @@ def compile(
     ...         [np.sin(theta), np.cos(theta)],
     ...     ], like=x)
     ...     return R @ x
-    >>> 
+    >>>
     >>> x = np.array([1.0, 0.0])
     >>> rotate(x, 0.5)
-    
+
     Using static arguments that modify the function behavior:
-    
+
     >>> @arc.compile(static_argnames=("use_boundary_conditions",))
     ... def solve_system(A, b, use_boundary_conditions=True):
     ...     if use_boundary_conditions:
     ...         b[[0, -1]] = 0.0  # Apply boundary conditions
     ...     return np.linalg.solve(A, b)
-    
+
     Different symbolic types:
-    
+
     >>> # Simple mathematical function - use SX for efficiency
     >>> @arc.compile(kind="SX")
     ... def norm(x):
     ...     return np.sqrt(np.sum(x**2))
-    >>> 
+    >>>
     >>> # Function with interpolation - requires MX
     >>> @arc.compile(kind="MX", static_argnames=("xp", "fp"))
     ... def interpolate(x, xp, fp):
     ...     return np.interp(x, xp, fp)
-    
+
     See Also
     --------
     arc.grad : Compute gradients of compiled functions
@@ -430,6 +441,7 @@ def compile(
 
     # If used as @compile(...)
     if func is None:
+
         def decorator(f):
             return FunctionCache(
                 f,
@@ -439,9 +451,13 @@ def compile(
                 kind=kind,
                 name=name,
             )
+
         return decorator
 
     # If used as @compile
+    if isinstance(func, FunctionCache):
+        return func
+
     return FunctionCache(
         func,
         static_argnums=static_argnums,

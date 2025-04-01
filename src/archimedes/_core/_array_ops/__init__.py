@@ -4,12 +4,13 @@ No part of this module should need to be imported directly or accessed by the us
 However, when `SymbolicArray` is used internally it should be imported from here,
 since this is where the `__array_ufunc__` and `__array_function__` methods are defined.
 """
+
 from .._array_impl import SymbolicArray
-from ._array_ufunc import SUPPORTED_UFUNCS
 from ._array_function import SUPPORTED_FUNCTIONS
+from ._array_ufunc import SUPPORTED_UFUNCS
 
 
-def __array_ufunc__(self: SymbolicArray, ufunc, method, *inputs, **kwargs):
+def __array_ufunc__(self: SymbolicArray, ufunc, method, *inputs, **kwargs):  # noqa: N807
     if method == "__call__":
         # Try to dispatch to the equivalent wrapped compiled function
         if (
@@ -24,7 +25,7 @@ def __array_ufunc__(self: SymbolicArray, ufunc, method, *inputs, **kwargs):
         )
 
 
-def __array_function__(self: SymbolicArray, func, types, args, kwargs):
+def __array_function__(self: SymbolicArray, func, types, args, kwargs):  # noqa: N807
     if (
         func.__name__ not in SUPPORTED_FUNCTIONS
         or SUPPORTED_FUNCTIONS[func.__name__] is NotImplemented
@@ -42,8 +43,8 @@ def __array_function__(self: SymbolicArray, func, types, args, kwargs):
 # and inject the SymbolicArray function.  This isn't really necessary if everything
 # was in one file, just helps to logically separate all the function overloading
 # from the core class definition.
-SymbolicArray.__array_ufunc__ = __array_ufunc__
-SymbolicArray.__array_function__ = __array_function__
+SymbolicArray.__array_ufunc__ = __array_ufunc__  # type: ignore[method-assign]
+SymbolicArray.__array_function__ = __array_function__  # type: ignore[method-assign]
 
 
 __all__ = ["SymbolicArray"]

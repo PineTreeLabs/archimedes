@@ -50,18 +50,17 @@ See the License for the specific language governing permissions and
 limitations under the License.
 """
 
-from functools import partial
-from collections import namedtuple
-from collections import OrderedDict
-from typing import NamedTuple
 import dataclasses
+from collections import OrderedDict, namedtuple
+from functools import partial
+from typing import NamedTuple
 
 import numpy as np
 import pytest
-from archimedes import tree, struct
-from archimedes._core import SymbolicArray, sym, compile
-from archimedes.tree._tree_util import LEAF
 
+from archimedes import struct, tree
+from archimedes._core import SymbolicArray, compile, sym
+from archimedes.tree._tree_util import LEAF
 
 
 def tree_equal(a, b):
@@ -143,7 +142,7 @@ def test_multimap():
     assert mapped == multimapped
 
     # Incorrect structure
-    with pytest.raises(ValueError, match=r'Trees must have the same structure.*'):
+    with pytest.raises(ValueError, match=r"Trees must have the same structure.*"):
         tree.map(lambda x, y: x * y, t, (0, 2, 3))
 
 
@@ -151,7 +150,6 @@ def test_reduce():
     t = [{"a": 1, "b": 2, "c": {"d": 3, "e": 4}}]
     _sum = tree.reduce(lambda x, y: x + y, t, 0)
     assert _sum == sum(range(1, 5))
-    
 
 
 def test_flatten_none():
@@ -202,12 +200,12 @@ def test_custom_node():
 
     def point_unflatten(aux_data, children) -> Point:
         x, y = children
-        name, = aux_data
+        (name,) = aux_data
         return Point(x, y, name)
 
     tree.register_pytree_node(Point, point_flatten, point_unflatten)
 
-    p = Point(1.0, 2.0, 'p')
+    p = Point(1.0, 2.0, "p")
     flat, treedef = tree.flatten(p)
     assert flat == [1.0, 2.0]
 
@@ -215,7 +213,6 @@ def test_custom_node():
     assert unflat.x == p.x
     assert unflat.y == p.y
     assert unflat.name == p.name
-
 
 
 def test_register_dataclass_field():
@@ -260,7 +257,8 @@ def test_register_dataclass_metadata():
     assert unflat.name == p.name
 
     # Error handling
-    with pytest.raises(TypeError, match=r'.*data_fields and meta_fields must both.*'):
+    with pytest.raises(TypeError, match=r".*data_fields and meta_fields must both.*"):
+
         @partial(
             tree.register_dataclass,
             meta_fields=("name",),
@@ -271,13 +269,15 @@ def test_register_dataclass_metadata():
             y: float
             name: str
 
-    with pytest.raises(TypeError, match=r'.*fields are required.*'):
+    with pytest.raises(TypeError, match=r".*fields are required.*"):
+
         @tree.register_dataclass
         class Point:
             x: float
             y: float
 
-    with pytest.raises(ValueError, match=r'.*``init=True`` and only them.'):
+    with pytest.raises(ValueError, match=r".*``init=True`` and only them."):
+
         @partial(
             tree.register_dataclass,
             meta_fields=("name",),
@@ -288,7 +288,8 @@ def test_register_dataclass_metadata():
             x: float
             y: float = dataclasses.field(init=False)
 
-    with pytest.raises(ValueError, match=r'.*Missing fields.*'):
+    with pytest.raises(ValueError, match=r".*Missing fields.*"):
+
         @partial(
             tree.register_dataclass,
             meta_fields=("name",),
@@ -298,9 +299,6 @@ def test_register_dataclass_metadata():
         class Point:
             x: float
             y: float
-
-    
-    
 
 
 class TestRavel:
@@ -316,7 +314,7 @@ class TestRavel:
             assert x.dtype == y.dtype
 
         return unraveled
-    
+
     def test_ravel_none(self):
         flat, unravel = tree.ravel(None)
         assert flat.size == 0
@@ -450,7 +448,7 @@ def test_register_struct():
     assert unflat.name == p.name
 
     p2 = p.replace(y=0.0)
-    assert not (p2 is p)
+    assert p2 is not p
     assert p2.y == 0.0
     assert p.y == 2.0
 

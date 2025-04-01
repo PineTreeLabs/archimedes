@@ -1,9 +1,15 @@
-import pytest
+# ruff: noqa: N802
+# ruff: noqa: N803
+# ruff: noqa: N806
+
 import numpy as np
+import pytest
 
 from archimedes.experimental.coco.discretization import (
-    RadauFiniteElements, RadauInterval
+    RadauFiniteElements,
+    RadauInterval,
 )
+
 
 def test_radau_interval():
     n_nodes = 3
@@ -19,6 +25,7 @@ def test_radau_interval():
     x_fn = radau.create_interpolant(x, t0, tf)
     assert np.allclose(x_fn(t0), x[0])
     assert np.allclose(x_fn(tf), x[-1])
+
 
 def test_radau_finite_elements():
     N = [3, 4, 5]
@@ -54,6 +61,7 @@ def test_radau_finite_elements():
     # Error handling in local_to_global
     with pytest.raises(ValueError):
         radau_fe.local_to_global(1000)
+
 
 def test_extrapolation():
     N = [3, 4]

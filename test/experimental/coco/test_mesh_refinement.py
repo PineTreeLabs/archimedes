@@ -1,7 +1,7 @@
 """Tests of adaptive meshing capabilities for the OCP solver"""
 
-import pytest
 import numpy as np
+import pytest
 
 from archimedes.experimental import coco as cc
 
@@ -21,7 +21,6 @@ def test_block_push():
     x0, xf = np.array([0.0, 0.0]), np.array([1.0, 0.0])
     u_min, u_max = -10.0, 10.0
     t0 = 0.0
-    N = 4
 
     boundary_conditions = [
         cc.start_time(t0),
@@ -47,18 +46,21 @@ def test_block_push():
 
     # Linearly interpolate initial guess
     tf_guess = 1.0
+
     def x_guess(t):
         return x0 + (t - t0) * (xf - x0) / (tf_guess - t0)
-    
+
     # Initial solution
     domain = cc.RadauFiniteElements(N=[5], knots=[])
-    sol = ocp.solve(domain, t_guess=(t0, tf_guess), x_guess=x_guess, print_level=0, print_time=0)
+    sol = ocp.solve(
+        domain, t_guess=(t0, tf_guess), x_guess=x_guess, print_level=0, print_time=0
+    )
 
     # Refine mesh
     max_iter = 10
     eps = 1e-4
     for i in range(max_iter):
-        print(f"\n*** Iteration {i+1} ***")
+        print(f"\n*** Iteration {i + 1} ***")
         residuals = cc.midpoint_residuals(ocp, domain, sol)
         converged, domain = cc.refine_mesh_bisection(
             domain,
@@ -83,8 +85,8 @@ def test_block_push():
     assert np.allclose(sol.tf, 0.632455549)
 
     # Check for "bang-bang" control
-    t1 = sol.tp[sol.tp < sol.tf/2]
-    t2 = sol.tp[sol.tp >= sol.tf/2]
+    t1 = sol.tp[sol.tp < sol.tf / 2]
+    t2 = sol.tp[sol.tp >= sol.tf / 2]
 
     assert np.allclose(sol.u(t1), u_max)
     assert np.allclose(sol.u(t2), u_min)
@@ -114,9 +116,7 @@ def test_moon_lander():
         cc.final_condition(xf),
     ]
 
-    path_constraints = [
-        cc.control_bounds([0.0], [3.0])
-    ]
+    path_constraints = [cc.control_bounds([0.0], [3.0])]
 
     # Define the optimal control problem
     ocp = cc.OptimalControlProblem(
@@ -129,11 +129,9 @@ def test_moon_lander():
         path_constraints=path_constraints,
     )
 
-
     # Linearly interpolate initial guess
     def x_guess(t):
         return x0 + (t - t0) * (xf - x0) / (tf_guess - t0)
-
 
     # Initial solution
     domain = cc.RadauFiniteElements(N=[5], knots=[])
@@ -150,10 +148,12 @@ def test_moon_lander():
 
     # Refine
     for i in range(max_iter):
-        print(f"\n*** Iteration {i+1} ***")
+        print(f"\n*** Iteration {i + 1} ***")
 
         # sol = ocp.solve(domain, t_guess=(t0, tf), x_guess=x_guess)
-        sol = ocp.solve(domain, t_guess=(t0, tf_guess), x_guess=x_guess, print_level=0, print_time=0)
+        sol = ocp.solve(
+            domain, t_guess=(t0, tf_guess), x_guess=x_guess, print_level=0, print_time=0
+        )
         residuals = cc.midpoint_residuals(ocp, domain, sol)
         converged, domain = cc.refine_mesh_bisection(
             domain,
@@ -177,17 +177,17 @@ def test_moon_lander():
 
     # Analytic solution
     h0, v0 = x0
-    tf_opt = (2 * v0) / 3 + 4 * np.sqrt(0.5 * v0 ** 2 + 1.5 * h0) / 3
+    tf_opt = (2 * v0) / 3 + 4 * np.sqrt(0.5 * v0**2 + 1.5 * h0) / 3
     s_opt = 0.5 * tf_opt + v0 / 3  # Optimal switching time
 
     def h1(t):
-        return -0.75 * t ** 2 + v0 * t + h0
+        return -0.75 * t**2 + v0 * t + h0
 
     def v1(t):
         return -1.5 * t + v0
 
     def h2(t):
-        return 0.75 * t ** 2 + (v0 - 3 * s_opt) * t + 1.5 * s_opt ** 2 + h0
+        return 0.75 * t**2 + (v0 - 3 * s_opt) * t + 1.5 * s_opt**2 + h0
 
     def v2(t):
         return 1.5 * t + v0 - 3 * s_opt

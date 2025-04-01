@@ -1,6 +1,4 @@
-from .nn import (
-    adam, dense, rbf, relu, elu, sigmoid, swish
-)
+from .nn import adam, dense, elu, rbf, relu, sigmoid, swish
 
 __all__ = [
     "rbf",

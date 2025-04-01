@@ -1,7 +1,5 @@
-
-
 # FIXME: Star imports
-from .interpolation import *
 from .discretization import *
-from .ocp import *
+from .interpolation import *
 from .mesh_refinement import *
+from .ocp import *
