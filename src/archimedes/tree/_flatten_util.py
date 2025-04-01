@@ -109,19 +109,21 @@ def ravel_pytree(pytree: PyTree) -> tuple[ArrayLike, HashablePartial]:
     flat_array : ndarray
         A 1D array containing all flattened leaf values concatenated together.
         The dtype is determined by promoting the dtypes of all leaf values.
-        If the input pytree is empty, a 1D empty array of dtype float32 is returned.
+        If the input pytree is empty, a 1D empty array of dtype ``np.float32`` is
+        returned.
     unravel : callable
-        A function that takes a 1D array of the same length as `flat_array` and
-        returns a pytree with the same structure as the input `pytree`, with the
+        A function that takes a 1D array of the same length as ``flat_array`` and
+        returns a pytree with the same structure as the input ``pytree``, with the
         values from the 1D array reshaped to match the original leaf shapes.
 
     Notes
     -----
     When to use:
+
     - When you need to convert structured data to a single flat vector for
       optimization, ODE solving, or other algorithms that work with flat arrays
-    - As a more powerful alternative to `flatten` when the leaf values themselves
-      need to be flattened
+    - As a more powerful alternative to :py:func:`flatten` when the leaf values
+      themselves need to be flattened
     - When interfacing with external libraries that require flat arrays
 
     The resulting unravel function is specific to the structure of the input pytree

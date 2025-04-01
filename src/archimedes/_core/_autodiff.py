@@ -13,7 +13,7 @@ def grad(
     static_argnums: int | Sequence[int] | None = None,
     static_argnames: str | Sequence[str] | None = None,
 ) -> Callable:
-    """Create a function that evaluates the gradient of `func`.
+    """Create a function that evaluates the gradient of ``func``.
 
     Transforms a scalar-valued function into a new function that computes
     the gradient (vector of partial derivatives) with respect to one or more
@@ -23,27 +23,27 @@ def grad(
     ----------
     func : callable
         The function to differentiate. Should be a scalar-valued function
-        (returns a single value with shape `()`). If not already a compiled
+        (returns a single value with shape ``()``). If not already a compiled
         function, it will be compiled with specified static arguments.
     argnums : int or tuple of ints, optional
         Specifies which positional argument(s) to differentiate with respect to.
         Default is 0, meaning the first argument.
     name : str, optional
-        Name for the created gradient function. If None, a name is automatically
+        Name for the created gradient function. If ``None``, a name is automatically
         generated based on the primal function's name.
     static_argnums : tuple of int, optional
         Specifies which positional arguments should be treated as static (not
-        differentiated or traced symbolically). Only used if `func` is not already
+        differentiated or traced symbolically). Only used if ``func`` is not already
         a compiled function.
     static_argnames : tuple of str, optional
         Specifies which keyword arguments should be treated as static. Only used
-        if `func` is not already a compiled function.
+        if ``func`` is not already a compiled function.
 
     Returns
     -------
     callable
-        A function that computes the gradient of `func` with respect to the
-        specified arguments. If multiple arguments are specified in `argnums`,
+        A function that computes the gradient of ``func`` with respect to the
+        specified arguments. If multiple arguments are specified in ``argnums``,
         the function returns a tuple of gradients, one for each specified argument.
 
     Notes
@@ -64,15 +64,16 @@ def grad(
     differentiation computes exact derivatives (to machine precision) by applying the
     chain rule to the computational graph generated from your function.
 
-    The `grad` function specifically handles scalar-valued functions, returning the
+    The ``grad`` function specifically handles scalar-valued functions, returning the
     gradient as a column vector with the same shape as the input. For vector-valued
-    functions, use `jac` (Jacobian) instead.
+    functions, use ``jac`` (Jacobian) instead.
 
     Edge cases:
-    - Raises ValueError if `argnums` contains a static argument index
+
+    - Raises ValueError if ``argnums`` contains a static argument index
     - Raises ValueError if the function does not return a single scalar value
-    - Differentiating through non-differentiable operations (like `abs` at x=0)
-      will return a valid but potentially undefined result
+    - Differentiating through non-differentiable operations (like ``abs`` at ``x=0``)
+      may return a valid but potentially undefined result
 
     Examples
     --------
@@ -107,8 +108,8 @@ def grad(
 
     See Also
     --------
-    arc.jac : Compute the Jacobian matrix of a function
-    arc.hess : Compute the Hessian matrix of a scalar function
+    jac : Compute the Jacobian matrix of a function
+    hess : Compute the Hessian matrix of a scalar function
     """
 
     if not isinstance(func, FunctionCache):
@@ -169,7 +170,7 @@ def jac(
     static_argnums: int | Sequence[int] | None = None,
     static_argnames: str | Sequence[str] | None = None,
 ) -> Callable:
-    """Create a function that evaluates the Jacobian of `func`.
+    """Create a function that evaluates the Jacobian of ``func``.
 
     Transforms a vector-valued function into a new function that computes
     the Jacobian matrix (matrix of all first-order partial derivatives) with
@@ -185,38 +186,39 @@ def jac(
         Specifies which positional argument(s) to differentiate with respect to.
         Default is 0, meaning the first argument.
     name : str, optional
-        Name for the created Jacobian function. If None, a name is automatically
+        Name for the created Jacobian function. If ``None``, a name is automatically
         generated based on the primal function's name.
     static_argnums : tuple of int, optional
         Specifies which positional arguments should be treated as static (not
-        differentiated or traced symbolically). Only used if `func` is not already
+        differentiated or traced symbolically). Only used if ``func`` is not already
         a compiled function.
     static_argnames : tuple of str, optional
         Specifies which keyword arguments should be treated as static. Only used
-        if `func` is not already a compiled function.
+        if ``func`` is not already a compiled function.
 
     Returns
     -------
     callable
-        A function that computes the Jacobian of `func` with respect to the
-        specified arguments. If multiple arguments are specified in `argnums`,
+        A function that computes the Jacobian of ``func`` with respect to the
+        specified arguments. If multiple arguments are specified in ``argnums``,
         the function returns a tuple of Jacobians, one for each specified argument.
 
     Notes
     -----
     When to use this function:
+
     - When working with derivatives of vector-valued functions
     - For constrained optimization problems where Jacobians are needed
     - For sensitivity analysis of vector outputs with respect to input parameters
     - For linearization of nonlinear models around operating points
 
     In cases where the full Jacobian is not needed, but only the product of the
-    Jacobian with a vector, consider using `jvp` (Jacobian-vector product) or
-    `vjp` (vector-transpose-Jacobian product) for more efficient computation.
+    Jacobian with a vector, consider using :py:func:`jvp` (Jacobian-vector product) or
+    :py:func:`vjp` (vector-transpose-Jacobian product) for more efficient computation.
 
     Currently this function only supports creating Jacobians for functions
     with a single return value. If the function has multiple return values,
-    the function will raise a ValueError.
+    the function will raise a ``ValueError``.
 
     Internally, CasADi chooses between forward and reverse mode automatic
     differentiation using a heuristic based on the number of required derivative
@@ -225,15 +227,17 @@ def jac(
     many outputs, forward mode is typically preferred.
 
     Conceptual model:
+
     The Jacobian matrix represents the best linear approximation to a function
-    near a given point. For a function f: R^n → R^m, the Jacobian is an m×n matrix
-    where each element (i,j) represents the partial derivative of the i-th output
-    with respect to the j-th input.  Hence, the function returned by `jac` takes the
-    form `J: R^n → R^(m×n)`.
+    near a given point. For a function :math:`f: R^n → R^m`, the Jacobian is an
+    :math:`m \\times n` matrix where each element (i,j) represents the partial
+    derivative of the i-th output with respect to the j-th input.  Hence, the function
+    returned by ``jac`` takes the form :math:`J: R^n → R^{m \\times n}`.
 
     Edge cases:
-    - Raises ValueError if `argnums` contains a static argument index
-    - Raises ValueError if the function does not return a single array
+
+    - Raises ``ValueError`` if ``argnums`` contains a static argument index
+    - Raises ``ValueError`` if the function does not return a single array
     - Currently only supports functions with a single return value (future versions
       may support multiple returns)
 
@@ -278,10 +282,10 @@ def jac(
 
     See Also
     --------
-    arc.grad : Compute the gradient of a scalar-valued function
-    arc.hess : Compute the Hessian matrix of a scalar function
-    arc.jvp : Compute Jacobian-vector products
-    arc.vjp : Compute vector-Jacobian products
+    grad : Compute the gradient of a scalar-valued function
+    hess : Compute the Hessian matrix of a scalar function
+    jvp : Compute Jacobian-vector products
+    vjp : Compute vector-Jacobian products
     """
     # TODO: Support multiple returns using PyTrees?
 
@@ -340,7 +344,7 @@ def hess(
     static_argnums: int | Sequence[int] | None = None,
     static_argnames: str | Sequence[str] | None = None,
 ) -> Callable:
-    """Create a function that evaluates the Hessian of `func`.
+    """Create a function that evaluates the Hessian of ``func``.
 
     Transforms a scalar-valued function into a new function that computes
     the Hessian matrix (matrix of all second-order partial derivatives) with
@@ -350,7 +354,7 @@ def hess(
     ----------
     func : callable
         The function to differentiate. Must be a scalar-valued function
-        (returns a single value with shape `()`). If not already a compiled
+        (returns a single value with shape ``()``). If not already a compiled
         function, it will be compiled with the specified static arguments.
     argnums : int or tuple of ints, optional
         Specifies which positional argument(s) to differentiate with respect to.
@@ -360,7 +364,7 @@ def hess(
         generated based on the primal function's name.
     static_argnums : tuple of int, optional
         Specifies which positional arguments should be treated as static (not
-        differentiated or traced symbolically). Only used if `func` is not already
+        differentiated or traced symbolically). Only used if ``func`` is not already
         a compiled function.
     static_argnames : tuple of str, optional
         Specifies which keyword arguments should be treated as static. Only used
@@ -369,29 +373,32 @@ def hess(
     Returns
     -------
     callable
-        A function that computes the Hessian of `func` with respect to the
-        specified arguments. If multiple arguments are specified in `argnums`,
+        A function that computes the Hessian of ``func`` with respect to the
+        specified arguments. If multiple arguments are specified in ``argnums``,
         the function returns a tuple of Hessians, one for each specified argument.
 
     Notes
     -----
     When to use this function:
+
     - For optimization problems requiring second-derivative information
     - For analyzing the local curvature of a cost function
     - When working with quadratic approximations of nonlinear functions
 
     Conceptual model:
+
     The Hessian matrix represents the local curvature of a function. For a function
-    f: R^n → R, the Hessian is an n×n symmetric matrix where each element (i,j)
-    represents the second partial derivative ∂²f/∂x_i∂x_j.
+    :math:`f: R^n → R`, the Hessian is an :math:`n \\times n` symmetric matrix where
+    each element (i,j) represents the second partial derivative
+    :math:`\\partial^2 f / \\partial x_i \\partial x_j`.
 
     The Hessian is computed using automatic differentiation by applying the gradient
     operation twice. This ensures high numerical accuracy compared to finite
     differencing methods, especially for functions with complex computational paths.
 
     Edge cases:
-    - Raises ValueError if `argnums` contains a static argument index
-    - Raises ValueError if the function does not return a single scalar value
+
+    - Raises ``ValueError`` if ``argnums`` contains a static argument index
     - Currently only supports functions with a single return value
 
     Examples
@@ -428,9 +435,9 @@ def hess(
 
     See Also
     --------
-    arc.grad : Compute the gradient of a scalar-valued function
-    arc.jac : Compute the Jacobian matrix of a function
-    arc.minimize : Optimization using gradient and Hessian information
+    grad : Compute the gradient of a scalar-valued function
+    jac : Compute the Jacobian matrix of a function
+    minimize : Optimization using automatic differentiation
     """
     # TODO: Support multiple returns using PyTrees?
 
@@ -487,10 +494,10 @@ def jvp(
     static_argnums: int | Sequence[int] | None = None,
     static_argnames: str | Sequence[str] | None = None,
 ) -> Callable:
-    """Create a function that evaluates the Jacobian-vector product of `func`.
+    """Create a function that evaluates the Jacobian-vector product of ``func``.
 
     Transforms a function into a new function that efficiently computes the
-    product of the Jacobian matrix of `func` with a given vector, using
+    product of the Jacobian matrix of ``func`` with a given vector, using
     forward-mode automatic differentiation.
 
     Parameters
@@ -499,49 +506,55 @@ def jvp(
         The function to differentiate. If not already a compiled function,
         it will be compiled with the specified static arguments.
     name : str, optional
-        Name for the created JVP function. If None, a name is automatically
+        Name for the created JVP function. If ``None``, a name is automatically
         generated based on the primal function's name.
     static_argnums : tuple of int, optional
         Specifies which positional arguments should be treated as static (not
-        differentiated or traced symbolically). Only used if `func` is not already
+        differentiated or traced symbolically). Only used if ``func`` is not already
         a compiled function.
     static_argnames : tuple of str, optional
         Specifies which keyword arguments should be treated as static. Only used
-        if `func` is not already a compiled function.
+        if ``func`` is not already a compiled function.
 
     Returns
     -------
     callable
-        A function with signature `jvp_fun(x, v)` that computes J(x)·v, where
-        J(x) is the Jacobian of `func` evaluated at `x` and `v` is the vector
-        to multiply with. The function returns a vector with the same shape as
-        the output of `func`.
+        A function with signature ``jvp_fun(x, v)`` that computes
+        :math:`J(x) \\cdot v`, where :math:`J(x)` is the Jacobian of ``func`` evaluated
+        at :math:`x`, and :math:`v` is the vector to multiply with. The function
+        returns a vector with the same shape as the output of ``func``.
 
     Notes
     -----
     When to use this function:
+
     - When you need directional derivatives along a specific vector
     - When computing sensitivities for functions with many outputs and few inputs
     - When the full Jacobian matrix would be too large to compute or store efficiently
     - In iterative algorithms that require repeated Jacobian-vector products
 
     Conceptual model:
+
     The Jacobian-vector product (JVP) computes the directional derivative of a
     function in the direction of a given vector, without explicitly forming the
-    full Jacobian matrix. For a function f: R^n → R^m and a vector v ∈ R^n, the
-    JVP is equivalent to J(x)·v where J(x) is the m×n Jacobian matrix at point x.
+    full Jacobian matrix. For a function :math:`f: R^n \\rightarrow R^m` and a vector
+    :math:`v \\in R^n`, the JVP is equivalent to :math:`J(x) \\cdot v`, where
+    :math:`J(x)` is the :math:`m \\times n` Jacobian matrix at point :math:`x`.
 
-    Forward-mode automatic differentiation computes JVPs very efficiently, with a
+    Forward-mode automatic differentiation computes JVPs efficiently, with a
     computational cost similar to that of evaluating the original function,
     regardless of the output dimension. This makes JVP particularly effective for
     functions with few inputs but many outputs.
 
-    The JVP also represents how a small change in the input (in the direction of v)
-    affects the output of the function, making it useful for sensitivity analysis.
+    The JVP also represents how a small change in the input (in the direction of
+    :math:`v`) affects the output of the function, making it useful for sensitivity
+    analysis.
 
     Edge cases:
-    - Raises ValueError if the function does not return a single vector-valued array
-    - The vector v must have the same shape as the input x
+
+    - Raises ``ValueError`` if the function does not return a single vector-valued\
+        array
+    - The vector ``v`` must have the same shape as the input ``x``
 
     Examples
     --------
@@ -586,9 +599,9 @@ def jvp(
 
     See Also
     --------
-    arc.vjp : Compute vector-Jacobian products (reverse-mode AD)
-    arc.jac : Compute the full Jacobian matrix
-    arc.grad : Compute the gradient of a scalar-valued function
+    vjp : Compute vector-Jacobian products (reverse-mode AD)
+    jac : Compute the full Jacobian matrix
+    grad : Compute the gradient of a scalar-valued function
     """
 
     # Note that the interface here differs from JAX, which has the signature
@@ -642,10 +655,10 @@ def vjp(
     static_argnums: int | Sequence[int] | None = None,
     static_argnames: str | Sequence[str] | None = None,
 ) -> Callable:
-    """Create a function that evaluates the vector-Jacobian product of `func`.
+    """Create a function that evaluates the vector-Jacobian product of ``func``.
 
     Transforms a function into a new function that efficiently computes the
-    product of a vector with the transposed Jacobian matrix of `func`, using
+    product of a vector with the transposed Jacobian matrix of ``func``, using
     reverse-mode automatic differentiation.
 
     Parameters
@@ -654,50 +667,54 @@ def vjp(
         The function to differentiate. If not already a compiled function,
         it will be compiled with the specified static arguments.
     name : str, optional
-        Name for the created VJP function. If None, a name is automatically
+        Name for the created VJP function. If ``None``, a name is automatically
         generated based on the primal function's name.
     static_argnums : tuple of int, optional
         Specifies which positional arguments should be treated as static (not
-        differentiated or traced symbolically). Only used if `func` is not already
+        differentiated or traced symbolically). Only used if ``func`` is not already
         a compiled function.
     static_argnames : tuple of str, optional
         Specifies which keyword arguments should be treated as static. Only used
-        if `func` is not already a compiled function.
+        if ``func`` is not already a compiled function.
 
     Returns
     -------
     callable
-        A function with signature `vjp_fun(x, w)` that computes w^T·J(x), where
-        J(x) is the Jacobian of `func` evaluated at `x` and `w` is the vector
-        to multiply with. The function returns a vector with the same shape as
-        the input `x`.
+        A function with signature ``vjp_fun(x, w)`` that computes
+        :math:`w^T \\cdot J(x)`, where :math:`J(x)` is the Jacobian of ``func``
+        evaluated at :math:`x` and :math:`w` is the vector to multiply with.
+        The function returns a vector with the same shape as the input ``x``.
 
     Notes
     -----
     When to use this function:
+
     - When you need gradients of scalar projections of the output
     - When computing sensitivities for functions with many inputs and few outputs
     - In adjoint-based (e.g PDE-constrained) optimization problems
 
     Conceptual model:
+
     The vector-Jacobian product (VJP) computes the gradient of a scalar projection
     of the output without explicitly forming the full Jacobian matrix. For a function
-    f: R^n → R^m and a vector w ∈ R^m, the VJP is equivalent to w^T·J(x) where J(x)
-    is the m×n Jacobian matrix at point x.
+    :math:`f: R^n \\rightarrow R^m` and a vector :math:`w \\in R^m`, the VJP is
+    equivalent to :math:`w^T \\cdot J(x)`, where :math:`J(x)` is the
+    :math:`m \\times n` Jacobian matrix evaluated at point :math:`x`.
 
-    Reverse-mode automatic differentiation computes VJPs very efficiently, with a
+    Reverse-mode automatic differentiation computes VJPs efficiently, with a
     computational cost similar to that of evaluating the original function,
     regardless of the input dimension. This makes VJP particularly effective for
     functions with many inputs but few outputs (which is why it's widely used in
     machine learning for gradient-based optimization). If the function is scalar-valued
-    then the VJP with vector w=1 is equivalent to the gradient of the function.
+    then the VJP with vector ``w=1`` is equivalent to the gradient of the function.
 
     The VJP represents the sensitivity of a weighted sum of outputs to changes in
     each input dimension.
 
-    Current limitations:
-    - Raises ValueError if the function does not return a single vector-valued array
-    - The vector w must have the same shape as the output of `func`
+    Edge cases:
+
+    - Raises ``ValueError`` if the function does not return a single vector-valued array
+    - The vector ``w`` must have the same shape as the output of ``func``
 
     Examples
     --------
@@ -745,9 +762,9 @@ def vjp(
 
     See Also
     --------
-    arc.jvp : Compute Jacobian-vector products (forward-mode AD)
-    arc.jac : Compute the full Jacobian matrix
-    arc.grad : Compute the gradient of a scalar-valued function (special case of VJP)
+    jvp : Compute Jacobian-vector products (forward-mode AD)
+    jac : Compute the full Jacobian matrix
+    grad : Compute the gradient of a scalar-valued function (special case of VJP)
     """
 
     # Note that the interface here differs from JAX, which has the signature

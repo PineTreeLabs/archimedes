@@ -44,29 +44,31 @@ def nlp_solver(
     This function transforms an objective function and optional constraint function
     into an efficient solver for nonlinear programming problems of the form:
 
-    minimize        f(x, p)
-    subject to      lbx <= x <= ubx
-                    lbg <= g(x, p) <= ubg
+    .. code-block:: text
 
-    where x represents decision variables and p represents parameters.
+        minimize        f(x, p)
+        subject to      lbx <= x <= ubx
+                        lbg <= g(x, p) <= ubg
+
+    where ``x`` represents decision variables and ``p`` represents parameters.
 
     Parameters
     ----------
     obj : callable
-        Objective function to minimize with signature `obj(x, *args)`.
+        Objective function to minimize with signature ``obj(x, *args)``.
         Must return a scalar value.
     constr : callable, optional
-        Constraint function with signature `constr(x, *args)`.
-        Must return an array of constraint values where the constraints
-        are interpreted as lbg <= constr(x, *args) <= ubg.
+        Constraint function with signature ``constr(x, *args)``.
+        Must return a vector of constraint values where the constraints
+        are interpreted as ``lbg <= constr(x, *args) <= ubg``.
     static_argnames : tuple of str, optional
-        Names of arguments in `obj` and `constr` that should be treated
+        Names of arguments in ``obj`` and ``constr`` that should be treated
         as static parameters rather than symbolic variables. Static arguments
         are not differentiated through and the solver will be recompiled when
         their values change.
     constrain_x : bool, default=False
-        If True, the solver will accept bounds on decision variables (lbx, ubx).
-        If False, no bounds on x will be applied (equivalent to -∞ <= x <= ∞).
+        If True, the solver will accept bounds on decision variables ``(lbx, ubx)``.
+        If False, no bounds on ``x`` will be applied (equivalent to ``-∞ <= x <= ∞``).
     name : str, optional
         Name for the resulting solver function. If None, a name will be
         generated based on the objective function name.
@@ -81,19 +83,23 @@ def nlp_solver(
     -------
     solver : FunctionCache
         A callable function that solves the nonlinear optimization problem.
-        The signature of this function depends on the values of `constrain_x`
+        The signature of this function depends on the values of ``constrain_x``
         and whether a constraint function was provided:
 
-        - With constraints and x bounds: `solver(x0, lbx, ubx, lbg, ubg, *args)`
-        - With constraints, no x bounds: `solver(x0, lbg, ubg, *args)`
-        - With x bounds, no constraints: `solver(x0, lbx, ubx, *args)`
-        - No constraints or x bounds: `solver(x0, *args)`
+        - With constraints and x bounds: ``solver(x0, lbx, ubx, lbg, ubg, *args)``
+
+        - With constraints, no x bounds: ``solver(x0, lbg, ubg, *args)``
+
+        - With x bounds, no constraints: ``solver(x0, lbx, ubx, *args)``
+
+        - No constraints or x bounds: ``solver(x0, *args)``
 
         The returned solver can be evaluated both numerically and symbolically.
 
     Notes
     -----
     When to use this function:
+
     - For solving optimization problems with differentiable objectives and constraints
     - When you need to solve similar optimization problems with different parameters
     - As part of larger computational graphs that include optimization steps
@@ -103,8 +109,9 @@ def nlp_solver(
     nonlinear problems. The function leverages automatic differentiation to compute
     exact derivatives of the objective and constraints.
 
-    Both `obj` and `constr` must accept the same arguments, and if `static_argnames`
-    is specified, the static arguments must be the same for both functions.
+    Both ``obj` and `constr`` must accept the same arguments, and if
+    ``static_argnames`` is specified, the static arguments must be the same for both
+    functions.
 
     Examples
     --------
@@ -138,9 +145,8 @@ def nlp_solver(
 
     See Also
     --------
-    arc.minimize : One-time solver for nonlinear optimization problems
-    arc.implicit : Create a function that solves F(x, p) = 0 for x
-    arc.integrator : Create a function that solves an ODE
+    minimize : One-time solver for nonlinear optimization problems
+    implicit : Create a function that solves F(x, p) = 0 for x
     """
     # TODO: Support other "plugins" ("knitro", "snopt", etc.)
     # TODO: Inspect function signature
@@ -310,53 +316,65 @@ def minimize(
     constr_bounds=None,
     **options,
 ):
-    """Minimize a scalar function with optional constraints.
+    """
+    Minimize a scalar function with optional constraints.
 
-    Find the minimum of an objective function, possibly subject to constraints
-    and bounds. This function provides a simplified interface to the IPOPT
-    nonlinear optimization solver for solving a single optimization problem.
+    Solve a nonlinear programming problem of the form
+    
+    
+    .. code-block:: text
+
+        minimize        f(x, p)
+        subject to      lbx <= x <= ubx
+                        lbg <= g(x, p) <= ubg
+                        
+    This function provides a simplified interface to the IPOPT nonlinear optimization
+    solver for solving a single optimization problem.
 
     Parameters
     ----------
     obj : callable
-        Objective function to minimize, with signature `obj(x, *args)`.
+        Objective function to minimize, with signature ``obj(x, *args)``.
         Must return a scalar value.
     x0 : array_like
-        Initial guess for the optimization. The shape of this array
-        determines the dimensionality of the optimization problem.
+        Initial guess for the optimization.
     args : tuple, optional
         Extra arguments passed to the objective and constraint functions.
     static_argnames : tuple of str, optional
         Names of arguments that should be treated as static (non-symbolic)
         parameters. Static arguments are not differentiated through.
     constr : callable, optional
-        Constraint function with the same signature as `obj`.
+        Constraint function with the same signature as ``obj``.
         Must return an array of constraint values where the constraints
-        are interpreted as lbg <= constr(x, *args) <= ubg.
+        are interpreted as ``lbg <= constr(x, *args) <= ubg``.
     bounds : tuple of (array_like, array_like), optional
-        Bounds on the decision variables, given as a tuple (lb, ub).
+        Bounds on the decision variables, given as a tuple ``(lb, ub)``.
         Each bound can be either a scalar or an array matching the shape
-        of x0. Use -np.inf and np.inf to specify no bound.
+        of ``x0``. Use ``-np.inf`` and ``np.inf`` to specify no bound.
     constr_bounds : tuple of (array_like, array_like), optional
-        Bounds on the constraint values, given as a tuple (lbg, ubg).
+        Bounds on the constraint values, given as a tuple ``(lbg, ubg)``.
         Each bound can be a scalar or an array matching the shape of the
         constraint function output. If None and constr is provided,
-        defaults to (0, 0) for equality constraints.
+        defaults to ``(0, 0)`` for equality constraints.
     **options : dict
-        Additional options passed to the IPOPT solver through `nlp_solver`.
+        Additional options passed to the IPOPT solver through :py:func:`nlp_solver`.
         Common options include:
+
         - print_level : int, verbosity level (0-12)
+
         - max_iter : int, maximum number of iterations
+
         - tol : float, convergence tolerance
 
     Returns
     -------
     x_opt : ndarray
-        The optimal solution found by the solver, with the same shape as x0.
+        The optimal solution found by the solver, with the same shape as ``x0``.
 
     Notes
     -----
     When to use this function:
+
     - For one-time optimization problems
     - For both constrained and unconstrained problems
     - For problems with smooth objective and constraint functions
@@ -365,7 +383,7 @@ def minimize(
     for large-scale nonlinear problems. IPOPT requires derivatives of the objective and
     constraints, which are automatically computed using automatic differentiation.
 
-    For repeated optimization with different parameters, use `arc.nlp_solver`
+    For repeated optimization with different parameters, use :py:func:`nlp_solver`
     directly to avoid recompilation overhead.
 
     Examples
@@ -412,9 +430,10 @@ def minimize(
 
     See Also
     --------
-    arc.nlp_solver : Create a reusable solver for nonlinear optimization
-    arc.root : Find the roots of a nonlinear function
-    arc.implicit : Create a function that solves F(x, p) = 0 for x
+    nlp_solver : Create a reusable solver for nonlinear optimization
+    root : Find the roots of a nonlinear function
+    implicit : Create a function that solves ``F(x, p) = 0`` for ``x``
+    scipy.optimize.minimize : SciPy's optimization interface
     """
     x0 = array(x0)
     # TODO: Expand docstring

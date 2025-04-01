@@ -327,7 +327,7 @@ def compile(
     Parameters
     ----------
     func : callable, optional
-        A Python function to be evaluated symbolically. If None, returns a decorator.
+        A Python function to be evaluated symbolically.
     static_argnums : int or sequence of int, optional
         Indices of arguments to treat as static (constant) in the function.
         Static arguments aren't converted to symbolic variables but are passed directly
@@ -340,10 +340,13 @@ def compile(
         Not fully implemented in the current version.
     kind : str, default="MX"
         The type of the symbolic variables. Options:
-        - "SX": Trace the function with scalar-valued symbolic type
-        - "MX": Trace the function with array-valued symbolic type
+
+        - SX: Trace the function with scalar-valued symbolic type
+
+        - MX: Trace the function with array-valued symbolic type
+
     name : str, optional
-        The name of the function. If None, taken from the function name.
+        The name of the function. If ``None``, taken from the function name.
         Required if the function is a lambda function.
 
     Returns
@@ -355,29 +358,32 @@ def compile(
     Notes
     -----
     When to use this function:
+
     - To accelerate numerical code by converting it to C++
     - To enable automatic differentiation of your functions
     - To generate C code from your functions
     - When embedding functions in optimization problems or ODE solvers
 
     Choosing a symbolic type:
+
     - This option determines the type of symbolic variables used to construct the
         computational graph.  The choice determines the efficiency and type of
         supported operations.
-    - `SX` produces scalar symbolic arrays, meaning that every entry in the array has
-        its own scalar symbol. This can produce highly efficient code, but is limited
-        to a subset of possible operations. For example, `SX` symbolics don't support
-        interpolation with lookup tables.
-    - `MX` symbolics are array-valued, meaning that the entire array is represented by
-        a single symbol. This allows for embedding more general operations like
+    - ``"SX"`` produces scalar symbolic arrays, meaning that every entry in the array
+        has its own scalar symbol. This can produce highly efficient code, but is
+        limited to a subset of operations. For example, ``"SX"`` symbolics don't
+        support interpolation with lookup tables.
+    - ``"MX"`` symbolics are array-valued, meaning that the entire array is represented
+        by a single symbol. This allows for embedding more general operations like
         interpolation, ODE solves, and optimization solves into the computational
-        graph, but may not be as fast as `SX` for functions that are dominated by
+        graph, but may not be as fast as ``"SX"`` for functions that are dominated by
         scalar operations.
-    - The current default is `MX` and the current recommendation is to use `MX`
+    - The current default is ``"MX"`` and the current recommendation is to use ``"MX"``
         symbolics unless you want to do targeted performance optimizations and feel
         comfortable with the symbolic array concepts.
 
     When a compiled function is called, Archimedes:
+
     1. Replaces arguments with symbolic variables of the same shape and dtype
     2. Traces the execution of your function with these symbolic arguments
     3. Creates a computational graph representing all operations
@@ -389,10 +395,12 @@ def compile(
     the cached graph, improving performance.
 
     Static arguments:
+
     Static arguments aren't converted to symbolic variables. This is useful for:
+
     - Configuration flags that affect control flow
     - Constants that shouldn't be differentiated through
-    - Values that would be inefficient to recalculate symbolically
+    - Values that would be inefficient to recalculate online
 
     Examples
     --------
@@ -434,9 +442,9 @@ def compile(
 
     See Also
     --------
-    arc.grad : Compute gradients of compiled functions
-    arc.jac : Compute Jacobians of compiled functions
-    arc.codegen : Generate C code from compiled functions
+    grad : Compute gradients of compiled functions
+    jac : Compute Jacobians of compiled functions
+    codegen : Generate C code from compiled functions
     """
 
     # If used as @compile(...)

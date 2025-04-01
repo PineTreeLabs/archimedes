@@ -13,7 +13,18 @@ author = "Jared Callaham"
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
 
-extensions = ["myst_parser", "sphinx.ext.napoleon"]
+extensions = [
+    "myst_parser",
+    "sphinx.ext.napoleon",
+    "sphinx.ext.autodoc",
+    "sphinx.ext.intersphinx",
+    "sphinx.ext.mathjax",
+]
+
+intersphinx_mapping = {
+    'numpy': ('https://numpy.org/doc/stable', None),
+    'scipy': ('https://docs.scipy.org/doc/scipy/', None),
+}
 
 myst_enable_extensions = [
     "amsmath",

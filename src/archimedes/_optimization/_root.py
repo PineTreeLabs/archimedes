@@ -33,59 +33,69 @@ def implicit(
     name: str | None = None,
     **options,
 ) -> FunctionCache:
-    """Construct an explicit function from an implicit relation.
+    """
+    Construct an explicit function from an implicit relation.
 
-    Given an implicit relation F(x, p) = 0 that defines x as a function of p,
-    this function creates a solver that computes x given p and an initial guess.
-    This transforms an equation F(x, p) = 0 into a function x = G(x0, p) that
-    returns the solution x for parameters p starting from initial guess x0.
+    Given a relation ``F(x, p) = 0`` that implicitly defines ``x`` as a function of
+    ``p``, this function creates a solver that computes ``x`` given ``p`` and an
+    initial guess. This effectively transforms the equation ``F(x, p) = 0`` into an
+    explicit function ``x = G(x0, p)`` that returns the solution ``x`` for parameters
+    ``p`` starting from initial guess ``x0``.
 
     Parameters
     ----------
     func : callable
-        The implicit function F(x, *args) = 0 to solve, with signature
-        `func(x, *args)`. Must return a residual with the same shape and
-        dtype as the input `x`.
+        The implicit function, with signature ``func(x, *args)``. Must return a
+        residual with the same shape and dtype as the input ``x``.
     static_argnames : tuple of str, optional
         Names of arguments that should be treated as static (non-symbolic)
         parameters. Static arguments are not differentiated through and
         the solver will be recompiled when their values change.
     solver : str, default="newton"
         The root-finding method to use. Options are:
-        - 'newton': Newton's method (default), best for general problems
-        - 'fast_newton': Simple Newton iterations with no line search
-        - 'kinsol': KINSOL solver from SUNDIALS, robust for large systems
+
+        - ``"newton"`` : Newton's method (default), best for general problems
+
+        - ``"fast_newton"`` : Simple Newton iterations with no line search
+
+        - ``"kinsol"`` : KINSOL solver from SUNDIALS, robust for large systems
+
     name : str, optional
-        Name for the returned function. If None, a name will be generated
+        Name for the returned function. If ``None``, a name will be generated
         based on the input function name.
     tol : float, optional
-        Absolute for convergence. If None, the default tolerance for the
-        chosen method will be used. This is typically a small value like 1e-8.
+        Absolute for convergence. If ``None``, the default tolerance for the
+        chosen method will be used.
     **options : dict, optional
         Common additional options specific to the chosen method:
 
-        For 'newton' and 'fast_newton':
+        For ``"newton"`` and ``"fast_newton"``:
+
         - max_iter : int, maximum iterations (default: 100)
 
-        For 'kinsol':
-        - max_iter : int, maximum iterations
-        - strategy : str, globalization strategy ('none', 'linesearch', 'picard', 'fp')
+        For ``"kinsol"``:
 
-        See the [CasADi documentation](https://web.casadi.org/python-api/#rootfinding)
+        - max_iter : int, maximum iterations
+    
+        - strategy : str, globalization strategy (``"none"``, ``"linesearch"``,\
+        ``"picard"``, ``"fp"``)
+
+        See the `CasADi documentation <https://web.casadi.org/python-api/#rootfinding/>`_
         for more details on the available options for each method.
 
     Returns
     -------
     solver : FunctionCache
-        A function that, when called with signature `solver(x0, *args)`,
-        returns the solution x to F(x, *args) = 0 starting from the initial
-        guess x0. This function can be evaluated both numerically and symbolically.
+        A function that, when called with signature ``solver(x0, *args)``,
+        returns the solution ``x`` to ``F(x, *args) = 0`` starting from the initial
+        guess ``x0``. This function can be evaluated both numerically and symbolically.
 
     Notes
     -----
     When to use this function:
-    - When you have an equation F(x, p) = 0 that you need to solve repeatedly
-      for different values of parameters p
+
+    - When you have an equation ``F(x, p) = 0`` that you need to solve repeatedly
+      for different values of parameters ``p``
     - For implementing equations of motion for constrained mechanical systems
     - For implicit numerical schemes in simulation
     - For embedding root-finding operations within larger computational graphs
@@ -94,7 +104,7 @@ def implicit(
     using automatic differentiation.
 
     For simple one-off root-finding problems where parameters don't change,
-    consider using `arc.root` instead which provides a simpler interface.
+    consider using :py:func:`root` instead which provides a simpler interface.
 
     The function generates a callable that behaves as a pure function, making
     it suitable for embedding in larger computational graphs or differentiating
@@ -152,9 +162,9 @@ def implicit(
 
     See Also
     --------
-    arc.root : Simpler interface for one-off root-finding
-    arc.minimize : Find the minimum of a scalar function
-    arc.nlp_solver : Create a reusable solver for nonlinear optimization
+    root : Simpler interface for one-off root-finding
+    minimize : Find the minimum of a scalar function
+    nlp_solver : Create a reusable solver for nonlinear optimization
     """
     # TODO: Inspect function signature to check for consistency
     # TODO: Support constraints on the unknowns (supported via options in CasADi)
@@ -273,16 +283,15 @@ def root(
 ) -> ArrayLike:
     """Find a root of a nonlinear function.
 
-    Solves the equation f(x) = 0 for x, where f is a vector function of
-    vector x. This function provides a simple interface to various root-finding
-    algorithms suitable for different types of problems.
+    Solves the equation ``f(x) = 0`` for ``x``, where ``f`` is a vector function of
+    vector ``x``.
 
     Parameters
     ----------
     func : callable
-        The function whose root to find, with signature `func(x, *args)`.
-        The function should return an array of the same shape as `x`.
-        For systems of equations, `func` should return a vector of residuals.
+        The function whose root to find, with signature ``func(x, *args)``.
+        The function should return an array of the same shape as `x``.
+        For systems of equations, ``func`` should return a vector of residuals.
     x0 : array_like
         Initial guess for the solution. The shape of this array determines
         the dimensionality of the problem to be solved.
@@ -292,41 +301,43 @@ def root(
         Names of arguments that should be treated as static (non-symbolic)
         parameters. Static arguments are not differentiated through and
         the solver will be recompiled when their values change.
-    method : str, optional
+    method : str, default="newton"
         The root-finding method to use. Options are:
-        - 'newton': Newton's method (default), best for general problems
-        - 'fast_newton': Simple Newton iterations with no line search
-        - 'kinsol': KINSOL solver from SUNDIALS, robust for large systems
+
+        - ``"newton"`` : Newton's method (default), best for general problems
+
+        - ``"fast_newton"`` : Simple Newton iterations with no line search
+
+        - ``"kinsol"`` : KINSOL solver from SUNDIALS, robust for large systems
+
     tol : float, optional
-        Absolute for convergence. If None, the default tolerance for the
-        chosen method will be used. This is typically a small value like 1e-8.
+        Absolute for convergence. If ``None``, the default tolerance for the
+        chosen method will be used.
     **options : dict, optional
         Common additional options specific to the chosen method:
 
-        For 'newton' and 'fast_newton':
+        For ``"newton"`` and ``"fast_newton"``:
+
         - max_iter : int, maximum iterations (default: 100)
 
-        For 'kinsol':
-        - max_iter : int, maximum iterations
-        - strategy : str, globalization strategy ('none', 'linesearch', 'picard', 'fp')
+        For ``"kinsol"``:
 
-        See the [CasADi documentation](https://web.casadi.org/python-api/#rootfinding)
-        for more details on the available options for each method.
+        - max_iter : int, maximum iterations
+    
+        - strategy : str, globalization strategy (``"none"``, ``"linesearch"``,\
+        ``"picard"``, ``"fp"``)
 
     Returns
     -------
     x : array_like
-        The solution found, with the same shape as the initial guess x0.
+        The solution found, with the same shape as the initial guess ``x0``.
         If the algorithm fails to converge, the best estimate is returned.
 
     Notes
     -----
-    When to use this function:
-    - For solving systems of nonlinear equations
-
     This function leverages Archimedes' automatic differentiation to compute
     the Jacobian matrix required by most root-finding methods. For repeated
-    solving with different parameters, use `arc.implicit` directly to create
+    solving with different parameters, use :py:func:`implicit` directly to create
     a reusable solver function.
 
     Examples
@@ -371,9 +382,10 @@ def root(
 
     See Also
     --------
-    arc.implicit : Create a function that solves F(x, p) = 0 for x given p
-    arc.minimize : Find the minimum of a scalar function
-    arc.jac : Compute the Jacobian of a function
+    implicit : Create a function that solves ``F(x, p) = 0`` for ``x`` given ``p``
+    minimize : Find the minimum of a scalar function
+    jac : Compute the Jacobian of a function using automatic differentiation
+    scipy.optimize.root : SciPy's interface to root-finding solvers
     """
     # TODO: Better documentation of common options
     if tol is not None:

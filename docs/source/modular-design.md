@@ -208,7 +208,7 @@ plt.grid(True)
 plt.show()
 ```
 
-:::{info}
+:::{note}
 Planned development may simplify some of this workflow.
 For example, pervasive support of PyTrees in functions like `odeint` will mean that the `ravel` and `unravel` operations will happen automatically and there will be no need to write wrapper functions like `ode_rhs` above or do the "postprocessing" step of manually unraveling the flat ODE solution.
 :::

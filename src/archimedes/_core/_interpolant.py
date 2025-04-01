@@ -79,13 +79,13 @@ def interpolant(
         - "bspline": Cubic B-spline interpolation (smoother)
     arg_names : list of str, optional
         Names for the input arguments to the interpolant function.
-        Default is ["x_0", "x_1", ...].
+        Default is ``["x_0", "x_1", ...]``.
     ret_name : str, optional
         Name for the output of the interpolant function.
-        Default is "f".
+        Default is ``"f"``.
     name : str, optional
         Name for the interpolant function itself.
-        Default is "interpolant".
+        Default is ``"interpolant"``.
 
     Returns
     -------
@@ -97,22 +97,24 @@ def interpolant(
     Notes
     -----
     When to use this function:
+
     - To create smooth approximations of complex functions from tabular data
     - To incorporate lookup tables into optimization or simulation workflows
     - To evaluate experimental or simulation data at arbitrary points
     - When embedding interpolation within other Archimedes functions
 
     Data organization:
-    For a 2D example with grid arrays `xgrid` and `ygrid`, organize the data into
-    a 2D data array `Z` where `Z[i,j] = f(xgrid[i], ygrid[j])`.  Corresponding 2D
-    grid arrays may be created using `np.meshgrid(xgrid, ygrid, indexing='ij')`.
+    For a 2D example with grid arrays ``xgrid`` and ``ygrid``, organize the data into
+    a 2D data array ``Z`` where ``Z[i,j] = f(xgrid[i], ygrid[j])``.  Corresponding 2D
+    grid arrays may be created using ``np.meshgrid(xgrid, ygrid, indexing='ij')``.
 
     This function creates a CasADi interpolant internally, which can be used with
     both numeric and symbolic inputs. It supports gradient computation through
     automatic differentiation for both interpolation methods, but only with respect
     to the input arguments (not the data).
 
-    Edge cases:
+    Limitations:
+
     - Evaluating outside the grid boundaries will return the nearest grid value
     - For multi-dimensional grids with N > 1, the interpolant expects N separate args
 
@@ -169,10 +171,11 @@ def interpolant(
 
     See Also
     --------
-    arc.compile : Compile a function for use with symbolic arrays
-    arc.grad : Compute the gradient of a function
-    numpy.interp : 1D interpolation in NumPy (non-symbolic)
-    scipy.interpolate : SciPy's interpolation package
+    compile : Compile a function for use with symbolic arrays
+    grad : Compute the gradient of a function
+    numpy.interp : 1D interpolation in NumPy
+    scipy.interpolate.RegularGridInterpolator : SciPy's equivalent for ``"linear"``
+    scipy.interpolate.RectBivariateSpline : SciPy's equivalent for ``"bspline"``
     """
     # Convert inputs to NumPy arrays
     grid = [np.asarray(grid_i) for grid_i in grid]

@@ -22,3 +22,5 @@ documentation for details.
    gotchas
    pytrees
    modular-design
+
+   modules

@@ -1,31 +1,29 @@
-"""
-This code modifies code from JAX:
-- vmap: https://github.com/jax-ml/jax/blob/main/jax/_src/api.py#L831-L1033
+# This code modifies code from JAX:
+# - vmap: https://github.com/jax-ml/jax/blob/main/jax/_src/api.py#L831-L1033
 
-Copyright (c) 2021 The JAX Authors
-Licensed under Apache License 2.0
-https://github.com/jax-ml/jax
+# Copyright (c) 2021 The JAX Authors
+# Licensed under Apache License 2.0
+# https://github.com/jax-ml/jax
 
-Modifications and additions to the original code:
-Copyright (c) 2025 Jared Callaham
-Licensed under the GNU General Public License v3.0
+# Modifications and additions to the original code:
+# Copyright (c) 2025 Jared Callaham
+# Licensed under the GNU General Public License v3.0
 
-As a combined work, use of this code requires compliance with the GNU GPL v3.0.
-The original license terms are included below for attribution:
+# As a combined work, use of this code requires compliance with the GNU GPL v3.0.
+# The original license terms are included below for attribution:
 
-=== Apache License 2.0 ===
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+# === Apache License 2.0 ===
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
 
-    https://www.apache.org/licenses/LICENSE-2.0
+#     https://www.apache.org/licenses/LICENSE-2.0
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-"""
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
 from __future__ import annotations
 
@@ -69,58 +67,67 @@ def scan(
     Parameters
     ----------
     func : callable
-        A function with signature f(carry, x) -> (new_carry, y) to be applied at each
-        loop iteration. The function must:
+        A function with signature ``func(carry, x) -> (new_carry, y)`` to be applied at
+        each loop iteration. The function must:
+
         - Accept exactly two arguments: the current carry value and loop variable
+
         - Return exactly two values: the updated carry value and an output for this step
+
         - Return a carry with the same structure as the input carry
+
     init_carry : array_like or PyTree
         The initial value of the carry state. Can be a scalar, array, or nested PyTree.
-        The structure of this value defines what func must return as its first output.
+        The structure of this value defines what ``func`` must return as its first
+        output.
     xs : array_like, optional
-        The values to loop over, with shape (length, ...). Each value is passed as the
-        second argument to func. Required unless length is provided.
+        The values to loop over, with shape ``(length, ...)``. Each value is passed as
+        the second argument to ``func``. Required unless length is provided.
     length : int, optional
-        The number of iterations to run. Required if xs is None. If both are provided,
-        xs.shape[0] must equal length.
+        The number of iterations to run. Required if ``xs`` is None. If both are
+        provided, ``xs.shape[0]`` must equal ``length``.
 
     Returns
     -------
-    final_carry : same type as init_carry
+    final_carry : same type as ``init_carry``
         The final carry value after all iterations.
     ys : array
-        The stacked outputs from each iteration, with shape (length, ...).
+        The stacked outputs from each iteration, with shape ``(length, ...)``.
 
     Notes
     -----
     When to use this function:
+
     - To keep computational graph size manageable for large loops
     - For implementing recurrent computations (filters, RNNs, etc.)
     - For iterative numerical methods (e.g., fixed-point iterations)
 
     Conceptual model:
-    Each iteration applies func to the current carry value and the current loop value:
-    (carry, y) = func(carry, x)
+    Each iteration applies ``func`` to the current carry value and the current loop
+    value: ``(carry, y) = func(carry, x)``
 
-    The carry is threaded through all iterations, while each y output is collected.
-    This pattern is common in many iterative algorithms and can be more efficient
-    than explicit Python loops because it creates a single node in the computational
-    graph regardless of the number of iterations.
+    The ``carry`` is threaded through all iterations, while each ``y`` output is
+    collected. This pattern is common in many iterative algorithms and can be more
+    efficient than explicit Python loops because it creates a single node in the
+    computational graph regardless of the number of iterations.
 
     The standard Python equivalent would be:
-    ```python
-    def scan_equivalent(func, init_carry, xs=None, length=None):
-        if xs is None:
-            xs = range(length)
-        carry = init_carry
-        ys = []
-        for x in xs:
-            carry, y = func(carry, x)
-            ys.append(y)
-        return carry, np.stack(ys)
-    ```
 
-    However, the compiled `scan` is more efficient for long loops because it creates a
+    .. highlight:: python
+    .. code-block:: python
+
+        def scan_equivalent(func, init_carry, xs=None, length=None):
+            if xs is None:
+                xs = range(length)
+            carry = init_carry
+            ys = []
+            for x in xs:
+                carry, y = func(carry, x)
+                ys.append(y)
+            return carry, np.stack(ys)
+
+
+    However, the compiled ``scan`` is more efficient for long loops because it creates a
     fixed-size computational graph regardless of loop length.
 
     Examples

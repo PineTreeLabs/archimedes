@@ -104,15 +104,17 @@ def tree_flatten(
     Notes
     -----
     A pytree is defined as a nested structure of:
+
     - Containers: recognized container types like lists, tuples, and dictionaries
     - Leaves: arrays, scalars, or custom objects not recognized as containers
 
     When to use:
+
     - When you need to extract all leaf values from a nested structure
     - When you need to convert between structured and flat representations
 
     When converting to/from a flat vector it will typically be more convenient to
-    use `tree.ravel` instead of this function.
+    use :py:func:`ravel` instead of this function.
 
     Examples
     --------
@@ -175,35 +177,34 @@ def tree_unflatten(treedef: PyTreeDef, xs: list[ArrayLike]) -> PyTree:
     """
     Reconstruct a pytree from a list of leaves and a treedef.
 
-    This function is the inverse of `flatten`. It takes a list of leaf values
+    This function is the inverse of :py:func:`flatten`. It takes a list of leaf values
     and a tree definition, and reconstructs the original pytree structure.
 
     Parameters
     ----------
     treedef : PyTreeDef
-        A tree definition, typically produced by `flatten` or `structure`.
+        A tree definition, typically produced by :py:func:`flatten` or
+        :py:func:`structure`.
     xs : list[ArrayLike]
         A list of leaf values to be placed in the reconstructed pytree.
-        The length must match the number of leaves in the treedef.
+        The length must match the number of leaves in ``treedef``.
 
     Returns
     -------
     pytree : PyTree
         The reconstructed pytree with the same structure as defined by treedef
-        and with leaf values from xs.
+        and with leaf values from ``xs``.
 
     Notes
     -----
-    When to use:
-    - To reconstruct a structured data object after operating on flattened values
-
     When converting to/from a flat vector it will typically be more convenient to
-    use `tree.ravel` instead of this function.
+    use :py:func:`ravel` instead of this function.
 
     Raises
     ------
     ValueError
-        If the number of leaves in xs doesn't match the expected number in treedef.
+        If the number of leaves in ``xs`` doesn't match the expected number in
+        ``treedef``.
 
     Examples
     --------
@@ -261,8 +262,9 @@ def tree_structure(
     """
     Extract the structure of a pytree without the leaf values.
 
-    This function returns a PyTreeDef that describes the structure of the pytree,
-    which can be used with `unflatten` to reconstruct a pytree with new leaf values.
+    This function returns a :py:class:PyTreeDef that describes the structure of the
+    pytree, which can be used with :py:func:`unflatten` to reconstruct a pytree with
+    new leaf values.
 
     Parameters
     ----------
@@ -275,12 +277,13 @@ def tree_structure(
 
     Returns
     -------
-    treedef : PyTreeDef
+    treedef : :py:class:`PyTreeDef`
         A tree definition that describes the structure of the input pytree.
 
     Notes
     -----
     When to use:
+
     - When you need to extract just the structure of a pytree for later use
     - When you want to create a template structure that can be filled with
       different leaf values
@@ -340,12 +343,6 @@ def tree_leaves(
     leaves : list
         A list of all leaf values from the pytree.
 
-    Notes
-    -----
-    When to use:
-    - For quick access to all data in a nested structure when you don't need
-      to reconstruct the data structure later
-
     Examples
     --------
     >>> import archimedes as arc
@@ -375,7 +372,7 @@ def tree_all(tree: PyTree, is_leaf: Callable[[Any], bool] | None = None) -> bool
     Check if all leaves in the pytree evaluate to True.
 
     This function traverses the pytree and checks if all leaf values are truthy,
-    similar to Python's built-in `all()` function but operating on all leaves
+    similar to Python's built-in :py:func:`all` function but operating on all leaves
     of a pytree.
 
     Parameters
@@ -397,8 +394,9 @@ def tree_all(tree: PyTree, is_leaf: Callable[[Any], bool] | None = None) -> bool
     Notes
     -----
     When to use:
-    - To check if all values in a structured object meet a certain condition
-      (after applying `map` with a condition function)
+
+    - To check if all values in a structured object meet a certain condition\
+      (after applying :py:func:`map` with a condition function)
     - To validate that all components of a model or state are initialized
     - As a convenient way to check properties across nested structures
 
@@ -438,7 +436,7 @@ def tree_map(
     """
     Apply a function to each leaf in a pytree.
 
-    This function traverses the pytree and applies the function `f` to each leaf,
+    This function traverses the pytree and applies the function ``f`` to each leaf,
     returning a new pytree with the same structure but transformed leaf values.
     If additional pytrees are provided, the function is applied to corresponding
     leaves from all pytrees.
@@ -460,12 +458,13 @@ def tree_map(
     Returns
     -------
     mapped_tree : Any
-        A new pytree with the same structure as `tree` but with leaf values
-        transformed by function `f`.
+        A new pytree with the same structure as ``tree`` but with leaf values
+        transformed by function ``f``.
 
     Notes
     -----
     When to use:
+
     - To transform data in a structured object without changing its structure
     - To perform element-wise operations on corresponding elements of multiple pytrees
     - As an alternative to manually looping through nested structures
@@ -529,7 +528,7 @@ def tree_reduce(
     Reduce a pytree to a single value using a function and initializer.
 
     This function traverses the pytree, applying the reduction function to
-    each leaf and an accumulator, similar to Python's built-in `reduce()`
+    each leaf and an accumulator, similar to Python's built-in :py:func:`reduce`
     but operating on all leaves of a pytree.
 
     Parameters
@@ -556,6 +555,7 @@ def tree_reduce(
     Notes
     -----
     When to use:
+
     - To compute aggregate values (sum, product, etc.) across all leaf values
     - To collect statistics from a structured model
     - To implement custom reduction operations on complex data structures
