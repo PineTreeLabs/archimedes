@@ -1,16 +1,17 @@
 """Autodiff transformations"""
+from typing import Callable, Sequence
 
 from ._function import FunctionCache
 from . import SymbolicArray
 
 
 def grad(
-    func,
-    argnums=0,
-    name=None,
-    static_argnums=None,
-    static_argnames=None,
-):
+    func: Callable,
+    argnums: int | Sequence[int] = 0,
+    name: str = None,
+    static_argnums: int | Sequence[int] = None,
+    static_argnames: str | Sequence[str] = None,
+) -> Callable:
     """Create a function that evaluates the gradient of `func`.
     
     Transforms a scalar-valued function into a new function that computes
@@ -159,12 +160,12 @@ def grad(
 
 
 def jac(
-    func,
-    argnums=0,
-    name=None,
-    static_argnums=None,
-    static_argnames=None,
-):
+    func: Callable,
+    argnums: int | Sequence[int] = 0,
+    name: str = None,
+    static_argnums: int | Sequence[int] = None,
+    static_argnames: str | Sequence[str] = None,
+) -> Callable:
     """Create a function that evaluates the Jacobian of `func`.
     
     Transforms a vector-valued function into a new function that computes
@@ -329,12 +330,12 @@ def jac(
 
 
 def hess(
-    func,
-    argnums=0,
-    name=None,
-    static_argnums=None,
-    static_argnames=None,
-):
+    func: Callable,
+    argnums: int | Sequence[int] = 0,
+    name: str = None,
+    static_argnums: int | Sequence[int] = None,
+    static_argnames: str | Sequence[str] = None,
+) -> Callable:
     """Create a function that evaluates the Hessian of `func`.
     
     Transforms a scalar-valued function into a new function that computes
@@ -475,11 +476,11 @@ def hess(
 
 
 def jvp(
-    func,
-    name=None,
-    static_argnums=None,
-    static_argnames=None,
-):
+    func: Callable,
+    name: str = None,
+    static_argnums: int | Sequence[int] = None,
+    static_argnames: str | Sequence[str] = None,
+) -> Callable:
     """Create a function that evaluates the Jacobian-vector product of `func`.
     
     Transforms a function into a new function that efficiently computes the
@@ -630,11 +631,11 @@ def jvp(
 
 
 def vjp(
-    func,
-    name=None,
-    static_argnums=None,
-    static_argnames=None,
-):
+    func: Callable,
+    name: str = None,
+    static_argnums: int | Sequence[int] = None,
+    static_argnames: str | Sequence[str] = None,
+) -> Callable:
     """Create a function that evaluates the vector-Jacobian product of `func`.
     
     Transforms a function into a new function that efficiently computes the
