@@ -1,26 +1,81 @@
-.. Archimedes documentation master file, created by
-   sphinx-quickstart on Mon Mar 24 11:17:19 2025.
-   You can adapt this file completely to your liking, but it should at least
-   contain the root `toctree` directive.
+.. Archimedes documentation master file
 
-Archimedes documentation
-========================
+==========================
+Archimedes Documentation
+==========================
 
-Add your content using ``reStructuredText`` syntax. See the
-`reStructuredText <https://www.sphinx-doc.org/en/master/usage/restructuredtext/index.html>`_
-documentation for details.
+**Archimedes** is an open-source Python framework designed to simplify complex modeling
+and simulation tasks, with the ultimate goal of making it possible to do practical
+hardware engineering with Python. It builds on the powerful symbolic computation
+capabilities of `CasADi <https://web.casadi.org/docs/>`_ with an interface designed to
+be familiar to NumPy users.
 
+Key features:
+
+* NumPy-compatible array API with automatic dispatch
+* Efficient execution of computational graphs in compiled C++
+* Automatic differentiation with forward- and reverse-mode sparse autodiff
+* Interface to "plugin" solvers for ODE/DAEs, root-finding, and nonlinear programming
+* Automated C code generation for embedded applications
+* JAX-style function transformations
+* PyTorch-style hierarchical data structures for parameters and dynamics modeling
+
+
+Quick Example
+-------------
+
+.. code-block:: python
+
+   import numpy as np
+   import archimedes as arc
+
+   def f(x):
+       return np.sin(x**2)
+
+   # Use automatic differentiation to compute df/dx
+   df = arc.grad(f)
+   np.allclose(df(1.0), 2.0 * np.cos(1.0))  # True
+
+   # Automatically generate C code
+   template_args = (0.0,)  # Data type for C function
+   arc.codegen(df, "grad_f.c", template_args)
+
+Documentation
+-------------
 
 .. toctree::
-   :maxdepth: 2
-   :caption: Contents:
+   :maxdepth: 1
+   :caption: Getting Started
 
    quickstart
    about
    getting-started
+
+.. toctree::
+   :maxdepth: 1
+   :caption: Core Concepts
+
    under-the-hood
-   gotchas
    pytrees
    modular-design
 
-   modules
+.. toctree::
+   :maxdepth: 1
+   :caption: Reference
+
+   gotchas
+   reference/index
+
+.. autosummary::
+   :toctree: modules
+   :template: _templates/autosummary/base.rst
+   :recursive:
+   :nosignatures:
+
+
+Indices and Tables
+-------------------
+
+* :ref:`genindex`
+* :ref:`modindex`
+* :ref:`search`

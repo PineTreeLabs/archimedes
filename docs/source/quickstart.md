@@ -4,7 +4,6 @@ This page will walk you through getting up and running with Archimedes, from ins
 
 ## Installation
 
-
 You can install however you wish, but we recommend using a virtual environment like Conda or virtualenv to help keep track of package versions and dependencies.
 We use [UV](https://github.com/astral-sh/uv) for development and recommend it as an environment as well:
 

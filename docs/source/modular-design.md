@@ -1,7 +1,7 @@
-# Hierarchical and Modular Dynamical Systems
+# Hierarchical Design Patterns
 
 This page covers best practices and design patterns for creating composable dynamic systems using Archimedes.
-By leveraging the `struct.pytree_node` decorator, you can create modular components that can be combined into complex hierarchical models while maintaining clean, organized code.
+By leveraging the [`pytree_node`](#archimedes.tree.struct.pytree_node) decorator, you can create modular components that can be combined into complex hierarchical models while maintaining clean, organized code.
 However, the recommendations in this guide are strictly suggestions; you can design your models and workflows however you wish.
 
 ## Core Concepts
@@ -20,7 +20,7 @@ Using tree-structured representations allows you to:
 
 Some recommended patterns for building modular dynamics components in Archimedes are:
 
-1. **Modular Components**: Create a `pytree_node` for each logical system component
+1. **Modular Components**: Create a [`pytree_node`](#archimedes.tree.struct.pytree_node) for each logical system component
 2. **Hierarchical Parameters**: Add model parameters as fields in the PyTree nodes
 3. **Nested State Classes**: Define a `State` class inside each model component
 4. **Dynamics Methods**: Implement `dynamics(self, t, state)` methods that return state derivatives
