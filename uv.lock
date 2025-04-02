@@ -56,6 +56,7 @@ all = [
 dev = [
     { name = "mypy" },
     { name = "myst-parser", extra = ["linkify"] },
+    { name = "nbconvert" },
     { name = "pytest" },
     { name = "pytest-cov" },
     { name = "ruff" },
@@ -78,6 +79,7 @@ provides-extras = ["all"]
 dev = [
     { name = "mypy", specifier = ">=1.15.0" },
     { name = "myst-parser", extras = ["linkify"], specifier = ">=4.0.1" },
+    { name = "nbconvert", specifier = ">=7.16.6" },
     { name = "pytest", specifier = ">=8.3.5" },
     { name = "pytest-cov", specifier = ">=6.0.0" },
     { name = "ruff", specifier = ">=0.11.2" },

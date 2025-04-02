@@ -9,19 +9,13 @@
 This reference provides a detailed overview of the functions and classes in the
 Archimedes library.
 
-Function compilation
-====================
-
-
+Core Functions
+==============
 
 .. autosummary::
-    :toctree: ../generated/
-    :template: ../_templates/autosummary/base.rst
-    :recursive:
+    :toctree: ../generated/api
+    :template: base.rst
 
-    error
-    tree
-    struct
     codegen
     array
     sym
@@ -47,4 +41,13 @@ Function compilation
     implicit
     root
 
-    tree.struct.pytree_node
+
+Modules
+==============
+
+.. autosummary::
+    :toctree: ../generated/api
+    :template: module.rst
+
+    tree
+    tree.struct

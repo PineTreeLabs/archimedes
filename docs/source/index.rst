@@ -66,12 +66,6 @@ Documentation
    gotchas
    reference/index
 
-.. autosummary::
-   :toctree: modules
-   :template: _templates/autosummary/base.rst
-   :recursive:
-   :nosignatures:
-
 
 Indices and Tables
 -------------------

@@ -44,6 +44,9 @@ myst_enable_extensions = [
     "tasklist",
 ]
 
+autosummary_generate = True
+autosummary_imported_members = True
+
 templates_path = ["_templates"]
 exclude_patterns = []
 
