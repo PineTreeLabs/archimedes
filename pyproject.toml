@@ -72,7 +72,10 @@ python_functions = "test_*"
 
 [tool.coverage.run]
 source = ["archimedes"]
-omit = ["*/archimedes/experimental/*"]
+omit = [
+    "*/archimedes/experimental/*",
+    "*/archimedes/typing.py",
+]
 
 [tool.coverage.report]
 exclude_lines = [
@@ -82,5 +85,6 @@ exclude_lines = [
     "if __name__ == .__main__.:",
     "pass",
     "raise ImportError",
+    "if TYPE_CHECKING:",
 ]
 fail_under = 100
