@@ -23,8 +23,8 @@ extensions = [
 ]
 
 intersphinx_mapping = {
-    'numpy': ('https://numpy.org/doc/stable', None),
-    'scipy': ('https://docs.scipy.org/doc/scipy/', None),
+    "numpy": ("https://numpy.org/doc/stable", None),
+    "scipy": ("https://docs.scipy.org/doc/scipy/", None),
 }
 
 myst_enable_extensions = [
