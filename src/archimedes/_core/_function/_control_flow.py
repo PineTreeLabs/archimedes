@@ -398,9 +398,7 @@ def vmap(
         in_axes = (in_axes,) * num_args
 
     if not isinstance(out_axes, int):
-        raise TypeError(
-            f"vmap out_axes must be an int, but got {out_axes}."
-        )
+        raise TypeError(f"vmap out_axes must be an int, but got {out_axes}.")
 
     def _vmap_func(*args):
         if isinstance(in_axes, tuple) and len(in_axes) != len(args):

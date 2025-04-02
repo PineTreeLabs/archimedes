@@ -166,7 +166,7 @@ class TestVmap:
         # Map over inconsistent arrays
         x = np.array([[1, 2], [3, 4], [5, 6]])  # (3, 2)
         y = np.array([[1, 2, 3, 4], [5, 6, 7, 8]])  # (2, 4)
-        
+
         with pytest.raises(
             ValueError, match=r".*all mapped arguments have the same mapped axis.*"
         ):
