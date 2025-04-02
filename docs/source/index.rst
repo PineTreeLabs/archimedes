@@ -57,7 +57,7 @@ Documentation
 
    under-the-hood
    pytrees
-   modular-design
+   generated/notebooks/modular-design
 
 .. toctree::
    :maxdepth: 1

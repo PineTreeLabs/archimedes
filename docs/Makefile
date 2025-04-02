@@ -19,5 +19,11 @@ help:
 %: Makefile
 	@$(SPHINXBUILD) -M $@ "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS) $(O)
 
+clean:
+	@rm -r build source/generated/*
+
+nbconvert:
+	@@jupyter nbconvert --to markdown --output-dir source/generated/notebooks --execute source/notebooks/modular-design.ipynb
+
 apidoc:
 	@sphinx-apidoc -f -o source ../src/archimedes ../src/archimedes/experimental/*
