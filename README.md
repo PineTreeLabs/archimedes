@@ -1,3 +1,7 @@
+![Build Status](https://github.com/jcallaham/archimedes/actions/workflows/ci.yaml/badge.svg)
+
+[![codecov](https://codecov.io/gh/jcallaham/archimedes/branch/main/graph/badge.svg)](https://codecov.io/gh/jcallaham/archimedes)
+
 # Archimedes
 
 Archimedes is an open-source Python framework designed to simplify complex modeling and simulation tasks, with the ultimate goal of making it possible to do practical hardware engineering with Python.
