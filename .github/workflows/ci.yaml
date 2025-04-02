@@ -26,6 +26,9 @@ jobs:
 
     - name: Run tests
       run: uv run pytest test
+
+    - name: Test notebooks
+      run: uv run pytest --nbmake docs/source/notebooks/*.ipynb
   
     - name: Lint with ruff
       run: |
