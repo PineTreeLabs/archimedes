@@ -270,7 +270,7 @@ def normalize_vmap_index(axis, data, insert=False):
 def vmap(
     func: Callable,
     in_axes: int | None | tuple[int | None, ...] = 0,
-    out_axes: int | None | PyTree = 0,
+    out_axes: int = 0,
     name: str | None = None,
 ) -> Callable:
     """
@@ -288,14 +288,16 @@ def vmap(
         or PyTree-structured data.
     in_axes : int, None, or tuple of ints/None, optional
         Specifies which axis of each input argument should be mapped over.
+
         - int: Use the same axis for all arguments (e.g., 0 for the first dimension)
+
         - None: Don't map this argument (broadcast it to all mapped elements)
+
         - tuple: Specify a different axis for each argument
+
         Default is 0 (map over the first axis of each argument).
-    out_axes : int, None, or PyTree of ints/None matching the output structure, optional
+    out_axes : int, optional
         Specifies where the mapped axis should appear in the output.
-        - int: Place the mapped axis at this position in all outputs
-        - PyTree: Specify different axes for different parts of a structured output
         Default is 0 (mapped axis is the first dimension of the output).
     name : str, optional
         Name for the transformed function. If None, derives a name from the
@@ -309,12 +311,14 @@ def vmap(
     Notes
     -----
     When to use this function:
+
     - When you need to apply the same operation to many inputs efficiently
     - To convert a single-example function into one that handles batches
     - To selectively vectorize over some arguments while broadcasting others
     - To "unflatten" tree-structured data by mapping the unravel function
 
     Conceptual model:
+
     `vmap` transforms functions to operate along array axes. For example, a function
     f(x) that takes a vector and returns a scalar can be transformed into one that
     takes a batch of vectors (an array) and returns a batch of scalars (a vector),
@@ -393,19 +397,8 @@ def vmap(
     if in_axes is None or isinstance(in_axes, int):
         in_axes = (in_axes,) * num_args
 
-    if not all(isinstance(leaf, int) for leaf in tree.leaves(in_axes)):
-        raise TypeError(
-            "vmap in_axes must be an int, None, or (nested) container "
-            f"with those types as leaves, but got {in_axes}."
-        )
-    if not all(isinstance(leaf, int) for leaf in tree.leaves(out_axes)):
-        raise TypeError(
-            "vmap out_axes must be an int, None, or (nested) container "
-            f"with those types as leaves, but got {out_axes}."
-        )
-
-    if isinstance(out_axes, list):
-        out_axes = tuple(out_axes)
+    if not isinstance(out_axes, int):
+        raise TypeError(f"vmap out_axes must be an int, but got {out_axes}.")
 
     def _vmap_func(*args):
         if isinstance(in_axes, tuple) and len(in_axes) != len(args):
@@ -464,7 +457,7 @@ def vmap(
         leading_axes = [arg.shape[0] for arg in args_flat]
         if len(set(leading_axes)) != 1:
             raise ValueError(
-                "vmap requires that all mapped arguments have the same leading axis "
+                "vmap requires that all mapped arguments have the same mapped axis "
                 f"length, but got {leading_axes}."
             )
 
@@ -488,20 +481,7 @@ def vmap(
         out_template = out_tree.unflatten(out_template_leaves)
 
         # Wrap out axes to (0, ndim)
-        if isinstance(out_axes, int):
-            out_axes_normalized = normalize_vmap_index(out_axes, out_template, True)
-
-        else:
-            out_axes_treedef = tree.structure(out_axes)
-            if out_tree != out_axes_treedef:
-                raise TypeError(
-                    "out_axes must be an int, None, or a PyTree structure matching "
-                    f"the output structure, but got {out_tree} and {out_axes_treedef}"
-                )
-
-            out_axes_normalized = tree.map(
-                lambda a, arr: normalize_axis_index(a, arr.ndim), out_axes, out_template
-            )
+        out_axes_normalized = normalize_vmap_index(out_axes, out_template, True)
 
         # Another inner step: manually "ravel"/"unravel" the arguments to/from a
         # 2D array for passing to/from `scan`.

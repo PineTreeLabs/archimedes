@@ -669,15 +669,13 @@ def _is_list_of_scalars(x: List[Any]) -> bool:
 def _dispatch_array(x: Any, dtype: DTypeLike | None = None) -> ArrayLike:
     """`array` function dispatched from np.array(..., like=[SymbolicArray])"""
     # For now, support three cases:
-    # 1. x is already an array (do nothing)
+    # 1. x is already an array (handled by main array function)
     # 2. x is a list of scalars (convert to an (n,) array)
     # 3. x is a list of lists (convert to an (n, m) array)
 
     # Case 1: x is already an array
-    if isinstance(x, SymbolicArray):
-        if dtype is not None:
-            x = x.astype(dtype)
-        return x
+    # This is handled by `array`, so we don't need to do anything here.
+    # Confirmed by code coverage analysis
 
     if isinstance(x, (list, tuple)):
         if len(x) == 0:
@@ -1023,12 +1021,12 @@ def zeros_like(
     ones_like : Create a symbolic array of ones with same shape as input
     array : Create an array from data
     """
-    x = array(x)  # Should be SymbolicArray or ndarray
     if kind is None:
         if isinstance(x, SymbolicArray):
             kind = x.kind
         else:
             kind = DEFAULT_SYM_NAME
+    x = array(x)  # Should be SymbolicArray or ndarray
     return zeros(x.shape, dtype=dtype or x.dtype, sparse=sparse, kind=kind)
 
 
@@ -1113,10 +1111,11 @@ def ones_like(
     empty_like : Create an uninitialized array with same shape as input
     """
     x = array(x)  # Should be SymbolicArray or ndarray
-    if kind is None and isinstance(x, SymbolicArray):
-        kind = x.kind
-    else:
-        kind = DEFAULT_SYM_NAME
+    if kind is None:
+        if isinstance(x, SymbolicArray):
+            kind = x.kind
+        else:
+            kind = DEFAULT_SYM_NAME
     return ones(x.shape, dtype=dtype or x.dtype, kind=kind)
 
 

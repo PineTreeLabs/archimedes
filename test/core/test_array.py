@@ -44,6 +44,11 @@ class TestSymbolicArrayCreate:
         result2 = arc.array(result)
         assert isinstance(result2, SymbolicArray)
 
+        # Cast dtype
+        result3 = arc.array(result2, dtype=np.float64)
+        assert isinstance(result3, SymbolicArray)
+        assert result3.dtype == np.float64
+
     def test_from_sx(self):
         x_sym = cs.SX.sym("x", 2, 2)
         x = SymbolicArray(x_sym)
@@ -113,6 +118,11 @@ class TestSymbolicArrayCreate:
             assert y.dtype == dtype
             assert cs.is_equal(y._sym, np.zeros(shape), 1)
 
+        # Test default symbolic kind
+        y = arc.zeros_like(np.ones(shape))
+        assert y.shape == shape
+        assert y.kind == arc._core._array_impl.DEFAULT_SYM_NAME
+
     @pytest.mark.parametrize("dtype", (bool, np.int32, np.float32, np.float64))
     def test_ones_like(self, dtype):
         shape = (3, 2)
@@ -126,6 +136,12 @@ class TestSymbolicArrayCreate:
             y = arc.ones_like(x, dtype=dtype)
             assert y.shape == shape
             assert y.dtype == dtype
+            assert cs.is_equal(y._sym, np.ones(shape), 1)
+
+            # Test changing the symbolic kind
+            y = arc.ones_like(x, kind="SX")
+            assert y.shape == shape
+            assert y.kind == "SX"
             assert cs.is_equal(y._sym, np.ones(shape), 1)
 
     def test_error_handling(self):

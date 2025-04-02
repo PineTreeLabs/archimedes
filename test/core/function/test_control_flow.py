@@ -143,7 +143,7 @@ class TestVmap:
         assert np.allclose(c, A @ b)
 
         mm = arc.vmap(
-            vv, (None, 1), 1
+            vv, in_axes=[None, 1], out_axes=1
         )  #  ([b,a], [a,c]) -> [b,c]  (c is the mapped axis)
 
         A = np.array([[1, 2], [3, 4], [5, 6]])  # (3, 2)
@@ -151,6 +151,26 @@ class TestVmap:
         C = mm(A, B)
         assert C.shape == (3, 4)
         assert np.allclose(C, A @ B)
+
+    def test_vmap_errors(self):
+        def f(x, y):
+            return x**2 + np.sin(y)
+
+        # Test in_axes errors
+        with pytest.raises(TypeError, match=r".*in_axes must be an.*"):
+            arc.vmap(f, in_axes="invalid")
+
+        with pytest.raises(TypeError, match=r".*out_axes must be an.*"):
+            arc.vmap(f, out_axes="invalid")
+
+        # Map over inconsistent arrays
+        x = np.array([[1, 2], [3, 4], [5, 6]])  # (3, 2)
+        y = np.array([[1, 2, 3, 4], [5, 6, 7, 8]])  # (2, 4)
+
+        with pytest.raises(
+            ValueError, match=r".*all mapped arguments have the same mapped axis.*"
+        ):
+            arc.vmap(f)(x, y)
 
     def test_vmap_dot(self):
         def dot(a, b):

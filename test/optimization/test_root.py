@@ -62,7 +62,7 @@ class TestRoot:
         def f(x):
             return x**2 - 1
 
-        x = root(f, x0=2.0)
+        x = root(f, x0=2.0, tol=1e-6)
         assert np.allclose(x, 1.0)
 
     def test_root_args(self):
