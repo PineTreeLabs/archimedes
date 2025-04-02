@@ -17,6 +17,10 @@ class TestSymFunction:
         assert f_sym.arg_names == ["x"]
         assert f_sym._compiled == {}
 
+        # Test recompilation
+        f_sym2 = compile(f_sym)
+        assert f_sym2 is f_sym
+
     def test_eval_numeric(self):
         f_sym = compile(f)
 
@@ -78,8 +82,8 @@ class TestSymFunction:
 
         # Create functions specifying static data both by number and by name
         for f_sym in (
-            compile(f2, static_argnums=(0,)),
-            compile(f2, static_argnames=("a",)),
+            compile(f2, static_argnums=0),
+            compile(f2, static_argnames="a"),
         ):
             # Nothing compiled yet
             assert len(f_sym._compiled) == 0
