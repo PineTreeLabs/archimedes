@@ -371,12 +371,14 @@ def sym(
         future.
     kind : {"SX", "MX"}, optional
         Kind of symbolic variable to create. Default is "MX".
-        - "SX": Scalar-based symbolic type. Each element of the array has its own
-          symbolic representation. Generally more efficient for element-wise operations
-          and when computing gradients of scalar functions.
-        - "MX": Matrix-based symbolic type. The entire array is represented by a single
-          symbolic object. Supports a broader range of operations but may be less
-          efficient for some applications.
+
+        - SX: Scalar-based symbolic type. Each element of the array has its own\
+        symbolic representation. Generally more efficient for element-wise operations\
+        and when computing gradients of scalar functions.
+
+        - MX: Matrix-based symbolic type. The entire array is represented by a single\
+        symbolic object. Supports a broader range of operations but may be less\
+        efficient for some applications.
 
     Returns
     -------
@@ -392,6 +394,7 @@ def sym(
     evaluated, differentiated, and optimized.
 
     The difference between SX and MX symbolic types is important:
+
     - SX types create element-wise symbolic variables and are more efficient for scalar
       operations and gradients of scalar functions.
     - MX types represent entire matrices as single symbolic objects and support a wider
@@ -399,6 +402,7 @@ def sym(
       element-wise.
 
     Current limitations:
+
     - Only supports up to 2D arrays (scalars, vectors, and matrices)
 
     Examples
@@ -437,8 +441,8 @@ def sym(
 
     See Also
     --------
-    archimedes.array : Create a regular or symbolic array from data
-    archimedes.compile : Create a symbolic function from a Python function
+    array : Create a regular or symbolic array from data
+    compile : Create a symbolic function from a Python function
     """
     # TODO: Use `scalar: bool` instead of `kind: str`
     if shape is None:
@@ -480,29 +484,32 @@ def sym_like(
         Name of the symbolic variable. This name is used for display purposes and
         debugging, and appears in symbolic expression representations.
     dtype : numpy.dtype, optional
-        Data type of the array. If None (default), uses the dtype of `x`.
+        Data type of the array. If None (default), uses the dtype of ``x``.
     kind : {"SX", "MX"}, optional
         Kind of symbolic variable to create. Default is "MX".
-        - "SX": Scalar-based symbolic type. Each element has its own symbolic
-          representation. Generally more efficient for element-wise operations.
-        - "MX": Matrix-based symbolic type. The entire array is represented by
-          a single symbolic object. Supports a broader range of operations.
+
+        - SX: Scalar-based symbolic type. Each element has its own symbolic\
+        representation. Generally more efficient for element-wise operations.
+
+        - MX: Matrix-based symbolic type. The entire array is represented by\
+        a single symbolic object. Supports a broader range of operations.
 
     Returns
     -------
     SymbolicArray
         Symbolic array with the given name and kind, matching the shape and
-        (optionally) dtype of the input array `x`.
+        (optionally) dtype of the input array ``x``.
 
     Notes
     -----
-    This function is particularly useful when:
+    This function is useful when:
+
     - Creating symbolic representations of existing numeric data
     - Building symbolic functions that need to match the structure of numeric inputs
     - Prototyping symbolic algorithms using existing arrays as templates
 
-    The function automatically converts non-array inputs to NumPy arrays using
-    `np.asarray()` before extracting their shape information.
+    The function automatically converts non-array inputs to NumPy arrays before
+    extracting their shape information.
 
     Examples
     --------
@@ -535,10 +542,10 @@ def sym_like(
 
     See Also
     --------
-    archimedes.sym : Create a symbolic array with explicit shape
-    archimedes.array : Create a regular or symbolic array from data
-    archimedes.zeros_like : Create an array of zeros with shape/dtype of an input array
-    archimedes.ones_like : Create an array of ones with shape/dtype of an input array
+    sym : Create a symbolic array with explicit shape
+    array : Create a regular or symbolic array from data
+    zeros_like : Create an array of zeros with shape/dtype of an input array
+    ones_like : Create an array of ones with shape/dtype of an input array
     """
     if not isinstance(x, (np.ndarray, SymbolicArray)):
         x = np.asarray(x)
@@ -557,13 +564,17 @@ def array(x: Any, dtype: DTypeLike | None = None) -> ArrayLike:
     ----------
     x : array_like
         An array-like object, which can be:
+
         - NumPy ndarray
+
         - SymbolicArray
-        - CasADi symbolic type (SX or MX)
+
         - List or nested list of scalars
+
         - Scalar value
+
     dtype : str or numpy.dtype, optional
-        The data type for the array. If not specified, dtype is inferred from `x`.
+        The data type for the array. If not specified, dtype is inferred from ``x``.
 
     Returns
     -------
@@ -573,8 +584,8 @@ def array(x: Any, dtype: DTypeLike | None = None) -> ArrayLike:
 
     Notes
     -----
-    Array creation using the NumPy dispatch mechanism (`np.array(..., like=...)`) is
-    recommended over calling `array(...)` directly. The dispatch mechanism supports a
+    Array creation using the NumPy dispatch mechanism (``np.array(..., like=...)``) is
+    recommended over calling ``array(...)`` directly. The dispatch mechanism supports a
     wider range of input types and better handles numeric input types.
 
     When working with symbolic computation, this function ensures that array creation
@@ -582,11 +593,13 @@ def array(x: Any, dtype: DTypeLike | None = None) -> ArrayLike:
     symbolic and numeric computation.
 
     This function currently supports:
+
     - Creating arrays from existing arrays (preserving type)
     - Creating arrays from lists of scalars (1D arrays)
     - Creating arrays from lists of lists (2D arrays)
 
     Limitations and edge cases:
+
     - Higher-dimensional arrays (>2D) are not supported
     - Creating arrays with inconsistent dimensions will raise a ValueError
     - Complex-valued arrays may have limited symbolic operation support
@@ -617,9 +630,9 @@ def array(x: Any, dtype: DTypeLike | None = None) -> ArrayLike:
     See Also
     --------
     numpy.array : The NumPy array creation function
-    archimedes.zeros : Create an array of zeros
-    archimedes.ones : Create an array of ones
-    archimedes.sym : Create a symbolic variable
+    zeros : Create an array of zeros
+    ones : Create an array of ones
+    sym : Create a symbolic variable
     """
 
     # Case 1. x is already an array
@@ -774,10 +787,12 @@ def zeros(
         If False, the array will contain actual numeric zero values.
     kind : {"SX", "MX"}, optional
         Kind of symbolic variable to create. Default is "MX".
-        - "SX": Scalar-based symbolic type. Each element has its own symbolic
-          representation. Generally more efficient for element-wise operations.
-        - "MX": Matrix-based symbolic type. The entire array is represented by
-          a single symbolic object. Supports a broader range of operations.
+
+        - SX: Scalar-based symbolic type. Each element has its own symbolic\
+        representation. Generally more efficient for element-wise operations.
+
+        - MX: Matrix-based symbolic type. The entire array is represented by\
+        a single symbolic object. Supports a broader range of operations.
 
     Returns
     -------
@@ -796,8 +811,8 @@ def zeros(
       more like traditional NumPy arrays filled with zeros.
 
     When working within a function that will be executed with both symbolic and
-    numeric arrays, prefer using `np.zeros_like` or `np.zeros(..., like=x)` where
-    `x` is either a SymbolicArray or NumPy array. This provides better compatibility
+    numeric arrays, prefer using ``np.zeros_like`` or ``np.zeros(..., like=x)`` where
+    ``x`` is either a SymbolicArray or NumPy array. This provides better compatibility
     across both numeric and symbolic execution paths.
 
     The exception is when you specifically need sparse/structural zeros, which are only
@@ -824,9 +839,9 @@ def zeros(
     See Also
     --------
     numpy.zeros : NumPy's array of zeros function
-    archimedes.zeros_like : Create an array of zeros with shape/dtype of an input array
-    archimedes.ones : Create an array of ones
-    archimedes.array : Create an array from data
+    zeros_like : Create an array of zeros with shape/dtype of an input array
+    ones : Create an array of ones
+    array : Create an array from data
     """
     sym_typ = SYM_KINDS[kind]
     _zeros = sym_typ if sparse else sym_typ.zeros
@@ -852,10 +867,12 @@ def ones(
         Data type of the array. Default is np.float64.
     kind : {"SX", "MX"}, optional
         Kind of symbolic variable to create. Default is "MX".
-        - "SX": Scalar-based symbolic type. Each element has its own symbolic
-          representation. Generally more efficient for element-wise operations.
-        - "MX": Matrix-based symbolic type. The entire array is represented by
-          a single symbolic object. Supports a broader range of operations.
+
+        - SX: Scalar-based symbolic type. Each element has its own symbolic\
+        representation. Generally more efficient for element-wise operations.
+
+        - MX: Matrix-based symbolic type. The entire array is represented by\
+        a single symbolic object. Supports a broader range of operations.
 
     Returns
     -------
@@ -869,8 +886,8 @@ def ones(
     weight matrices, mask arrays, or default values for symbolic computation.
 
     When working within a function that will be executed with both symbolic and
-    numeric arrays, prefer using `np.ones_like` or `np.ones(..., like=x)` where
-    `x` is either a SymbolicArray or NumPy array. This provides better compatibility
+    numeric arrays, prefer using ``np.ones_like`` or ``np.ones(..., like=x)`` where
+    ``x`` is either a SymbolicArray or NumPy array. This provides better compatibility
     across both numeric and symbolic execution paths.
 
     Examples
@@ -894,10 +911,10 @@ def ones(
     See Also
     --------
     numpy.ones : NumPy's array of ones function
-    archimedes.ones_like : Create an array of ones with shape/dtype of an input array
-    archimedes.zeros : Create an array of zeros
-    archimedes.eye : Create an identity matrix
-    archimedes.array : Create an array from data
+    ones_like : Create an array of ones with shape/dtype of an input array
+    zeros : Create an array of zeros
+    eye : Create an identity matrix
+    array : Create an array from data
     """
     return SymbolicArray(
         SYM_KINDS[kind].ones(*_cs_shape(shape)), dtype=dtype, shape=_np_shape(shape)
@@ -914,8 +931,8 @@ def zeros_like(
     Create a symbolic array of zeros with the same shape and dtype as an input array.
 
     This function constructs a symbolic array filled with zeros, matching the dimensions
-    and data type of an existing array. It's particularly useful for creating compatible
-    zero arrays in functions that need to work with both symbolic and numeric inputs.
+    and data type of an existing array. It's useful for creating compatible zero arrays
+    in functions that need to work with both symbolic and numeric inputs.
 
     Parameters
     ----------
@@ -923,7 +940,7 @@ def zeros_like(
         The array whose shape and dtype will be used. Can be a NumPy ndarray,
         SymbolicArray, or any array-like object that can be converted to an array.
     dtype : numpy.dtype, optional
-        Data type of the new array. If None (default), uses the dtype of `x`.
+        Data type of the new array. If None (default), uses the dtype of ``x``.
     sparse : bool, optional
         If True (default), creates "structural" zeros, which are symbolic
         placeholders rather than actual numeric values. These are more efficient
@@ -931,37 +948,40 @@ def zeros_like(
         If False, creates numerical zero values.
     kind : {"SX", "MX"} or None, optional
         Kind of symbolic variable to create. If None (default), uses the kind
-        of `x` if it's a SymbolicArray, otherwise uses "MX".
-        - "SX": Scalar-based symbolic type. Each element has its own symbolic
-          representation. Generally more efficient for element-wise operations.
-        - "MX": Matrix-based symbolic type. The entire array is represented by
-          a single symbolic object. Supports a broader range of operations.
+        of ``x`` if it's a SymbolicArray, otherwise uses "MX".
+
+        - SX: Scalar-based symbolic type. Each element has its own symbolic\
+        representation. Generally more efficient for element-wise operations.
+
+        - MX: Matrix-based symbolic type. The entire array is represented by\
+        a single symbolic object. Supports a broader range of operations.
 
     Returns
     -------
     SymbolicArray
-        Symbolic array of zeros with the same shape as `x`, and with the
+        Symbolic array of zeros with the same shape as ``x``, and with the
         specified dtype and symbolic kind.
 
     Notes
     -----
-    This function is the symbolic counterpart to NumPy's `zeros_like`. While creating
-    a standard NumPy array of zeros requires numeric inputs, this function works with
-    both symbolic and numeric arrays, preserving the symbolic nature when needed.
+    This function is the symbolic counterpart to NumPy's :py:func:`np.zeros_like`.
+    While creating a standard NumPy array of zeros requires numeric inputs, this
+    function works with both symbolic and numeric arrays, preserving the symbolic
+    nature when needed.
 
-    When used inside a function decorated with `compile`, this function helps create
-    temporary arrays that match the input's shape, which is particularly important for
-    maintaining compatibility between symbolic and numeric execution paths.
+    When used inside a function decorated with :py:func:`compile`, this function helps
+    create arrays that match the input's shape, which is useful for maintaining
+    compatibility between symbolic and numeric execution paths.
 
-    The `sparse` parameter determines whether the zeros are "structural" (symbolic
+    The ``sparse`` parameter determines whether the zeros are "structural" (symbolic
     placeholders) or actual numeric zeros, which can affect memory usage and
     computational efficiency.
 
-    When the array is not sparse, it is preferred to use `np.zeros_like` or
-    `np.zeros(..., like=x)`, where `x` is either a SymbolicArray or NumPy array.
+    When the array is not sparse, it is preferred to use ``np.zeros_like`` or
+    ``np.zeros(..., like=x)``, where ``x`` is either a SymbolicArray or NumPy array.
     This can provide better compatibility across both numeric and symbolic execution
     paths. The exception is when you specifically need sparse/structural zeros, which
-    are only available through this direct function call with `sparse=True`.
+    are only available through this direct function call with ``sparse=True``.
 
     Examples
     --------
@@ -999,9 +1019,9 @@ def zeros_like(
     See Also
     --------
     numpy.zeros_like : NumPy's equivalent function for numeric arrays
-    archimedes.zeros : Create a symbolic array of zeros with specified shape
-    archimedes.ones_like : Create a symbolic array of ones with same shape as input
-    archimedes.array : Create an array from data
+    zeros : Create a symbolic array of zeros with specified shape
+    ones_like : Create a symbolic array of ones with same shape as input
+    array : Create an array from data
     """
     x = array(x)  # Should be SymbolicArray or ndarray
     if kind is None:
@@ -1028,19 +1048,21 @@ def ones_like(
         The array whose shape and dtype will be used. Can be a NumPy ndarray,
         SymbolicArray, or any array-like object that can be converted to an array.
     dtype : numpy.dtype, optional
-        Data type of the new array. If None (default), uses the dtype of `x`.
+        Data type of the new array. If None (default), uses the dtype of ``x``.
     kind : {"SX", "MX"} or None, optional
         Kind of symbolic variable to create. If None (default), uses the kind
         of `x` if it's a SymbolicArray, otherwise uses "MX".
-        - "SX": Scalar-based symbolic type. Each element has its own symbolic
-          representation. Generally more efficient for element-wise operations.
-        - "MX": Matrix-based symbolic type. The entire array is represented by
-          a single symbolic object. Supports a broader range of operations.
+
+        - SX: Scalar-based symbolic type. Each element has its own symbolic\
+        representation. Generally more efficient for element-wise operations.
+
+        - MX: Matrix-based symbolic type. The entire array is represented by\
+        a single symbolic object. Supports a broader range of operations.
 
     Returns
     -------
     SymbolicArray
-        Symbolic array of ones with the same shape as `x`, and with the
+        Symbolic array of ones with the same shape as ``x``, and with the
         specified dtype and symbolic kind.
 
     Notes
@@ -1049,9 +1071,9 @@ def ones_like(
     NumPy array of ones can only hold numeric values, this function works with both
     symbolic and numeric entries, preserving the symbolic nature when needed.
 
-    When used inside a function decorated with `compile`, this function helps create
-    arrays of ones that match the input's shape, which is particularly important for
-    initializing accumulators, creating masks, or setting default values.
+    When used inside a function decorated with :py:func:``compile``, this function
+    helps create arrays of ones that match the input's shape, which is useful for
+    for initializing accumulators, creating masks, or setting default values.
 
     Examples
     --------
@@ -1086,9 +1108,9 @@ def ones_like(
     See Also
     --------
     numpy.ones_like : NumPy's equivalent function for numeric arrays
-    archimedes.ones : Create a symbolic array of ones with specified shape
-    archimedes.zeros_like : Create a symbolic array of zeros with same shape as input
-    archimedes.empty_like : Create an uninitialized array with same shape as input
+    ones : Create a symbolic array of ones with specified shape
+    zeros_like : Create a symbolic array of zeros with same shape as input
+    empty_like : Create an uninitialized array with same shape as input
     """
     x = array(x)  # Should be SymbolicArray or ndarray
     if kind is None and isinstance(x, SymbolicArray):
@@ -1116,10 +1138,12 @@ def eye(
         Data type of the array. Default is np.float64.
     kind : {"SX", "MX"}, optional
         Kind of symbolic variable to create. Default is "MX".
-        - "SX": Scalar-based symbolic type. Each element has its own symbolic
-          representation. Generally more efficient for element-wise operations.
-        - "MX": Matrix-based symbolic type. The entire array is represented by
-          a single symbolic object. Supports a broader range of operations.
+
+        - SX: Scalar-based symbolic type. Each element has its own symbolic\
+        representation. Generally more efficient.
+
+        - MX: Matrix-based symbolic type. The entire array is represented by\
+        a single symbolic object. Supports a broader range of operations.
 
     Returns
     -------
@@ -1130,12 +1154,6 @@ def eye(
     -----
     The identity matrix is a square matrix with ones on the main diagonal and zeros
     elsewhere.
-
-    Identity matrices are useful in symbolic computation for:
-    - Initializing transformation matrices
-    - Setting up state transition matrices
-    - Formulating constraints in optimization problems
-    - Creating masks for specific diagonal elements
 
     When working within a function that will be executed with both symbolic and
     numeric arrays, prefer using `np.eye(..., like=x)` where `x` is either a
@@ -1162,7 +1180,7 @@ def eye(
     See Also
     --------
     numpy.eye : NumPy's identity matrix function
-    archimedes.ones : Create an array of ones
-    archimedes.zeros : Create an array of zeros
+    ones : Create an array of ones
+    zeros : Create an array of zeros
     """
     return SymbolicArray(SYM_KINDS[kind].eye(n), dtype=dtype, shape=(n, n))

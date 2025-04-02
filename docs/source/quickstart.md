@@ -4,7 +4,6 @@ This page will walk you through getting up and running with Archimedes, from ins
 
 ## Installation
 
-
 You can install however you wish, but we recommend using a virtual environment like Conda or virtualenv to help keep track of package versions and dependencies.
 We use [UV](https://github.com/astral-sh/uv) for development and recommend it as an environment as well:
 
@@ -64,6 +63,6 @@ If you have not read about the fundamental concepts in Archimedes on [What is Ar
 Alternatively, you can skip to [Getting Started](getting-started.md) if you just want to jump right into coding.
 Optionally, to get a deeper understanding of how Archimedes works (and therefore how to work with it), see [Under the Hood](under-the-hood.md).
 
-Once you're comfortable with the basics, there are deep dives on [working with tree-structured data](pytrees.md), recommended [design patterns](modular-design.md), and [quirks and gotchas](gotchas.md).
+Once you're comfortable with the basics, there are deep dives on [working with tree-structured data](pytrees.md), recommended [design patterns](generated/notebooks/modular-design.md), and [quirks and gotchas](gotchas.md).
 
 <!-- TODO: Add pointers to examples and API documentation once available -->

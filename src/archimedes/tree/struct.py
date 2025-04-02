@@ -78,11 +78,11 @@ def field(
     """
     Create a field specification with pytree-related metadata.
 
-    This function extends dataclasses.field() with additional metadata to control
-    how fields are treated in pytree operations. Fields can be marked as static
-    (metadata) or dynamic (data).
-    Except for the `static` argument, all other arguments are passed directly to
-    `dataclasses.field()`; see documentation for the dataclasses module for details.
+    This function extends :py:func:`dataclasses.field()` with additional metadata to
+    control how fields are treated in pytree operations. Fields can be marked as static
+    (metadata) or dynamic (data). Except for the `static` argument, all other arguments
+    are passed directly to :py:func:`dataclasses.field()`; see documentation for the
+    :py:mod:`dataclasses` module for details.
 
     Parameters
     ----------
@@ -92,9 +92,9 @@ def field(
         in the flattened representation.
     metadata : dict, optional
         Additional metadata to include in the field specification. This will be
-        merged with the 'static' setting.
+        merged with the ``static`` setting.
     **kwargs : dict
-        Additional keyword arguments passed to dataclasses.field().
+        Additional keyword arguments passed to :py:func:`dataclasses.field()`.
 
     Returns
     -------
@@ -104,11 +104,12 @@ def field(
     Notes
     -----
     When to use:
+
     - To mark configuration parameters that shouldn't change during operations
     - To define default values or constructors for fields
 
     Static fields are not included when you flatten a pytree or apply transformations
-    like `map`, but they are preserved in the structure and included when you
+    like ``map``, but they are preserved in the structure and included when you
     reconstruct the object.
 
     Examples
@@ -147,7 +148,7 @@ def field(
 
     See Also
     --------
-    struct.pytree_node : Decorator for creating pytree-compatible classes
+    pytree_node : Decorator for creating pytree-compatible classes
     register_dataclass : Register a dataclass as a pytree node
     """
     f: dataclasses.Field = dataclasses.field(
@@ -170,10 +171,10 @@ def pytree_node(cls: T | None = None, **kwargs) -> T | Callable:
     Parameters
     ----------
     cls : type, optional
-        The class to decorate. If None, returns a decorator function.
+        The class to convert into a pytree
     **kwargs : dict
         Additional keyword arguments passed to dataclasses.dataclass().
-        By default, `frozen=True` is set unless explicitly overridden.
+        By default, ``frozen=True`` is set unless explicitly overridden.
 
     Returns
     -------
@@ -183,6 +184,7 @@ def pytree_node(cls: T | None = None, **kwargs) -> T | Callable:
     Notes
     -----
     When to use:
+
     - To create structured data objects for use in Archimedes models and simulations
     - To define state containers that work with pytree-based transformations
     - To create modular, composable model components with clear interfaces
@@ -190,18 +192,19 @@ def pytree_node(cls: T | None = None, **kwargs) -> T | Callable:
 
     The "frozen" attribute makes the class immutable, meaning that once an instance
     is created, its fields cannot be modified. This is useful for ensuring that
-    the state of the object remains consistent during operations. The `replace()`
+    the state of the object remains consistent during operations. The ``replace()``
     method allows you to create modified copies of the object with new values for
     specific fields.
 
     Fields are automatically classified as either "data" (dynamic values that
     change during operations) or "static" (configuration parameters). By default,
-    all fields are treated as data unless marked with `field(static=True)`.
+    all fields are treated as data unless marked with ``field(static=True)``.
 
     The decorated class:
+
     - Is frozen (immutable) by default
-    - Has a `replace()` method for creating modified copies
-    - Will be properly handled by `tree.flatten()`, `tree.map()`, etc.
+    - Has a ``replace()`` method for creating modified copies
+    - Will be properly handled by ``tree.flatten()``, ``tree.map()``, etc.
     - Can be nested within other pytree nodes
 
     Examples
@@ -293,10 +296,10 @@ def pytree_node(cls: T | None = None, **kwargs) -> T | Callable:
 
 def is_pytree_node(obj: Any) -> bool:
     """
-    Check if an object is a registered pytree node created with pytree_node decorator.
+    Check if an object is a registered pytree node.
 
     This function determines whether an object was created using the
-    `struct.pytree_node` decorator, which indicates it has special handling
+    :py:func:``pytree_node`` decorator, which indicates it has special handling
     for pytree operations.
 
     Parameters
@@ -307,17 +310,20 @@ def is_pytree_node(obj: Any) -> bool:
     Returns
     -------
     is_node : bool
-        True if the object is a pytree node created with the decorator, False otherwise.
+        ``True`` if the object is a pytree node created with the decorator,
+        ``False`` otherwise.
 
     Notes
     -----
     When to use:
+
     - To check if an object will be handled specially by pytree operations
     - For conditional logic based on whether an object is a custom pytree node
     - For debugging pytree-related functionality
 
-    This function specifically checks for objects created with the `pytree_node`
-    decorator, not built-in pytree containers like lists, tuples, and dictionaries.
+    This function specifically checks for objects created with the
+    :py:func:`pytree_node` decorator, not built-in pytree containers like lists,
+    tuples, and dictionaries.
 
     Examples
     --------

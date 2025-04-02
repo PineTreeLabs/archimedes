@@ -67,9 +67,12 @@ def register_pytree_node(ty: Any, to_iter: Callable, from_iter: Callable) -> Non
     to_iter : callable
         A function that accepts an instance of type `ty` and returns a tuple
         of `(children, aux_data)`, where:
+
         - `children` is an iterable of the pytree node's children
-        - `aux_data` is any auxiliary metadata needed to reconstruct the node
-          but not part of the pytree structure itself
+
+        - `aux_data` is any auxiliary metadata needed to reconstruct the node\
+        but not part of the pytree structure itself
+
     from_iter : callable
         A function that accepts `aux_data` and an iterable of children and returns
         a reconstructed instance of type `ty`.
@@ -81,6 +84,7 @@ def register_pytree_node(ty: Any, to_iter: Callable, from_iter: Callable) -> Non
     Notes
     -----
     When to use:
+
     - When you have custom container types that should be traversed by pytree operations
     - To enable pytree transformations on your own data structures
     - When creating reusable components that need to be compatible with Archimedes'

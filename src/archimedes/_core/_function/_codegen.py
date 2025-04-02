@@ -151,7 +151,7 @@ def codegen(
 
     See Also
     --------
-    arc.compile : Create a compiled function for use with codegen
+    compile : Create a compiled function for use with codegen
     """
     # TODO: Automatic type inference if not specified
 
