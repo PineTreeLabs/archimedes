@@ -23,6 +23,10 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         python -m pip install ".[dev]"
+              - name: List files in the repository
+    - name: Print packages
+      run: |
+        pip list
     - name: Lint with ruff
       run: |
         ruff check .
