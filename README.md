@@ -1,6 +1,6 @@
 ![Build Status](https://github.com/jcallaham/archimedes/actions/workflows/ci.yaml/badge.svg)
 
-[![codecov](https://codecov.io/gh/jcallaham/archimedes/branch/main/graph/badge.svg)](https://codecov.io/gh/jcallaham/archimedes)
+[![codecov](https://codecov.io/gh/jcallaham/archimedes/graph/badge.svg?token=37QNTHS42R)](https://codecov.io/gh/jcallaham/archimedes)
 
 # Archimedes
 
