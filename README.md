@@ -1,8 +1,7 @@
-![Build Status](https://github.com/jcallaham/archimedes/actions/workflows/ci.yaml/badge.svg)
-
-[![codecov](https://codecov.io/gh/jcallaham/archimedes/graph/badge.svg?token=37QNTHS42R)](https://codecov.io/gh/jcallaham/archimedes)
-
 # Archimedes
+
+![Build Status](https://github.com/jcallaham/archimedes/actions/workflows/ci.yaml/badge.svg)
+[![codecov](https://codecov.io/gh/jcallaham/archimedes/graph/badge.svg?token=37QNTHS42R)](https://codecov.io/gh/jcallaham/archimedes)
 
 Archimedes is an open-source Python framework designed to simplify complex modeling and simulation tasks, with the ultimate goal of making it possible to do practical hardware engineering with Python.
 
@@ -10,50 +9,14 @@ Archimedes is an open-source Python framework designed to simplify complex model
 
 By building on CasADi, Archimedes provides a number of key features that make it a powerful tool for modeling and simulation:
 
-- Efficient execution of computational graphs in compiled C++
-- Automatic differentiation: support for forward- and reverse-mode sparse autodiff
-- Interface to "plugin" solvers for ODE/DAEs, root-finding problems, and nonlinear programming.
-- Automated C code generation
+* NumPy-compatible array API with automatic dispatch
+* Efficient execution of computational graphs in compiled C++
+* Automatic differentiation with forward- and reverse-mode sparse autodiff
+* Interface to "plugin" solvers for ODE/DAEs, root-finding, and nonlinear programming
+* Automated C code generation for embedded applications
+* JAX-style function transformations
+* PyTorch-style hierarchical data structures for parameters and dynamics modeling
 
-The key new element of Archimedes is tying the CasADi symbolic framework to the NumPy array API:
-
-- Symbolically evaluate NumPy code using automated dispatch
-- Compile and differentiate pure NumPy functions with JAX-style transformations (e.g. `grad`, `scan`, etc.)
-- Work with nested tree-like data structures ("PyTrees" in JAX lingo)
-
-# Installation
-
-### Basic setup
-
-Archimedes is currently not available on PyPI (pending resolution of an existing defunct project on PyPI also named Archimedes), but can be installed from source:
-
-```bash
-git clone https://github.com/jcallaham/archimedes.git
-cd archimedes
-pip install .
-```
-
-### Recommended development setup
-
-For development, we recommend using [UV](https://docs.astral.sh/uv/) for faster dependency resolution and virtual environment management:
-
-```bash
-# Create and activate a virtual environment 
-uv venv
-source .venv/bin/activate
-
-git clone https://github.com/jcallaham/archimedes.git
-cd archimedes
-
-# Install the package with development dependencies
-uv pip install -e ".[all]"
-```
-
-To install the Jupyter notebook kernel, if you have installed `[all]` dependencies you can run
-
-```bash
-uv run ipython kernel install --user --env VIRTUAL_ENV $(pwd)/.venv --name=archimedes
-```
 
 # Examples
 
@@ -120,167 +83,38 @@ print(np.allclose(x_opt, [1.0, 1.0], atol=1e-3))
 - [Adaptive optimal control with pseudospectral collocation](examples/coco/)
 
 
-# Current status
+# Installation
 
-Archimedes is still in active development, and the API is subject to change.  e are actively seeking feedback from users to help shape the direction of the project.
+### Basic setup
 
-Key planned directions include hardware support (e.g. HIL testing) and extending physics modeling capabilities.  Please reach out to us if you have any questions or feedback.
+Archimedes is currently not available on PyPI (pending resolution of an existing defunct project on PyPI also named Archimedes), but can be installed from source:
 
-# Gotchas
-### Array creation
-
-Most NumPy functions can be used out of the box and will dispatch to the corresponding symbolic operation.
-However, this won't work:
-
-```python
-def f(x):
-    return np.array([x[1], x[0]])
+```bash
+git clone https://github.com/jcallaham/archimedes.git
+cd archimedes
+pip install .
 ```
 
-and neither will this:
+### Recommended development setup
 
-```python
-def f(x):
-    y = np.zeros(x.shape[0])
-    for i in range(x.shape[0]):
-        y[i] = x[i]
-    return y
+For development, we recommend using [UV](https://docs.astral.sh/uv/) for faster dependency resolution and virtual environment management:
+
+```bash
+# Create and activate a virtual environment 
+uv venv
+source .venv/bin/activate
+
+git clone https://github.com/jcallaham/archimedes.git
+cd archimedes
+
+# Install the package with development dependencies
+uv pip install -e ".[all]"
 ```
 
-In both cases NumPy dispatch doesn't know it should be creating `SymbolicArray` objects. In the first case, NumPy will create an `ndarray` of type `object` full of the two indexed `SymbolicArray`s.  In the second case, it will throw an error since the `SymbolicArray` can't be converted to a float.
+To install the Jupyter notebook kernel, if you have installed `[all]` dependencies you can run
 
-The solution to this is to call `archimedes.array` and similar functions, which will create either a symbolic or numeric array depending on the type of the inputs.  `np.array` can only be called if the array will be "static" - that is, will never contain any symbolic components.
-
-All of the following are valid and will work with either symbolic or numeric inputs, however:
-
-```python
-import archimedes as arc
-
-# OK: like=x ensures that the array creation dispatches to the symbolic version when x is symbolic
-def f1(x):
-    return np.array([x[1], x[0]], like=x)
-
-# OK: this is a dispatched function
-def f2(x):
-    return np.hstack([x[1], x[0]])
-
-# OK: the `array` function can handle either NumPy or symbolic inputs
-def f3(x):
-    return arc.array([x[1], x[0]])
-
-# OK: zeros_like is a dispatched function
-def f4(x):
-    y = np.zeros_like(x)
-    for i in range(x.shape[0]):
-        y[i] = x[i]
-    return y
-
-# OK: like=x ensures that the array creation dispatches to the symbolic version when x is symbolic
-def f5(x):
-    y = np.zeros(4, like=x)
-    for i in range(y.size):
-        y[i] = i * sum(x)
-    return y
-```
-
-### Control flow
-
-Some familiar control flow constructs in Python are not supported in symbolic evaluations.  For example, the following will fail:
-
-```python
-@arc.compile
-def f(x):
-    if x > 0:
-        return x
-    else:
-        return 0
-```
-
-The reason for this is that `x > 0` is a symbolic expression, and symbolic expressions can't be evaluated in a boolean context.  An easy workaround for this is to use `np.where` to implement a conditional:
-
-```python
-@arc.compile
-def f(x):
-    return np.where(x > 0, x, 0)
-```
-
-Similarly, loop bounds must be "static" - that is, they can't be symbolic expressions.  For example, the following will fail:
-
-```python
-@arc.compile
-def f(x):
-    y = 0
-    for i in range(sum(x)):
-        y += i
-    return y
-```
-
-As with the conditional, `sum(x)` is a symbolic expression that can't be evaluated in a loop bound.
-However, array sizes and other constants can be used in loop bounds.  For example, the following will work:
-
-```python
-@arc.compile
-def f(x):
-    y = 0
-    for i in range(x.shape[0]):
-        y += i
-    return y
-```
-
-For repeated evaluations of a function, it is recommended to use `arc.scan` to efficiently construct the computational graph (see for example the [implementation of the prediction error method](archimedes/experimental/sysid/pem.py)).
-
-
-### Backend conversion
-Conversion back and forth between `casadi.DM` and `np.ndarray` is expensive (see ODE example).  For cases where the call will happen many times, conversion should be avoided via CasADi symbolic primitives like `integrator`.
-
-
-### Function signatures
-
-Keyword arguments are supported, but all function arguments must be allowed to be either positional or keyword.  In addition, all arguments must be defined explicitly.  That is, the following signatures are valid:
-
-```
-def f1(x):
-    return np.sin(x)
-
-compile(f1)  # OK, positional args are supported
-
-def f2(x, a=2.0):
-    return np.sin(a * x)
-
-compile(f2)  # OK, kwargs are supported
-```
-
-but positional-only, keyword-only, varargs, etc. are not allowed.  The following signatures are therefore invalid:
-
-```
-def f3(x, /):
-    return np.sin(x)
-
-compile(f3)  # Positional-only not allowed
-
-def f4(x, *, a=2.0):
-    return np.sin(a * x)
-
-compile(f4)  # Keyword-only not allowed
-
-def f6(x, *params):
-    return sum(params) * x
-
-compile(f5)  # Variadic args not allowed
-
-def f6(x, **kwargs):
-    return kwargs["A"] * np.sin(kwargs["f"] * x)
-
-compile(f6)  # Variadic kwargs not allowed
-```
-
-Note that this requirement only applies to the top-level function that is evaluated symbolically.  So for example, the `**kwargs` example `f6` above could be called from another function:
-
-```
-def g(x, A=2.0, f=np.pi):
-    return f6(x, A=A, f=f)
-
-compile(g)   # OK, all arguments are defined explicitly at top level
+```bash
+uv run ipython kernel install --user --env VIRTUAL_ENV $(pwd)/.venv --name=archimedes
 ```
 
 <!-- 
@@ -328,8 +162,51 @@ compile(g)   # OK, all arguments are defined explicitly at top level
 -->
 
 
-# Testing
+# Testing and development
 
-For a test coverage report, run `pytest --cov=archimedes --cov-report=html`
+You can run a version of the CI test workflow locally as follows.
 
-To print the coverage report to the terminal, run `pytest --cov=archimedes --cov-report=term-missing`
+First, set up an environment using UV and installing development dependencies as described above.
+Then you can run the basic unit tests with:
+
+```bash
+uv run pytest
+```
+
+We require 100% code coverage of the tests to help ensure reliability.  To print a test test coverage report to the terminal run
+
+```bash
+uv run pytest --cov=archimedes --cov-report=term-missing
+```
+
+Alternatively, generate a detailed report with
+
+```bash
+uv run pytest --cov=archimedes --cov-report=html
+```
+
+Check that the notebooks run with
+
+```bash
+uv run pytest --nbmake docs/source/notebooks/*.ipynb
+```
+
+Linting and formatting is done with [ruff](https://docs.astral.sh/ruff/):
+
+```bash
+uv run ruff check .
+uv run ruff format --check .
+```
+
+Finally, to build the documentation locally, run
+
+```bash
+cd docs
+make clean && make nbconvert && make html
+```
+
+This will scrape API documentation from the docstrings, convert Jupyter notebooks to Markdown files, and then create the HTML website from the outputs.
+
+# Current status
+
+Archimedes is still in active development, and the API is subject to change.  We are actively seeking feedback from users to help shape the direction of the project.  Key planned directions include hardware support (e.g. HIL testing) and extending physics modeling capabilities.  Please don't hesitate to reach out to us if you have any questions or feedback.

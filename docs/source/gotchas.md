@@ -6,7 +6,7 @@ This document outlines common pitfalls and quirks you might encounter when using
 
 This page is modeled after ["🔪 JAX - The Sharp Bits 🔪"](https://docs.jax.dev/en/latest/notebooks/Common_Gotchas_in_JAX.html), since JAX and Archimedes share many design features.
 
-## 🔪 Pure Functions
+## Pure Functions
 
 Archimedes transformations and compilation is designed to work only with functions that are *pure*: all input data is passed through the function parameters, and all results are returned through the function return values.
 
@@ -34,8 +34,57 @@ Less obviously, print statements are a "side effect" that makes functions impure
 For tips on printing and debugging see the [debug](#debugging) section below.
 
 
+## Function signatures
+
+Keyword arguments are supported, but all function arguments must be allowed to be either positional or keyword.  In addition, all arguments must be defined explicitly.  That is, the following signatures are valid:
+
+```python
+def f1(x):
+    return np.sin(x)
+
+compile(f1)  # OK, positional args are supported
+
+def f2(x, a=2.0):
+    return np.sin(a * x)
+
+compile(f2)  # OK, kwargs are supported
+```
+
+but positional-only, keyword-only, varargs, etc. are not allowed.  The following signatures are therefore invalid:
+
+```python
+def f3(x, /):
+    return np.sin(x)
+
+compile(f3)  # Positional-only not allowed
+
+def f4(x, *, a=2.0):
+    return np.sin(a * x)
+
+compile(f4)  # Keyword-only not allowed
+
+def f6(x, *params):
+    return sum(params) * x
+
+compile(f5)  # Variadic args not allowed
+
+def f6(x, **kwargs):
+    return kwargs["A"] * np.sin(kwargs["f"] * x)
+
+compile(f6)  # Variadic kwargs not allowed
+```
+
+Note that this requirement only applies to the top-level function that is evaluated symbolically.  So for example, the `**kwargs` example `f6` above could be called from another function:
+
+```python
+def g(x, A=2.0, f=np.pi):
+    return f6(x, A=A, f=f)
+
+compile(g)   # OK, all arguments are defined explicitly at top level
+```
+
 (numpy-compatibility-limitations)=
-## 🔪 NumPy Compatibility Limitations
+## NumPy Compatibility Limitations
 
 Archimedes currently supports many common NumPy operations, but not all.
 To see the exhaustive list and current implementation status, see:
@@ -46,7 +95,7 @@ To see the exhaustive list and current implementation status, see:
 Any entries with `NotImplemented` values are currently not supported.
 **If you'd like to see one of these implemented, feel free to file a feature request (or bump an existing one)!**
 
-## 🔪 Matrix- vs. scalar-valued symbolics
+## Matrix- vs. scalar-valued symbolics
 
 When compiling functions, note that there are two basic symbolic types inherited from CasADi: `SX` and `MX`.
 `SX` symbolics create symbolic arrays as a collection of symbolic scalars, while `MX` directly create a single symbol to represent an array.
@@ -55,12 +104,12 @@ There are performance and flexibility tradeoffs between the two, and trying to m
 Specifically, if you get `NotImplemented` errors related to functions that you know are supported (see [above](#numpy-compatibility-limitations)), a likely reason is that you have somehow mixed `SX` and `MX` symbolics.
 For more information see the [section on symbolic types](symbolic-types) in Under the Hood.
 
-## 🔪 Array Dimensions
+## Array Dimensions
 
 In contrast to standard NumPy N-dimensional arrays, CasADi symbolic arrays are always two-dimensional (an artifact of its MATLAB-oriented heritage).
 Archimedes allows for 0-D, 1-D, and 2-D arrays to mimic NumPy behavior, but higher-dimensional arrays are currently not supported.
 
-## 🔪 Array Creation
+## Array Creation
 
 One of the most common pitfalls in Archimedes involves creating arrays within compiled functions.
 This is because of the step where the function arguments are replaced with symbolic arrays; standard NumPy array creation doesn't automatically work with these symbolic arrays:
@@ -113,7 +162,7 @@ def good_function4(x):
 If you get the error `ValueError: setting an array element with a sequence. The requested array would exceed the maximum number of dimension of 64.` this is most likely due to incorrect array creation.
 :::
 
-## 🔪 Control Flow
+## Control Flow
 
 Python's standard control flow constructs like `if/else` and loops with dynamic bounds don't work well with symbolic evaluation. For example:
 
@@ -159,7 +208,7 @@ def good_loop(x):
 
 See the [control flow](control-flow)  section of Getting Started for a simple example with `scan`, or see the `scan` API documentation for details.
 
-## 🔪 Static Arguments
+## Static Arguments
 
 Some function arguments shouldn't be traced symbolically, but instead treated as fixed configuration parameters. Archimedes provides a way to specify these:
 
@@ -173,7 +222,7 @@ def solve_with_optional_bc(A, b, apply_bc=True):
 
 When a function with static arguments is called, it will be retraced whenever the static argument value changes. This allows conditional evaluation based on configuration, but can lead to performance issues if done excessively.
 
-## 🔪 Function Caching
+## Function Caching
 
 "Compiled" functions in Archimedes are cached based on the shapes and dtypes of their arguments, as well as on the values of static parameters. This means the first call to a function with a specific argument shape might be slower (due to tracing), but subsequent calls with the same shape will be faster.
 
@@ -190,7 +239,7 @@ f(np.array([1.0, 2.0, 3.0]))  # New trace with shape (3,)
 Be aware that excessive retracing with different argument shapes can lead to performance degradation and memory usage growth.
 
 (in-place-operations)=
-## 🔪 In-place Operations
+## In-place Operations
 
 Unlike NumPy, which allows in-place modification of arrays, symbolic arrays in Archimedes should be treated as immutable. Operations that appear to modify arrays in-place in Python actually create new symbolic expressions behind the scenes.
 
@@ -218,7 +267,7 @@ The current recommendation is that it is okay to do in-place operations, but do 
 Specifically, it is a good idea when implementing a function like this to always decorate it so that there is not a "NumPy version" that may inadvertently behave differently than the "Archimedes version".
 
 (debugging)=
-## 🔪 Debugging Symbolic Code
+## Debugging Symbolic Code
 
 Debugging symbolic code can be challenging because:
 1. Error messages may refer to CasADi internals rather than your code
@@ -254,7 +303,7 @@ If you are seeing unexpected divergences, **please file a bug report.**
 
 <!-- TODO: Add arc.debug.print and arc.debug.callback when available -->
 
-## 🔪 Symbolic vs. Numeric Interface Differences
+## Symbolic vs. Numeric Interface Differences
 
 While Archimedes tries to make symbolic and numeric functions behave identically, there are some unavoidable differences:
 
@@ -277,7 +326,7 @@ def complex_function(x, callback):
 traced_function = arc.compile(complex_function, static_argnames=("callback",))
 ```
 
-## 🔪 PyTree Handling
+## PyTree Handling
 
 While PyTrees provide a powerful way to handle nested data structures, they come with their own quirks:
 
@@ -298,7 +347,7 @@ restored = unflatten(modified)  # This works because shape is preserved
 #broken = unflatten(larger)  # Error: incompatible flat array shape
 ```
 
-## 🔪 ODE Solving Intricacies
+## ODE Solving Intricacies
 
 When using ODE solvers, be aware of:
 
@@ -331,7 +380,7 @@ def simulate_multiple_efficient(initial_conditions, t_eval):
 If the dynamics function has additional arguments, the `solver` function will have the signature `solver(x0, *args)`.
 See the API documentation for `integrator` for details.
 
-## 🔪 Conclusion
+## Conclusion
 
 Archimedes can be helpful for improving the performance and functionality of scientific computing work, but it does have its share of sharp edges.
 Some of these may be resolved with further development, but some are due to the nature of the symbolic-numeric computing paradigm.
