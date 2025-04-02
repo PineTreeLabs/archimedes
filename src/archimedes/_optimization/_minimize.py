@@ -320,14 +320,14 @@ def minimize(
     Minimize a scalar function with optional constraints.
 
     Solve a nonlinear programming problem of the form
-    
-    
+
+
     .. code-block:: text
 
         minimize        f(x, p)
         subject to      lbx <= x <= ubx
                         lbg <= g(x, p) <= ubg
-                        
+
     This function provides a simplified interface to the IPOPT nonlinear optimization
     solver for solving a single optimization problem.
 

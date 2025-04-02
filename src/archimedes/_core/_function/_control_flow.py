@@ -421,7 +421,7 @@ def vmap(
         mapped_args = OrderedDict()
         for ax, key, arg in zip(
             in_axes,  # type: ignore
-            func.signature.parameters.keys(),   # type: ignore
+            func.signature.parameters.keys(),  # type: ignore
             args,
         ):
             if ax is None:
