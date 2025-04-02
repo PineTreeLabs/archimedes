@@ -28,7 +28,9 @@ jobs:
       run: uv run pytest test
 
     - name: Test notebooks
-      run: uv run pytest --nbmake docs/source/notebooks/*.ipynb
+      run: |
+        python -m ipykernel install --user --name archimedes
+        uv run pytest --nbmake docs/source/notebooks/*.ipynb
   
     - name: Lint with ruff
       run: |
