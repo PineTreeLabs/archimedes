@@ -27,7 +27,14 @@ jobs:
         python -m ipykernel install --user --name archimedes
 
     - name: Run tests
-      run: uv run pytest test
+      run: uv run pytest --cov=archimedes --cov-report=xml
+
+    # - name: Upload coverage to Codecov
+    #   uses: codecov/codecov-action@v4
+    #   with:
+    #     file: ./coverage.xml
+    #     fail_ci_if_error: true
+    #     token: ${{ secrets.CODECOV_TOKEN }}
 
     - name: Test notebooks
       run: uv run pytest --nbmake docs/source/notebooks/*.ipynb
