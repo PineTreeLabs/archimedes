@@ -22,7 +22,7 @@ jobs:
         python-version: ${{ matrix.python-version }}
 
     - name: Install the project
-      run: uv sync --all-extras --dev
+      run: uv pip install .
 
     - name: Run tests
       run: uv run pytest test
@@ -32,6 +32,21 @@ jobs:
         python -m ipykernel install --user --name archimedes
         uv run pytest --nbmake docs/source/notebooks/*.ipynb
   
+
+  linting:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+  
+    - name: Install uv
+      uses: astral-sh/setup-uv@v5
+      with:
+          python-version-file: ".python-version"
+
+    - name: Install the project
+      run: uv sync --all-extras --dev
+
     - name: Lint with ruff
       run: |
         uv run ruff check .
