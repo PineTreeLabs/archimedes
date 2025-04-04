@@ -1,6 +1,7 @@
 from . import error, tree
 from ._core import (
     array,
+    callback,
     codegen,
     compile,
     eye,
@@ -27,6 +28,7 @@ __all__ = [
     "error",
     "tree",
     "struct",
+    "callback",
     "codegen",
     "array",
     "sym",
