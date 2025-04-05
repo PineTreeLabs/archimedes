@@ -6,6 +6,7 @@ import numpy.testing as npt
 from scipy.spatial.transform import Rotation
 
 import archimedes as arc
+from archimedes import struct
 
 from multirotor import (
     FlightVehicle,
@@ -35,7 +36,7 @@ class BasicFlightVehicle(FlightVehicle):
 
 @pytest.fixture
 def basic_vehicle():
-    return BasicFlightVehicle(m=m, J_B=J_B)
+    return BasicFlightVehicle(m=m, J_B=J_B, attitude="euler")
 
 
 class TestVehicleKinematics:
@@ -105,7 +106,8 @@ class TestVehicleKinematics:
         x[6:9] = np.array([1, 0, 0])  # Constant velocity in x-direction
         u = np.zeros(4)
 
-        x_dot = basic_vehicle(t, x, u)
+        print(basic_vehicle)
+        x_dot = basic_vehicle.dynamics(t, x, u)
 
         x_dot_ex = np.zeros(12)
         x_dot_ex[0] = 1.0  # Velocity in x-direction
@@ -126,7 +128,7 @@ class TestVehicleKinematics:
         x[6:9] = v_B
         u = np.zeros(4)
 
-        x_dot = basic_vehicle(0, x, u)
+        x_dot = basic_vehicle.dynamics(0, x, u)
 
         x_dot_ex = np.zeros(12)
         x_dot_ex[0:3] = v_N
@@ -145,7 +147,7 @@ class TestVehicleKinematics:
             return F_B, M_B, np.array([])
 
         basic_vehicle.net_forces = constant_force
-        x_dot = basic_vehicle(t, x, u)
+        x_dot = basic_vehicle.dynamics(t, x, u)
 
         x_dot_ex = np.zeros(12)
         x_dot_ex[6] = fx / m
@@ -158,7 +160,7 @@ class TestVehicleKinematics:
         x[9] = 1.0  # Constant angular velocity around x-axis (roll)
         u = np.zeros(4)
 
-        x_dot = basic_vehicle(t, x, u)
+        x_dot = basic_vehicle.dynamics(t, x, u)
 
         x_dot_ex = np.zeros(12)
         x_dot_ex[3] = 1.0  # Roll rate
@@ -170,7 +172,7 @@ class TestVehicleKinematics:
         x = np.zeros(12)
         u = np.zeros(4)
         mx = 1.0
-        npt.assert_allclose(basic_vehicle.J_B_inv, J_B_inv)
+        npt.assert_allclose(np.linalg.inv(basic_vehicle.J_B), J_B_inv)
 
         def constant_moment(t, x, u, C_BN):
             F_B = np.zeros(3)
@@ -178,7 +180,7 @@ class TestVehicleKinematics:
             return F_B, M_B, np.array([])
 
         basic_vehicle.net_forces = constant_moment
-        x_dot = basic_vehicle(t, x, u)
+        x_dot = basic_vehicle.dynamics(t, x, u)
 
         x_dot_ex = np.zeros(12)
         x_dot_ex[9] = mx * J_B_inv[0, 0]
@@ -197,7 +199,7 @@ class TestVehicleKinematics:
         x[9:12] = w_B
         u = np.zeros(4)
         
-        x_dot = basic_vehicle(0, x, u)
+        x_dot = basic_vehicle.dynamics(0, x, u)
 
         x_dot_ex = np.zeros(12)
         x_dot_ex[3:6] = euler_rates
@@ -218,7 +220,7 @@ class TestVehicleKinematics:
             return F_B, M_B, np.array([])
 
         basic_vehicle.net_forces = constant_force_and_moment
-        x_dot = basic_vehicle(t, x, u)
+        x_dot = basic_vehicle.dynamics(t, x, u)
 
         # Check linear motion
         npt.assert_allclose(x_dot[0], 1.0)  # Velocity in x-direction
@@ -597,6 +599,7 @@ class TestTrimStability:
             drag_model=drag_model,
             gravity_model=gravity_model,
             rotor_model=rotor_model,
+            attitude="euler",
         )
 
         #
@@ -616,7 +619,7 @@ class TestTrimStability:
             C_BN = dcm(rpy)
             v_B = C_BN @ v_N
             x = np.concatenate([p_N, rpy, v_B, w_B])
-            x_dot = vehicle(0.0, x, u)
+            x_dot = vehicle.dynamics(0.0, x, u)
             return x_dot[6:]  # Residuals of dynamics equations only
         
         u0 = 500.0
@@ -658,7 +661,7 @@ class TestTrimStability:
                 vx, v_B_trim[1], vz,
                 0.0, q, 0.0,
             ], like=x_lon)
-            x_dot = vehicle(0.0, x, u)
+            x_dot = vehicle.dynamics(0.0, x, u)
             return x_dot[lon_idx]
 
         x_lon_trim = x_trim[lon_idx]
@@ -706,7 +709,7 @@ class TestTrimStability:
                 v_B_trim[0], vy, v_B_trim[2],
                 p, 0.0, r,
             ], like=x_lat)
-            x_dot = vehicle(0.0, x, u)
+            x_dot = vehicle.dynamics(0.0, x, u)
             return x_dot[lat_idx]
 
         x_lat_trim = x_trim[lat_idx]

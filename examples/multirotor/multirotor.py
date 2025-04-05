@@ -1,12 +1,13 @@
 import abc
 from functools import cached_property, partial
 from typing import ClassVar, Callable
-import dataclasses
 import numpy as np
 
 from scipy.special import roots_legendre
 
 import archimedes as arc
+from archimedes import struct
+from archimedes.experimental.aero import FlightVehicle
 
 
 # (AoA, Cl, Cd, Cm) data for NACA 0012 airfoil
@@ -182,86 +183,10 @@ def euler_kinematics(rpy, inverse=False):
         return H
 
 
-@dataclasses.dataclass
-class FlightVehicle(metaclass=abc.ABCMeta):
-    m: float = 1.0  # mass [kg]
-    J_B: np.ndarray = dataclasses.field(default_factory=lambda: np.eye(3))  # inertia matrix
-    J_B_inv: np.ndarray = None
 
-    def __post_init__(self):
-        if self.J_B_inv is None:
-            self.J_B_inv = np.linalg.inv(self.J_B)
-
-    @abc.abstractmethod
-    def net_forces(self, t, x, u, C_BN):
-        """Net forces and moments in body frame B, plus any extra state derivatives
-        
-        Args:
-            t: time
-            x: state vector
-            u: rotor speeds
-            C_BN: rotation matrix from inertial (N) to body (B) frame
-
-        Returns:
-            F_B: net forces in body frame B
-            M_B: net moments in body frame B
-            aux_state_derivs: time derivatives of auxiliary state variables
-        """
-
-    def __call__(self, t, x, u):
-        """
-        Flat-earth 6-dof dynamics for a multirotor vehicle
-
-        Based on equations 1.7-18 from Lewis, Johnson, Stevens
-
-        The input should be a function of time and state: u(t, x) -> u
-
-        Args:
-            t: time
-            x: state vector
-            u: rotor speeds
-
-        Returns:
-            xdot: time derivative of the state vector
-        """
-
-        # Unpack the state
-        p_N = x[0:3]  # Position of the center of mass in the Newtonian frame N
-        rpy = x[3:6]  # Roll-pitch-yaw Euler angles
-        v_B = x[6:9]  # Velocity of the center of mass in body frame B
-        w_B = x[9:12] # Roll-pitch-yaw rates in body frame (ω_B)
-
-        # Convert roll-pitch-yaw (rpy) orientation to the direction cosine matrix.
-        # C_BN rotates from the Newtonian frame N to the body frame B.
-        # C_BN.T = C_NB rotates from the body frame B to the Newtonian frame N.
-        C_BN = dcm(rpy)
-
-        F_B, M_B, aux_state_derivs = self.net_forces(t, x, u, C_BN)
-
-        # Transform roll-pitch-yaw rates in the body frame to time derivatives of Euler angles
-        # These are the Euler kinematic equations (1.4-5)
-        H = euler_kinematics(rpy)
-
-        # Time derivatives of roll-pitch-yaw (rpy) orientation
-        drpy = H @ w_B
-
-        # Velocity in the Newtonian frame
-        dp_N = C_BN.T @ v_B
-
-        # Acceleration in body frame
-        dv_B = (F_B / self.m) - np.cross(w_B, v_B)
-
-        # Angular acceleration in body frame
-        # solve Euler dynamics equation 𝛕 = I α + ω × (I ω)  for α
-        dw_B = self.J_B_inv @ (M_B - np.cross(w_B, self.J_B @ w_B))
-
-        # Pack the state derivatives
-        return np.hstack([dp_N, drpy, dv_B, dw_B, aux_state_derivs])
-
-
-@dataclasses.dataclass
+@struct.pytree_node
 class RotorGeometry:
-    offset: np.ndarray = dataclasses.field(default_factory=lambda: np.zeros(3))  # Location of the rotor hub in the body frame B [m]
+    offset: np.ndarray = struct.field(default_factory=lambda: np.zeros(3))  # Location of the rotor hub in the body frame B [m]
     ccw: bool = True  # True if rotor spins counter-clockwise when viewed from above
     torsional_cant: float = 0.0  # torsional cant angle χ [rad]
     flapwise_cant: float = 0.0  # flapwise cant angle γ [rad]
@@ -311,7 +236,7 @@ class GravityModel(metaclass=abc.ABCMeta):
         """
 
 
-@dataclasses.dataclass
+@struct.pytree_node
 class ConstantGravityModel(GravityModel):
     g0: float = 9.81
 
@@ -319,7 +244,7 @@ class ConstantGravityModel(GravityModel):
         return np.array([0, 0, self.g0], like=p_N)
 
 
-@dataclasses.dataclass
+@struct.pytree_node
 class PointGravityModel(GravityModel):
     G: float = 6.6743e-11  # Gravitational constant [N-m²/kg²]
     R_e: float = 6.371e6  # Radius of earth [m]
@@ -343,7 +268,7 @@ class VehicleDragModel(metaclass=abc.ABCMeta):
         """
 
 
-@dataclasses.dataclass
+@struct.pytree_node
 class QuadraticDragModel(VehicleDragModel):
     """Simple velocity-squared drag model for the main vehicle body"""
 
@@ -421,7 +346,7 @@ class RotorModel(metaclass=abc.ABCMeta):
         """Aerodynamic forces and moments in wind frame W"""
 
 
-@dataclasses.dataclass
+@struct.pytree_node
 class QuadraticRotorModel(RotorModel):
     """Simple velocity-squared model for rotor aerodynamics"""
 
@@ -445,12 +370,12 @@ class QuadraticRotorModel(RotorModel):
         return F_W, M_W, aux_state_derivs
 
 
-@dataclasses.dataclass
+@struct.pytree_node
 class MultiRotorVehicle(FlightVehicle):
-    rotors: list[RotorGeometry] = dataclasses.field(default_factory=list)
-    rotor_model: RotorModel = dataclasses.field(default_factory=QuadraticRotorModel)
-    drag_model: VehicleDragModel = dataclasses.field(default_factory=QuadraticDragModel)
-    gravity_model: GravityModel = dataclasses.field(default_factory=ConstantGravityModel)
+    rotors: list[RotorGeometry] = struct.field(default_factory=list)
+    rotor_model: RotorModel = struct.field(default_factory=QuadraticRotorModel)
+    drag_model: VehicleDragModel = struct.field(default_factory=QuadraticDragModel)
+    gravity_model: GravityModel = struct.field(default_factory=ConstantGravityModel)
 
     def net_forces(self, t, x, u, C_BN):
         p_N = x[0:3]  # Position of the center of mass in inertial frame N
@@ -521,7 +446,7 @@ class AirfoilModel(metaclass=abc.ABCMeta):
         pass
 
 
-@dataclasses.dataclass
+@struct.pytree_node
 class ThinAirfoil(AirfoilModel):
     """Airfoil model based on thin airfoil theory.
     
@@ -548,7 +473,7 @@ class ThinAirfoil(AirfoilModel):
         return Cl, Cd, Cm
 
 
-@dataclasses.dataclass
+@struct.pytree_node(frozen=False)  # Non-frozen to allow for initializing node data
 class TabulatedAirfoil(AirfoilModel):
     """Airfoil model based on tabulated data"""
 
@@ -556,8 +481,8 @@ class TabulatedAirfoil(AirfoilModel):
     # specifying coefficients as a function of angle of attack. Each
     # item in the list corresponds to a different airfoil section;
     # data is interpolated linearly between sections.
-    airfoil_data: list[np.ndarray] = dataclasses.field(default_factory=list)
-    rad_loc: list[float] = dataclasses.field(default_factory=list)  # Radial locations of airfoil sections [m]
+    airfoil_data: list[np.ndarray] = struct.field(default_factory=list)
+    rad_loc: list[float] = struct.field(default_factory=list)  # Radial locations of airfoil sections [m]
 
     def initialize(self, nodes_rad):
         if self.compressibility_model not in (None, "glauert"):
@@ -627,7 +552,7 @@ class TabulatedAirfoil(AirfoilModel):
         return Cl, Cd, Cm
 
 
-@dataclasses.dataclass
+@struct.pytree_node(frozen=False)  # Non-frozen to allow for initializing weights
 class BladeElementModel(RotorModel):
     """Blade element model for rotor aerodynamics
     
@@ -645,7 +570,7 @@ class BladeElementModel(RotorModel):
     rho: float = 1.225  # Air density [kg/m^3]
 
     # Airfoil model
-    airfoil_model: AirfoilModel = dataclasses.field(default_factory=ThinAirfoil)
+    airfoil_model: AirfoilModel = struct.field(default_factory=ThinAirfoil)
 
     # Iterative inflow solver parameters
     T0: float = 0.0 # Reference thrust per rotor (e.g. weight / number of rotors)
