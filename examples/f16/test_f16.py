@@ -43,80 +43,49 @@ def test_352():
     w_B = np.array([0.7, -0.8, 0.9])  # Angular velocity in body frame
     q = euler_to_quaternion(rpy)
     pow = 90.0  # Engine power
-    x = np.array([*p_N, *q, *v_B, *w_B, pow])
+    x = SubsonicF16.State(p_N, q, v_B, w_B, pow)
 
     # NOTE: There is a typo in the chapter 3 code implementation of the DCM,
     # leading to a sign change for yaw rate xd[11].  Hence, Table 3.5-2 has
     # 248.1241 instead of -248.1241 (the latter is consistent with the SciPy
     # DCM implementation).
     q_t = 0.5 * quaternion_multiply(q, np.array([0, *w_B]))
-    x_t_expected = np.array([
+    drpy_ex = np.array([
+        2.505734,  # phi (roll)
+        0.3250820,  # theta (pitch)
+        2.145926,  # psi (yaw)
+    ])
+    dp_N_ex = np.array([
         342.4439,  # x (north)
         -266.7707,  # y (east)
         -248.1241,  # z (down)
-        *q_t,
+    ])
+    dv_B_ex = np.array([
         100.8536,  # u
         -218.3080,  # v
         -437.0399,  # w
+    ])
+    dw_B_ex = np.array([
         12.62679,  # p
         0.9649671,  # q
         0.5809759,  # r
-        -58.68999,  # engine power
     ])
 
     model = SubsonicF16(m=mass, J_B=J_B, xcg=0.4)
     x_t = model.dynamics(0.0, x, u)
-    print(x_t - x_t_expected)
-    assert np.allclose(x_t - x_t_expected, 0.0, atol=1e-2)
+    assert np.allclose(x_t.p_N, dp_N_ex, atol=1e-2)
+    assert np.allclose(x_t.att, q_t, atol=1e-2)
+    assert np.allclose(x_t.v_B, dv_B_ex, atol=1e-2)
+    assert np.allclose(x_t.w_B, dw_B_ex, atol=1e-2)
 
-
-def test_352_euler():
-    """Compare to Table 3.5-2 in Lewis, Johnson, Stevens"""
-
-    u = np.array([0.9, 20.0, -15.0, -20.0])
-
-    # Original state used (Vt, alpha, beta) = (500.0, 0.5, -0.2)
-    # New model uses equivalent (u, v, w) = (430.0447, -99.3347, 234.9345)
-    #   --> (du, dv, dw) = 100.8536, -218.3080, -437.0399
-    x = np.array([
-        1000.0,  # x (north)
-        900.0,  # y (east)
-        10000.0,  # z (down)
-        -1.0,  # phi (roll)
-        1.0,  # theta (pitch)
-        -1.0,  # psi (yaw)
-        430.0447,  # u
-        -99.3347,  # v
-        234.9345,  # w
-        0.7,  # p
-        -0.8,  # q
-        0.9,  # r
-        90.0,  # engine power
-    ])
-
-    # NOTE: There is a typo in the chapter 3 code implementation of the DCM,
-    # leading to a sign change for yaw rate xd[11].  Hence, Table 3.5-2 has
-    # 248.1241 instead of -248.1241 (the latter is consistent with the SciPy
-    # DCM implementation).
-    xd_expected = np.array([
-        342.4439,  # x (north)
-        -266.7707,  # y (east)
-        -248.1241,  # z (down)
-        2.505734,  # phi (roll)
-        0.3250820,  # theta (pitch)
-        2.145926,  # psi (yaw)
-        100.8536,  # u
-        -218.3080,  # v
-        -437.0399,  # w
-        12.62679,  # p
-        0.9649671,  # q
-        0.5809759,  # r
-        -58.68999,  # engine power
-    ])
-
+    # Check with Euler attitude representation
     model = SubsonicF16(m=mass, J_B=J_B, xcg=0.4, attitude="euler")
-    xd = model.dynamics(0.0, x, u)
-    assert np.allclose(xd - xd_expected, 0.0, atol=1e-2)
+    x = SubsonicF16.State(p_N, rpy, v_B, w_B, pow)
+    x_t = model.dynamics(0.0, x, u)
+    assert np.allclose(x_t.p_N, dp_N_ex, atol=1e-2)
+    assert np.allclose(x_t.att, drpy_ex, atol=1e-2)
+    assert np.allclose(x_t.v_B, dv_B_ex, atol=1e-2)
+    assert np.allclose(x_t.w_B, dw_B_ex, atol=1e-2)
 
 
 def test_36():
@@ -139,14 +108,14 @@ def test_36():
     w_B = np.array([-1.499617e-2, 2.933811e-1, 6.084932e-2])  # Angular velocity in body frame
     q = euler_to_quaternion(rpy)
     pow = 6.412363e1  # Engine power
-    x = np.array([*p_N, *q, *v_B, *w_B, pow])
+    x = SubsonicF16.State(p_N, q, v_B, w_B, pow)
 
     u = np.array([thtl, el, ail, rdr])
 
     model = SubsonicF16(m=mass, J_B=J_B, xcg=0.35)
     x_t = model.dynamics(0.0, x, u)
-    zero_idx = range(7, 13)
-    assert np.allclose(x_t[zero_idx], 0.0, atol=1e-4)
+    assert np.allclose(x_t.v_B, 0.0, atol=1e-4)
+    assert np.allclose(x_t.w_B, 0.0, atol=1e-4)
 
     # Check that the angle rates are correct
     # First we have to convert the desired angular rates to angular momentum
@@ -155,13 +124,12 @@ def test_36():
     w_B_expected = H_inv @ rpy_t
     # Second, convert the angular momentum to a quaternion rate
     q_t_expected = 0.5 * quaternion_multiply(q, np.array([0, *w_B_expected]))
-    q_t = x_t[3:7]
-    assert np.allclose(q_t, q_t_expected, atol=1e-4)
+    assert np.allclose(x_t.att, q_t_expected, atol=1e-4)
 
     # Turn coordination when flight path angle is zero
     # This verifies equation 3.6-7 in Lewis, Johnson, Stevens
     phi = rpy[0]
-    w_B = 2 * quaternion_multiply(quaternion_inverse(q), q_t)
+    w_B = 2 * quaternion_multiply(quaternion_inverse(q), x_t.att)
     w_B = w_B[1:]  # Discard the scalar component of the angular momentum "quaternion"
     H = euler_kinematics(rpy)  # w_B -> rpy_t
     rpy_t = H @ w_B
@@ -172,53 +140,22 @@ def test_36():
     tph2 = G * np.cos(beta) / (np.cos(alpha) - G * np.sin(alpha) * np.sin(beta))
     assert np.allclose(tph1, tph2)
 
-
-def test_36_euler():
-    """Trim conditions (Sec. 3.6 in Lewis, Johnson, Stevens)"""
-    vt = 5.020000e2
-    alpha = 2.392628e-1
-    beta = 5.061803e-4
-    u = vt * np.cos(alpha) * np.cos(beta)
-    v = vt * np.sin(beta)
-    w = vt * np.sin(alpha) * np.cos(beta)
-
-    thtl = 8.349601e-1
-    el = -1.481766e0
-    ail = 9.553108e-2
-    rdr = -4.118124e-1
-
-    x = np.array([
-        0.0,  # x (north)
-        0.0,  # y (east)
-        0.0,  # z (down)
-        1.366289e0,  # phi (roll)
-        5.000808e-2,  # theta (pitch)
-        2.340769e-1,  # psi (yaw)
-        u,
-        v,
-        w,
-        -1.499617e-2,  # p
-        2.933811e-1,  # q
-        6.084932e-2,  # r
-        6.412363e1,  # engine power
-    ])
-
-    u = np.array([thtl, el, ail, rdr])
-
+    # Recheck with Euler attitude representation
     model = SubsonicF16(m=mass, J_B=J_B, xcg=0.35, attitude="euler")
-    xd = model.dynamics(0.0, x, u)
-    zero_idx = [6, 7, 8, 9, 10, 11]
-    assert np.allclose(xd[zero_idx], 0.0, atol=1e-4)
+    x = SubsonicF16.State(p_N, rpy, v_B, w_B, pow)
+    x_t = model.dynamics(0.0, x, u)
+
+    assert np.allclose(x_t.v_B, 0.0, atol=1e-4)
+    assert np.allclose(x_t.w_B, 0.0, atol=1e-4)
 
     # Check command rates
-    assert np.allclose(xd[3], 0.0, atol=1e-4)  # Roll rate
-    assert np.allclose(xd[4], 0.0, atol=1e-4)  # Pitch-up rate
-    assert np.allclose(xd[5], 0.3, atol=1e-4)  # Turn rate
+    assert np.allclose(x_t.att[0], 0.0, atol=1e-4)  # Roll rate
+    assert np.allclose(x_t.att[1], 0.0, atol=1e-4)  # Pitch-up rate
+    assert np.allclose(x_t.att[2], 0.3, atol=1e-4)  # Turn rate
 
     # Turn coordination when flight path angle is zero
-    phi, theta = x[3:5]
-    G = xd[5] * vt / g0
+    phi, theta, _psi = x.att
+    G = x_t.att[2] * vt / g0
     tph1 = np.tan(phi)
     tph2 = G * np.cos(beta) / (np.cos(alpha) - G * np.sin(alpha) * np.sin(beta))
     assert np.allclose(tph1, tph2)
-

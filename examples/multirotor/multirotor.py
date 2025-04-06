@@ -278,7 +278,7 @@ class QuadraticDragModel(VehicleDragModel):
     r_CoP = np.zeros(3)  # Center of pressure offset from body CG [m]
 
     def __call__(self, t, x):
-        v_B = x[6:9]  # Velocity of the center of mass in body frame B
+        v_B = x.v_B  # Velocity of the center of mass in body frame B
 
         # Velocity magnitude with guard against near-zero values
         v_mag = np.linalg.norm(v_B)
@@ -378,9 +378,9 @@ class MultiRotorVehicle(FlightVehicle):
     gravity_model: GravityModel = struct.field(default_factory=ConstantGravityModel)
 
     def net_forces(self, t, x, u, C_BN):
-        p_N = x[0:3]  # Position of the center of mass in inertial frame N
-        v_B = x[6:9]  # Velocity of the center of mass in body frame B
-        w_B = x[9:12] # Roll-pitch-yaw rates in body frame (ω_B)
+        p_N = x.p_N  # Position of the center of mass in inertial frame N
+        v_B = x.v_B  # Velocity of the center of mass in body frame B
+        w_B = x.w_B # Roll-pitch-yaw rates in body frame (ω_B)
 
         # Calculate local gravity force on B, expressed in
         # the Newtonian frame N
@@ -392,12 +392,15 @@ class MultiRotorVehicle(FlightVehicle):
         # Frotor_B, Mrotor_B, aux_state_derivs = self.rotor_model(t, x, u)
         Frotor_B = np.zeros_like(v_B)
         Mrotor_B = np.zeros_like(v_B)
-        aux_state_derivs = np.array([], like=x)
-        aux_state_idx = 12 # Basic rigid body dynamics has 12 states, so aerodynamic states start here
+        aux_state_derivs = np.array([], like=p_N)
+        aux_state_idx = 0
         num_aux_states = self.rotor_model.num_aux_states
         for (j, rotor) in enumerate(self.rotors):
-            aux_state = x[aux_state_idx:aux_state_idx+num_aux_states]
-            aux_state_idx += num_aux_states
+            if x.aux is not None:
+                aux_state = x.aux[aux_state_idx:aux_state_idx+num_aux_states]
+                aux_state_idx += num_aux_states
+            else:
+                aux_state = None
             rotor_speed = u[j]
 
             Fj_B, Mj_B, aux_state_derivs_j = self.rotor_model(t, v_B, w_B, aux_state, rotor_speed, rotor)

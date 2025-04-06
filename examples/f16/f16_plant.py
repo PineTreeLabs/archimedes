@@ -354,15 +354,11 @@ class SubsonicF16(FlightVehicle):
 
         # Unpack state and controls
         thtl, el, ail, rdr = u
-        if self.attitude == "quaternion":
-            u, v, w = x[7:10]  # Velocity of the center of mass in body frame B
-            p, q, r = x[10:13]  # Angular velocity in body frame (ω_B)
-        elif self.attitude == "euler":
-            u, v, w = x[6:9]
-            p, q, r = x[9:12]
-        
+        u, v, w = x.v_B  # Velocity of the center of mass in inertial frame N
+        p, q, r = x.w_B  # Angular velocity in body frame (ω_B)
+    
         # Dynamic component of engine state (auxiliary state)
-        pow = x[-1]
+        pow = x.aux
         pow_t = _calc_pdot(pow, thtl)
 
         vt = np.sqrt(u**2 + v**2 + w**2)
@@ -373,7 +369,7 @@ class SubsonicF16(FlightVehicle):
         beta_deg = np.rad2deg(beta)
 
         # Air data computer and engine model
-        alt = x[2]
+        alt = x.p_N[2]
         amach, qbar = _adc(vt, alt)
         T_B = _calc_thrust(pow, alt, amach)
 

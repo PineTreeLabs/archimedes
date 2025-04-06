@@ -26,7 +26,7 @@ J_B_inv = np.linalg.inv(J_B)
 class BasicFlightVehicle(FlightVehicle):
     def net_forces(self, t, x, u, C_BN):
         # Zero forces and moments by default
-        return np.zeros(3, like=x), np.zeros(3, like=x), np.array([], like=x)
+        return np.zeros_like(x.p_N), np.zeros_like(x.p_N), np.array([])
 
 
 @pytest.fixture
@@ -129,17 +129,23 @@ class TestQuaternionOperations:
 class TestVehicleDynamics:
     def test_constant_velocity_no_orientation(self, basic_vehicle):
         t = 0
-        x = np.zeros(13)
-        x[3] = 1.0  # Unit quaternion (no rotation)
-        x[7:10] = np.array([1, 0, 0])  # Constant velocity in x-direction
+        v_B = np.array([1, 0, 0])  # Constant velocity in x-direction
+        x = basic_vehicle.State(
+            p_N=np.zeros(3),
+            att=np.array([1, 0, 0, 0]),  # Unit quaternion (no rotation)
+            v_B=v_B,
+            w_B=np.zeros(3),
+        )
         u = np.zeros(4)
 
         dynamics = arc.compile(basic_vehicle.dynamics)
         x_dot = dynamics(t, x, u)
 
-        x_dot_ex = np.zeros(13)
-        x_dot_ex[0] = 1.0  # Velocity in x-direction
-        npt.assert_allclose(x_dot, x_dot_ex)
+        dp_N_ex = np.array([1, 0, 0])  # Velocity in x-direction
+        npt.assert_allclose(x_dot.p_N, dp_N_ex, atol=1e-8)
+        npt.assert_allclose(x_dot.att, np.zeros(4), atol=1e-8)
+        npt.assert_allclose(x_dot.v_B, np.zeros(3), atol=1e-8)
+        npt.assert_allclose(x_dot.w_B, np.zeros(3), atol=1e-8)
 
     def test_constant_velocity_with_orientation(self, basic_vehicle):
         # When the vehicle is not aligned with the world frame, the velocity
@@ -150,22 +156,36 @@ class TestVehicleDynamics:
         C_BN = dcm_from_euler(rpy)
         v_N = C_BN.T @ v_B
 
-        x = np.zeros(13)
-        x[3:7] = euler_to_quaternion(rpy)
-        x[7:10] = v_B
+        q = euler_to_quaternion(rpy)
+
+        t = 0
+        x = basic_vehicle.State(
+            p_N=np.zeros(3),
+            att=q,
+            v_B=v_B,
+            w_B=np.zeros(3),
+        )
         u = np.zeros(4)
 
         dynamics = arc.compile(basic_vehicle.dynamics)
-        x_dot = dynamics(0.0, x, u)
+        x_dot = dynamics(t, x, u)
 
         x_dot_ex = np.zeros(13)
-        x_dot_ex[0:3] = v_N
-        npt.assert_allclose(x_dot, x_dot_ex, atol=1e-8)
+        dp_N_ex = v_N
+        npt.assert_allclose(x_dot.p_N, dp_N_ex, atol=1e-8)
+        npt.assert_allclose(x_dot.att, np.zeros(4), atol=1e-8)
+        npt.assert_allclose(x_dot.v_B, np.zeros(3), atol=1e-8)
+        npt.assert_allclose(x_dot.w_B, np.zeros(3), atol=1e-8)
 
     def test_constant_force(self, basic_vehicle):
         # Test that constant acceleration leads to correct velocity changes
         t = 0
-        x = np.zeros(13)
+        x = basic_vehicle.State(
+            p_N=np.zeros(3),
+            att=np.array([1, 0, 0, 0]),
+            v_B=np.zeros(3),
+            w_B=np.zeros(3),
+        )
         fx = 1.0
         u = np.zeros(4)
 
@@ -178,15 +198,18 @@ class TestVehicleDynamics:
         dynamics = arc.compile(basic_vehicle.dynamics)
         x_dot = dynamics(t, x, u)
 
-        x_dot_ex = np.zeros(13)
-        x_dot_ex[7] = fx / m
-        npt.assert_allclose(x_dot, x_dot_ex)
+        dv_B_ex = np.array([fx / m, 0, 0])
+        npt.assert_allclose(x_dot.v_B, dv_B_ex)
+        npt.assert_allclose(x_dot.w_B, np.zeros(3))
 
     def test_constant_angular_velocity(self, basic_vehicle):
         t = 0
-        x = np.zeros(13)
-        x[3] = 1.0  # Unit quaternion (no rotation)
-        x[10] = 1.0  # Constant angular velocity around x-axis
+        x = basic_vehicle.State(
+            p_N=np.zeros(3),
+            att=np.array([1, 0, 0, 0]),
+            v_B=np.zeros(3),
+            w_B=np.array([1, 0, 0]),  # Constant angular velocity around x-axis
+        )
         u = np.zeros(4)
 
         dynamics = arc.compile(basic_vehicle.dynamics)
@@ -194,12 +217,17 @@ class TestVehicleDynamics:
 
         # Check quaternion derivative
         expected_qdot = np.array([0, 0.5, 0, 0])  # From quaternion kinematics
-        npt.assert_allclose(x_dot[3:7], expected_qdot)
+        npt.assert_allclose(x_dot.att, expected_qdot)
 
     def test_constant_moment(self, basic_vehicle):
         # Test that constant moment results in expected angular velocity changes
         t = 0
-        x = np.zeros(13)
+        x = basic_vehicle.State(
+            p_N=np.zeros(3),
+            att=np.array([1, 0, 0, 0]),
+            v_B=np.zeros(3),
+            w_B=np.zeros(3),
+        )
         u = np.zeros(4)
         mx = 1.0
 
@@ -212,16 +240,16 @@ class TestVehicleDynamics:
         dynamics = arc.compile(basic_vehicle.dynamics)
         x_dot = dynamics(t, x, u)
 
-        x_dot_ex = np.zeros(13)
-        x_dot_ex[10] = mx * J_B_inv[0, 0]
-        npt.assert_allclose(x_dot, x_dot_ex)
+        dw_B_ex = np.array([mx * J_B_inv[0, 0], 0, 0])
+        npt.assert_allclose(x_dot.w_B, dw_B_ex)
 
     def test_combined_motion(self, basic_vehicle):
         t = 0
-        x = np.zeros(13)
-        x[3] = 1.0  # Unit quaternion (no rotation)
-        x[7:10] = np.array([1, 0, 0])  # Initial velocity in x-direction
-        x[10:13] = np.array([0, 0.1, 0])  # Angular velocity around y-axis
+        p_N = np.array([0, 0, 0])
+        q = np.array([1, 0, 0, 0])  # Unit quaternion (no rotation)
+        v_B = np.array([1, 0, 0])  # Initial velocity in x-direction
+        w_B = np.array([0, 0.1, 0])  # Angular velocity around y-axis
+        x = basic_vehicle.State(p_N, q, v_B, w_B)
         u = np.zeros(4)
 
         def constant_force_and_moment(t, x, u, C_BN):
@@ -234,16 +262,16 @@ class TestVehicleDynamics:
         x_dot = dynamics(t, x, u)
 
         # Check linear motion
-        npt.assert_allclose(x_dot[0], 1.0)  # Velocity in x-direction
-        npt.assert_allclose(x_dot[7], 1 / m)  # Acceleration in x-direction
+        npt.assert_allclose(x_dot.p_N[0], 1.0)  # Velocity in x-direction
+        npt.assert_allclose(x_dot.v_B[0], 1 / m)  # Acceleration in x-direction
 
         # Check quaternion derivative
-        expected_qdot = quaternion_derivative(x[3:7], x[10:13])
-        npt.assert_allclose(x_dot[3:7], expected_qdot)
+        expected_qdot = quaternion_derivative(x.att, x.w_B)
+        npt.assert_allclose(x_dot.att, expected_qdot)
 
         # Check Coriolis effect
         expected_z_velocity = 0.1  # ω_y * v_x
-        npt.assert_allclose(x_dot[9], expected_z_velocity)
+        npt.assert_allclose(x_dot.v_B[2], expected_z_velocity)
 
     def test_quaternion_normalization(self, basic_vehicle):
         # Test that quaternion remains normalized under dynamics
@@ -252,14 +280,16 @@ class TestVehicleDynamics:
         q = euler_to_quaternion(angles)
 
         x = np.zeros(13)
-        x[3:7] = q
-        x[10:13] = np.array([0.1, 0.2, 0.3])  # Angular velocity
+        p_N = np.array([0, 0, 0])
+        v_B = np.array([0, 0, 0])
+        w_B = np.array([0.1, 0.2, 0.3])  # Angular velocity
         u = np.zeros(4)
+        x = basic_vehicle.State(p_N, q, v_B, w_B)
 
         dynamics = arc.compile(basic_vehicle.dynamics)
         x_dot = dynamics(t, x, u)
 
         # Verify that quaternion derivative maintains unit norm
         # q·q̇ should be zero for unit quaternion
-        q_dot = x_dot[3:7]
+        q_dot = x_dot.att
         npt.assert_allclose(np.dot(q, q_dot), 0, atol=1e-10)

@@ -31,7 +31,7 @@ J_B_inv = np.linalg.inv(J_B)
 class BasicFlightVehicle(FlightVehicle):
     def net_forces(self, t, x, u, C_BN):
         # Zero forces and moments by default
-        return np.zeros(3, like=x), np.zeros(3, like=x), np.array([], like=x)
+        return np.zeros_like(x.p_N), np.zeros_like(x.p_N), np.array([])
 
 
 @pytest.fixture
@@ -103,18 +103,29 @@ class TestVehicleKinematics:
         # when the body frame is aligned with the world frame
         t = 0
         x = np.zeros(12)
-        x[6:9] = np.array([1, 0, 0])  # Constant velocity in x-direction
+        x = basic_vehicle.State(
+            p_N=np.zeros(3),  # Position in the Newtonian frame
+            att=np.zeros(3),  # Attitude (roll, pitch, yaw)
+            v_B=np.array([1, 0, 0]),  # Velocity in the body frame
+            w_B=np.zeros(3),  # Angular velocity in the body frame
+        )
         u = np.zeros(4)
 
-        print(basic_vehicle)
-        x_dot = basic_vehicle.dynamics(t, x, u)
+        x_t = basic_vehicle.dynamics(t, x, u)
 
-        x_dot_ex = np.zeros(12)
-        x_dot_ex[0] = 1.0  # Velocity in x-direction
+        x_t_ex = basic_vehicle.State(
+            p_N=np.array([1, 0, 0]),  # Position in the Newtonian frame
+            att=np.zeros(3),  # Attitude (roll, pitch, yaw)
+            v_B=np.zeros(3),  # Velocity in the body frame
+            w_B=np.zeros(3),  # Angular velocity in the body frame
+        )
 
-        npt.assert_allclose(x_dot, x_dot_ex)
+        npt.assert_allclose(x_t.p_N, x_t_ex.p_N)
+        npt.assert_allclose(x_t.att, x_t_ex.att)
+        npt.assert_allclose(x_t.v_B, x_t_ex.v_B)
+        npt.assert_allclose(x_t.w_B, x_t_ex.w_B)
 
-    def constant_velocity_with_orientation(self, basic_vehicle):
+    def test_constant_velocity_with_orientation(self, basic_vehicle):
         # When the vehicle is not aligned with the world frame, the velocity
         # should be transformed accordingly
         rpy = np.array([0.1, 0.2, 0.3])
@@ -123,21 +134,36 @@ class TestVehicleKinematics:
         C_BN = dcm(rpy)
         v_N = C_BN.T @ v_B
 
-        x = np.zeros(12)
-        x[3:6] = rpy
-        x[6:9] = v_B
+        x = basic_vehicle.State(
+            p_N=np.zeros(3),
+            att=rpy,  # Attitude (roll, pitch, yaw)
+            v_B=v_B,  # Velocity in the body frame
+            w_B=np.zeros(3),  # Angular velocity in the body frame
+        )
         u = np.zeros(4)
 
-        x_dot = basic_vehicle.dynamics(0, x, u)
+        x_t = basic_vehicle.dynamics(0, x, u)
 
-        x_dot_ex = np.zeros(12)
-        x_dot_ex[0:3] = v_N
-        npt.assert_allclose(x_dot, x_dot_ex)
+        x_t_ex = basic_vehicle.State(
+            p_N=v_N,  # Position in the Newtonian frame
+            att=np.zeros(3),  # Attitude (roll, pitch, yaw)
+            v_B=np.zeros(3),  # Velocity in the body frame
+            w_B=np.zeros(3),  # Angular velocity in the body frame
+        )
+        npt.assert_allclose(x_t.p_N, x_t_ex.p_N)
+        npt.assert_allclose(x_t.att, x_t_ex.att)
+        npt.assert_allclose(x_t.v_B, x_t_ex.v_B)
+        npt.assert_allclose(x_t.w_B, x_t_ex.w_B)
 
     def test_constant_force(self, basic_vehicle):
         # Test that constant acceleration leads to correct velocity changes
         t = 0
-        x = np.zeros(12)
+        x = basic_vehicle.State(
+            p_N=np.zeros(3),
+            att=np.zeros(3),  # Attitude (roll, pitch, yaw)
+            v_B=np.zeros(3),  # Velocity in the body frame
+            w_B=np.zeros(3),  # Angular velocity in the body frame
+        )
         fx = 1.0
         u = np.zeros(4)
 
@@ -147,29 +173,54 @@ class TestVehicleKinematics:
             return F_B, M_B, np.array([])
 
         basic_vehicle.net_forces = constant_force
-        x_dot = basic_vehicle.dynamics(t, x, u)
+        x_t = basic_vehicle.dynamics(t, x, u)
 
-        x_dot_ex = np.zeros(12)
-        x_dot_ex[6] = fx / m
-        npt.assert_allclose(x_dot, x_dot_ex)
+        x_t_ex = basic_vehicle.State(
+            p_N=np.zeros(3),  # Position in the Newtonian frame
+            att=np.zeros(3),  # Attitude (roll, pitch, yaw)
+            v_B=np.array([fx / m, 0, 0]),  # Velocity in the body frame
+            w_B=np.zeros(3),  # Angular velocity in the body frame
+        )
+        npt.assert_allclose(x_t.p_N, x_t_ex.p_N)
+        npt.assert_allclose(x_t.att, x_t_ex.att)
+        npt.assert_allclose(x_t.v_B, x_t_ex.v_B)
+        npt.assert_allclose(x_t.w_B, x_t_ex.w_B)
 
     def test_constant_angular_velocity(self, basic_vehicle):
         # Test that constant angular velocity results in expected orientation changes
         t = 0
-        x = np.zeros(12)
-        x[9] = 1.0  # Constant angular velocity around x-axis (roll)
+
+        x = basic_vehicle.State(
+            p_N=np.zeros(3),
+            att=np.zeros(3),
+            v_B=np.zeros(3),
+            w_B=np.array([1.0, 0, 0]),  # Constant angular velocity around x-axis
+        )
         u = np.zeros(4)
 
-        x_dot = basic_vehicle.dynamics(t, x, u)
+        x_t = basic_vehicle.dynamics(t, x, u)
 
-        x_dot_ex = np.zeros(12)
-        x_dot_ex[3] = 1.0  # Roll rate
-        npt.assert_allclose(x_dot, x_dot_ex)
+        x_t_ex = basic_vehicle.State(
+            p_N=np.zeros(3),
+            att=np.array([1, 0, 0]),  # Constant roll rate
+            v_B=np.zeros(3),
+            w_B=np.zeros(3),
+        )
+        npt.assert_allclose(x_t.p_N, x_t_ex.p_N)
+        npt.assert_allclose(x_t.att, x_t_ex.att)
+        npt.assert_allclose(x_t.v_B, x_t_ex.v_B)
+        npt.assert_allclose(x_t.w_B, x_t_ex.w_B)
 
     def test_constant_moment(self, basic_vehicle):
         # Test that constant moment results in expected angular velocity changes
         t = 0
-        x = np.zeros(12)
+
+        x = basic_vehicle.State(
+            p_N=np.zeros(3),
+            att=np.zeros(3),
+            v_B=np.zeros(3),
+            w_B=np.zeros(3),
+        )
         u = np.zeros(4)
         mx = 1.0
         npt.assert_allclose(np.linalg.inv(basic_vehicle.J_B), J_B_inv)
@@ -180,11 +231,18 @@ class TestVehicleKinematics:
             return F_B, M_B, np.array([])
 
         basic_vehicle.net_forces = constant_moment
-        x_dot = basic_vehicle.dynamics(t, x, u)
+        x_t = basic_vehicle.dynamics(t, x, u)
 
-        x_dot_ex = np.zeros(12)
-        x_dot_ex[9] = mx * J_B_inv[0, 0]
-        npt.assert_allclose(x_dot, x_dot_ex)
+        x_t_ex = basic_vehicle.State(
+            p_N=np.zeros(3),
+            att=np.zeros(3),
+            v_B=np.zeros(3),
+            w_B=np.array([mx * J_B_inv[0, 0], 0, 0]),  # Angular velocity in the body frame
+        )
+        npt.assert_allclose(x_t.p_N, x_t_ex.p_N)
+        npt.assert_allclose(x_t.att, x_t_ex.att)
+        npt.assert_allclose(x_t.v_B, x_t_ex.v_B)
+        npt.assert_allclose(x_t.w_B, x_t_ex.w_B)
 
     def test_euler_kinematic_consistency(self, basic_vehicle):
         # Test consistency between Euler rates and body angular rates
@@ -194,24 +252,35 @@ class TestVehicleKinematics:
         H = euler_kinematics(rpy)
         euler_rates = H @ w_B
 
-        x = np.zeros(12)
-        x[3:6] = rpy
-        x[9:12] = w_B
+        x = basic_vehicle.State(
+            p_N=np.zeros(3),
+            att=rpy,
+            v_B=np.zeros(3),
+            w_B=w_B,
+        )
         u = np.zeros(4)
         
-        x_dot = basic_vehicle.dynamics(0, x, u)
+        x_t = basic_vehicle.dynamics(0, x, u)
 
-        x_dot_ex = np.zeros(12)
-        x_dot_ex[3:6] = euler_rates
-        x_dot_ex[9:12] = -J_B_inv @ np.cross(w_B, J_B @ w_B)
-        
-        npt.assert_allclose(x_dot, x_dot_ex)
+        x_t_ex = basic_vehicle.State(
+            p_N=np.zeros(3),
+            att=euler_rates,
+            v_B=np.zeros(3),
+            w_B=-J_B_inv @ np.cross(w_B, J_B @ w_B),
+        )
+        npt.assert_allclose(x_t.p_N, x_t_ex.p_N)
+        npt.assert_allclose(x_t.att, x_t_ex.att)
+        npt.assert_allclose(x_t.v_B, x_t_ex.v_B)
+        npt.assert_allclose(x_t.w_B, x_t_ex.w_B)
 
     def test_combined_motion(self, basic_vehicle):
         t = 0
-        x = np.zeros(12)
-        x[6:9] = np.array([1, 0, 0])  # Initial velocity in x-direction
-        x[9:12] = np.array([0, 0.1, 0])  # Angular velocity around y-axis
+        x = basic_vehicle.State(
+            p_N=np.zeros(3),
+            att=np.zeros(3),  # Attitude (roll, pitch, yaw)
+            v_B=np.array([1, 0, 0]),  # Velocity in the body frame
+            w_B=np.array([0, 0.1, 0]),  # Angular velocity in the body frame
+        )
         u = np.zeros(4)
 
         def constant_force_and_moment(t, x, u, C_BN):
@@ -220,18 +289,15 @@ class TestVehicleKinematics:
             return F_B, M_B, np.array([])
 
         basic_vehicle.net_forces = constant_force_and_moment
-        x_dot = basic_vehicle.dynamics(t, x, u)
+        x_t = basic_vehicle.dynamics(t, x, u)
 
         # Check linear motion
-        npt.assert_allclose(x_dot[0], 1.0)  # Velocity in x-direction
-        npt.assert_allclose(x_dot[6], 1/m)  # Acceleration in x-direction
+        npt.assert_allclose(x_t.p_N, np.array([1, 0, 0]))
+        az_B = 0.1  # Coriolis: ω_y * v_x
+        npt.assert_allclose(x_t.v_B, np.array([1 / m, 0, az_B]))
 
         # Check angular motion
-        npt.assert_allclose(x_dot[4], 0.1)  # Pitch rate
-        
-        # Check Coriolis effect
-        expected_z_velocity = 0.1  # ω_y * v_x
-        npt.assert_allclose(x_dot[8], expected_z_velocity)
+        npt.assert_allclose(x_t.att, np.array([0, 0.1, 0]))  # Pitch rate
 
 
 class TestBladeElementModel:
@@ -618,10 +684,11 @@ class TestTrimStability:
             rpy = np.array([phi, theta, 0.0], like=p)
             C_BN = dcm(rpy)
             v_B = C_BN @ v_N
-            x = np.concatenate([p_N, rpy, v_B, w_B])
-            x_dot = vehicle.dynamics(0.0, x, u)
-            return x_dot[6:]  # Residuals of dynamics equations only
-        
+            x = vehicle.State(p_N, rpy, v_B, w_B)
+            x_t = vehicle.dynamics(0.0, x, u)
+            # Residuals of dynamics equations only
+            return np.hstack([x_t.v_B, x_t.w_B])
+    
         u0 = 500.0
         p0 = np.array([0.0, 0.0, u0, u0, u0, u0])
 
@@ -640,7 +707,7 @@ class TestTrimStability:
         rpy_trim = np.array([phi_trim, theta_trim, 0.0])
         C_BN = dcm(rpy_trim)
         v_B_trim = C_BN @ v_N
-        x_trim = np.concatenate([p_N, rpy_trim, v_B_trim, w_B])
+        x_trim = vehicle.State(p_N, rpy_trim, v_B_trim, w_B)
 
         #
         # Linear stability analysis for longitudinal motion
@@ -649,22 +716,28 @@ class TestTrimStability:
         # Longitudinal dynamics include surge (vx), heave (vz),
         # pitch (theta), and pitch rate (q). The other states are
         # assumed to be in trim
-        lon_idx = [4, 6, 8, 10]  # (theta, vx, vz, q)
+        def longitudinal_dofs(x):
+            return np.hstack([
+                x.att[1],  # theta
+                x.v_B[0],  # vx
+                x.v_B[2],  # vz
+                x.w_B[1],  # q
+            ])
 
         # Right-hand side function for the lateral dynamics
         @arc.compile
         def f_lon(x_lon, u):
             theta, vx, vz, q = x_lon  # Perturbations
-            x = np.array([
-                0.0, 0.0, 0.0,
-                phi_trim, theta, 0.0,
-                vx, v_B_trim[1], vz,
-                0.0, q, 0.0,
-            ], like=x_lon)
-            x_dot = vehicle.dynamics(0.0, x, u)
-            return x_dot[lon_idx]
+            x = vehicle.State(
+                np.zeros(3),
+                np.hstack([phi_trim, theta, 0.0]),
+                np.hstack([vx, v_B_trim[1], vz]),
+                np.hstack([0.0, q, 0.0]),
+            )
+            x_t = vehicle.dynamics(0.0, x, u)
+            return longitudinal_dofs(x_t)
 
-        x_lon_trim = x_trim[lon_idx]
+        x_lon_trim = longitudinal_dofs(x_trim)
 
         # Linearized state-space matrices
         A_lon = arc.jac(f_lon, 0)(x_lon_trim, u_trim)
@@ -697,22 +770,28 @@ class TestTrimStability:
         # side-slip (vy), roll rate (p), and yaw rate (r).
         # The other states are assumed to be in trim
 
-        lat_idx = [3, 7, 9, 11]  # (phi, vy, q, r)
+        def lateral_dofs(x):
+            return np.hstack([
+                x.att[0],  # phi
+                x.v_B[1],  # vy
+                x.w_B[0],  # p
+                x.w_B[2],  # r
+            ])
 
         # Right-hand side function for the lateral dynamics
         @arc.compile
         def f_lat(x_lat, u):
             phi, vy, p, r = x_lat  # Perturbations
-            x = np.array([
-                0.0, 0.0, 0.0,
-                phi, theta_trim, 0.0,
-                v_B_trim[0], vy, v_B_trim[2],
-                p, 0.0, r,
-            ], like=x_lat)
-            x_dot = vehicle.dynamics(0.0, x, u)
-            return x_dot[lat_idx]
+            x = vehicle.State(
+                np.zeros(3),
+                np.hstack([phi, theta_trim, 0.0]),
+                np.hstack([v_B_trim[0], vy, v_B_trim[2]]),
+                np.hstack([p, 0.0, r]),
+            )
+            x_t = vehicle.dynamics(0.0, x, u)
+            return lateral_dofs(x_t)
 
-        x_lat_trim = x_trim[lat_idx]
+        x_lat_trim = lateral_dofs(x_trim)
 
         # Linearized state-space matrices
         A_lat = arc.jac(f_lat, 0)(x_lat_trim, u_trim)
