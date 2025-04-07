@@ -23,8 +23,11 @@ from ._optimization import implicit, minimize, nlp_solver, root
 from ._simulation import integrator, odeint
 from .tree import struct
 
+from . import theme
+
 __all__ = [
     "error",
+    "theme",
     "tree",
     "struct",
     "codegen",

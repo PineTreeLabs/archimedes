@@ -27,6 +27,7 @@ build-backend = "hatchling.build"
 
 [dependency-groups]
 dev = [
+    "furo>=2024.8.6",
     "mypy>=1.15.0",
     "myst-parser[linkify]>=4.0.1",
     "nbconvert>=7.16.6",

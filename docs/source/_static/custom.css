@@ -1,0 +1,136 @@
+/* Import fonts */
+@import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&family=Roboto+Slab:wght@400;600;700&family=Source+Code+Pro:wght@400;500&display=swap');
+
+/* Custom styles for Furo theme */
+:root {
+    /* Your forge-inspired color palette */
+    --dark-charcoal: #2A2A2A;
+    --copper-orange: #D35400;
+    --rich-brown: #5D4037;
+    --ember-red: #C0392B;
+    --pale-gold: #F1C40F;
+    --slate-blue: #34495E;
+    --light-gray: #F5F5F5;
+}
+
+/* Fix for dark mode inconsistent background */
+[data-theme="dark"] {
+    --color-background-primary: var(--dark-charcoal) !important;
+    --color-background-secondary: #1A1A1A !important;
+    --color-background: #222222 !important;
+    --color-foreground-primary: var(--light-gray) !important;
+    --color-foreground-secondary: #CCCCCC !important;
+    
+    /* Code blocks in dark mode */
+    --color-code-background: #333333 !important;
+    --color-code-foreground: var(--light-gray) !important;
+    
+    /* Admonitions in dark mode */
+    --color-admonition-background: rgba(53, 53, 53, 0.8) !important;
+}
+
+/* Font family overrides */
+.sidebar-brand-text, h1, h2, h3, h4, h5, h6 {
+    font-family: 'Roboto Slab', serif !important;
+}
+
+.toc-title, .sidebar-tree .caption {
+    font-family: 'Roboto Slab', serif !important;
+    font-weight: 600;
+}
+
+.content {
+    font-family: 'Roboto', sans-serif !important;
+}
+
+pre, code, .highlight {
+    font-family: 'Source Code Pro', monospace !important;
+}
+
+/* Logo styling in sidebar */
+.sidebar-brand-container {
+    display: flex;
+    align-items: center;
+    margin-bottom: 0;
+}
+
+.sidebar-logo {
+    height: 32px;
+    width: auto;
+    margin-right: 16px;
+}
+
+/* Remove the "documentation" text */
+.sidebar-brand-text::after {
+    content: "" !important;
+}
+
+/* Improve code highlighting in dark mode */
+[data-theme="dark"] pre {
+    background-color: #333333 !important;
+    border: 1px solid #444444;
+}
+
+/* Custom styling for syntax highlighting in dark mode */
+[data-theme="dark"] .highlight .s1 { color: #d9a0a0; } /* Strings */
+[data-theme="dark"] .highlight .nn { color: #a0d9a0; } /* Module names */
+[data-theme="dark"] .highlight .nb { color: #a0a0d9; } /* Built-ins */
+[data-theme="dark"] .highlight .k { color: var(--pale-gold); } /* Keywords */
+[data-theme="dark"] .highlight .n { color: var(--light-gray); } /* Names */
+
+/* Function signature styling in dark mode */
+[data-theme="dark"] .sig {
+    background-color: #333333 !important;
+}
+
+/* Table styling in dark mode */
+[data-theme="dark"] table.docutils {
+    border-color: #444444;
+}
+
+[data-theme="dark"] table.docutils thead {
+    background-color: #333333;
+}
+
+[data-theme="dark"] table.docutils tbody tr:nth-child(odd) {
+    background-color: #2A2A2A;
+}
+
+[data-theme="dark"] table.docutils tbody tr:nth-child(even) {
+    background-color: #333333;
+}
+
+
+/* Theme image handling - more robust selectors */
+/* For markdown-generated images with data-theme attribute */
+img[data-theme="light"] {
+    display: block;
+  }
+  
+  img[data-theme="dark"] {
+    display: none;
+  }
+  
+  /* For images inside p elements with data-theme attribute */
+  p[data-theme="light"] img,
+  .light-theme-image {
+    display: block;
+  }
+  
+  p[data-theme="dark"] img,
+  .dark-theme-image {
+    display: none;
+  }
+  
+  /* Dark theme behavior */
+  [data-theme="dark"] img[data-theme="light"],
+  [data-theme="dark"] p[data-theme="light"] img,
+  [data-theme="dark"] .light-theme-image {
+    display: none;
+  }
+  
+  [data-theme="dark"] img[data-theme="dark"],
+  [data-theme="dark"] p[data-theme="dark"] img,
+  [data-theme="dark"] .dark-theme-image {
+    display: block;
+  }
