@@ -16,6 +16,7 @@ dependencies = [
 
 [project.optional-dependencies]
 all = [
+    "control>=0.10.1",
     "ipykernel>=6.29.5",
     "jupyter>=1.1.1",
     "matplotlib>=3.10.1",
@@ -49,7 +50,10 @@ select = [
     "I",  # isort
     "N",  # pep8-naming
 ]
-exclude = ["src/archimedes/experimental/*"]
+exclude = [
+    "src/archimedes/experimental/*",
+    "examples/*",
+]
 
 [tool.ruff.lint.isort]
 known-first-party = ["archimedes"]

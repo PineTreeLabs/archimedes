@@ -1,3 +1,4 @@
+from .gravity import GravityModel, ConstantGravity
 from .flight_dynamics import (
     FlightVehicle,
     dcm_from_euler,
@@ -20,4 +21,6 @@ __all__ = [
     "euler_to_quaternion",
     "quaternion_to_euler",
     "euler_kinematics",
+    "GravityModel",
+    "ConstantGravity",
 ]

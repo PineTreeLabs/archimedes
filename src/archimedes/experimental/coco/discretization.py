@@ -76,12 +76,18 @@ class RadauFiniteElements(SplineDiscretization):
     n_elements: int = None
 
     def __post_init__(self, N):
-        if len(N) != len(self.knots) + 1:
-            raise ValueError(
-                "Number of knots must be one fewer than the number of elements"
-            )
+        if isinstance(N, int):
+            N = [N]
         self.elements = [RadauInterval(n_nodes=N_k) for N_k in N]
-        self.knots = np.asarray(self.knots)
+        if self.knots is None:
+            # Default to equally spaced knots
+            self.knots = np.linspace(-1, 1, len(N) + 1)[1:-1]
+        else:
+            if len(N) != len(self.knots) + 1:
+                raise ValueError(
+                    "Number of knots must be one fewer than the number of elements"
+                )
+            self.knots = np.asarray(self.knots)
 
         # Check that knots are in ascending order
         if not np.all(np.diff(self.knots) > 0):

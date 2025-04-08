@@ -47,6 +47,7 @@ dependencies = [
 
 [package.optional-dependencies]
 all = [
+    { name = "control" },
     { name = "ipykernel" },
     { name = "jupyter" },
     { name = "matplotlib" },
@@ -68,6 +69,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "casadi", specifier = ">=3.6.7" },
+    { name = "control", marker = "extra == 'all'", specifier = ">=0.10.1" },
     { name = "ipykernel", marker = "extra == 'all'", specifier = ">=6.29.5" },
     { name = "jupyter", marker = "extra == 'all'", specifier = ">=1.1.1" },
     { name = "matplotlib", marker = "extra == 'all'", specifier = ">=3.10.1" },
@@ -403,6 +405,20 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/f0/ed/92d86f183a8615f13f6b9cbfc5d4298a509d6ce433432e21da838b4b63f4/contourpy-1.3.1-cp313-cp313t-musllinux_1_2_x86_64.whl", hash = "sha256:89785bb2a1980c1bd87f0cb1517a71cde374776a5f150936b82580ae6ead44a1", size = 1318403 },
     { url = "https://files.pythonhosted.org/packages/b3/0e/c8e4950c77dcfc897c71d61e56690a0a9df39543d2164040301b5df8e67b/contourpy-1.3.1-cp313-cp313t-win32.whl", hash = "sha256:8eb96e79b9f3dcadbad2a3891672f81cdcab7f95b27f28f1c67d75f045b6b4f1", size = 185117 },
     { url = "https://files.pythonhosted.org/packages/c1/31/1ae946f11dfbd229222e6d6ad8e7bd1891d3d48bde5fbf7a0beb9491f8e3/contourpy-1.3.1-cp313-cp313t-win_amd64.whl", hash = "sha256:287ccc248c9e0d0566934e7d606201abd74761b5703d804ff3df8935f523d546", size = 236668 },
+]
+
+[[package]]
+name = "control"
+version = "0.10.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "matplotlib" },
+    { name = "numpy" },
+    { name = "scipy" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/33/c2/c480f2af22bfb3f2fbb0e791a26e7b8d7d3a63b6873f644c22b161dd5299/control-0.10.1.tar.gz", hash = "sha256:3bba142c9274d896efda8c9a21aaf61dd38d673d6d40714a7989d143428e738c", size = 9474344 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/b2/9b/972af6f963631c10e98e35fe53a46f6f4ec1e2dd05c5d88f63f3c75c3d21/control-0.10.1-py3-none-any.whl", hash = "sha256:ff4c7620addb7edcafa24f712b9cad61dcdf50a40018f16b8dcb0b26c7774524", size = 549597 },
 ]
 
 [[package]]
