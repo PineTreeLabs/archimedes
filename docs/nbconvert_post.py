@@ -90,3 +90,16 @@ if __name__ == "__main__":
     print(f"Completed. {files_copied} PNG files were copied with '_dark' suffix.")
 
     process_markdown_files()
+
+    # Recursively copy source/notebooks/_static to source/generated/notebooks/_static
+    static_source = Path("source/notebooks/_static")
+    static_target = Path("source/generated/notebooks/_static")
+    static_target.mkdir(exist_ok=True, parents=True)
+    for item in static_source.glob("*"):
+        target_item = static_target / item.name
+        if item.is_dir():
+            shutil.copytree(item, target_item, dirs_exist_ok=True)
+        else:
+            shutil.copy2(item, target_item)
+    print(f"Copied static files from {static_source} to {static_target}.")
+
