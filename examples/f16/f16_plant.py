@@ -31,21 +31,21 @@ class ConstantGravity(GravityModel):
 
 @struct.pytree_node
 class AtmosphereModel:
+    R0: float = 2.377e-3  # Density scale [slug/ft^3]
+    gamma: float = 1.4  # Adiabatic index for air [-]
+    Rs: float = 1716.3  # Specific gas constant for air [ft·lbf/slug-R]
+    dTdz: float = 0.703e-5  # Temperature gradient scale [1/ft]
+    Tmin: float = 390.0  # Minimum temperature [R]
+    Tmax: float = 519.0  # Maximum temperature [R]
+    max_alt: float = 35000.0  # Maximum altitude [ft]
+
     def __call__(self, Vt, alt):
-        R0 = 2.377e-3  # Density scale [slug/ft^3]
-        gamma = 1.4  # Adiabatic index for air [-]
-        Rs = 1716.3  # Specific gas constant for air [ft·lbf/slug-R]
-        Tfac = 1 - 0.703e-5 * alt  # Temperature factor
+        Tfac = 1 - self.dTdz * alt  # Temperature factor [-]
 
-        T = np.where(alt >= 35000.0, 390.0, 519.0 * Tfac)
+        T = np.where(alt >= self.max_alt, self.Tmin, self.Tmax * Tfac)
 
-        if alt > 35000.0:
-            T = 390.0
-        else:
-            T = 519.0 * Tfac
-
-        rho = R0 * Tfac**4.14
-        amach = Vt / np.sqrt(gamma * Rs * T)
+        rho = self.R0 * Tfac**4.14
+        amach = Vt / np.sqrt(self.gamma * self.Rs * T)
         qbar = 0.5 * rho * Vt**2
 
         return amach, qbar

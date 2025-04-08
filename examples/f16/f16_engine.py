@@ -140,20 +140,26 @@ Tmax_interpolant = arc.interpolant([alt_vector, mach_vector], Tmax_data)
 
 @struct.pytree_node
 class F16Engine:
+    lo_gear: float = 64.94  # Low gear throttle slope
+    hi_gear: float = 217.38  # High gear throttle slope
+    throttle_breakpoint: float = 0.77  # Switch between linear throttle models
+    rtau_min: float = 0.1  # Minimum inv time constant for engine response [1/s]
+    rtau_max: float = 1.0  # Maximum inv time constant for engine response [1/s]
+
     def _tgear(self, thtl):
+        c_hi = (self.hi_gear - self.lo_gear) * self.throttle_breakpoint
         return np.where(
-            thtl <= 0.77,
-            64.94 * thtl,
-            217.38 * thtl - 117.38,
+            thtl <= self.throttle_breakpoint,
+            self.lo_gear * thtl,
+            self.hi_gear * thtl - c_hi,
         )
 
-    def _rtau(self, dp):
+    def _rtau(self, dP):
         """Inverse time constant for engine response"""
-
         return np.where(
-            dp <= 25,
-            1.0,
-            np.where(dp >= 50, 0.1, 1.9 - 0.036 * dp),
+            dP <= 25,
+            self.rtau_max,
+            np.where(dP >= 50, self.rtau_min, 1.9 - 0.036 * dP),
         )
 
     def dynamics(self, t, x, u):
@@ -162,17 +168,16 @@ class F16Engine:
         thtl = u  # Throttle position
 
         cpow = self._tgear(thtl)  # Command power
-
-        p2 = np.where(
+        P2 = np.where(
             cpow >= 50.0,
             np.where(P >= 50.0, cpow, 60.0),
             np.where(P >= 50.0, 40.0, cpow),
         )
 
         # 1/tau
-        rtau = np.where(P >= 50.0, 5.0, self._rtau(p2 - P))
+        rtau = np.where(P >= 50.0, 5.0, self._rtau(P2 - P))
 
-        return rtau * (p2 - P)
+        return rtau * (P2 - P)
 
     def calc_thrust(self, x, alt, rmach):
         P = x  # Engine power
