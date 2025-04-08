@@ -80,6 +80,7 @@ source = ["archimedes"]
 omit = [
     "*/archimedes/experimental/*",
     "*/archimedes/typing.py",
+    "*/archimedes/theme.py",
 ]
 
 [tool.coverage.report]
