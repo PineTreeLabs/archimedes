@@ -1,4 +1,4 @@
-from . import error, tree
+from . import error, theme, tree
 from ._core import (
     array,
     codegen,
@@ -21,10 +21,13 @@ from ._core import (
 )
 from ._optimization import implicit, minimize, nlp_solver, root
 from ._simulation import integrator, odeint
+from .theme import set_theme
 from .tree import struct
 
 __all__ = [
     "error",
+    "theme",
+    "set_theme",
     "tree",
     "struct",
     "codegen",

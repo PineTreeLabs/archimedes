@@ -1,7 +1,6 @@
-.. Archimedes documentation master file
 
 ==========================
-Archimedes Documentation
+Archimedes
 ==========================
 
 **Archimedes** is an open-source Python framework designed to simplify complex modeling

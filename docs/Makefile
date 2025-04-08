@@ -23,7 +23,14 @@ clean:
 	@rm -r build source/generated/*
 
 nbconvert:
-	@uv run jupyter nbconvert --to markdown --output-dir source/generated/notebooks --execute source/notebooks/modular-design.ipynb
+	@ARCHIMEDES_THEME="light" uv run jupyter nbconvert --to markdown \
+		--output-dir source/generated/notebooks --execute source/notebooks/*.ipynb
+
+	@ARCHIMEDES_THEME="dark" uv run jupyter nbconvert --to markdown \
+		--output-dir source/generated/notebooks_dark --execute source/notebooks/*.ipynb
+
+	@python nbconvert_post.py
+	@rm -r source/generated/notebooks_dark
 
 apidoc:
 	@sphinx-apidoc -f -o source ../src/archimedes ../src/archimedes/experimental/*
