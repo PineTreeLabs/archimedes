@@ -37,7 +37,7 @@ def test_352():
     # Original state used (Vt, alpha, beta) = (500.0, 0.5, -0.2)
     # New model uses equivalent (u, v, w) = (430.0447, -99.3347, 234.9345)
     #   --> (du, dv, dw) = 100.8536, -218.3080, -437.0399
-    p_N = np.array([1000.0, 900.0, 10000.0])  # NED-frame position
+    p_N = np.array([1000.0, 900.0, -10000.0])  # NED-frame position
     rpy = np.array([-1.0, 1.0, -1.0])  # Roll, pitch, yaw
     v_B = np.array([430.0447, -99.3347, 234.9345])  # Velocity in body frame
     w_B = np.array([0.7, -0.8, 0.9])  # Angular velocity in body frame
