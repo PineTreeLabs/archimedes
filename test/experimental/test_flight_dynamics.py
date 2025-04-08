@@ -170,7 +170,6 @@ class TestVehicleDynamics:
         dynamics = arc.compile(basic_vehicle.dynamics)
         x_dot = dynamics(t, x, u)
 
-        x_dot_ex = np.zeros(13)
         dp_N_ex = v_N
         npt.assert_allclose(x_dot.p_N, dp_N_ex, atol=1e-8)
         npt.assert_allclose(x_dot.att, np.zeros(4), atol=1e-8)
