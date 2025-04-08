@@ -19,92 +19,94 @@ from archimedes.experimental.aero import FlightVehicle
 # tunnel data should be used for more accurate aerodynamic modeling.
 # Also, the Cm data is set to zero based on thin-airfoil assumptions, but
 # this may not be accurate for realistic airfoils.
-NACA_0012 = np.array([
-    [ 0.        ,  0.        ,  0.023     ,  0.        ],
-    [ 0.017     ,  0.134     ,  0.023     ,  0.        ],
-    [ 0.035     ,  0.272     ,  0.025     ,  0.        ],
-    [ 0.052     ,  0.402     ,  0.027     ,  0.        ],
-    [ 0.07      ,  0.532     ,  0.03      ,  0.        ],
-    [ 0.087     ,  0.658     ,  0.033     ,  0.        ],
-    [ 0.105     ,  0.776     ,  0.038     ,  0.        ],
-    [ 0.122     ,  0.892     ,  0.044     ,  0.        ],
-    [ 0.14      ,  0.996     ,  0.05      ,  0.        ],
-    [ 0.157     ,  1.092     ,  0.058     ,  0.        ],
-    [ 0.175     ,  1.172     ,  0.066     ,  0.        ],
-    [ 0.192     ,  1.248     ,  0.076     ,  0.        ],
-    [ 0.209     ,  1.306     ,  0.086     ,  0.        ],
-    [ 0.227     ,  1.354     ,  0.098     ,  0.        ],
-    [ 0.244     ,  1.384     ,  0.111     ,  0.        ],
-    [ 0.262     ,  1.404     ,  0.126     ,  0.        ],
-    [ 0.279     ,  1.402     ,  0.125     ,  0.        ],
-    [ 0.297     ,  1.414     ,  0.158     ,  0.        ],
-    [ 0.314     ,  1.408     ,  0.177     ,  0.        ],
-    [ 0.332     ,  1.406     ,  0.197     ,  0.        ],
-    [ 0.349     ,  1.406     ,  0.218     ,  0.        ],
-    [ 0.436     ,  1.44      ,  0.326     ,  0.        ],
-    [ 0.524     ,  1.524     ,  0.456     ,  0.        ],
-    [ 0.611     ,  1.588     ,  0.58      ,  0.        ],
-    [ 0.698     ,  1.626     ,  0.705     ,  0.        ],
-    [ 0.785     ,  1.626     ,  0.831     ,  0.        ],
-    [ 0.872     ,  1.586     ,  0.952     ,  0.        ],
-    [ 1.047     ,  1.394     ,  1.179     ,  0.        ],
-    [ 1.221     ,  1.068     ,  1.369     ,  0.        ],
-    [ 1.396     ,  0.628     ,  1.482     ,  0.        ],
-    [ 1.571     ,  0.134     ,  1.518     ,  0.        ],
-    [ 1.745     , -0.36      ,  1.48      ,  0.        ],
-    [ 1.92      , -0.804     ,  1.363     ,  0.        ],
-    [ 2.094     , -1.156     ,  1.186     ,  0.        ],
-    [ 2.268     , -1.39      ,  0.972     ,  0.        ],
-    [ 2.443     , -1.478     ,  0.734     ,  0.        ],
-    [ 2.618     , -1.404     ,  0.493     ,  0.        ],
-    [ 2.793     , -1.3       ,  0.28      ,  0.        ],
-    [ 2.967     , -1.202     ,  0.11      ,  0.        ],
-    [ 3.142     , -0.        ,  0.016     ,  0.        ],
-    [ 3.31618531,  1.202     ,  0.11      ,  0.        ],
-    [ 3.49018531,  1.3       ,  0.28      ,  0.        ],
-    [ 3.66518531,  1.404     ,  0.493     ,  0.        ],
-    [ 3.84018531,  1.478     ,  0.734     ,  0.        ],
-    [ 4.01518531,  1.39      ,  0.972     ,  0.        ],
-    [ 4.18918531,  1.156     ,  1.186     ,  0.        ],
-    [ 4.36318531,  0.804     ,  1.363     ,  0.        ],
-    [ 4.53818531,  0.36      ,  1.48      ,  0.        ],
-    [ 4.71218531, -0.134     ,  1.518     ,  0.        ],
-    [ 4.88718531, -0.628     ,  1.482     ,  0.        ],
-    [ 5.06218531, -1.068     ,  1.369     ,  0.        ],
-    [ 5.23618531, -1.394     ,  1.179     ,  0.        ],
-    [ 5.41118531, -1.586     ,  0.952     ,  0.        ],
-    [ 5.49818531, -1.626     ,  0.831     ,  0.        ],
-    [ 5.58518531, -1.626     ,  0.705     ,  0.        ],
-    [ 5.67218531, -1.588     ,  0.58      ,  0.        ],
-    [ 5.75918531, -1.524     ,  0.456     ,  0.        ],
-    [ 5.84718531, -1.44      ,  0.326     ,  0.        ],
-    [ 5.93418531, -1.406     ,  0.218     ,  0.        ],
-    [ 5.95118531, -1.406     ,  0.197     ,  0.        ],
-    [ 5.96918531, -1.408     ,  0.177     ,  0.        ],
-    [ 5.98618531, -1.414     ,  0.158     ,  0.        ],
-    [ 6.00418531, -1.402     ,  0.125     ,  0.        ],
-    [ 6.02118531, -1.404     ,  0.126     ,  0.        ],
-    [ 6.03918531, -1.384     ,  0.111     ,  0.        ],
-    [ 6.05618531, -1.354     ,  0.098     ,  0.        ],
-    [ 6.07418531, -1.306     ,  0.086     ,  0.        ],
-    [ 6.09118531, -1.248     ,  0.076     ,  0.        ],
-    [ 6.10818531, -1.172     ,  0.066     ,  0.        ],
-    [ 6.12618531, -1.092     ,  0.058     ,  0.        ],
-    [ 6.14318531, -0.996     ,  0.05      ,  0.        ],
-    [ 6.16118531, -0.892     ,  0.044     ,  0.        ],
-    [ 6.17818531, -0.776     ,  0.038     ,  0.        ],
-    [ 6.19618531, -0.658     ,  0.033     ,  0.        ],
-    [ 6.21318531, -0.532     ,  0.03      ,  0.        ],
-    [ 6.23118531, -0.402     ,  0.027     ,  0.        ],
-    [ 6.24818531, -0.272     ,  0.025     ,  0.        ],
-    [ 6.26618531, -0.134     ,  0.023     ,  0.        ],
-    [ 6.28318531, -0.        ,  0.023     ,  0.        ],
-])
+NACA_0012 = np.array(
+    [
+        [0.0, 0.0, 0.023, 0.0],
+        [0.017, 0.134, 0.023, 0.0],
+        [0.035, 0.272, 0.025, 0.0],
+        [0.052, 0.402, 0.027, 0.0],
+        [0.07, 0.532, 0.03, 0.0],
+        [0.087, 0.658, 0.033, 0.0],
+        [0.105, 0.776, 0.038, 0.0],
+        [0.122, 0.892, 0.044, 0.0],
+        [0.14, 0.996, 0.05, 0.0],
+        [0.157, 1.092, 0.058, 0.0],
+        [0.175, 1.172, 0.066, 0.0],
+        [0.192, 1.248, 0.076, 0.0],
+        [0.209, 1.306, 0.086, 0.0],
+        [0.227, 1.354, 0.098, 0.0],
+        [0.244, 1.384, 0.111, 0.0],
+        [0.262, 1.404, 0.126, 0.0],
+        [0.279, 1.402, 0.125, 0.0],
+        [0.297, 1.414, 0.158, 0.0],
+        [0.314, 1.408, 0.177, 0.0],
+        [0.332, 1.406, 0.197, 0.0],
+        [0.349, 1.406, 0.218, 0.0],
+        [0.436, 1.44, 0.326, 0.0],
+        [0.524, 1.524, 0.456, 0.0],
+        [0.611, 1.588, 0.58, 0.0],
+        [0.698, 1.626, 0.705, 0.0],
+        [0.785, 1.626, 0.831, 0.0],
+        [0.872, 1.586, 0.952, 0.0],
+        [1.047, 1.394, 1.179, 0.0],
+        [1.221, 1.068, 1.369, 0.0],
+        [1.396, 0.628, 1.482, 0.0],
+        [1.571, 0.134, 1.518, 0.0],
+        [1.745, -0.36, 1.48, 0.0],
+        [1.92, -0.804, 1.363, 0.0],
+        [2.094, -1.156, 1.186, 0.0],
+        [2.268, -1.39, 0.972, 0.0],
+        [2.443, -1.478, 0.734, 0.0],
+        [2.618, -1.404, 0.493, 0.0],
+        [2.793, -1.3, 0.28, 0.0],
+        [2.967, -1.202, 0.11, 0.0],
+        [3.142, -0.0, 0.016, 0.0],
+        [3.31618531, 1.202, 0.11, 0.0],
+        [3.49018531, 1.3, 0.28, 0.0],
+        [3.66518531, 1.404, 0.493, 0.0],
+        [3.84018531, 1.478, 0.734, 0.0],
+        [4.01518531, 1.39, 0.972, 0.0],
+        [4.18918531, 1.156, 1.186, 0.0],
+        [4.36318531, 0.804, 1.363, 0.0],
+        [4.53818531, 0.36, 1.48, 0.0],
+        [4.71218531, -0.134, 1.518, 0.0],
+        [4.88718531, -0.628, 1.482, 0.0],
+        [5.06218531, -1.068, 1.369, 0.0],
+        [5.23618531, -1.394, 1.179, 0.0],
+        [5.41118531, -1.586, 0.952, 0.0],
+        [5.49818531, -1.626, 0.831, 0.0],
+        [5.58518531, -1.626, 0.705, 0.0],
+        [5.67218531, -1.588, 0.58, 0.0],
+        [5.75918531, -1.524, 0.456, 0.0],
+        [5.84718531, -1.44, 0.326, 0.0],
+        [5.93418531, -1.406, 0.218, 0.0],
+        [5.95118531, -1.406, 0.197, 0.0],
+        [5.96918531, -1.408, 0.177, 0.0],
+        [5.98618531, -1.414, 0.158, 0.0],
+        [6.00418531, -1.402, 0.125, 0.0],
+        [6.02118531, -1.404, 0.126, 0.0],
+        [6.03918531, -1.384, 0.111, 0.0],
+        [6.05618531, -1.354, 0.098, 0.0],
+        [6.07418531, -1.306, 0.086, 0.0],
+        [6.09118531, -1.248, 0.076, 0.0],
+        [6.10818531, -1.172, 0.066, 0.0],
+        [6.12618531, -1.092, 0.058, 0.0],
+        [6.14318531, -0.996, 0.05, 0.0],
+        [6.16118531, -0.892, 0.044, 0.0],
+        [6.17818531, -0.776, 0.038, 0.0],
+        [6.19618531, -0.658, 0.033, 0.0],
+        [6.21318531, -0.532, 0.03, 0.0],
+        [6.23118531, -0.402, 0.027, 0.0],
+        [6.24818531, -0.272, 0.025, 0.0],
+        [6.26618531, -0.134, 0.023, 0.0],
+        [6.28318531, -0.0, 0.023, 0.0],
+    ]
+)
 
 
 def dcm(rpy, transpose=False):
     """Returns matrix to transform from inertial to body frame (R_BN)
-    
+
     If transpose=True, returns matrix to transform from body to inertial frame (R_NB).
     """
     φ, θ, ψ = rpy[0], rpy[1], rpy[2]
@@ -113,11 +115,14 @@ def dcm(rpy, transpose=False):
     sθ, cθ = np.sin(θ), np.cos(θ)
     sψ, cψ = np.sin(ψ), np.cos(ψ)
 
-    R = np.array([
-        [cθ * cψ, cθ * sψ, -sθ],
-        [sφ * sθ * cψ - cφ * sψ, sφ * sθ * sψ + cφ * cψ, sφ * cθ],
-        [cφ * sθ * cψ + sφ * sψ, cφ * sθ * sψ - sφ * cψ, cφ * cθ]
-    ], like=rpy)
+    R = np.array(
+        [
+            [cθ * cψ, cθ * sψ, -sθ],
+            [sφ * sθ * cψ - cφ * sψ, sφ * sθ * sψ + cφ * cψ, sφ * cθ],
+            [cφ * sθ * cψ + sφ * sψ, cφ * sθ * sψ - sφ * cψ, cφ * cθ],
+        ],
+        like=rpy,
+    )
 
     if transpose:
         R = R.T
@@ -132,11 +137,7 @@ def z_dcm(yaw, transpose=False):
 
     c, s = np.cos(yaw), np.sin(yaw)
 
-    R = np.array([
-        [c, s, 0],
-        [-s, c, 0],
-        [0, 0, 1]
-    ], like=yaw)
+    R = np.array([[c, s, 0], [-s, c, 0], [0, 0, 1]], like=yaw)
 
     if transpose:
         R = R.T
@@ -167,26 +168,33 @@ def euler_kinematics(rpy, inverse=False):
     _0 = np.zeros_like(φ)
 
     if inverse:
-        Hinv = np.array([
-            [_1, _0, -sθ],
-            [_0,  cφ, cθ*sφ],
-            [_0, -sφ, cθ*cφ],
-        ], like=rpy)
+        Hinv = np.array(
+            [
+                [_1, _0, -sθ],
+                [_0, cφ, cθ * sφ],
+                [_0, -sφ, cθ * cφ],
+            ],
+            like=rpy,
+        )
         return Hinv
 
     else:
-        H = np.array([
-            [_1, sφ*tθ, cφ*tθ],
-            [_0, cφ, -sφ],
-            [_0, sφ / cθ, cφ / cθ],
-        ], like=rpy)
+        H = np.array(
+            [
+                [_1, sφ * tθ, cφ * tθ],
+                [_0, cφ, -sφ],
+                [_0, sφ / cθ, cφ / cθ],
+            ],
+            like=rpy,
+        )
         return H
-
 
 
 @struct.pytree_node
 class RotorGeometry:
-    offset: np.ndarray = struct.field(default_factory=lambda: np.zeros(3))  # Location of the rotor hub in the body frame B [m]
+    offset: np.ndarray = struct.field(
+        default_factory=lambda: np.zeros(3)
+    )  # Location of the rotor hub in the body frame B [m]
     ccw: bool = True  # True if rotor spins counter-clockwise when viewed from above
     torsional_cant: float = 0.0  # torsional cant angle χ [rad]
     flapwise_cant: float = 0.0  # flapwise cant angle γ [rad]
@@ -198,29 +206,35 @@ class RotorGeometry:
 
         # Torsional cant angle rotation (Rχ)
         c, s = np.cos(self.torsional_cant), np.sin(self.torsional_cant)
-        R_torsional = np.array([
-            [x ** 2 * (c - 1) + 1, -x * y * (c - 1), -y * s],
-            [-x * y * (c - 1), y ** 2 * (c - 1) + 1, x * s],
-            [y * s, -x * s, c]
-        ])
+        R_torsional = np.array(
+            [
+                [x**2 * (c - 1) + 1, -x * y * (c - 1), -y * s],
+                [-x * y * (c - 1), y**2 * (c - 1) + 1, x * s],
+                [y * s, -x * s, c],
+            ]
+        )
 
         # Flapwise cant angle rotation (Rγ)
         c, s = np.cos(self.flapwise_cant), np.sin(self.flapwise_cant)
-        R_flapwise = np.array([
-            [x ** 2 * (c - 1) + 1, x * y * (c - 1), -x * s],
-            [x * y * (c - 1), y ** 2 * (c - 1) + 1, -y * s],
-            [x * s, y * s, c]
-        ])
+        R_flapwise = np.array(
+            [
+                [x**2 * (c - 1) + 1, x * y * (c - 1), -x * s],
+                [x * y * (c - 1), y**2 * (c - 1) + 1, -y * s],
+                [x * s, y * s, c],
+            ]
+        )
 
         return R_torsional @ R_flapwise
-    
+
     @property
     def r_B(self):
         """Offset of the rotor hub in the body frame coordinates B"""
         return self.offset
-    
+
     def __hash__(self):
-        return hash((str(self.offset), self.ccw, self.torsional_cant, self.flapwise_cant))
+        return hash(
+            (str(self.offset), self.ccw, self.torsional_cant, self.flapwise_cant)
+        )
 
 
 class GravityModel(metaclass=abc.ABCMeta):
@@ -326,7 +340,9 @@ class RotorModel(metaclass=abc.ABCMeta):
         v_W = R_WH @ v_H  # Rotate velocity to wind frame
         w_W = R_WH @ w_H  # Rotate angular velocity to wind frame
 
-        F_W, M_W, aux_state_derivs = self.wind_frame_loads(t, v_W, w_W, x, Omega, geometry)
+        F_W, M_W, aux_state_derivs = self.wind_frame_loads(
+            t, v_W, w_W, x, Omega, geometry
+        )
 
         Fj_H = R_WH.T @ F_W  # Rotate force to hub frame
         Mj_H = R_WH.T @ M_W  # Rotate moment to hub frame
@@ -336,7 +352,7 @@ class RotorModel(metaclass=abc.ABCMeta):
         M_B = geometry.R_BH @ Mj_H + np.cross(geometry.r_B, F_B)
 
         return F_B, M_B, aux_state_derivs
-    
+
     @property
     def num_aux_states(self) -> int:
         return 0
@@ -357,8 +373,8 @@ class QuadraticRotorModel(RotorModel):
 
     def wind_frame_loads(self, t, v_W, w_W, x, Omega, geometry: RotorGeometry):
         M_sign = 1 if geometry.ccw else -1
-        z_W = np.array([0., 0., 1.])
-        u_sq = Omega ** 2
+        z_W = np.array([0.0, 0.0, 1.0])
+        u_sq = Omega**2
 
         # Note that the wind and hub frame z-axes are coincident
         F_W = -self.kF * u_sq * z_W
@@ -380,7 +396,7 @@ class MultiRotorVehicle(FlightVehicle):
     def net_forces(self, t, x, u, C_BN):
         p_N = x.p_N  # Position of the center of mass in inertial frame N
         v_B = x.v_B  # Velocity of the center of mass in body frame B
-        w_B = x.w_B # Roll-pitch-yaw rates in body frame (ω_B)
+        w_B = x.w_B  # Roll-pitch-yaw rates in body frame (ω_B)
 
         # Calculate local gravity force on B, expressed in
         # the Newtonian frame N
@@ -395,15 +411,17 @@ class MultiRotorVehicle(FlightVehicle):
         aux_state_derivs = np.array([], like=p_N)
         aux_state_idx = 0
         num_aux_states = self.rotor_model.num_aux_states
-        for (j, rotor) in enumerate(self.rotors):
+        for j, rotor in enumerate(self.rotors):
             if x.aux is not None:
-                aux_state = x.aux[aux_state_idx:aux_state_idx+num_aux_states]
+                aux_state = x.aux[aux_state_idx : aux_state_idx + num_aux_states]
                 aux_state_idx += num_aux_states
             else:
                 aux_state = None
             rotor_speed = u[j]
 
-            Fj_B, Mj_B, aux_state_derivs_j = self.rotor_model(t, v_B, w_B, aux_state, rotor_speed, rotor)
+            Fj_B, Mj_B, aux_state_derivs_j = self.rotor_model(
+                t, v_B, w_B, aux_state, rotor_speed, rotor
+            )
 
             # Sum the forces and moments from each rotor
             Frotor_B += Fj_B
@@ -431,13 +449,13 @@ class AirfoilModel(metaclass=abc.ABCMeta):
     @abc.abstractmethod
     def __call__(self, alpha, Re, M_inf, force_only=False):
         """Returns lift, drag, and moment coefficients for the given angle of attack
-        
+
         Args:
             alpha: angle of attack [rad]
             Re: Reynolds number
             M_inf: freestream Mach number
             force_only: if True, only compute lift and drag coefficients
-        
+
         Returns:
             Cl: lift coefficient
             Cd: drag coefficient
@@ -452,7 +470,7 @@ class AirfoilModel(metaclass=abc.ABCMeta):
 @struct.pytree_node
 class ThinAirfoil(AirfoilModel):
     """Airfoil model based on thin airfoil theory.
-    
+
     This highly simplified model assumes constant aerodynamic derivatives
     along the span of the airfoil.
     """
@@ -485,7 +503,9 @@ class TabulatedAirfoil(AirfoilModel):
     # item in the list corresponds to a different airfoil section;
     # data is interpolated linearly between sections.
     airfoil_data: list[np.ndarray] = struct.field(default_factory=list)
-    rad_loc: list[float] = struct.field(default_factory=list)  # Radial locations of airfoil sections [m]
+    rad_loc: list[float] = struct.field(
+        default_factory=list
+    )  # Radial locations of airfoil sections [m]
 
     def initialize(self, nodes_rad):
         if self.compressibility_model not in (None, "glauert"):
@@ -495,9 +515,11 @@ class TabulatedAirfoil(AirfoilModel):
 
         airfoil_data = self.airfoil_data
         rad_loc = self.rad_loc
-        
+
         if len(airfoil_data) != len(rad_loc):
-            raise ValueError("airfoil_data, and radial locations must have the same length")
+            raise ValueError(
+                "airfoil_data, and radial locations must have the same length"
+            )
 
         if len(airfoil_data) == 0:
             raise ValueError("At least one airfoil section must be provided")
@@ -509,7 +531,9 @@ class TabulatedAirfoil(AirfoilModel):
         # Check that all airfoil sections have the same number of data points
         n_data = len(airfoil_data[0])
         if not all(len(data) == n_data for data in airfoil_data):
-            raise ValueError("All airfoil sections must have the same number of data points")
+            raise ValueError(
+                "All airfoil sections must have the same number of data points"
+            )
 
         # Interpolate between airfoil sections
         node_airfoil_data = []
@@ -524,10 +548,12 @@ class TabulatedAirfoil(AirfoilModel):
             elif j == len(rad_loc):
                 print(f"Warning: Extrapolating Cl and Cd for radial location {r}")
                 j = len(rad_loc) - 1
-            
+
             # Interpolate between the two sections
-            x = (r - rad_loc[j-1]) / (rad_loc[j] - rad_loc[j-1])
-            node_airfoil_data.append(airfoil_data[j-1] * (1 - x) + airfoil_data[j] * x)
+            x = (r - rad_loc[j - 1]) / (rad_loc[j] - rad_loc[j - 1])
+            node_airfoil_data.append(
+                airfoil_data[j - 1] * (1 - x) + airfoil_data[j] * x
+            )
 
         # node_airfoil_data will have shape (n_rad * p_rad) x n_alpha x 3
         # with the last dimension corresponding to (AoA, Cl, Cd)
@@ -548,7 +574,7 @@ class TabulatedAirfoil(AirfoilModel):
                 Cm[i] = np.interp(alpha[i], alpha_bkpts, Cm_data)
 
         if self.compressibility_model == "glauert":
-            glauert = 1 / np.sqrt(1 - M_inf ** 2)
+            glauert = 1 / np.sqrt(1 - M_inf**2)
             Cl = Cl * glauert
             Cm = Cm * glauert
 
@@ -558,17 +584,17 @@ class TabulatedAirfoil(AirfoilModel):
 @struct.pytree_node(frozen=False)  # Non-frozen to allow for initializing weights
 class BladeElementModel(RotorModel):
     """Blade element model for rotor aerodynamics
-    
+
     This model is based on blade-element theory with uniform inflow (momentum disk)
     approximation for rotor-induced inflow.
-    
+
     Uses Gauss-Legendre quadrature for integration over the rotor disk.
     """
 
     # Aerodynamic model parameters
     Nb: int = 2  # Number of blades
     R: float = 1.0  # Rotor radius [m]
-    e: float = 0.1 # Root cut-out ratio [-]
+    e: float = 0.1  # Root cut-out ratio [-]
     a: float = 343.0  # Speed of sound [m/s]
     rho: float = 1.225  # Air density [kg/m^3]
 
@@ -576,7 +602,7 @@ class BladeElementModel(RotorModel):
     airfoil_model: AirfoilModel = struct.field(default_factory=ThinAirfoil)
 
     # Iterative inflow solver parameters
-    T0: float = 0.0 # Reference thrust per rotor (e.g. weight / number of rotors)
+    T0: float = 0.0  # Reference thrust per rotor (e.g. weight / number of rotors)
     newton_max_iter: int = 50  # Maximum number of iterations for Newton solve
     newton_abstol: float = 1e-6  # Absolute tolerance for Newton solve
 
@@ -612,7 +638,7 @@ class BladeElementModel(RotorModel):
             mu_z = -v_W[2] / (Omega * self.R)
             # Compute thrust coefficient based on momentum disk theory
             # See (2.126) in Leishman
-            CT_momentum_disk = 2 * (lambda_ - mu_z) * np.sqrt(mu_x ** 2 + lambda_ ** 2)
+            CT_momentum_disk = 2 * (lambda_ - mu_z) * np.sqrt(mu_x**2 + lambda_**2)
             # Compute thrust coefficient based on blade element theory
             CT_blade_element = self.thrust_coefficient(
                 t, v_W, w_W, x, Omega, lambda_, geometry
@@ -638,7 +664,7 @@ class BladeElementModel(RotorModel):
         nodes_rad = []
         weights_rad = []
         for i in range(n_rad):
-            a, b = el_rad[i], el_rad[i+1]
+            a, b = el_rad[i], el_rad[i + 1]
             x0 = 0.5 * (a + b)  # Center of the interval
             dx = 0.5 * (b - a)  # Half-width of the interval
             nodes_rad.extend(x0 + dx * x_rad)
@@ -650,11 +676,11 @@ class BladeElementModel(RotorModel):
         self.nodes_rad = np.repeat(np.array(nodes_rad)[:, None], (p_az * n_az), axis=1)
 
         # Divide the azimuthal span into n_az elements
-        el_az = np.linspace(0, 2*np.pi, n_az + 1)
+        el_az = np.linspace(0, 2 * np.pi, n_az + 1)
         nodes_az = []
         weights_az = []
         for i in range(n_az):
-            a, b = el_az[i], el_az[i+1]
+            a, b = el_az[i], el_az[i + 1]
             x0 = 0.5 * (a + b)
             dx = 0.5 * (b - a)
             nodes_az.extend(x0 + dx * x_az)
@@ -667,7 +693,7 @@ class BladeElementModel(RotorModel):
 
     def inflow(self, r, psi, v_W, w_W, Omega, lambda_):
         """Calculate the rotor inflow at a given radius and azimuthal position
-        
+
         Args:
             r: radial position from rotor hub to blade element [m]
             psi: azimuthal position of the rotor blade [rad]
@@ -686,29 +712,35 @@ class BladeElementModel(RotorModel):
         # Flow components relative to the blade element, including rigid body
         # rotations of the entire vehicle and rotor-induced inflow
         ux_b = Omega * r + Vx * np.sin(psi) - r * w_W[2]
-        uz_b = -Vz - lambda_ * Omega * self.R + r * (w_W[0] * np.sin(psi) + w_W[1] * np.cos(psi))
+        uz_b = (
+            -Vz
+            - lambda_ * Omega * self.R
+            + r * (w_W[0] * np.sin(psi) + w_W[1] * np.cos(psi))
+        )
 
         # induced inflow angle γ (angle of attack α = pitch - γ)
         gamma = np.arctan2(-uz_b, ux_b)
 
         # Total inflow velocity squared
-        U_sq = ux_b ** 2 + uz_b ** 2
+        U_sq = ux_b**2 + uz_b**2
 
         return U_sq, gamma
 
     def induced_inflow_ratio(self, t, v_W, w_W, x, Omega, geometry: RotorGeometry):
         # Reference thrust coefficient with guard against zero rotor speed
         Omega = np.where(Omega < 0.0, min(Omega, -1.0), max(Omega, 1.0))
-        CT0 = self.T0 / (0.5 * self.rho * np.pi * self.R ** 2 * Omega ** 2)
+        CT0 = self.T0 / (0.5 * self.rho * np.pi * self.R**2 * Omega**2)
         lambda_guess = np.sqrt(0.5 * CT0)  # Initial guess for the inflow ratio
         return self._lambda_solve(lambda_guess, t, v_W, w_W, x, Omega, geometry)
-    
-    def thrust_coefficient(self, t, v_W, w_W, x, Omega, lambda_, geometry: RotorGeometry):
+
+    def thrust_coefficient(
+        self, t, v_W, w_W, x, Omega, lambda_, geometry: RotorGeometry
+    ):
         F_W = self._compute_forces_moments(
             t, v_W, w_W, x, Omega, lambda_, geometry, force_only=True
         )
         # Different definitions are sometimes used: see (2.31) in Leishman
-        CT = abs(F_W[2]) / (self.rho * np.pi * self.R ** 4 * Omega ** 2)
+        CT = abs(F_W[2]) / (self.rho * np.pi * self.R**4 * Omega**2)
         return CT
 
     def wind_frame_loads(self, t, v_W, w_W, x, u, geometry: RotorGeometry):
@@ -716,10 +748,10 @@ class BladeElementModel(RotorModel):
         # theory and the blade element model in terms of thrust.
         lambda_ = self.induced_inflow_ratio(t, v_W, w_W, x, u, geometry)
         return self._compute_forces_moments(t, v_W, w_W, x, u, lambda_, geometry)
-    
+
     def _differential_shear(self, v_W, w_W, u, lambda_, force_only=False):
         # Compute infinitesimal shear forces and moments dS(r, ψ), dM(r, ψ) at each node
-        
+
         # Determine the relative velocity U for the blade element at each node
         U_sq, gamma = self.inflow(self.nodes_rad, self.nodes_az, v_W, w_W, u, lambda_)
 
@@ -731,7 +763,9 @@ class BladeElementModel(RotorModel):
         else:
             M_inf = 0.0
 
-        Cl, Cd, Cm = self.airfoil_model(alpha, Re=None, M_inf=M_inf, force_only=force_only)
+        Cl, Cd, Cm = self.airfoil_model(
+            alpha, Re=None, M_inf=M_inf, force_only=force_only
+        )
 
         # Integrate in radial direction to get root forces and moments as a function
         # of azimuthal position
@@ -752,7 +786,7 @@ class BladeElementModel(RotorModel):
         dMx = dFz * self.nodes_rad
 
         # Root torsional moment Mϕ(ψ)
-        dMy = 0.5 * self.rho * c ** 2 * U_sq * Cm
+        dMy = 0.5 * self.rho * c**2 * U_sq * Cm
 
         # Root lagwise bending moment Mζ(ψ)
         dMz = -dFx * self.nodes_rad
@@ -781,8 +815,14 @@ class BladeElementModel(RotorModel):
         # Integrate in azimuthal direction to get mean forces in wind frame
         Nb_fac = self.Nb / (2 * np.pi)
         psi = self.nodes_az[0]  # Only need the array of unique azimuthal nodes
-        Fx_W = Nb_fac * np.dot(-Fx_b * np.sin(psi) - Fy_b * np.cos(psi), self.weights_az)
-        Fy_W = sign * Nb_fac * np.dot(-Fx_b * np.cos(psi) + Fy_b * np.sin(psi), self.weights_az)
+        Fx_W = Nb_fac * np.dot(
+            -Fx_b * np.sin(psi) - Fy_b * np.cos(psi), self.weights_az
+        )
+        Fy_W = (
+            sign
+            * Nb_fac
+            * np.dot(-Fx_b * np.cos(psi) + Fy_b * np.sin(psi), self.weights_az)
+        )
         Fz_W = Nb_fac * np.dot(-Fz_b, self.weights_az)
 
         F_W = np.array([Fx_W, Fy_W, Fz_W], like=v_W)
@@ -795,8 +835,14 @@ class BladeElementModel(RotorModel):
         Mz_b = dMz.T @ self.weights_rad  # Root lagwise bending moment Mζ(ψ)
 
         # Integrate in azimuthal direction to get mean moments in wind frame
-        Mx_W = sign * Nb_fac * np.dot(-Mx_b * np.sin(psi) - My_b * np.cos(psi), self.weights_az)
-        My_W = Nb_fac * np.dot(-Mx_b * np.cos(psi) + My_b * np.sin(psi), self.weights_az)
+        Mx_W = (
+            sign
+            * Nb_fac
+            * np.dot(-Mx_b * np.sin(psi) - My_b * np.cos(psi), self.weights_az)
+        )
+        My_W = Nb_fac * np.dot(
+            -Mx_b * np.cos(psi) + My_b * np.sin(psi), self.weights_az
+        )
         Mz_W = sign * Nb_fac * np.dot(-Mz_b, self.weights_az)
 
         # No aerodynamic states

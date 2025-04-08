@@ -228,7 +228,7 @@ class FlightVehicle(metaclass=abc.ABCMeta):
 
         if self.attitude == "euler":
             rpy = x.att
-    
+
             # Convert roll-pitch-yaw (rpy) orientation to the direction cosine matrix.
             # C_BN rotates from the Newtonian frame N to the body frame B.
             # C_BN.T = C_NB rotates from the body frame B to the Newtonian frame N.
@@ -243,7 +243,7 @@ class FlightVehicle(metaclass=abc.ABCMeta):
 
         elif self.attitude == "quaternion":
             q = x.att
-    
+
             # Convert roll-pitch-yaw (rpy) orientation to the direction cosine matrix.
             # C_BN rotates from the Newtonian frame N to the body frame B.
             # C_BN.T = C_NB rotates from the body frame B to the Newtonian frame N.

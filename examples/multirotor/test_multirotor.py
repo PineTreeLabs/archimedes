@@ -44,35 +44,50 @@ class TestVehicleKinematics:
         # Test cases: [roll, pitch, yaw] in radians
         test_angles = [
             np.array([0, 0, 0]),  # Identity
-            np.array([np.pi/4, 0, 0]),  # 45 degree roll
-            np.array([0, np.pi/4, 0]),  # 45 degree pitch
-            np.array([0, 0, np.pi/4]),  # 45 degree yaw
-            np.array([np.pi/6, np.pi/4, np.pi/3]),  # Arbitrary rotation
-            np.array([np.pi, np.pi/2, np.pi/4]),  # Edge case
+            np.array([np.pi / 4, 0, 0]),  # 45 degree roll
+            np.array([0, np.pi / 4, 0]),  # 45 degree pitch
+            np.array([0, 0, np.pi / 4]),  # 45 degree yaw
+            np.array([np.pi / 6, np.pi / 4, np.pi / 3]),  # Arbitrary rotation
+            np.array([np.pi, np.pi / 2, np.pi / 4]),  # Edge case
         ]
 
         for angles in test_angles:
             C_BN_custom = dcm(angles)
-        
+
             # SciPy's rotation (use 'ZYX' for intrinsic rotations, which is
             # equivalent to yaw-pitch-roll).  Note that SciPy expects angles
             # in sequence order, so in this case yaw-pitch-roll and will return
             # the inertial-to-body transformation matrix (the transpose of `dcm`).
-            r = Rotation.from_euler('ZYX', angles[::-1])
+            r = Rotation.from_euler("ZYX", angles[::-1])
             C_BN_scipy = r.as_matrix().T
 
             # Compare the results
-            npt.assert_allclose(C_BN_custom, C_BN_scipy, rtol=1e-6, atol=1e-6,
-                                err_msg=f"Mismatch for angles {angles}")
+            npt.assert_allclose(
+                C_BN_custom,
+                C_BN_scipy,
+                rtol=1e-6,
+                atol=1e-6,
+                err_msg=f"Mismatch for angles {angles}",
+            )
 
             # Verify orthogonality
             identity = np.eye(3)
-            npt.assert_allclose(C_BN_custom @ C_BN_custom.T, identity, rtol=1e-6, atol=1e-6,
-                                err_msg=f"Non-orthogonal matrix for angles {angles}")
+            npt.assert_allclose(
+                C_BN_custom @ C_BN_custom.T,
+                identity,
+                rtol=1e-6,
+                atol=1e-6,
+                err_msg=f"Non-orthogonal matrix for angles {angles}",
+            )
 
             # Verify determinant is 1 (proper rotation)
-            npt.assert_allclose(np.linalg.det(C_BN_custom), 1.0, rtol=1e-6, atol=1e-6,
-                                err_msg=f"Determinant not 1 for angles {angles}")
+            npt.assert_allclose(
+                np.linalg.det(C_BN_custom),
+                1.0,
+                rtol=1e-6,
+                atol=1e-6,
+                err_msg=f"Determinant not 1 for angles {angles}",
+            )
 
     def test_euler_kinematics(self):
         rpy = np.array([0.1, 0.2, 0.3])
@@ -81,7 +96,7 @@ class TestVehicleKinematics:
         # using the rotation matrices directly.
         pqr = np.array([0.4, 0.5, 0.6])  # Roll, pitch, yaw rates
         C_roll = dcm(np.array([rpy[0], 0, 0]))  # C_φ
-        C_pitch = dcm(np.array([0, rpy[1], 0])) # C_θ
+        C_pitch = dcm(np.array([0, rpy[1], 0]))  # C_θ
         # Successively transform each rate into the body frame
         w_B_ex = np.array([pqr[0], 0.0, 0.0]) + C_roll @ (
             np.array([0.0, pqr[1], 0.0]) + C_pitch @ np.array([0.0, 0.0, pqr[2]])
@@ -237,7 +252,9 @@ class TestVehicleKinematics:
             p_N=np.zeros(3),
             att=np.zeros(3),
             v_B=np.zeros(3),
-            w_B=np.array([mx * J_B_inv[0, 0], 0, 0]),  # Angular velocity in the body frame
+            w_B=np.array(
+                [mx * J_B_inv[0, 0], 0, 0]
+            ),  # Angular velocity in the body frame
         )
         npt.assert_allclose(x_t.p_N, x_t_ex.p_N)
         npt.assert_allclose(x_t.att, x_t_ex.att)
@@ -259,7 +276,7 @@ class TestVehicleKinematics:
             w_B=w_B,
         )
         u = np.zeros(4)
-        
+
         x_t = basic_vehicle.dynamics(0, x, u)
 
         x_t_ex = basic_vehicle.State(
@@ -319,7 +336,7 @@ class TestBladeElementModel:
         Cd_0 = 0.02
 
         # Theoretical predictions for thin airfoil with parabolic camber
-        Cl_0 = 4*np.pi*h
+        Cl_0 = 4 * np.pi * h
         Cl_alpha = 2 * np.pi
         Cm_0 = -np.pi * h
 
@@ -374,7 +391,7 @@ class TestBladeElementModel:
         npt.assert_allclose(dMx, r * dSz_ex)
         npt.assert_allclose(dMz, -r * dSx_ex)
 
-        dMy_ex = 0.5 * rho * c ** 2 * Cm * (Omega * r) ** 2
+        dMy_ex = 0.5 * rho * c**2 * Cm * (Omega * r) ** 2
         npt.assert_allclose(dMy, dMy_ex)
 
         # Check net forces and moments
@@ -384,8 +401,8 @@ class TestBladeElementModel:
         )
 
         # Everything but thrust and torque average to zero
-        Sz = (1/6) * rho * c * Cl * Omega ** 2 * R ** 3 * (1 - e ** 3)
-        Mz = -(1/8) * rho * c * Cd * Omega ** 2 * R ** 4 * (1 - e ** 4)
+        Sz = (1 / 6) * rho * c * Cl * Omega**2 * R**3 * (1 - e**3)
+        Mz = -(1 / 8) * rho * c * Cd * Omega**2 * R**4 * (1 - e**4)
 
         Fz_W = -rotor_model.Nb * Sz
         Mz_W = -rotor_model.Nb * Mz
@@ -413,7 +430,7 @@ class TestBladeElementModel:
         Cd_0 = 0.02
 
         # Theoretical predictions for thin airfoil with parabolic camber
-        Cl_0 = 4*np.pi*h
+        Cl_0 = 4 * np.pi * h
         Cl_alpha = 2 * np.pi
         Cm_0 = -np.pi * h
 
@@ -458,18 +475,18 @@ class TestBladeElementModel:
         Cm = Cm_0
 
         # Blade root drag shear
-        dSx_ex = 0.5 * rho * c * (a * Cl + Cd) * (Omega * r) ** 2 * np.sqrt(1 + a ** 2)
+        dSx_ex = 0.5 * rho * c * (a * Cl + Cd) * (Omega * r) ** 2 * np.sqrt(1 + a**2)
         npt.assert_allclose(dSx, dSx_ex)
 
         # Blade root vertical shear
-        dSz_ex = 0.5 * rho * c * (Cl - a * Cd) * (Omega * r) ** 2 * np.sqrt(1 + a ** 2)
+        dSz_ex = 0.5 * rho * c * (Cl - a * Cd) * (Omega * r) ** 2 * np.sqrt(1 + a**2)
         npt.assert_allclose(dSz, dSz_ex)
 
         # Check bending moments
         npt.assert_allclose(dMx, r * dSz_ex)
         npt.assert_allclose(dMz, -r * dSx_ex)
 
-        dMy_ex = 0.5 * rho * c ** 2 * Cm * (Omega * r) ** 2 * (1 + a ** 2)
+        dMy_ex = 0.5 * rho * c**2 * Cm * (Omega * r) ** 2 * (1 + a**2)
         npt.assert_allclose(dMy, dMy_ex)
 
         # Check net force and moments
@@ -479,12 +496,24 @@ class TestBladeElementModel:
 
         # Everything but thrust and torque average to zero
         Sz = (
-            (1/6) * rho * c * (Cl - a * Cd) * Omega ** 2 \
-            * R ** 3 * (1 - e ** 3) * np.sqrt(1 + a ** 2)
+            (1 / 6)
+            * rho
+            * c
+            * (Cl - a * Cd)
+            * Omega**2
+            * R**3
+            * (1 - e**3)
+            * np.sqrt(1 + a**2)
         )
         Mz = -(
-            (1/8) * rho * c * (a * Cl + Cd) * Omega ** 2 \
-            * R ** 4 * (1 - e ** 4) * np.sqrt(1 + a ** 2)
+            (1 / 8)
+            * rho
+            * c
+            * (a * Cl + Cd)
+            * Omega**2
+            * R**4
+            * (1 - e**4)
+            * np.sqrt(1 + a**2)
         )
 
         Fz_W = -rotor_model.Nb * Sz
@@ -516,7 +545,7 @@ class TestBladeElementModel:
         Cd_0 = 0.0
 
         # Theoretical predictions for thin airfoil with parabolic camber
-        Cl_0 = 4*np.pi*h
+        Cl_0 = 4 * np.pi * h
         Cl_alpha = 2 * np.pi
         Cm_0 = -np.pi * h
 
@@ -544,7 +573,7 @@ class TestBladeElementModel:
         )
 
         psi = rotor_model.nodes_az
-        assert not(np.any(np.isclose(psi % 2 * np.pi, 0.0)))  # Singularity at psi=0
+        assert not (np.any(np.isclose(psi % 2 * np.pi, 0.0)))  # Singularity at psi=0
 
         phi = np.arctan2(-Vz, Vx * np.sin(psi))
 
@@ -558,7 +587,7 @@ class TestBladeElementModel:
 
         c = c0
         Cl = Cl_0 - Cl_alpha * phi
-        U_sq = (Vx * np.sin(psi)) ** 2 + Vz ** 2
+        U_sq = (Vx * np.sin(psi)) ** 2 + Vz**2
 
         dSx_ex = 0.5 * rho * c * U_sq * Cl * np.sin(phi)
         npt.assert_allclose(dSx, dSx_ex)
@@ -586,7 +615,7 @@ class TestBladeElementModel:
         Cd_0 = 0.02
 
         # Theoretical predictions for thin airfoil with parabolic camber
-        Cl_0 = 4*np.pi*h
+        Cl_0 = 4 * np.pi * h
         Cl_alpha = 2 * np.pi
         Cm_0 = -np.pi * h
 
@@ -619,7 +648,9 @@ class TestBladeElementModel:
         lambda_guess = 0.0
         t = 0.0
         x = np.array([])
-        lambda_ = rotor_model._lambda_solve(lambda_guess, t, v_W, w_W, x, Omega, geometry)
+        lambda_ = rotor_model._lambda_solve(
+            lambda_guess, t, v_W, w_W, x, Omega, geometry
+        )
 
         CT_blade_element = rotor_model.thrust_coefficient(
             t, v_W, w_W, x, Omega, lambda_, geometry
@@ -627,12 +658,14 @@ class TestBladeElementModel:
 
         mu_x = -v_W[0] / (Omega * rotor_model.R)
         mu_z = -v_W[2] / (Omega * rotor_model.R)
-        CT_momentum_disk = 2 * (lambda_ - mu_z) * np.sqrt(mu_x ** 2 + lambda_ ** 2)
+        CT_momentum_disk = 2 * (lambda_ - mu_z) * np.sqrt(mu_x**2 + lambda_**2)
 
         npt.assert_allclose(CT_blade_element, CT_momentum_disk, rtol=1e-6, atol=1e-6)
 
+
 class TestTrimStability:
     """Check trim and linear stability of the multirotor vehicle"""
+
     def test_hover_stability(self):
         kF = 1.0
         rotor_model = QuadraticRotorModel(
@@ -648,14 +681,16 @@ class TestTrimStability:
 
         L = 0.2  # Arm length
         rotors = []
-        theta = np.pi/4
+        theta = np.pi / 4
         ccw = True
         for i in range(4):
-            rotors.append(RotorGeometry(
-                offset=np.array([L*np.cos(theta), L*np.sin(theta), 0]),
-                ccw=ccw,
-            ))
-            theta += np.pi/2
+            rotors.append(
+                RotorGeometry(
+                    offset=np.array([L * np.cos(theta), L * np.sin(theta), 0]),
+                    ccw=ccw,
+                )
+            )
+            theta += np.pi / 2
             ccw = not ccw
 
         vehicle = MultiRotorVehicle(
@@ -688,7 +723,7 @@ class TestTrimStability:
             x_t = vehicle.dynamics(0.0, x, u)
             # Residuals of dynamics equations only
             return np.hstack([x_t.v_B, x_t.w_B])
-    
+
         u0 = 500.0
         p0 = np.array([0.0, 0.0, u0, u0, u0, u0])
 
@@ -699,7 +734,7 @@ class TestTrimStability:
         u_trim = p_trim[2:]
 
         u_trim_ex = np.sqrt(m * g0 / (4 * kF)) * np.ones(4)
-        
+
         npt.assert_allclose(phi_trim, 0.0, atol=1e-6)
         npt.assert_allclose(theta_trim, 0.0, atol=1e-6)
         npt.assert_allclose(u_trim, u_trim_ex, atol=1e-6)
@@ -717,12 +752,14 @@ class TestTrimStability:
         # pitch (theta), and pitch rate (q). The other states are
         # assumed to be in trim
         def longitudinal_dofs(x):
-            return np.hstack([
-                x.att[1],  # theta
-                x.v_B[0],  # vx
-                x.v_B[2],  # vz
-                x.w_B[1],  # q
-            ])
+            return np.hstack(
+                [
+                    x.att[1],  # theta
+                    x.v_B[0],  # vx
+                    x.v_B[2],  # vz
+                    x.w_B[1],  # q
+                ]
+            )
 
         # Right-hand side function for the lateral dynamics
         @arc.compile
@@ -743,12 +780,14 @@ class TestTrimStability:
         A_lon = arc.jac(f_lon, 0)(x_lon_trim, u_trim)
         B_lon = arc.jac(f_lon, 1)(x_lon_trim, u_trim)
 
-        A_lon_ex = np.array([
-            [0, 0, 0, 1],
-            [-g0, 0, 0, 0],
-            [0, 0, 0, 0],
-            [0, 0, 0, 0],
-        ])
+        A_lon_ex = np.array(
+            [
+                [0, 0, 0, 1],
+                [-g0, 0, 0, 0],
+                [0, 0, 0, 0],
+                [0, 0, 0, 0],
+            ]
+        )
         npt.assert_allclose(A_lon, A_lon_ex, atol=1e-6)
 
         # Check that the control matrix is zero for (theta, u)
@@ -771,12 +810,14 @@ class TestTrimStability:
         # The other states are assumed to be in trim
 
         def lateral_dofs(x):
-            return np.hstack([
-                x.att[0],  # phi
-                x.v_B[1],  # vy
-                x.w_B[0],  # p
-                x.w_B[2],  # r
-            ])
+            return np.hstack(
+                [
+                    x.att[0],  # phi
+                    x.v_B[1],  # vy
+                    x.w_B[0],  # p
+                    x.w_B[2],  # r
+                ]
+            )
 
         # Right-hand side function for the lateral dynamics
         @arc.compile
@@ -797,12 +838,14 @@ class TestTrimStability:
         A_lat = arc.jac(f_lat, 0)(x_lat_trim, u_trim)
         B_lat = arc.jac(f_lat, 1)(x_lat_trim, u_trim)
 
-        A_lat_ex = np.array([
-            [0, 0, 1, 0],
-            [g0, 0, 0, 0],
-            [0, 0, 0, 0],
-            [0, 0, 0, 0],
-        ])
+        A_lat_ex = np.array(
+            [
+                [0, 0, 1, 0],
+                [g0, 0, 0, 0],
+                [0, 0, 0, 0],
+                [0, 0, 0, 0],
+            ]
+        )
 
         npt.assert_allclose(A_lat, A_lat_ex, atol=1e-6)
 

@@ -44,9 +44,9 @@ class AtmosphereModel:
         else:
             T = 519.0 * Tfac
 
-        rho = R0 * Tfac ** 4.14
+        rho = R0 * Tfac**4.14
         amach = Vt / np.sqrt(gamma * Rs * T)
-        qbar = 0.5 * rho * Vt ** 2
+        qbar = 0.5 * rho * Vt**2
 
         return amach, qbar
 
@@ -114,9 +114,9 @@ class SubsonicF16(FlightVehicle):
         # Moments
         p, q, r = x.w_B  # Angular velocity in body frame (ω_B)
         Meng_B = self.hx * np.array([0.0, -r, q])
-        Maero_B = qbar * self.S * np.array([
-            self.b * clt, self.cbar * cmt, self.b * cnt
-        ])
+        Maero_B = (
+            qbar * self.S * np.array([self.b * clt, self.cbar * cmt, self.b * cnt])
+        )
         M_B = Meng_B + Maero_B
 
         # Dynamic component of engine state (auxiliary state)
@@ -124,4 +124,3 @@ class SubsonicF16(FlightVehicle):
 
         aux_state_derivs = np.atleast_1d(pow_t)
         return F_B, M_B, aux_state_derivs
-

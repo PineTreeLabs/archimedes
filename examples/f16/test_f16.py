@@ -23,11 +23,14 @@ Azz = 63100.0
 Axz = -982.0
 mass = weight / g0
 
-J_B = np.array([
-    [Axx, 0.0, Axz],
-    [0.0, Ayy, 0.0],
-    [Axz, 0.0, Azz],
-])
+J_B = np.array(
+    [
+        [Axx, 0.0, Axz],
+        [0.0, Ayy, 0.0],
+        [Axz, 0.0, Azz],
+    ]
+)
+
 
 def test_352():
     """Compare to Table 3.5-2 in Lewis, Johnson, Stevens"""
@@ -50,26 +53,34 @@ def test_352():
     # 248.1241 instead of -248.1241 (the latter is consistent with the SciPy
     # DCM implementation).
     q_t = 0.5 * quaternion_multiply(q, np.array([0, *w_B]))
-    drpy_ex = np.array([
-        2.505734,  # phi (roll)
-        0.3250820,  # theta (pitch)
-        2.145926,  # psi (yaw)
-    ])
-    dp_N_ex = np.array([
-        342.4439,  # x (north)
-        -266.7707,  # y (east)
-        -248.1241,  # z (down)
-    ])
-    dv_B_ex = np.array([
-        100.8536,  # u
-        -218.3080,  # v
-        -437.0399,  # w
-    ])
-    dw_B_ex = np.array([
-        12.62679,  # p
-        0.9649671,  # q
-        0.5809759,  # r
-    ])
+    drpy_ex = np.array(
+        [
+            2.505734,  # phi (roll)
+            0.3250820,  # theta (pitch)
+            2.145926,  # psi (yaw)
+        ]
+    )
+    dp_N_ex = np.array(
+        [
+            342.4439,  # x (north)
+            -266.7707,  # y (east)
+            -248.1241,  # z (down)
+        ]
+    )
+    dv_B_ex = np.array(
+        [
+            100.8536,  # u
+            -218.3080,  # v
+            -437.0399,  # w
+        ]
+    )
+    dw_B_ex = np.array(
+        [
+            12.62679,  # p
+            0.9649671,  # q
+            0.5809759,  # r
+        ]
+    )
 
     model = SubsonicF16(m=mass, J_B=J_B, xcg=0.4)
     x_t = model.dynamics(0.0, x, u)
@@ -105,7 +116,9 @@ def test_36():
     p_N = np.array([0.0, 0.0, 0.0])  # NED-frame position
     rpy = np.array([1.366289e0, 5.000808e-2, 2.340769e-1])  # Roll, pitch, yaw
     v_B = np.array([u, v, w])  # Velocity in body frame
-    w_B = np.array([-1.499617e-2, 2.933811e-1, 6.084932e-2])  # Angular velocity in body frame
+    w_B = np.array(
+        [-1.499617e-2, 2.933811e-1, 6.084932e-2]
+    )  # Angular velocity in body frame
     q = euler_to_quaternion(rpy)
     pow = 6.412363e1  # Engine power
     x = SubsonicF16.State(p_N, q, v_B, w_B, pow)

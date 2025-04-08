@@ -26,7 +26,7 @@ class NitrogenTetroxide(ThermalFluidEoS):
     of enthalpy with respect to temperature.
 
     Generally expected to be valid from around 300-500 K at pressures from 5-10 MPa
-    
+
     Thermal expansion data from:
         Properties of the System N2O4 ⇆ 2NO2 ⇆ 2NO + O2
         S. S. T. F and D. M. Mason
@@ -46,6 +46,7 @@ class NitrogenTetroxide(ThermalFluidEoS):
     Enthalpy of formation and Shomate coefficients:
         NIST WebBook, Dinitrogen tetroxide
     """
+
     M = 92.011  # molar mass [g/mol]
 
     # Shomate coefficients from NIST WebBook
@@ -59,35 +60,39 @@ class NitrogenTetroxide(ThermalFluidEoS):
     H = -19.56401
 
     p_bkpts = np.array([6.895, 10.342]) * 1e6  # Pa
-    T_bkpts = np.array([294.26, 310.93, 327.59, 344.26, 360.93, 377.59, 394.26, 410.93])  # K
-    rho_data = np.array([
-        [1452.2666, 1457.5532],
-        [1413.8048, 1420.0849],
-        [1373.7974, 1379.7048],
-        [1328.2225, 1337.0923],
-        [1276.1576, 1287.2479],
-        [1214.9109, 1228.1338],
-        [1138.8123, 1158.7416],
-        [1029.4641, 1064.2805],
-    ])
+    T_bkpts = np.array(
+        [294.26, 310.93, 327.59, 344.26, 360.93, 377.59, 394.26, 410.93]
+    )  # K
+    rho_data = np.array(
+        [
+            [1452.2666, 1457.5532],
+            [1413.8048, 1420.0849],
+            [1373.7974, 1379.7048],
+            [1328.2225, 1337.0923],
+            [1276.1576, 1287.2479],
+            [1214.9109, 1228.1338],
+            [1138.8123, 1158.7416],
+            [1029.4641, 1064.2805],
+        ]
+    )
 
     h0_f = -19.56e3  # enthalpy of formation [J/mol]
 
     def __init__(self):
         # 2D interpolation for rho(p, T)
         self._rho = arc.interpolant([self.p_bkpts, self.T_bkpts], self.rho_data.T)
-    
+
         # Use root-finding to solve for pressure
         @arc.compile(kind="MX")
         def p_solve(p, rho, T):
             return rho - self.rho(p=p, T=T)
-    
+
         # p(p_guess=1MPa, rho, T)
         self._p_solve = partial(arc.implicit(p_solve), 1e6)
 
     def _calc_p(self, rho: float, T: float) -> float:
         return self._p_solve(rho, T)
-    
+
     def _calc_rho(self, p: float, T: float) -> float:
         return self._rho(p, T)
 
@@ -102,7 +107,7 @@ class NitrogenTetroxide(ThermalFluidEoS):
             + self.F
             - self.H
         )
-    
+
     def s(self, rho: float, T: float) -> float:
         t = T / 1000
         return (
@@ -126,7 +131,7 @@ class NitrogenTetroxide(ThermalFluidEoS):
 
 class MonoMethylHydrazine(ThermalFluidEoS):
     """Mono-methyl hydrazine (MMH/CH6N2)
-    
+
     Implemented with a lookup table for ρ(T) using RocketProp
     (based on published data from Aerojet Rocketdyne), with a
     correction for pressure based on the speed of sound.
@@ -134,7 +139,7 @@ class MonoMethylHydrazine(ThermalFluidEoS):
     Speed of sound:
         USAF PROPELLANT HANDBOOKS: HYDRAZINE FUELS
         Table 2.4.1
-    
+
     Heat capacity and enthalpy of formation:
         NIST WebBook: Hydrazine, methyl-
     """
@@ -151,7 +156,7 @@ class MonoMethylHydrazine(ThermalFluidEoS):
     rho_ref = 875.0  # reference density [kg/m^3]
 
     cs = 1548.0  # speed of sound [m/s]
-    T_bkpts = np.array([300., 325., 350., 375., 400.])
+    T_bkpts = np.array([300.0, 325.0, 350.0, 375.0, 400.0])
     rho_data = np.array([873.377, 849.244, 824.137, 797.884, 770.255])
 
     # Reference energy
@@ -164,7 +169,7 @@ class MonoMethylHydrazine(ThermalFluidEoS):
         @arc.compile(kind="MX")
         def p_solve(p, rho, T):
             return rho - self._calc_rho(p=p, T=T)
-    
+
         # p(p_guess=1MPa, rho, T)
         self._p_solve = partial(arc.implicit(p_solve), 1e6)
 
@@ -172,7 +177,7 @@ class MonoMethylHydrazine(ThermalFluidEoS):
         rho = np.interp(T, self.T_bkpts, self.rho_data)
         rho = rho + (p - self.p_ref) / self.cs**2  # Pressure correction
         return rho
-    
+
     def _calc_p(self, rho: float, T: float) -> float:
         return self._p_solve(rho, T)
 
@@ -181,22 +186,27 @@ class MonoMethylHydrazine(ThermalFluidEoS):
         p = self._calc_p(rho, T)
         u = self.u_ref + cv * (T - self.T_ref)
         return u + (p / rho)
-    
+
     def _calc_cp(self, rho: float, T: float) -> float:
         cp = 134.93  # specific heat capacity [J/mol-K]
         return cp / (1e-3 * self.M)  # [J/kg-K]
 
     def _calc_cv(self, rho: float, T: float) -> float:
         p = self._calc_p(rho, T)
-        k = (1 / rho) * arc.grad(self._calc_rho, 0)(p, T)  # isothermal compressibility [Pa⁻¹]
-        alpha = -(1 / rho) * arc.grad(self._calc_rho, 1)(p, T)  # thermal expansion coefficient [K⁻¹]
+        k = (1 / rho) * arc.grad(self._calc_rho, 0)(
+            p, T
+        )  # isothermal compressibility [Pa⁻¹]
+        alpha = -(1 / rho) * arc.grad(self._calc_rho, 1)(
+            p, T
+        )  # thermal expansion coefficient [K⁻¹]
         cp = self._calc_cp(rho, T)
-        return cp - (T / rho) * (alpha ** 2 / k)
+        return cp - (T / rho) * (alpha**2 / k)
 
 
 #
 # Engine model
 #
+
 
 @struct.pytree_node
 class Engine:
@@ -254,7 +264,7 @@ class Engine:
 
     def dynamics(self, x: State, u: BoundaryConditions) -> State:
         # Compute the thermodynamic conditions using the EoS
-    
+
         fluid_ft = self.fuel(p=u.p_ft, T=u.T_ft)
         fluid_fl = self.fuel(rho=x.fl.rho, T=x.fl.T)
         fluid_fm = self.fuel(rho=x.fm.rho, T=x.fm.T)
@@ -287,9 +297,7 @@ class Engine:
         dn_o = dm_oin / (self.oxidizer.M * 1e-3)  # molar flow rate of oxidizer
         dn_e = dm_noz / (self.exhaust.M * 1e-3)  # molar flow rate of exhaust
         dQ_cc = (
-            dn_f * self.fuel.h0_f
-            + dn_o * self.oxidizer.h0_f
-            - dn_e * self.exhaust.h0_f
+            dn_f * self.fuel.h0_f + dn_o * self.oxidizer.h0_f - dn_e * self.exhaust.h0_f
         )
 
         dm_fl = dm_fv - dm_fmi
@@ -333,19 +341,19 @@ class Engine:
         g0 = 9.81  # m/s^2
 
         # Exhaust velocity [m/s]
-        ve = np.sqrt(2 * cp * T_cc * (1 - (p_amb / p_cc)**((gamma - 1) / gamma)))
+        ve = np.sqrt(2 * cp * T_cc * (1 - (p_amb / p_cc) ** ((gamma - 1) / gamma)))
 
         # Exhaust mass flow rate [kg/s]
         dm_e = x.noz.dm
 
         # Thrust [N]
         return dm_e * ve
-    
+
     @property
     def OF_stoich(self):
         """Stoichiometrix O/F ratio determined by CEA"""
         return 2.49641
-    
+
     def OF(self, x: State) -> float:
         """O/F ratio"""
         return x.oin.dm / x.fin.dm
