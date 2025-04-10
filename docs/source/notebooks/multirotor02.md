@@ -156,7 +156,7 @@ class GravityModel(metaclass=abc.ABCMeta):
 
 
 @struct.pytree_node
-class ConstantGravityModel(GravityModel):
+class ConstantGravity(GravityModel):
     g0: float = 9.81
 
     def __call__(self, p_N):
@@ -164,7 +164,7 @@ class ConstantGravityModel(GravityModel):
 
 
 @struct.pytree_node
-class PointGravityModel(GravityModel):
+class PointGravity(GravityModel):
     r_EN: np.ndarray  # Position vector from Earth's CM to the origin of the N frame [m]
     G: float = 6.6743e-11  # Gravitational constant [N-m²/kg²]
 
@@ -194,7 +194,7 @@ Now we can customize our gravity model outside of the vehicle dynamics, allowing
 g0 = 9.81
 m = 2.0
 J_B = np.diag([0.01, 0.02, 0.03])
-gravity = ConstantGravityModel(g0=g0)
+gravity = ConstantGravity(g0=g0)
 vehicle = MultiRotorVehicle(m=m, J_B=J_B, gravity_model=gravity)
 ```
 
@@ -345,7 +345,7 @@ class QuadraticDragModel(VehicleDragModel):
 
 
 @struct.pytree_node
-class ConstantGravityModel(GravityModel):
+class ConstantGravity(GravityModel):
     """Uniform gravitational field (flat-Earth approximation)"""
     g0: float = 9.81
 
@@ -373,11 +373,17 @@ class QuadraticRotorModel(RotorModel):
         return F_W, M_W
 ```
 
-The full class hierarchy is summarized graphically below:
+The full class hierarchy so far is summarized graphically below:
 
-<img src="_static/multirotor/class_hierarchy.png" alt="class_hierarchy" width="400"/>
+```{image} _static/multirotor/class_hierarchy.png
+:class: only-light
+```
 
-While we don't expect to need any other gravity models, it is certainly possible that replacing the vehicle drag model with one that accounts for angle of attack and sideslip angle would improve the accuracy of the model.
+```{image} _static/multirotor/class_hierarchy_dark.png
+:class: only-dark
+```
+
+While we don't expect to need any other gravity models in this case, it is certainly possible that replacing the vehicle drag model with one that accounts for angle of attack and sideslip angle would improve the accuracy of the model.
 In this tutorial, however, we will primarily focus on improving the rotor model; the additional model components are included to illustrate the approach to constructing a modeling framework by using the programming principles of abstraction, inheritance, and composition.
 
 ## Composition vs. Inheritance
@@ -395,7 +401,7 @@ In our case, it's easy to plug in the class names to understand the hierarchy:
 
 * `MultiRotorVehicle` _is_ a `FlightVehicle` (inheritance)
 * `MultiRotorVehicle` _has_ a `GravityModel` (composition)
-* `ConstantGravityModel` _is_ a `GravityModel` (inheritance)
+* `ConstantGravity` _is_ a `GravityModel` (inheritance)
 
 It's worth taking a minute to make sense of the class structure here, since we'll expand it significantly with the blade element momentum theory aerodynamics model (a new `RotorModel` implementation) later in this tutorial.
 

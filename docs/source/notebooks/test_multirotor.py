@@ -8,10 +8,12 @@ from scipy.spatial.transform import Rotation
 import archimedes as arc
 from archimedes import struct
 
-from multirotor import (
+from archimedes.experimental.aero import (
     FlightVehicle,
-    dcm,
+    dcm_from_euler as dcm,
     euler_kinematics,
+)
+from multirotor import (
     RotorGeometry,
     ThinAirfoil,
     BladeElementModel,

@@ -7,7 +7,10 @@ from scipy.special import roots_legendre
 
 import archimedes as arc
 from archimedes import struct
-from archimedes.experimental.aero import FlightVehicle
+from archimedes.experimental.aero import (
+    FlightVehicle,
+    dcm_from_euler as dcm  # Used for stability analysis in notebooks
+)
 
 
 # (AoA, Cl, Cd, Cm) data for NACA 0012 airfoil
@@ -104,32 +107,6 @@ NACA_0012 = np.array(
 )
 
 
-def dcm(rpy, transpose=False):
-    """Returns matrix to transform from inertial to body frame (R_BN)
-
-    If transpose=True, returns matrix to transform from body to inertial frame (R_NB).
-    """
-    φ, θ, ψ = rpy[0], rpy[1], rpy[2]
-
-    sφ, cφ = np.sin(φ), np.cos(φ)
-    sθ, cθ = np.sin(θ), np.cos(θ)
-    sψ, cψ = np.sin(ψ), np.cos(ψ)
-
-    R = np.array(
-        [
-            [cθ * cψ, cθ * sψ, -sθ],
-            [sφ * sθ * cψ - cφ * sψ, sφ * sθ * sψ + cφ * cψ, sφ * cθ],
-            [cφ * sθ * cψ + sφ * sψ, cφ * sθ * sψ - sφ * cψ, cφ * cθ],
-        ],
-        like=rpy,
-    )
-
-    if transpose:
-        R = R.T
-
-    return R
-
-
 def z_dcm(yaw, transpose=False):
     """Return the rotation matrix about the z-axis by the specified yaw angle"""
     if np.isscalar(yaw):
@@ -143,51 +120,6 @@ def z_dcm(yaw, transpose=False):
         R = R.T
 
     return R
-
-
-def euler_kinematics(rpy, inverse=False):
-    """Euler kinematical equations
-
-    Define 𝚽 = [phi, theta, psi] == Euler angles for roll, pitch, yaw (same in body and inertial frames)
-
-    The kinematics in body and inertial frames are:
-            ω = [P, Q, R] == [roll_rate, pitch_rate, yaw_rate] in body frame
-            d𝚽/dt = time derivative of Euler angles (inertial frame)
-
-    Returns matrix H(𝚽) such that d𝚽/dt = H(𝚽) * ω
-    If inverse=True, returns matrix H(𝚽)^-1 such that ω = H(𝚽)^-1 * d𝚽/dt.
-    """
-
-    φ, θ = rpy[0], rpy[1]  # Roll, pitch
-
-    sφ, cφ = np.sin(φ), np.cos(φ)
-    sθ, cθ = np.sin(θ), np.cos(θ)
-    tθ = np.tan(θ)
-
-    _1 = np.ones_like(φ)
-    _0 = np.zeros_like(φ)
-
-    if inverse:
-        Hinv = np.array(
-            [
-                [_1, _0, -sθ],
-                [_0, cφ, cθ * sφ],
-                [_0, -sφ, cθ * cφ],
-            ],
-            like=rpy,
-        )
-        return Hinv
-
-    else:
-        H = np.array(
-            [
-                [_1, sφ * tθ, cφ * tθ],
-                [_0, cφ, -sφ],
-                [_0, sφ / cθ, cφ / cθ],
-            ],
-            like=rpy,
-        )
-        return H
 
 
 @struct.pytree_node
@@ -251,7 +183,7 @@ class GravityModel(metaclass=abc.ABCMeta):
 
 
 @struct.pytree_node
-class ConstantGravityModel(GravityModel):
+class ConstantGravity(GravityModel):
     g0: float = 9.81
 
     def __call__(self, p_N):
@@ -259,7 +191,7 @@ class ConstantGravityModel(GravityModel):
 
 
 @struct.pytree_node
-class PointGravityModel(GravityModel):
+class PointGravity(GravityModel):
     G: float = 6.6743e-11  # Gravitational constant [N-m²/kg²]
     R_e: float = 6.371e6  # Radius of earth [m]
 
@@ -391,7 +323,7 @@ class MultiRotorVehicle(FlightVehicle):
     rotors: list[RotorGeometry] = struct.field(default_factory=list)
     rotor_model: RotorModel = struct.field(default_factory=QuadraticRotorModel)
     drag_model: VehicleDragModel = struct.field(default_factory=QuadraticDragModel)
-    gravity_model: GravityModel = struct.field(default_factory=ConstantGravityModel)
+    gravity_model: GravityModel = struct.field(default_factory=ConstantGravity)
 
     def net_forces(self, t, x, u, C_BN):
         p_N = x.p_N  # Position of the center of mass in inertial frame N
