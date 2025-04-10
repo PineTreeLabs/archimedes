@@ -102,4 +102,3 @@ if __name__ == "__main__":
         else:
             shutil.copy2(item, target_item)
     print(f"Copied static files from {static_source} to {static_target}.")
-
