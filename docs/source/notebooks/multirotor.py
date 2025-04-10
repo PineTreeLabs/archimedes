@@ -8,7 +8,10 @@ from scipy.special import roots_legendre
 
 import archimedes as arc
 from archimedes import struct
-from archimedes.experimental.aero import FlightVehicle
+from archimedes.experimental.aero import (
+    FlightVehicle,
+    dcm_from_euler as dcm,
+)
 
 # (AoA, Cl, Cd, Cm) data for NACA 0012 airfoil
 # NOTE: This data was generated using the incompressible flow solver in
