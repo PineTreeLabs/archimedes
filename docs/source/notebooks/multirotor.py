@@ -1,17 +1,14 @@
+# ruff: noqa: N802, N803, N806, N815, N816
 import abc
-from functools import cached_property, partial
-from typing import ClassVar, Callable
-import numpy as np
+from functools import cached_property
+from typing import Callable, ClassVar
 
+import numpy as np
 from scipy.special import roots_legendre
 
 import archimedes as arc
 from archimedes import struct
-from archimedes.experimental.aero import (
-    FlightVehicle,
-    dcm_from_euler as dcm  # Used for stability analysis in notebooks
-)
-
+from archimedes.experimental.aero import FlightVehicle
 
 # (AoA, Cl, Cd, Cm) data for NACA 0012 airfoil
 # NOTE: This data was generated using the incompressible flow solver in
@@ -256,8 +253,8 @@ class RotorModel(metaclass=abc.ABCMeta):
             M_B: aerodynamic moments for this rotor in body frame B
             aux_state_derivs: time derivatives of aerodynamic state variables
         """
-        # So far this framework assumes no extenal wind; hence the rotor-relative air velocity
-        # is just the body velocity transformed to the j-th hub frame.
+        # So far this framework assumes no extenal wind; hence the rotor-relative
+        # air velocity is just the body velocity transformed to the j-th hub frame.
         v_H = geometry.R_BH.T @ v_B
         w_H = geometry.R_BH.T @ w_B  # Angular velocity in the hub frame
 

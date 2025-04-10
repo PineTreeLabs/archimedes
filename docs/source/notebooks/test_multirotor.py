@@ -1,28 +1,26 @@
-from functools import partial
-import pytest
+# ruff: noqa: N806, N803, N816
 import numpy as np
 import numpy.testing as npt
-
+import pytest
+from multirotor import (
+    BladeElementModel,
+    ConstantGravity,
+    MultiRotorVehicle,
+    QuadraticDragModel,
+    QuadraticRotorModel,
+    RotorGeometry,
+    ThinAirfoil,
+)
 from scipy.spatial.transform import Rotation
 
 import archimedes as arc
-from archimedes import struct
-
 from archimedes.experimental.aero import (
     FlightVehicle,
-    dcm_from_euler as dcm,
     euler_kinematics,
 )
-from multirotor import (
-    RotorGeometry,
-    ThinAirfoil,
-    BladeElementModel,
-    MultiRotorVehicle,
-    QuadraticRotorModel,
-    QuadraticDragModel,
-    ConstantGravityModel,
+from archimedes.experimental.aero import (
+    dcm_from_euler as dcm,
 )
-
 
 m = 1.7  # Arbitrary mass
 g0 = 9.81
@@ -679,7 +677,7 @@ class TestTrimStability:
             Cd=0.0,
             A=1.0,
         )
-        gravity_model = ConstantGravityModel(g0=g0)
+        gravity_model = ConstantGravity(g0=g0)
 
         L = 0.2  # Arm length
         rotors = []
