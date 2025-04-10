@@ -10,7 +10,9 @@ import archimedes as arc
 from archimedes import struct
 from archimedes.experimental.aero import (
     FlightVehicle,
-    dcm_from_euler as dcm,
+)
+from archimedes.experimental.aero import (
+    dcm_from_euler as dcm,  # noqa: F401
 )
 
 # (AoA, Cl, Cd, Cm) data for NACA 0012 airfoil
