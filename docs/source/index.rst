@@ -60,6 +60,12 @@ Documentation
 
 .. toctree::
    :maxdepth: 1
+   :caption: Examples
+
+   notebooks/multirotor00
+
+.. toctree::
+   :maxdepth: 1
    :caption: Reference
 
    gotchas
