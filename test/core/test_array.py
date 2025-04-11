@@ -148,6 +148,12 @@ class TestSymbolicArrayCreate:
         with pytest.raises(ValueError, match=r"Unknown symbolic kind.*"):
             sym("x", kind="abc")
 
+        with pytest.raises(ValueError, match=r"Shape must be an int or tuple of ints"):
+            sym("x", shape="invalid")
+
+        with pytest.raises(ValueError, match=r"Only scalars, vectors.*"):
+            sym("x", shape=(3, 3, 3))
+
         with pytest.raises(ValueError):
             arc.zeros(shape=(2, 3, 4))
 

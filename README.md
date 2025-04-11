@@ -1,6 +1,7 @@
 # Archimedes
 
 ![Build Status](https://github.com/jcallaham/archimedes/actions/workflows/ci.yaml/badge.svg)
+![Security Scan](https://github.com/jcallaham/archimedes/workflows/security.yaml/badge.svg)
 [![codecov](https://codecov.io/gh/jcallaham/archimedes/graph/badge.svg?token=37QNTHS42R)](https://codecov.io/gh/jcallaham/archimedes)
 
 Archimedes is an open-source Python framework designed to simplify complex modeling and simulation tasks, with the ultimate goal of making it possible to do practical hardware engineering with Python.
@@ -206,6 +207,23 @@ make clean && make nbconvert && make html
 ```
 
 This will scrape API documentation from the docstrings, convert Jupyter notebooks to Markdown files, and then create the HTML website from the outputs.
+
+## Security scanning
+
+First, scan the project requirements for known vulnerabilities:
+
+```bash
+uv export --no-emit-project --format requirements-txt > requirements.txt
+uv run pip-audit -r requirements.txt --disable-pip
+rm requirements.txt
+```
+
+Then run [Bandit](https://bandit.readthedocs.io/) to do a static analysis of the Archimedes code itself:
+
+```bash
+uv run bandit -r src
+```
+
 
 # Current status
 
