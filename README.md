@@ -218,7 +218,7 @@ uv run pip-audit -r requirements.txt --disable-pip
 rm requirements.txt
 ```
 
-Then run [Bandit](https://bandit.readthedocs.io/) to do a static analysis of the Archimides code itself:
+Then run [Bandit](https://bandit.readthedocs.io/) to do a static analysis of the Archimedes code itself:
 
 ```bash
 uv run bandit -r src
