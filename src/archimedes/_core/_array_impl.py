@@ -449,11 +449,11 @@ def sym(
         shape = ()
     if isinstance(shape, int):
         shape = (shape,)
-    assert isinstance(shape, tuple) and len(shape) >= 0, (
-        "shape must be a tuple of length >= 0"
-    )
-    assert all(isinstance(s, int) for s in shape), "shape must be a tuple of ints"
-    assert len(shape) <= 2, "Only scalars, vectors, and matrices are supported for now"
+    if not isinstance(shape, tuple) or not all(isinstance(s, int) for s in shape):
+        raise ValueError("Shape must be an int or tuple of ints")
+    if not (len(shape) <= 2):
+        raise ValueError("Only scalars, vectors, and matrices are supported for now")
+
     # Note that CasADi creates variables in column-major order, so to be consistent
     # with NumPy we have to reverse the shape and transpose the result.  This only
     # applies to SX, since for MX it's just a single symbol anyway.

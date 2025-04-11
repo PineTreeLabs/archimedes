@@ -207,6 +207,23 @@ make clean && make nbconvert && make html
 
 This will scrape API documentation from the docstrings, convert Jupyter notebooks to Markdown files, and then create the HTML website from the outputs.
 
+## Security scanning
+
+First, scan the project requirements for known vulnerabilities:
+
+```bash
+uv export --no-emit-project --format requirements-txt > requirements.txt
+uv run pip-audit -r requirements.txt --disable-pip
+rm requirements.txt
+```
+
+Then run [Bandit](https://bandit.readthedocs.io/) to do a static analysis of the Archimides code itself:
+
+```bash
+uv run bandit -r src
+```
+
+
 # Current status
 
 Archimedes is still in active development, and the API is subject to change.  We are actively seeking feedback from users to help shape the direction of the project.  Key planned directions include hardware support (e.g. HIL testing) and extending physics modeling capabilities.  Please don't hesitate to reach out to us if you have any questions or feedback.
