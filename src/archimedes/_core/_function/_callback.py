@@ -1,16 +1,12 @@
 from __future__ import annotations
 
-import inspect
-from functools import partial
-from typing import TYPE_CHECKING, Any, Callable, Hashable, NamedTuple, Sequence, Tuple
+from typing import Any, Callable
 
-import casadi as cs
-from casadi import Callback, Sparsity
 import numpy as np
+from casadi import Callback, Sparsity
 
 from .._array_impl import _as_casadi_array, array
 from ._compile import FunctionCache
-
 
 _callback_refs: list[Callback] = []
 
@@ -89,7 +85,7 @@ def callback(func: Callable, *args) -> Any:
     ...     return y * 2
     >>>
     >>> model(np.array([0.5, 1.5]))
-    
+
     See Also
     --------
     compile : Function for symbolically compiling Python functions
@@ -137,18 +133,15 @@ def callback(func: Callable, *args) -> Any:
             cb_args = arg_unravel(dm_arg)
 
             ret = func(*cb_args)
-    
+
             # Callback expects DM returns, so flatten this to an array
             ret = tree.map(np.asarray, ret)
             ret, _ = tree.ravel(ret)
             return [ret]
 
-    if hasattr(func, "__name__"):
-        name = f"cb_{func.__name__}"
-    else:
-        name = "cb"
-
+    name = f"cb_{func.__name__}"
     cb = _Callback(name)
+
     def _call(*args):
         arg_flat, _ = tree.ravel(args)
         ret_flat = _exec_callback(cb, arg_flat)
