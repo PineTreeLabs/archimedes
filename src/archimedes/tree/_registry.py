@@ -294,9 +294,6 @@ def register_dataclass(
             if f.metadata.get("static", False)
         ]
 
-    assert meta_fields is not None
-    assert data_fields is not None
-
     # Store inputs as immutable tuples in this scope, because we close over them
     # for later evaluation. This prevents potentially confusing behavior if the
     # caller were to pass in lists that are later mutated.

@@ -1,7 +1,6 @@
-.. Archimedes documentation master file
 
 ==========================
-Archimedes Documentation
+Archimedes
 ==========================
 
 **Archimedes** is an open-source Python framework designed to simplify complex modeling
@@ -58,6 +57,12 @@ Documentation
    under-the-hood
    pytrees
    generated/notebooks/modular-design
+
+.. toctree::
+   :maxdepth: 1
+   :caption: Examples
+
+   notebooks/multirotor00
 
 .. toctree::
    :maxdepth: 1

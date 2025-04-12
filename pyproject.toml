@@ -16,6 +16,7 @@ dependencies = [
 
 [project.optional-dependencies]
 all = [
+    "control>=0.10.1",
     "ipykernel>=6.29.5",
     "jupyter>=1.1.1",
     "matplotlib>=3.10.1",
@@ -27,10 +28,13 @@ build-backend = "hatchling.build"
 
 [dependency-groups]
 dev = [
+    "bandit[toml]>=1.8.3",
+    "furo>=2024.8.6",
     "mypy>=1.15.0",
     "myst-parser[linkify]>=4.0.1",
     "nbconvert>=7.16.6",
     "nbmake>=1.5.5",
+    "pip-audit>=2.9.0",
     "pytest>=8.3.5",
     "pytest-cov>=6.0.0",
     "ruff>=0.11.2",
@@ -48,7 +52,10 @@ select = [
     "I",  # isort
     "N",  # pep8-naming
 ]
-exclude = ["src/archimedes/experimental/*"]
+exclude = [
+    "src/archimedes/experimental/*",
+    "examples/*",
+]
 
 [tool.ruff.lint.isort]
 known-first-party = ["archimedes"]
@@ -75,6 +82,7 @@ source = ["archimedes"]
 omit = [
     "*/archimedes/experimental/*",
     "*/archimedes/typing.py",
+    "*/archimedes/theme.py",
 ]
 
 [tool.coverage.report]

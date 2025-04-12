@@ -1,8 +1,13 @@
+from __future__ import annotations
+from typing import TYPE_CHECKING
 import abc
 
 import numpy as np
 
 from archimedes import struct
+
+if TYPE_CHECKING:
+    from archimedes.typing import PyTree
 
 
 def quaternion_inverse(q):
@@ -95,6 +100,51 @@ def dcm_from_euler(rpy, transpose=False):
     return R
 
 
+def z_dcm(yaw, transpose=False):
+    """Return the rotation matrix about the z-axis by the specified yaw angle"""
+    if np.isscalar(yaw):
+        yaw = np.array(yaw)
+
+    c, s = np.cos(yaw), np.sin(yaw)
+
+    R = np.array([[c, s, 0], [-s, c, 0], [0, 0, 1]], like=yaw)
+
+    if transpose:
+        R = R.T
+
+    return R
+
+
+def y_dcm(pitch, transpose=False):
+    """Return the rotation matrix about the y-axis by the specified pitch angle"""
+    if np.isscalar(pitch):
+        pitch = np.array(pitch)
+
+    c, s = np.cos(pitch), np.sin(pitch)
+
+    R = np.array([[c, 0, -s], [0, 1, 0], [s, 0, c]], like=pitch)
+
+    if transpose:
+        R = R.T
+
+    return R
+
+
+def x_dcm(roll, transpose=False):
+    """Return the rotation matrix about the x-axis by the specified roll angle"""
+    if np.isscalar(roll):
+        roll = np.array(roll)
+
+    c, s = np.cos(roll), np.sin(roll)
+
+    R = np.array([[1, 0, 0], [0, c, s], [0, -s, c]], like=roll)
+
+    if transpose:
+        R = R.T
+
+    return R
+
+
 def euler_to_quaternion(rpy):
     """Convert roll-pitch-yaw Euler angles to quaternion."""
     φ, θ, ψ = rpy[0], rpy[1], rpy[2]
@@ -169,10 +219,37 @@ def euler_kinematics(rpy, inverse=False):
         return H
 
 
+def wind_frame(v_rel_B):
+    """Compute total velocity, angle of attack, and sideslip angle
+
+    The input should be the vehicle wind-relative velocity computed in
+    body-frame axes.  If the inertial velocity of the vehicle expressed in
+    body-frame axes is v_B and the Earth-relative wind velocity is w_N,
+    then the relative velocity is v_rel_B = v_B + R_BN @ w_N, where R_BN
+    is the rotation matrix from inertial to body frame.
+
+    If there is no wind, then v_rel_B = v_B.
+    """
+    u, v, w = v_rel_B
+    vt = np.sqrt(u**2 + v**2 + w**2)
+    alpha = np.arctan2(w, u)
+    beta = np.arcsin(v / vt)
+    return vt, alpha, beta
+
+
 @struct.pytree_node
 class FlightVehicle(metaclass=abc.ABCMeta):
     m: float = 1.0  # mass [kg]
     J_B: np.ndarray = struct.field(default_factory=lambda: np.eye(3))  # inertia matrix
+    attitude: str = struct.field(default="quaternion", static=True)
+
+    @struct.pytree_node
+    class State:
+        p_N: np.ndarray  # Position of the center of mass in the Newtonian frame N
+        att: np.ndarray  # Attitude (orientation) of the vehicle
+        v_B: np.ndarray  # Velocity of the center of mass in body frame B
+        w_B: np.ndarray  # Roll-pitch-yaw rates in body frame (ω_B)
+        aux: PyTree = struct.field(default=None)  # Auxiliary state variables
 
     @abc.abstractmethod
     def net_forces(self, t, x, u, C_BN):
@@ -208,20 +285,37 @@ class FlightVehicle(metaclass=abc.ABCMeta):
         """
 
         # Unpack the state
-        p_N = x[0:3]  # Position of the center of mass in the Newtonian frame N
-        q = x[3:7]  # Quaternion orientation
-        v_B = x[7:10]  # Velocity of the center of mass in body frame B
-        w_B = x[10:13]  # Angular velocity in body frame (ω_B)
+        p_N = x.p_N  # Position of the center of mass in the Newtonian frame N
+        v_B = x.v_B  # Velocity of the center of mass in body frame B
+        w_B = x.w_B  # Roll-pitch-yaw rates in body frame (ω_B)
 
-        # Convert roll-pitch-yaw (rpy) orientation to the direction cosine matrix.
-        # C_BN rotates from the Newtonian frame N to the body frame B.
-        # C_BN.T = C_NB rotates from the body frame B to the Newtonian frame N.
-        C_BN = dcm_from_quaternion(q)
+        if self.attitude == "euler":
+            rpy = x.att
+
+            # Convert roll-pitch-yaw (rpy) orientation to the direction cosine matrix.
+            # C_BN rotates from the Newtonian frame N to the body frame B.
+            # C_BN.T = C_NB rotates from the body frame B to the Newtonian frame N.
+            C_BN = dcm_from_euler(rpy)
+
+            # Transform roll-pitch-yaw rates in the body frame to time derivatives of Euler angles
+            # These are the Euler kinematic equations (1.4-5)
+            H = euler_kinematics(rpy)
+
+            # Time derivatives of roll-pitch-yaw (rpy) orientation
+            att_deriv = H @ w_B
+
+        elif self.attitude == "quaternion":
+            q = x.att
+
+            # Convert roll-pitch-yaw (rpy) orientation to the direction cosine matrix.
+            # C_BN rotates from the Newtonian frame N to the body frame B.
+            # C_BN.T = C_NB rotates from the body frame B to the Newtonian frame N.
+            C_BN = dcm_from_quaternion(q)
+
+            # Time derivative of the quaternion
+            att_deriv = quaternion_derivative(q, w_B)
 
         F_B, M_B, aux_state_derivs = self.net_forces(t, x, u, C_BN)
-
-        # Time derivative of the quaternion
-        dq = quaternion_derivative(q, w_B)
 
         # Velocity in the Newtonian frame
         dp_N = C_BN.T @ v_B
@@ -235,4 +329,10 @@ class FlightVehicle(metaclass=abc.ABCMeta):
         dw_B = np.linalg.solve(self.J_B, M_B - np.cross(w_B, self.J_B @ w_B))
 
         # Pack the state derivatives
-        return np.hstack([dp_N, dq, dv_B, dw_B, aux_state_derivs])
+        return self.State(
+            p_N=dp_N,
+            att=att_deriv,
+            v_B=dv_B,
+            w_B=dw_B,
+            aux=aux_state_derivs,
+        )
