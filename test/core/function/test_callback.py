@@ -1,8 +1,8 @@
-import sys
 import io
-import pytest
+import sys
 
 import numpy as np
+from scipy import signal
 
 import archimedes as arc
 
@@ -21,6 +21,25 @@ def test_callback():
     z = call_f(x, y)
     assert np.allclose(z, f(x, y))
     assert z.shape == x.shape
+
+
+def test_unsupported_op():
+    def calc_sum_psd(x):
+        # Computation that is not supported symbolically
+        f, Pxx = signal.welch(x)  # noqa: N806
+        print(f)
+        return sum(Pxx[f > 0.1])
+
+    # Call from within a compiled function
+    @arc.compile
+    def sum_psd(x):
+        result_shape_dtypes = 0.0  # Template data type for
+        return arc.callback(calc_sum_psd, result_shape_dtypes, x)
+
+    x = np.arange(1024)
+
+    y = calc_sum_psd(x)
+    assert np.allclose(y, sum_psd(x))
 
 
 def test_tree_structured_callback():
@@ -92,7 +111,6 @@ def test_error_propagation():
 
 
 def test_debug_print():
-
     def print_func(x):
         print("Value: {}".format(x))
         return x * 2
@@ -105,16 +123,16 @@ def test_debug_print():
     # Redirect stdout
     captured_output = io.StringIO()
     sys.stdout = captured_output
-    
+
     # Call the function with test data
     x = np.array([1.0, 2.0, 3.0])
     result = print_test(x)
-    
+
     # Restore stdout
     sys.stdout = sys.__stdout__
-    
+
     # Check that the output contains the expected text
     assert "Value: [1. 2. 3.]" in captured_output.getvalue()
-    
+
     # Also verify that the function returns the correct result
     assert np.allclose(result, x * 2)
