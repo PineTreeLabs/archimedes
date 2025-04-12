@@ -12,7 +12,7 @@ from .._array_impl import _as_casadi_array, array
 from ._compile import FunctionCache
 
 
-_callback_refs: dict[int, Callback] = {}
+_callback_refs: list[Callback] = []
 
 
 def _exec_callback(cb, arg_flat):
@@ -100,7 +100,7 @@ def callback(func, *args):
     # Store this or the memory reference will get cleaned up
     # and raise a null error when the callback gets executed
     # with data.
-    _callback_refs[hash(cb)] = cb
+    _callback_refs.append(cb)
 
     print(f"args = {args}")
     return _call(*args)
