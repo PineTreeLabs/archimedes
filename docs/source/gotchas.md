@@ -31,7 +31,8 @@ def impure_accumulator(x):
 While Archimedes works with impure functions in simple cases, this can lead to surprising behavior when functions are transformed or reused. For example, if the global variable `g` changes value, the function might still use the original value in some contexts.
 
 Less obviously, print statements are a "side effect" that makes functions impure.
-For tips on printing and debugging see the [debug](#debugging) section below.
+However, it is possible to print from within the compiled computational graph using the [callback](#callbacks) mechanism.
+For more tips on printing and debugging see the [debug](#debugging) section below.
 
 
 ## Function signatures
@@ -266,6 +267,36 @@ This behavior differs from both NumPy (which modifies arrays in-place) and JAX (
 The current recommendation is that it is okay to do in-place operations, but do it with caution.
 Specifically, it is a good idea when implementing a function like this to always decorate it so that there is not a "NumPy version" that may inadvertently behave differently than the "Archimedes version".
 
+(callbacks)=
+## Calling external code
+
+It is possible to embed arbitrary Python code inside of a compiled function using the :py:func:`callback` mechanism.
+All that is required is to specify the shape and data type of the output of your function so that a node for the computational graph can be created with the right output type.
+
+Here is a simple example using an operation that does not have symbolic support (estimating power spectral density using Welch's method); if a function like this needs to be called from within an Archimedes function it can be done as follows:
+
+```python
+from scipy import signal
+
+def calc_sum_psd(x):
+    # Computation that is not supported symbolically
+    f, Pxx = signal.welch(x)
+    return sum(Pxx[f > 1.0])
+
+# Call from within a compiled function
+@arc.compile
+def sum_psd(x):
+    result_shape_dtypes = 0.0  # Template data type for output (float)
+    return arc.callback(calc_sum_psd, result_shape_dtypes, x)
+
+x = np.arange(1024)
+print(sum_psd(x))  # 0.010448377825162803
+```
+
+This is useful for calling legacy code, non-NumPy calculations, and for printing output as a debugging tactic (more on this [next](#debugging)).
+
+Note that the callback code is not guaranteed to execute unless there is a non-empty return value; when doing "dummy" operations like printing it is recommended to just return the inputs directly.
+
 (debugging)=
 ## Debugging Symbolic Code
 
@@ -301,7 +332,26 @@ Aside from specific cases like [in-place operations](#in-place-operations), Arch
 If you are seeing unexpected divergences, **please file a bug report.**
 :::
 
-<!-- TODO: Add arc.debug.print and arc.debug.callback when available -->
+It is possible to print from within a compiled function using the [callback mechanism](#callbacks) described above.  For example:
+
+```python
+
+def print_func(y):
+    print("Value: {}".format(y))
+    return y
+
+# A compiled function that uses the print functionality
+@arc.compile
+def func(x):
+    y = np.sin(x)
+    return arc.callback(print_func, y, y)
+
+x = np.array([1.0, 2.0, 3.0])
+y = func(x)  # prints "Value: [0.84147098 0.90929743 0.14112001]"
+```
+
+Note that the callback code is not guaranteed to execute unless there is a non-empty return value.
+The pattern shown here of returning any arguments used for printing is a simple workaround.
 
 ## Symbolic vs. Numeric Interface Differences
 

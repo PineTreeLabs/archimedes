@@ -1,6 +1,7 @@
 from . import error, theme, tree
 from ._core import (
     array,
+    callback,
     codegen,
     compile,
     eye,
@@ -30,6 +31,7 @@ __all__ = [
     "set_theme",
     "tree",
     "struct",
+    "callback",
     "codegen",
     "array",
     "sym",

@@ -17,6 +17,7 @@ from ._array_ops import SymbolicArray
 from ._autodiff import grad, hess, jac, jvp, vjp
 from ._function import (
     FunctionCache,
+    callback,
     codegen,
     compile,
     scan,
@@ -36,6 +37,7 @@ __all__ = [
     "_as_casadi_array",
     "compile",
     "FunctionCache",
+    "callback",
     "codegen",
     "grad",
     "jac",

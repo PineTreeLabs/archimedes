@@ -8,7 +8,7 @@ Archimedes is an open-source Python framework designed to simplify complex model
 
 ### Key features
 
-By building on CasADi, Archimedes provides a number of key features that make it a powerful tool for modeling and simulation:
+By combining the powerful symbolic capabilities of [CasADi](https://web.casadi.org/docs/) with the intuitive interface designs of NumPy, PyTorch, and JAX, Archimedes provides a number of key features:
 
 * NumPy-compatible array API with automatic dispatch
 * Efficient execution of computational graphs in compiled C++
@@ -96,9 +96,9 @@ cd archimedes
 pip install .
 ```
 
-### Recommended development setup
+### Recommended setup
 
-For development, we recommend using [UV](https://docs.astral.sh/uv/) for faster dependency resolution and virtual environment management:
+For development (or just a more robust environment configuration), we recommend using [UV](https://docs.astral.sh/uv/) for faster dependency resolution and virtual environment management:
 
 ```bash
 # Create and activate a virtual environment 
