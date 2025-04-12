@@ -65,6 +65,12 @@ def callback(func: Callable, *args) -> Any:
     2. It cannot be differentiated through automatically
     3. It may be slower than native symbolic operations
 
+    Note that while it is _possible_ to use this function to circumvent the
+    requirement that Archimedes code be functionally pure, this is strongly
+    recommended against, primarily because the function may be evaluated multiple
+    times during construction of the underlying CasADi object, so side effects
+    may be unpredictable.
+
     Examples
     --------
     >>> import numpy as np
@@ -146,7 +152,7 @@ def callback(func: Callable, *args) -> Any:
     cb = _Callback(name)
     print(cb, cb.size_in(0), cb.size_out(0))
     def _call(*args):
-        print(f"args= {[arg.shape for arg in args]}")
+        # print(f"args= {[arg.shape for arg in args]}")
         arg_flat, _ = tree.ravel(args)
         print(arg_flat.shape)
         ret_flat = _exec_callback(cb, arg_flat)
