@@ -135,12 +135,11 @@ def callback(func: Callable, *args) -> Any:
             # -> convert to NumPy and unravel back to tree
             dm_arg = np.asarray(dm_arg[0])
             cb_args = arg_unravel(dm_arg)
-            print(f"_Callback.eval for {func} with args {cb_args}")
+
             ret = func(*cb_args)
-            print(f"_Callback.eval returns {ret}")
+    
             # Callback expects DM returns, so flatten this to an array
             ret = tree.map(np.asarray, ret)
-            print(f"Mapped -> {ret}")
             ret, _ = tree.ravel(ret)
             return [ret]
 
@@ -150,11 +149,8 @@ def callback(func: Callable, *args) -> Any:
         name = "cb"
 
     cb = _Callback(name)
-    print(cb, cb.size_in(0), cb.size_out(0))
     def _call(*args):
-        # print(f"args= {[arg.shape for arg in args]}")
         arg_flat, _ = tree.ravel(args)
-        print(arg_flat.shape)
         ret_flat = _exec_callback(cb, arg_flat)
         return ret_unravel(ret_flat)
 
@@ -169,5 +165,4 @@ def callback(func: Callable, *args) -> Any:
     # with data.
     _callback_refs.append(cb)
 
-    print(f"args = {args}")
     return _call(*args)
