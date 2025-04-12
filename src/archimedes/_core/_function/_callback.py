@@ -16,16 +16,80 @@ _callback_refs: list[Callback] = []
 
 
 def _exec_callback(cb, arg_flat):
-    print("Exec callback")
     arg_flat = _as_casadi_array(arg_flat)  # Convert any lists, tuples, etc to arrays
-    print(arg_flat, type(arg_flat))
     ret_cs = cb(arg_flat)
-    print()
     ret = array(ret_cs)
     return ret
 
 
-def callback(func, *args):
+def callback(func: Callable, *args) -> Any:
+    """
+    Execute an arbitrary Python function within an symbolic computational graph.
+
+    This function allows arbitrary Python functions to be incorporated into
+    computational graphs.  This makes it possible to use functions that cannot be
+    traced symbolically within functions created with :py:func:`compile`.
+
+    Parameters
+    ----------
+    func : callable
+        The Python function to wrap. This function should accept the same number of
+        arguments as provided in *args and should return values that can be
+        converted to NumPy arrays.
+    *args : Any
+        Arguments to pass to ``func``. These are used to determine the input and output
+        shapes for the callback wrapper.
+
+    Returns
+    -------
+    Any
+        The result of calling ``func(*args)``, structured as a PyTree if applicable.
+
+    Notes
+    -----
+    When to use this function:
+
+    - When you need to incorporate external functions that cannot be directly
+      evaluated symbolically into Archimedes computational graphs
+    - When interfacing with legacy code or external libraries that need to be
+      called during symbolic execution
+    - When implementing custom numerical algorithms that don't map cleanly to
+      Archimedes' symbolic operations
+    - For testing and debugging purposes to inspect the numerical values at
+      some point in an otherwise symbolically compiled function
+
+    The callback is executed numerically in interpreted Python at each evaluation,
+    which means:
+
+    1. It won't benefit from symbolic optimization
+    2. It cannot be differentiated through automatically
+    3. It may be slower than native symbolic operations
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> import archimedes as arc
+    >>>
+    >>> # Define an external function
+    >>> def custom_nonlinearity(x):
+    ...     print("Evaluating custom_nonlinearity")
+    ...     return np.tanh(x) * np.exp(-0.1 * x**2)
+    >>>
+    >>>
+    >>> # Use in a compiled function
+    >>> @arc.compile
+    ... def model(x):
+    ...     y = arc.callback(custom_nonlinearity, x)
+    ...     return y * 2
+    >>>
+    >>> model(np.array([0.5, 1.5]))
+    
+    See Also
+    --------
+    compile : Function for symbolically compiling Python functions
+    integrator : Specialized solver transformation for ODEs
+    implicit : Specialized solver transformation for implicit functions
+    """
     from archimedes import tree  # HACK: avoid circular imports
 
     # Create a FunctionCache for the function - we don't actually
@@ -35,13 +99,11 @@ def callback(func, *args):
 
     arg_flat, arg_unravel = tree.ravel(args)
     arg_shape = (len(arg_flat), 1)
-    print(f"arg_flat: {arg_flat}")
 
     # Need to evaluate once to know the expected return size
     ret = func(*args)
     ret_flat, ret_unravel = tree.ravel(ret)
     ret_shape = (len(ret_flat), 1)
-    print(f"ret_flat: {ret_flat}")
 
     class _Callback(Callback):
         def __init__(self, name, opts={}):
@@ -65,9 +127,7 @@ def callback(func, *args):
         def eval(self, dm_arg):
             # Here cb_args is a list with a single flattened DM array
             # -> convert to NumPy and unravel back to tree
-            print(f"dm_arg = {dm_arg}")
             dm_arg = np.asarray(dm_arg[0])
-            print(f"dm_arg = {dm_arg}")
             cb_args = arg_unravel(dm_arg)
             print(f"_Callback.eval for {func} with args {cb_args}")
             ret = func(*cb_args)
@@ -89,7 +149,8 @@ def callback(func, *args):
         print(f"args= {[arg.shape for arg in args]}")
         arg_flat, _ = tree.ravel(args)
         print(arg_flat.shape)
-        return _exec_callback(cb, arg_flat)
+        ret_flat = _exec_callback(cb, arg_flat)
+        return ret_unravel(ret_flat)
 
     _call.__name__ = name
     _call = FunctionCache(
