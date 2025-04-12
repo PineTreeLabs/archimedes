@@ -6,6 +6,7 @@ import numpy as np
 import archimedes as arc
 from archimedes import struct
 
+from archimedes.experimental import aero
 from archimedes.experimental.aero import (
     GravityModel,
     FlightVehicle,
@@ -66,13 +67,6 @@ class SubsonicF16(FlightVehicle):
     xcgr: float = 0.35  # Reference CG location (% of cbar)
     hx: float = 160.0  # Engine angular momentum (assumed constant)
 
-    def wind_frame(self, v_B):
-        u, v, w = v_B
-        vt = np.sqrt(u**2 + v**2 + w**2)
-        alpha = np.arctan2(w, u)
-        beta = np.arcsin(v / vt)
-        return vt, alpha, beta
-
     def net_forces(self, t, x, u, C_BN):
         """Net forces and moments in body frame B, plus any extra state derivatives
 
@@ -91,7 +85,7 @@ class SubsonicF16(FlightVehicle):
         # Unpack state and controls
         thtl, el, ail, rdr = u
 
-        vt, alpha, beta = self.wind_frame(x.v_B)
+        vt, alpha, beta = aero.wind_frame(x.v_B)
 
         # Atmosphere model
         alt = -x.p_N[2]

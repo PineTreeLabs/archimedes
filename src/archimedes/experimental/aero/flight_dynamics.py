@@ -100,6 +100,51 @@ def dcm_from_euler(rpy, transpose=False):
     return R
 
 
+def z_dcm(yaw, transpose=False):
+    """Return the rotation matrix about the z-axis by the specified yaw angle"""
+    if np.isscalar(yaw):
+        yaw = np.array(yaw)
+
+    c, s = np.cos(yaw), np.sin(yaw)
+
+    R = np.array([[c, s, 0], [-s, c, 0], [0, 0, 1]], like=yaw)
+
+    if transpose:
+        R = R.T
+
+    return R
+
+
+def y_dcm(pitch, transpose=False):
+    """Return the rotation matrix about the y-axis by the specified pitch angle"""
+    if np.isscalar(pitch):
+        pitch = np.array(pitch)
+
+    c, s = np.cos(pitch), np.sin(pitch)
+
+    R = np.array([[c, 0, -s], [0, 1, 0], [s, 0, c]], like=pitch)
+
+    if transpose:
+        R = R.T
+
+    return R
+
+
+def x_dcm(roll, transpose=False):
+    """Return the rotation matrix about the x-axis by the specified roll angle"""
+    if np.isscalar(roll):
+        roll = np.array(roll)
+
+    c, s = np.cos(roll), np.sin(roll)
+
+    R = np.array([[1, 0, 0], [0, c, s], [0, -s, c]], like=roll)
+
+    if transpose:
+        R = R.T
+
+    return R
+
+
 def euler_to_quaternion(rpy):
     """Convert roll-pitch-yaw Euler angles to quaternion."""
     φ, θ, ψ = rpy[0], rpy[1], rpy[2]
@@ -172,6 +217,24 @@ def euler_kinematics(rpy, inverse=False):
             like=rpy,
         )
         return H
+
+
+def wind_frame(v_rel_B):
+    """Compute total velocity, angle of attack, and sideslip angle
+
+    The input should be the vehicle wind-relative velocity computed in
+    body-frame axes.  If the inertial velocity of the vehicle expressed in
+    body-frame axes is v_B and the Earth-relative wind velocity is w_N,
+    then the relative velocity is v_rel_B = v_B + R_BN @ w_N, where R_BN
+    is the rotation matrix from inertial to body frame.
+
+    If there is no wind, then v_rel_B = v_B.
+    """
+    u, v, w = v_rel_B
+    vt = np.sqrt(u**2 + v**2 + w**2)
+    alpha = np.arctan2(w, u)
+    beta = np.arcsin(v / vt)
+    return vt, alpha, beta
 
 
 @struct.pytree_node

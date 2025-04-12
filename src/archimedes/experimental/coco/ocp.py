@@ -4,7 +4,7 @@ from typing import Callable
 
 import numpy as np
 
-from archimedes import compile, minimize
+from archimedes import compile, minimize, vmap
 
 from .discretization import SplineDiscretization
 from .interpolation import LagrangePolynomial
@@ -205,9 +205,15 @@ class OptimalControlProblem(OCPBase):
             # Dynamical constraints
             # TODO: Support mass matrix here for DAEs
             res = []
-            F = tscale * self.ode(t[:-1], x[:-1, :].T, u.T, p)
+            # F = tscale * self.ode(t[:-1], x[:-1, :].T, u.T, p)
+
+            # vmap_ode = vmap(self.ode, in_axes=(0, 1, 1, None), out_axes=1)
+            # print(t[:-1].shape, x[:-1, :].T.shape, u.T.shape)
+            # F = tscale * vmap_ode(t[:-1], x[:-1, :].T, u.T, p)
             for i in range(N):
-                res = np.append(res, x_dot[i, :].T - F[:, i])
+                # res = np.append(res, x_dot[i, :].T - F[:, i])
+                F = tscale * self.ode(t[i], x[i, :], u[i, :], p)
+                res = np.append(res, x_dot[i, :].T - F)
 
             # # Constrain the non-collocated end point
             # w = domain.weights
@@ -298,9 +304,13 @@ class OptimalControlProblem(OCPBase):
         x_dot_fn = element.create_interpolant(x_dot_, t0, tf)
 
         def _res(t):
-            F = self.ode(t, sol.x(t).T, sol.u(t).T, sol.p)
+            x = sol.x(t)
+            u = sol.u(t)
+            F = np.zeros_like(x)
+            for i in range(len(x)):
+                F[i] = self.ode(t[i], x[i], u[i], sol.p)
             x_dot = x_dot_fn(t)
-            return abs(x_dot - 0.5 * (tf - t0) * F.T)
+            return abs(x_dot - 0.5 * (tf - t0) * F)
 
         return _res
 

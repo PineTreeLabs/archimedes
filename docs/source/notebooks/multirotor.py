@@ -10,6 +10,7 @@ import archimedes as arc
 from archimedes import struct
 from archimedes.experimental.aero import (
     FlightVehicle,
+    z_dcm,
 )
 from archimedes.experimental.aero import (
     dcm_from_euler as dcm,  # noqa: F401
@@ -107,21 +108,6 @@ NACA_0012 = np.array(
         [6.28318531, -0.0, 0.023, 0.0],
     ]
 )
-
-
-def z_dcm(yaw, transpose=False):
-    """Return the rotation matrix about the z-axis by the specified yaw angle"""
-    if np.isscalar(yaw):
-        yaw = np.array(yaw)
-
-    c, s = np.cos(yaw), np.sin(yaw)
-
-    R = np.array([[c, s, 0], [-s, c, 0], [0, 0, 1]], like=yaw)
-
-    if transpose:
-        R = R.T
-
-    return R
 
 
 @struct.pytree_node

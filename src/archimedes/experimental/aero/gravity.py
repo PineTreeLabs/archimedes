@@ -4,7 +4,10 @@ import numpy as np
 
 from archimedes import struct
 
-__all__ = ["GravityModel", "ConstantGravityModel"]
+__all__ = [
+    "GravityModel",
+    "ConstantGravityModel",
+]
 
 
 class GravityModel(metaclass=abc.ABCMeta):
