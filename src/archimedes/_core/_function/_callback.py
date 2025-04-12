@@ -18,7 +18,7 @@ def _exec_callback(cb, arg_flat):
     return ret
 
 
-def callback(func: Callable, *args) -> Any:
+def callback(func: Callable, result_shape_dtypes, *args) -> Any:
     """
     Execute an arbitrary Python function within an symbolic computational graph.
 
@@ -32,6 +32,10 @@ def callback(func: Callable, *args) -> Any:
         The Python function to wrap. This function should accept the same number of
         arguments as provided in *args and should return values that can be
         converted to NumPy arrays.
+    result_shape_dtypes : PyTree
+        A PyTree structure that defines the expected shape and data types of the
+        function's output. This is used to determine the output shape of the
+        callback wrapper without calling the function itself.
     *args : Any
         Arguments to pass to ``func``. These are used to determine the input and output
         shapes for the callback wrapper.
@@ -63,9 +67,8 @@ def callback(func: Callable, *args) -> Any:
 
     Note that while it is _possible_ to use this function to circumvent the
     requirement that Archimedes code be functionally pure, this is strongly
-    recommended against, primarily because the function may be evaluated multiple
-    times during construction of the underlying CasADi object, so side effects
-    may be unpredictable.
+    recommended against, primarily because the number of evaluation times is
+    not guaranteed, so side effects may be unpredictable.
 
     Examples
     --------
@@ -81,7 +84,8 @@ def callback(func: Callable, *args) -> Any:
     >>> # Use in a compiled function
     >>> @arc.compile
     ... def model(x):
-    ...     y = arc.callback(custom_nonlinearity, x)
+    ...     result_shape_dtypes = x  # Output has same type as input
+    ...     y = arc.callback(custom_nonlinearity, result_shape_dtypes, x)
     ...     return y * 2
     >>>
     >>> model(np.array([0.5, 1.5]))
@@ -97,14 +101,13 @@ def callback(func: Callable, *args) -> Any:
     # Create a FunctionCache for the function - we don't actually
     # want to "compile" this, but the FunctionCache is still helpful for
     # signature handling, etc.
-    cache = FunctionCache(func)
+    cache = func if isinstance(func, FunctionCache) else FunctionCache(func)
 
     arg_flat, arg_unravel = tree.ravel(args)
     arg_shape = (len(arg_flat), 1)
 
     # Need to evaluate once to know the expected return size
-    ret = func(*args)
-    ret_flat, ret_unravel = tree.ravel(ret)
+    ret_flat, ret_unravel = tree.ravel(result_shape_dtypes)
     ret_shape = (len(ret_flat), 1)
 
     class _Callback(Callback):
@@ -139,7 +142,7 @@ def callback(func: Callable, *args) -> Any:
             ret, _ = tree.ravel(ret)
             return [ret]
 
-    name = f"cb_{func.__name__}"
+    name = f"cb_{cache.name}"
     cb = _Callback(name)
 
     def _call(*args):

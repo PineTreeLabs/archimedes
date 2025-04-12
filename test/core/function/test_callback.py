@@ -1,3 +1,7 @@
+import sys
+import io
+import pytest
+
 import numpy as np
 
 import archimedes as arc
@@ -10,7 +14,8 @@ def test_callback():
 
     @arc.compile
     def call_f(x, y):
-        return arc.callback(f, x, y)
+        result_shape_dtypes = x  # Output has same type as input
+        return arc.callback(f, result_shape_dtypes, x, y)
 
     x, y = np.array([1.0, 2.0]), 3.0
     z = call_f(x, y)
@@ -26,7 +31,8 @@ def test_tree_structured_callback():
 
     @arc.compile
     def tree_model(data):
-        return arc.callback(tree_func, data)
+        result_shape_dtypes = {"doubled": data["values"], "squared": data["values"]}
+        return arc.callback(tree_func, result_shape_dtypes, data)
 
     data = {"values": np.array([1.0, 2.0, 3.0])}
     result = tree_model(data)
@@ -43,7 +49,8 @@ def test_multiple_arguments():
 
     @arc.compile
     def multi_model(x, y, z):
-        return arc.callback(multi_arg_func, x, y, z)
+        result_shape_dtypes = x
+        return arc.callback(multi_arg_func, result_shape_dtypes, x, y, z)
 
     x = np.array([1.0, 2.0])
     y = 3.0
@@ -67,7 +74,8 @@ def test_error_propagation():
 
         @arc.compile
         def error_model(x):
-            return arc.callback(error_func, x)
+            result_shape_dtypes = x  # Output has same type as input
+            return arc.callback(error_func, result_shape_dtypes, x)
 
         # This should fail at runtime
         error_model(np.array([-1.0, 4.0]))
@@ -81,3 +89,32 @@ def test_error_propagation():
     except RuntimeError as e:
         assert "Negative input not allowed" in str(e)
         print("Error propagation test passed")
+
+
+def test_debug_print():
+
+    def print_func(x):
+        print("Value: {}".format(x))
+        return x * 2
+
+    # Create a function that uses the print functionality
+    @arc.compile
+    def print_test(x):
+        return arc.callback(print_func, x, x)
+
+    # Redirect stdout
+    captured_output = io.StringIO()
+    sys.stdout = captured_output
+    
+    # Call the function with test data
+    x = np.array([1.0, 2.0, 3.0])
+    result = print_test(x)
+    
+    # Restore stdout
+    sys.stdout = sys.__stdout__
+    
+    # Check that the output contains the expected text
+    assert "Value: [1. 2. 3.]" in captured_output.getvalue()
+    
+    # Also verify that the function returns the correct result
+    assert np.allclose(result, x * 2)
