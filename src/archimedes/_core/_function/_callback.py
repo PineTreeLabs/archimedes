@@ -5,7 +5,7 @@ from functools import partial
 from typing import TYPE_CHECKING, Any, Callable, Hashable, NamedTuple, Sequence, Tuple
 
 import casadi as cs
-from casadi import Callback
+from casadi import Callback, Sparsity
 import numpy as np
 
 from .._array_impl import _as_casadi_array, array
@@ -19,17 +19,10 @@ def _exec_callback(cb, arg_flat):
     print("Exec callback")
     arg_flat = _as_casadi_array(arg_flat)  # Convert any lists, tuples, etc to arrays
     print(arg_flat, type(arg_flat))
-    print(cb)
     ret_cs = cb(arg_flat)
     print()
     ret = array(ret_cs)
     return ret
-
-
-class TreeStore:
-    def __init__(self):
-        self.arg_unravel = None
-        self.ret_unravel = None
 
 
 def callback(func, *args):
@@ -40,9 +33,15 @@ def callback(func, *args):
     # signature handling, etc.
     cache = FunctionCache(func)
 
-    store = TreeStore()  # For unraveling types
-    arg_flat, store.arg_unravel = tree.ravel(args)
+    arg_flat, arg_unravel = tree.ravel(args)
+    arg_shape = (len(arg_flat), 1)
     print(f"arg_flat: {arg_flat}")
+
+    # Need to evaluate once to know the expected return size
+    ret = func(*args)
+    ret_flat, ret_unravel = tree.ravel(ret)
+    ret_shape = (len(ret_flat), 1)
+    print(f"ret_flat: {ret_flat}")
 
     class _Callback(Callback):
         def __init__(self, name, opts={}):
@@ -56,6 +55,12 @@ def callback(func, *args):
         def get_n_out(self):
             return 1
 
+        def get_sparsity_in(self, i):
+            return Sparsity.dense(*arg_shape)
+
+        def get_sparsity_out(self, i):
+            return Sparsity.dense(*ret_shape)
+
         # Evaluate numerically
         def eval(self, dm_arg):
             # Here cb_args is a list with a single flattened DM array
@@ -63,14 +68,14 @@ def callback(func, *args):
             print(f"dm_arg = {dm_arg}")
             dm_arg = np.asarray(dm_arg[0])
             print(f"dm_arg = {dm_arg}")
-            cb_args = store.arg_unravel(dm_arg)
+            cb_args = arg_unravel(dm_arg)
             print(f"_Callback.eval for {func} with args {cb_args}")
             ret = func(*cb_args)
             print(f"_Callback.eval returns {ret}")
             # Callback expects DM returns, so flatten this to an array
             ret = tree.map(np.asarray, ret)
             print(f"Mapped -> {ret}")
-            ret, store.unravel = tree.ravel(ret)
+            ret, _ = tree.ravel(ret)
             return [ret]
 
     if hasattr(func, "__name__"):
@@ -79,6 +84,7 @@ def callback(func, *args):
         name = "cb"
 
     cb = _Callback(name)
+    print(cb, cb.size_in(0), cb.size_out(0))
     def _call(*args):
         print(f"args= {[arg.shape for arg in args]}")
         arg_flat, _ = tree.ravel(args)
