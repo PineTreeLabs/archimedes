@@ -30,20 +30,18 @@ from __future__ import annotations
 from collections import OrderedDict
 from typing import TYPE_CHECKING, Callable, TypeVar
 
-import numpy as np
 import casadi as cs
+import numpy as np
 
 from archimedes import tree
-from archimedes._core import SymbolicArray
 from archimedes._core._array_impl import (
     DEFAULT_SYM_NAME,
     _as_casadi_array,
     array,
-    sym_like,
 )
 
 from .._array_ops._array_ops import normalize_axis_index
-from ._compile import compile, FunctionCache
+from ._compile import FunctionCache, compile
 
 if TYPE_CHECKING:
     from ...typing import ArrayLike, PyTree
@@ -268,10 +266,9 @@ def switch(
     name: str | None = None,
     kind: str = DEFAULT_SYM_NAME,
 ) -> PyTree:
-
     """
     Selectively apply one of several functions based on an index.
-    
+
     This function provides a conditional branching mechanism that selects and applies
     one of the provided branch functions based on the index value. The function is
     similar to a switch/case statement but can be embedded within computational graphs.
@@ -283,7 +280,7 @@ def switch(
         index = min(max(index, 0), len(branches) - 1)
         return branches[index](*args)
     ```
-    
+
     Parameters
     ----------
     index : int
@@ -306,20 +303,21 @@ def switch(
     PyTree
         The result of applying the selected branch function to the provided arguments.
         All branches must return the same structure.
-    
+
     Notes
     -----
     This function converts conditional branching into a computational graph construct.
     Unlike Python's if/else, which doesn't work with symbolic values, ``switch`` is
     compatible with symbolic/numeric execution.
 
-    The function evaluates each branch at compilation time to ensure they have compatible
-    output structures. At runtime, only the selected branch is executed.
+    The function evaluates each branch at compilation time to ensure they have
+    compatible output structures. At runtime, only the selected branch is executed.
 
     Behavior notes:
     - If `index` is out of bounds, it will be clamped to the valid range.
-    - All branches must return the same PyTree structure, or a ValueError will be raised.
-    - At least one branch must be provided, or a ValueError will be raised.
+    - All branches must return the same PyTree structure, or a ValueError will be
+      raised.
+    - At least two branches must be provided, or a ValueError will be raised.
     - Functions are traced at compilation time, meaning any side effects will occur
       for all branches during tracing, even though only one branch executes at runtime.
       It is strongly recommended to avoid side effects.
@@ -329,43 +327,43 @@ def switch(
     --------
     >>> import numpy as np
     >>> import archimedes as arc
-    >>> 
+    >>>
     >>> # Define functions for each branch
     >>> def branch0(x):
     ...     return x**2
-    ... 
+    ...
     >>> def branch1(x):
     ...     return np.sin(x)
-    ... 
+    ...
     >>> def branch2(x):
     ...     return -x
-    ... 
+    ...
     >>> # Create a switch function
     >>> @arc.compile
     ... def apply_operation(x, op_index):
     ...     return arc.switch(op_index, (branch0, branch1, branch2), x)
-    ... 
+    ...
     >>> # Apply different branches based on the index
     >>> x = np.array([0.5, 1.0, 1.5])
     >>> apply_operation(x, 0)  # Returns x**2
     >>> apply_operation(x, 1)  # Returns sin(x)
     >>> apply_operation(x, 2)  # Returns -x
-    
+
     # Example with a PyTree
     >>> def multiply(data, factor):
     ...     return {k: v * factor for k, v in data.items()}
-    ... 
+    ...
     >>> def add_offset(data, offset):
     ...     return {k: v + offset for k, v in data.items()}
-    ... 
+    ...
     >>> @arc.compile
     ... def process_data(data, op_index, param):
     ...     return arc.switch(op_index, (multiply, add_offset), data, param)
-    ... 
+    ...
     >>> data = {"a": np.array([1.0, 2.0]), "b": np.array([3.0, 4.0])}
     >>> process_data(data, 0, 2.0)  # Multiplies all values by 2.0
     >>> process_data(data, 1, 1.0)  # Adds 1.0 to all values
-    
+
     See Also
     --------
     np.where : Element-wise conditional selection between two arrays
@@ -381,7 +379,6 @@ def switch(
     # Wrap this within a compile decorator to ensure everything is symbolic
     @compile(name=name, static_argnums=(1,))
     def _switch(index, branches, args):
-
         # Ravel all args to a single flat argument for constructing
         # an equivalent flattened CasADi function
         args_flat, args_unravel = tree.ravel(args)
