@@ -9,7 +9,7 @@ def f(x):
     return x**2 + 1
 
 
-class TestSymFunction:
+class TestCompile:
     def test_construction(self):
         f_sym = compile(f)
         assert isinstance(f_sym, FunctionCache)
@@ -20,6 +20,21 @@ class TestSymFunction:
         # Test recompilation
         f_sym2 = compile(f_sym)
         assert f_sym2 is f_sym
+
+    def test_naming(self):
+        # Lambda function
+        f_sym = compile(lambda x: x)
+        assert f_sym.name.startswith("lambda")
+
+        # Callable class
+        class _Functor:
+            def __call__(self, x):
+                return 2 * x
+
+        func = _Functor()
+        assert not hasattr(func, "__name__")
+        f_sym = compile(func)
+        assert f_sym.name.startswith("function")
 
     def test_eval_numeric(self):
         f_sym = compile(f)
