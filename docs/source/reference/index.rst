@@ -26,8 +26,10 @@ Core Functions
     ones_like
     eye
     scan
+    switch
     vmap
     compile
+    callback
     grad
     jac
     hess

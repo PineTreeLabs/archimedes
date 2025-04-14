@@ -275,11 +275,12 @@ def switch(
 
     Semantically, this function is equivalent to the following Python code:
 
-    ```python
-    def switch(index, branches, *args):
-        index = min(max(index, 0), len(branches) - 1)
-        return branches[index](*args)
-    ```
+    .. highlight:: python
+    .. code-block:: python
+
+        def switch(index, branches, *args):
+            index = min(max(index, 0), len(branches) - 1)
+            return branches[index](*args)
 
     Parameters
     ----------
@@ -314,6 +315,7 @@ def switch(
     compatible output structures. At runtime, only the selected branch is executed.
 
     Behavior notes:
+
     - If `index` is out of bounds, it will be clamped to the valid range.
     - All branches must return the same PyTree structure, or a ValueError will be
       raised.
