@@ -22,6 +22,9 @@ if TYPE_CHECKING:
     CompiledKey = Tuple[Tuple[HashablePartial, ...], Tuple[Hashable, ...]]
 
 
+_lambda_idx = 0  # Global index for naming anonymous functions
+
+
 class CompiledFunction(NamedTuple):
     """Container for a CasADi function specialized to particular arg types.
 
@@ -121,7 +124,18 @@ class FunctionCache:
         name=None,
     ):
         self._func = func  # The original Python function
-        self.name = name if name is not None else func.__name__
+
+        if name is None:
+            if hasattr(func, "__name__"):
+                name = func.__name__
+                if name == "<lambda>":
+                    global _lambda_idx
+                    name = f"lambda_{_lambda_idx}"
+                    _lambda_idx += 1
+            else:
+                name = f"function_{id(func)}"
+
+        self.name = name
 
         # Kind of symbolic object to use
         # TODO: Make this `scalar: bool` instead of `kind: str`
