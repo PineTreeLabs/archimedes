@@ -412,7 +412,7 @@ def switch(
                 if results_size != results_flat.size:
                     raise ValueError(
                         "All branches of a switch must return the same number of "
-                        f"elements, but got {results_flat.size} for branch 0 and "
+                        f"elements, but got {results_size} for branch 0 and "
                         f"{results_flat.size} for branch {branch.name}."
                     )
                 if results_treedef != results_treedef_i:
