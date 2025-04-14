@@ -56,6 +56,7 @@ Documentation
 
    under-the-hood
    pytrees
+   generated/notebooks/control-flow
    generated/notebooks/modular-design
 
 .. toctree::

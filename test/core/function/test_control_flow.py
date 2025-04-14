@@ -126,6 +126,287 @@ class TestScan:
             arc.scan(g, 0.0, length=3)
 
 
+class TestSwitch:
+    # Basic functionality tests with different indices
+    def test_basic_indices(self):
+        branches = (
+            lambda x: x,
+            lambda x: x**2,
+            lambda x: x**3,
+        )
+
+        @arc.compile
+        def apply_operation(x, op_index):
+            return arc.switch(op_index, branches, x)
+
+        x = np.array([2.0, 3.0])
+
+        # Test each valid index
+        assert np.allclose(apply_operation(x, 0), x)
+        assert np.allclose(apply_operation(x, 1), x**2)
+        assert np.allclose(apply_operation(x, 2), x**3)
+
+    # Edge cases - empty or single branches
+    def test_empty_branches(self):
+        @arc.compile
+        def apply_operation(x, op_index):
+            return arc.switch(op_index, (), x)
+
+        x = np.array([1.0, 2.0])
+        with pytest.raises(ValueError):
+            apply_operation(x, 0)
+
+        @arc.compile
+        def apply_operation(x, op_index):
+            return arc.switch(op_index, (lambda x: x**2,), x)
+
+        with pytest.raises(ValueError):
+            apply_operation(x, 0)
+
+    # Index bounds handling
+    def test_index_out_of_bounds(self):
+        branches = (
+            lambda x: x,
+            lambda x: 2 * x,
+            lambda x: 3 * x,
+        )
+
+        @arc.compile
+        def apply_operation(x, op_index):
+            return arc.switch(op_index, branches, x)
+
+        x = np.array([5.0])
+
+        # Test negative indices (should clamp to first branch)
+        assert np.allclose(apply_operation(x, -1), x)
+        assert np.allclose(apply_operation(x, -100), x)
+
+        # Test too large indices (should clamp to last branch)
+        assert np.allclose(apply_operation(x, 3), 3 * x)
+        assert np.allclose(apply_operation(x, 999), 3 * x)
+
+    # Error handling - branch return structure mismatch
+    def test_branch_structure_mismatch(self):
+        @arc.compile
+        def apply_operation(x, op_index):
+            return arc.switch(
+                op_index,
+                (
+                    lambda x: x,  # Returns array
+                    lambda x: x[0],  # Returns scalar
+                ),
+                x,
+            )
+
+        x = np.array([1.0, 2.0])
+        with pytest.raises(ValueError, match=r".*must return the same number.*"):
+            apply_operation(x, 0)
+
+        # Tree-structured returns
+        @arc.compile
+        def apply_operation(x, op_index):
+            return arc.switch(
+                op_index,
+                (
+                    lambda x: x,  # Returns array
+                    lambda x: {"a": x},  # Returns dict
+                ),
+                x,
+            )
+
+        x = np.array([1.0, 2.0])
+        with pytest.raises(ValueError, match=r".*must return the same PyTree.*"):
+            apply_operation(x, 0)
+
+    # Multiple arguments to branches
+    def test_multiple_arguments(self):
+        @arc.compile
+        def apply_operation(x, y, op_index):
+            return arc.switch(
+                op_index,
+                (
+                    lambda x, y: x + y,
+                    lambda x, y: x * y,
+                ),
+                x,
+                y,
+            )
+
+        assert np.isclose(apply_operation(3.0, 4.0, 0), 7.0)
+        assert np.isclose(apply_operation(3.0, 4.0, 1), 12.0)
+
+    # PyTree handling
+    def test_pytree_arguments(self):
+        def process1(data):
+            return {k: v * 2 for k, v in data.items()}
+
+        def process2(data):
+            return {k: v + 10 for k, v in data.items()}
+
+        @arc.compile
+        def process_data(data, op_index):
+            return arc.switch(op_index, (process1, process2), data)
+
+        data = {"a": np.array([1.0, 2.0]), "b": np.array([3.0, 4.0])}
+
+        # Test both branches
+        result1 = process_data(data, 0)
+        assert np.allclose(result1["a"], np.array([2.0, 4.0]))
+        assert np.allclose(result1["b"], np.array([6.0, 8.0]))
+
+        result2 = process_data(data, 1)
+        assert np.allclose(result2["a"], np.array([11.0, 12.0]))
+        assert np.allclose(result2["b"], np.array([13.0, 14.0]))
+
+    # Compare numeric vs symbolic evaluation
+    def test_numeric_vs_symbolic(self):
+        def branch0(x):
+            return x**2
+
+        def branch1(x):
+            return np.sin(x)
+
+        # Non-compiled version (numeric)
+        def numeric_switch(x, op_index):
+            branches = (branch0, branch1)
+            op_index = max(0, min(op_index, len(branches) - 1))
+            return branches[op_index](x)
+
+        # Compiled version (symbolic)
+        @arc.compile
+        def symbolic_switch(x, op_index):
+            return arc.switch(op_index, (branch0, branch1), x)
+
+        x = np.array([0.5, 1.0, 1.5])
+
+        # Test both branches
+        for i in [0, 1]:
+            numeric_result = numeric_switch(x, i)
+            symbolic_result = symbolic_switch(x, i)
+            assert np.allclose(numeric_result, symbolic_result)
+
+    # Test gradient computation through switch
+    def test_gradient(self):
+        @arc.compile
+        def apply_operation(x, op_index):
+            return arc.switch(
+                op_index,
+                (
+                    lambda x: x**2,
+                    lambda x: np.sin(x),
+                ),
+                x,
+            )
+
+        # Get gradient with respect to x
+        grad_op = arc.grad(apply_operation, argnums=0)
+
+        x = 0.5
+
+        # Gradient of x^2 should be 2x
+        grad_val = grad_op(x, 0)
+        assert np.isclose(grad_val, 2 * x)
+
+        # Gradient of sin(x) should be cos(x)
+        grad_val = grad_op(x, 1)
+        assert np.isclose(grad_val, np.cos(x))
+
+    # Named switch
+    def test_named_switch(self):
+        @arc.compile
+        def apply_operation(x, op_index):
+            return arc.switch(
+                op_index,
+                (
+                    lambda x: x**2,
+                    lambda x: np.sin(x),
+                ),
+                x,
+                name="custom_switch_name",
+            )
+
+        x = np.array([2.0])
+        assert np.allclose(apply_operation(x, 0), x**2)
+
+    # Test with compiled branch functions
+    def test_compiled_branch_functions(self):
+        @arc.compile
+        def branch0(x):
+            return x**2
+
+        @arc.compile
+        def branch1(x):
+            return np.sin(x)
+
+        @arc.compile
+        def apply_operation(x, op_index):
+            return arc.switch(op_index, (branch0, branch1), x)
+
+        x = np.array([0.5, 1.0, 1.5])
+
+        assert np.allclose(apply_operation(x, 0), x**2)
+        assert np.allclose(apply_operation(x, 1), np.sin(x))
+
+    # Nested switch operations
+    def test_nested_switch(self):
+        @arc.compile
+        def nested_operation(x, outer_idx, inner_idx):
+            branches = (
+                lambda x: x**2,
+                lambda x: x**3,
+            )
+
+            return arc.switch(
+                outer_idx,
+                (
+                    # Outer branch 0: apply inner switch
+                    lambda x, inner_idx: arc.switch(inner_idx, branches, x),
+                    # Outer branch 1: negate the inner switch result
+                    lambda x, inner_idx: -arc.switch(inner_idx, branches, x),
+                ),
+                x,
+                inner_idx,
+            )
+
+        x = 2.0
+
+        assert np.isclose(nested_operation(x, 0, 0), 4.0)  # x^2
+        assert np.isclose(nested_operation(x, 0, 1), 8.0)  # x^3
+        assert np.isclose(nested_operation(x, 1, 0), -4.0)  # -x^2
+        assert np.isclose(nested_operation(x, 1, 1), -8.0)  # -x^3
+
+    # Test branch side effects to verify all branches are traced
+    def test_branch_tracing(self):
+        side_effects = []
+
+        def branch0(x):
+            side_effects.append("branch0")
+            return x**2
+
+        def branch1(x):
+            side_effects.append("branch1")
+            return np.sin(x)
+
+        # Clear side effects before compilation
+        side_effects.clear()
+
+        @arc.compile
+        def apply_operation(x, op_index):
+            return arc.switch(op_index, (branch0, branch1), x)
+
+        # First call should trace both branches during compilation
+        x = np.array([1.0])
+        apply_operation(x, 0)
+
+        # Both branches should have been traced
+        assert set(side_effects) == {"branch0", "branch1"}
+
+        # Clear and call again - no retracing should occur
+        side_effects.clear()
+        apply_operation(x, 1)
+        assert len(side_effects) == 0
+
+
 class TestVmap:
     def test_product(self):
         # Example from JAX docs: matrix-matrix product

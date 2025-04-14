@@ -1,7 +1,7 @@
 from ._callback import callback
 from ._codegen import codegen
 from ._compile import FunctionCache, compile
-from ._control_flow import scan, vmap
+from ._control_flow import scan, switch, vmap
 
 __all__ = [
     "callback",
@@ -9,5 +9,6 @@ __all__ = [
     "FunctionCache",
     "codegen",
     "scan",
+    "switch",
     "vmap",
 ]

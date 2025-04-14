@@ -21,6 +21,7 @@ from ._function import (
     codegen,
     compile,
     scan,
+    switch,
     vmap,
 )
 from ._interpolant import interpolant
@@ -45,6 +46,7 @@ __all__ = [
     "jvp",
     "vjp",
     "scan",
+    "switch",
     "vmap",
     "interpolant",
 ]

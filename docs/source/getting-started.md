@@ -424,6 +424,8 @@ print("Outputs:", ys)  # [ 2  6 12 20 30]
 This function also supports tree-structured arguments for `carry`, but the return type of `func` must match the initial carry type.
 There is a learning curve associated with structured control flow functions like `scan`, but it is a powerful and flexible function for constructing symbolically traceable control flow like bounded while loops and map-accumulate operations.
 
+For more details, see the [full documentation page on control flow](generated/notebooks/control-flow)
+
 (functional-programming)=
 ## Functional programming
 

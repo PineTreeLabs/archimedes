@@ -30,13 +30,18 @@ from __future__ import annotations
 from collections import OrderedDict
 from typing import TYPE_CHECKING, Callable, TypeVar
 
+import casadi as cs
 import numpy as np
 
 from archimedes import tree
-from archimedes._core._array_impl import _as_casadi_array, array
+from archimedes._core._array_impl import (
+    DEFAULT_SYM_NAME,
+    _as_casadi_array,
+    array,
+)
 
 from .._array_ops._array_ops import normalize_axis_index
-from ._compile import FunctionCache
+from ._compile import FunctionCache, compile
 
 if TYPE_CHECKING:
     from ...typing import ArrayLike, PyTree
@@ -45,6 +50,7 @@ if TYPE_CHECKING:
 
 __all__ = [
     "scan",
+    "switch",
     "vmap",
 ]
 
@@ -249,8 +255,197 @@ def scan(
     # Reshape so that the shape is (length, ...) (note transposing the CasADi result)
     ys = array(cs_ys.T, x_out.dtype).reshape((length,) + x_out.shape)
 
-    # Return the CasADi outputs as NumPy or SymbolicArray types
+    # Return the outputs as NumPy or SymbolicArray types
     return carry, ys
+
+
+def switch(
+    index: int,
+    branches: tuple[Callable, ...],
+    *args: PyTree,
+    name: str | None = None,
+    kind: str = DEFAULT_SYM_NAME,
+) -> PyTree:
+    """
+    Selectively apply one of several functions based on an index.
+
+    This function provides a conditional branching mechanism that selects and applies
+    one of the provided branch functions based on the index value. The function is
+    similar to a switch/case statement but can be embedded within computational graphs.
+
+    Semantically, this function is equivalent to the following Python code:
+
+    .. highlight:: python
+    .. code-block:: python
+
+        def switch(index, branches, *args):
+            index = min(max(index, 0), len(branches) - 1)
+            return branches[index](*args)
+
+    Parameters
+    ----------
+    index : int
+        The branch selector. Must be an integer. If the index is out of bounds,
+        it will be clamped to the valid range ``[0, len(branches)-1]``.
+    branches : tuple of callables
+        A tuple of functions to choose from. Each function must accept the same
+        arguments and return compatible structures.
+    *args : PyTree
+        Arguments to pass to the selected branch function. All branches must
+        accept these arguments.
+    name : str, optional
+        Name for the resulting function. Used for debugging and visualization.
+        Default is "switch_{index}".
+    kind : str, optional
+        The kind of symbolics to use when constructing the function. Default is "MX".
+
+    Returns
+    -------
+    PyTree
+        The result of applying the selected branch function to the provided arguments.
+        All branches must return the same structure.
+
+    Notes
+    -----
+    This function converts conditional branching into a computational graph construct.
+    Unlike Python's if/else, which doesn't work with symbolic values, ``switch`` is
+    compatible with symbolic/numeric execution.
+
+    The function evaluates each branch at compilation time to ensure they have
+    compatible output structures. At runtime, only the selected branch is executed.
+
+    Behavior notes:
+
+    - If `index` is out of bounds, it will be clamped to the valid range.
+    - All branches must return the same PyTree structure, or a ValueError will be
+      raised.
+    - At least two branches must be provided, or a ValueError will be raised.
+    - Functions are traced at compilation time, meaning any side effects will occur
+      for all branches during tracing, even though only one branch executes at runtime.
+      It is strongly recommended to avoid side effects.
+    - This function supports automatic differentiation
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> import archimedes as arc
+    >>>
+    >>> # Define functions for each branch
+    >>> def branch0(x):
+    ...     return x**2
+    ...
+    >>> def branch1(x):
+    ...     return np.sin(x)
+    ...
+    >>> def branch2(x):
+    ...     return -x
+    ...
+    >>> # Create a switch function
+    >>> @arc.compile
+    ... def apply_operation(x, op_index):
+    ...     return arc.switch(op_index, (branch0, branch1, branch2), x)
+    ...
+    >>> # Apply different branches based on the index
+    >>> x = np.array([0.5, 1.0, 1.5])
+    >>> apply_operation(x, 0)  # Returns x**2
+    >>> apply_operation(x, 1)  # Returns sin(x)
+    >>> apply_operation(x, 2)  # Returns -x
+
+    # Example with a PyTree
+    >>> def multiply(data, factor):
+    ...     return {k: v * factor for k, v in data.items()}
+    ...
+    >>> def add_offset(data, offset):
+    ...     return {k: v + offset for k, v in data.items()}
+    ...
+    >>> @arc.compile
+    ... def process_data(data, op_index, param):
+    ...     return arc.switch(op_index, (multiply, add_offset), data, param)
+    ...
+    >>> data = {"a": np.array([1.0, 2.0]), "b": np.array([3.0, 4.0])}
+    >>> process_data(data, 0, 2.0)  # Multiplies all values by 2.0
+    >>> process_data(data, 1, 1.0)  # Adds 1.0 to all values
+
+    See Also
+    --------
+    np.where : Element-wise conditional selection between two arrays
+    scan : Functional for-loop construct for repeated operations
+    """
+
+    if len(branches) < 2:
+        raise ValueError("switch requires at least two branches")
+
+    if name is None:
+        name = f"switch_{index}"
+
+    # Wrap this within a compile decorator to ensure everything is symbolic
+    @compile(name=name, static_argnums=(1,))
+    def _switch(index, branches, args):
+        # Ravel all args to a single flat argument for constructing
+        # an equivalent flattened CasADi function
+        args_flat, args_unravel = tree.ravel(args)
+
+        # Check that each branch evaluates to the same output structure
+        # Note that this evaluates each branch at compile time, but at
+        # runtime the only evaluation is the CasADi conditional below, which
+        # is short-circuiting.
+        results_treedef = None
+        results_unravel = None
+        results_size = None
+        cs_branches = []  # Flat inputs -> flat outputs
+        for branch in branches:
+            if not isinstance(branch, FunctionCache):
+                branch = FunctionCache(branch)
+
+            # Evaluate the branch for type checking of results
+            results = branch(*args)
+
+            # Flatten the results to a single array for each branch
+            results_flat, results_unravel = tree.ravel(results)
+
+            # Check for consistency of the output structure
+            if results_treedef is None:
+                results_treedef = tree.structure(results)
+                results_size = results_flat.size
+            else:
+                results_treedef_i = tree.structure(results)
+                if results_size != results_flat.size:
+                    raise ValueError(
+                        "All branches of a switch must return the same number of "
+                        f"elements, but got {results_size} for branch 0 and "
+                        f"{results_flat.size} for branch {branch.name}."
+                    )
+                if results_treedef != results_treedef_i:
+                    raise ValueError(
+                        "All branches of a switch must return the same PyTree "
+                        f"structure, but got {results_treedef} for branch 0 and "
+                        f"{results_treedef_i} for branch {branch.name}."
+                    )
+
+            # Save a flattened version of the branch function
+            cs_branches.append(
+                cs.Function(
+                    branch.name,
+                    [_as_casadi_array(args_flat)],
+                    [_as_casadi_array(results_flat)],
+                )
+            )
+
+        # Create the CasADi function that will perform the switch
+        cs_switch = cs.Function.conditional(name, cs_branches[:-1], cs_branches[-1])
+
+        # Evaluate the CasADi function symbolically
+        index = np.fmax(np.fmin(index, len(branches) - 1), 0)  # Clamp to valid range
+        cs_results = cs_switch(_as_casadi_array(index), _as_casadi_array(args_flat))
+
+        # Convert back to a flat SymbolicArray
+        results_flat = array(cs_results, dtype=results_flat.dtype)
+
+        # Unravel the flat result to the original structure
+        return results_unravel(results_flat)
+
+    # Call the switch function with the provided arguments
+    return _switch(index, branches, args)
 
 
 def normalize_vmap_index(axis, data, insert=False):

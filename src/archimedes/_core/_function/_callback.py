@@ -30,7 +30,7 @@ def callback(func: Callable, result_shape_dtypes, *args) -> Any:
     ----------
     func : callable
         The Python function to wrap. This function should accept the same number of
-        arguments as provided in *args and should return values that can be
+        arguments as provided in ``*args`` and should return values that can be
         converted to NumPy arrays.
     result_shape_dtypes : PyTree
         A PyTree structure that defines the expected shape and data types of the
