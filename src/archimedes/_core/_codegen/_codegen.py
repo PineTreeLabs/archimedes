@@ -1,12 +1,12 @@
 """C code generation"""
 
-from typing import TYPE_CHECKING, Any, Callable, Sequence
-import jinja2
 import os
+from typing import TYPE_CHECKING, Any, Callable, Sequence, NamedTuple
 
 import numpy as np
 
 from .._function import FunctionCache
+from ._renderer import _render_template
 
 if TYPE_CHECKING:
     pass
@@ -21,7 +21,14 @@ dtype_to_c = {
     np.bool_: "bool",
     np.float32: "float",
     np.int32: "int",
+    np.dtype("float32"): "float",
+    np.dtype("int32"): "int",
+    np.dtype("float64"): "double",
+    np.dtype("int64"): "long long int",
+    np.dtype("bool_"): "bool",
+    np.dtype("uint"): "unsigned int",
 }
+
 
 
 def codegen(
@@ -39,6 +46,8 @@ def codegen(
     header: bool = True,
     with_mem: bool = False,
     indent: int = 4,
+    template: str | None = None,
+    template_config: dict[str, str] | None = None,
 ) -> None:
     """Generate C/C++ code from a compiled function.
 
@@ -85,6 +94,14 @@ def codegen(
         If True, generate a simplified C API with memory management helpers.
     indent : int, default=4
         The number of spaces to use for indentation in the generated code.
+    template : str, optional
+        TODO: Update docstring
+    template_config : dict[str, str], optional
+        Additional options for rendering the template.  This might include the
+        following keys:
+
+        - template_path: Path to a custom template file, if not using the default.
+        - output_path: Path where the generated code will be written.
 
     Returns
     -------
@@ -99,7 +116,6 @@ def codegen(
     - For maximum runtime performance by removing Python interpretation overhead
     - For creating standalone, portable implementations of your algorithm
 
-    Conceptual model:
     This function specializes your computational graph to specific input shapes
     and types, then uses CasADi's code generation capabilities to produce C code
     that implements the same computation. The generated code has no dependencies
@@ -111,6 +127,9 @@ def codegen(
     To store numerical constants in the generated code, either:
     1. "Close over" the values in your function definition, or
     2. Pass them as hashable static arguments
+
+    Template generation:
+    TODO: Add to docstring
 
     Examples
     --------
@@ -157,6 +176,14 @@ def codegen(
     """
     # TODO: Automatic type inference if not specified
 
+    # Check that all arguments are arrays
+    for arg in args:
+        if not isinstance(arg, np.ndarray) and not np.isscalar(arg):
+            raise TypeError(
+                f"Argument {arg} is not a NumPy array. "
+                "Please provide NumPy arrays for code generation."
+            )
+
     if not isinstance(func, FunctionCache):
         func = FunctionCache(
             func,
@@ -184,50 +211,75 @@ def codegen(
     if kwargs is None:
         kwargs = {}
 
-    # Compile the function for this set of arguments.  We don't need to
-    # actually evaluate the function here, just make sure that a CasADi
-    # function is generated.
-    specialized_func, _sym_args = func._specialize(*args, **kwargs)
+    # Compile the function for this set of arguments.
+    specialized_func, sym_args = func._specialize(*args, **kwargs)
 
-    # Now we can generate the code
+    # Evaluate for the template arguments to get the correct return types
+    results = specialized_func(*sym_args)
+
+    # Now we can generate the function code
     specialized_func.codegen(filename, options)
 
+    # Generate a template/driver file if requested
+    if template is None:
+        return
 
-def _render_c_driver(context, output_path, template_path=None):
-    """
-    Render a C driver file from a Jinja2 template.
-    
-    Args:
-        context: Dictionary with template variables
-        output_path: Path where the generated code will be written
-        template_path: Path to the Jinja2 template file
-    """
-    if template_path is None:
-        template_path = os.path.join(
-            os.path.dirname(__file__), "_templates/c_driver.j2",
-        )
+    if template_config is None:
+        template_config = {}
 
-    template_dir = os.path.dirname(template_path)
-    template_name = os.path.basename(template_path)
+    # Build the context for the renderer
+    context = {
+        "driver_name": os.path.splitext(os.path.basename(filename))[0],
+        "function_name": func.name,
+        "float_type": dtype_to_c[float_type],
+        "int_type": dtype_to_c[int_type],
+        "inputs": [],
+        "outputs": [],
+    }
 
-    # Set up Jinja environment
-    env = jinja2.Environment(
-        loader=jinja2.FileSystemLoader(template_dir or '.'),
-        trim_blocks=True,
-        lstrip_blocks=True
-    )
+    if "input_descriptions" in template_config:
+        input_descriptions = template_config.pop("input_descriptions")
+    else:
+        input_descriptions = {}
+    
+    if "output_descriptions" in template_config:
+        output_descriptions = template_config.pop("output_descriptions")
+    else:
+        output_descriptions = {}
 
-    # Load template
-    template = env.get_template(template_name)
-    
-    # Render template with context
-    rendered_code = template.render(**context)
-    
-    # Create directory if it doesn't exist
-    os.makedirs(os.path.dirname(os.path.abspath(output_path)), exist_ok=True)
-    
-    # Write output file
-    with open(output_path, 'w') as f:
-        f.write(rendered_code)
-    
-    print(f"Generated C driver at: {output_path}")
+    for arg, name in zip(args, func.arg_names):
+        input_context = _context_helper(arg, name, float_type, int_type)
+        context["inputs"].append(input_context)
+        if name in input_descriptions:
+            input_context["description"] = input_descriptions[name]
+
+    for ret, name in zip(results, func.return_names):
+        output_context = _context_helper(ret, name, float_type, int_type)
+        context["outputs"].append(output_context)
+        if name in output_descriptions:
+            output_context["description"] = output_descriptions[name]
+
+    from pprint import pprint
+    pprint(context)
+    _render_template(template, context, **template_config)
+
+
+def _context_helper(arg, name, float_type, int_type):
+    arg = np.asarray(arg)
+    dtype = float_type if np.issubdtype(arg.dtype, np.floating) else int_type
+    if np.isscalar(arg) or arg.shape == ():
+        initial_value = str(arg)
+        dims = None
+        is_addr = True
+    else:
+        initial_value = "{" + ", ".join(map(str, arg.flatten())) + "}"
+        dims = str(arg.size)
+        is_addr = False
+    return {
+        "type": dtype_to_c[dtype],
+        "name": name,
+        "dims": dims,
+        "initial_value": initial_value,
+        "description": None,
+        "is_addr": is_addr,
+    }

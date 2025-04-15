@@ -1,14 +1,15 @@
 // gcc {{ driver_name }}.c {{ function_name }}.c -o {{ driver_name }}
-#include <stdio.h>
 #include "{{ function_name }}.h"
 
 // Allocate memory for inputs and outputs
 {% for input in inputs %}
-{{ input.type }} {{ input.name }}{% if input.dims %}[{{ input.dims }}]{% endif %} = {{ input.initial_value }};  // {{ input.description }}
+{{ input.type }} {{ input.name }}{% if input.dims %}[{{ input.dims }}]{% endif %} = {{ input.initial_value }};{% if input.description %}  // {{ input.description }}{% endif %}
+
 {% endfor %}
 
 {% for output in outputs %}
-{{ output.type }} {{ output.name }}{% if output.dims %}[{{ output.dims }}]{% endif %} = {0};  // {{ output.description }}
+{{ output.type }} {{ output.name }}{% if output.dims %}[{{ output.dims }}]{% endif %} = {0};{% if output.description %}  // {{ output.description }}{% endif %}
+
 {% endfor %}
 
 // Prepare pointers to inputs, outputs, and work arrays
@@ -19,31 +20,17 @@ const {{ float_type }}* arg[{{ function_name }}_SZ_ARG] = {0};
 
 int main(int argc, char *argv[]) {
     // Set up input arguments
-    {% for arg_mapping in input_mappings %}
-    arg[{{ loop.index0 }}] = {% if arg_mapping.is_addr %}&{% endif %}{{ arg_mapping.var }};
+    {% for input in inputs %}
+    arg[{{ loop.index0 }}] = {% if input.is_addr %}&{% endif %}{{ input.name }};
     {% endfor %}
     
     // Set up output arguments
-    {% for res_mapping in output_mappings %}
-    res[{{ loop.index0 }}] = {% if res_mapping.is_addr %}&{% endif %}{{ res_mapping.var }};
+    {% for output in outputs %}
+    res[{{ loop.index0 }}] = {% if output.is_addr %}&{% endif %}{{ output.name }};
     {% endfor %}
 
     // Call the function
     {{ function_name }}(arg, res, iw, w, 0);
-
-    // Print results
-    {% for output in print_outputs %}
-    printf("{{ output.name }} = %f\n", {{ output.value }});
-    {% endfor %}
-    
-    {% if state_updates %}
-    // Copy output to input (for next iteration)
-    {% for update in state_updates %}
-    for (int i = 0; i < {{ update.size }}; ++i) {
-        {{ update.dst }}[i] = {{ update.src }}[i];
-    }
-    {% endfor %}
-    {% endif %}
     
     return 0;
 }

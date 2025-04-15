@@ -60,9 +60,22 @@ template_args = (x, e)
 # Compile the function with specified static arguments and return names
 pid = arc.compile(
     pid,
-    static_argnames=tuple(static_args.keys()),
+    # static_argnames=tuple(static_args.keys()),
     return_names=("x_new", "u"),
 )
+
+template_config = {
+    "output_path": "main.c",
+    "input_descriptions": {
+        "x": "State vector",
+        "e": "Error signal (scalar)",
+    },
+    "output_descriptions": {
+        "x_new": "Updated state",
+        "u": "Output vector (scalar)",
+    },
+}
+
 
 arc.codegen(
     pid,
@@ -72,6 +85,8 @@ arc.codegen(
     header=True,
     float_type=np.float32,
     int_type=np.int32,
+    template="c",
+    template_config=template_config,
 )
 
 x = np.array([1.0, 2.0, 3.0])
@@ -94,14 +109,16 @@ context = {
             'name': 'x', 
             'dims': '3', 
             'initial_value': '{1.0, 2.0, 3.0}', 
-            'description': 'State vector'
+            'description': 'State vector',
+            'is_addr': False,
         },
         {
             'type': 'float', 
             'name': 'e', 
             'dims': None, 
             'initial_value': '0.5', 
-            'description': 'Error signal (scalar)'
+            'description': 'Error signal (scalar)',
+            'is_addr': True,
         }
     ],
     'outputs': [
@@ -109,34 +126,19 @@ context = {
             'type': 'float', 
             'name': 'x_new', 
             'dims': '3', 
-            'description': 'Updated state'
+            'description': 'Updated state',
+            'is_addr': False,
         },
         {
             'type': 'float', 
             'name': 'u', 
             'dims': None, 
-            'description': 'Output vector (scalar)'
+            'description': 'Output vector (scalar)',
+            'is_addr': True,
         }
     ],
-    'input_mappings': [
-        {'var': 'x', 'is_addr': False},
-        {'var': 'e', 'is_addr': True}
-    ],
-    'output_mappings': [
-        {'var': 'x_new', 'is_addr': False},
-        {'var': 'u', 'is_addr': True}
-    ],
-    'print_outputs': [
-        {'name': 'x_new[0]', 'value': 'x_new[0]'},
-        {'name': 'x_new[1]', 'value': 'x_new[1]'},
-        {'name': 'x_new[2]', 'value': 'x_new[2]'},
-        {'name': 'u', 'value': 'u'}
-    ],
-    'state_updates': [
-        {'dst': 'x', 'src': 'x_new', 'size': '3'}
-    ]
 }
 
-# Render the template
-from archimedes._core._codegen._codegen import _render_c_driver
-_render_c_driver(context, "main.c")
+# # Render the template
+# from archimedes._core._codegen._codegen import _render_c_driver
+# _render_c_driver(context, "main.c")

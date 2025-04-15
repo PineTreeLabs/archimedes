@@ -1,10 +1,9 @@
-// gcc main.c pid.c -o main
-#include <stdio.h>
+// gcc pid.c pid.c -o pid
 #include "pid.h"
 
 // Allocate memory for inputs and outputs
-float x[3] = {1.0, 2.0, 3.0};  // State vector
-float e = 0.5;  // Error signal (scalar)
+float x[3] = {0.0, 0.0, 0.0};  // State vector
+float e = 0.0;  // Error signal (scalar)
 
 float x_new[3] = {0};  // Updated state
 float u = {0};  // Output vector (scalar)
@@ -26,17 +25,6 @@ int main(int argc, char *argv[]) {
 
     // Call the function
     pid(arg, res, iw, w, 0);
-
-    // Print results
-    printf("x_new[0] = %f\n", x_new[0]);
-    printf("x_new[1] = %f\n", x_new[1]);
-    printf("x_new[2] = %f\n", x_new[2]);
-    printf("u = %f\n", u);
-    
-    // Copy output to input (for next iteration)
-    for (int i = 0; i < 3; ++i) {
-        x[i] = x_new[i];
-    }
     
     return 0;
 }
