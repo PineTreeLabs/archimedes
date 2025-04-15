@@ -78,3 +78,65 @@ x = np.array([1.0, 2.0, 3.0])
 e = 0.5
 x, u = pid(x, e, **static_args)
 print(f"Updated state: {x}, Control output: {u}")
+
+
+# Generate C driver code
+
+# Example context for rendering main.c
+context = {
+    'driver_name': 'main',
+    'function_name': 'pid',
+    'float_type': 'float',
+    'int_type': 'int',
+    'inputs': [
+        {
+            'type': 'float', 
+            'name': 'x', 
+            'dims': '3', 
+            'initial_value': '{1.0, 2.0, 3.0}', 
+            'description': 'State vector'
+        },
+        {
+            'type': 'float', 
+            'name': 'e', 
+            'dims': None, 
+            'initial_value': '0.5', 
+            'description': 'Error signal (scalar)'
+        }
+    ],
+    'outputs': [
+        {
+            'type': 'float', 
+            'name': 'x_new', 
+            'dims': '3', 
+            'description': 'Updated state'
+        },
+        {
+            'type': 'float', 
+            'name': 'u', 
+            'dims': None, 
+            'description': 'Output vector (scalar)'
+        }
+    ],
+    'input_mappings': [
+        {'var': 'x', 'is_addr': False},
+        {'var': 'e', 'is_addr': True}
+    ],
+    'output_mappings': [
+        {'var': 'x_new', 'is_addr': False},
+        {'var': 'u', 'is_addr': True}
+    ],
+    'print_outputs': [
+        {'name': 'x_new[0]', 'value': 'x_new[0]'},
+        {'name': 'x_new[1]', 'value': 'x_new[1]'},
+        {'name': 'x_new[2]', 'value': 'x_new[2]'},
+        {'name': 'u', 'value': 'u'}
+    ],
+    'state_updates': [
+        {'dst': 'x', 'src': 'x_new', 'size': '3'}
+    ]
+}
+
+# Render the template
+from archimedes._core._codegen._codegen import _render_c_driver
+_render_c_driver(context, "main.c")

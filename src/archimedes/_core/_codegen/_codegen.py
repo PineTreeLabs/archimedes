@@ -1,6 +1,8 @@
 """C code generation"""
 
 from typing import TYPE_CHECKING, Any, Callable, Sequence
+import jinja2
+import os
 
 import numpy as np
 
@@ -189,3 +191,43 @@ def codegen(
 
     # Now we can generate the code
     specialized_func.codegen(filename, options)
+
+
+def _render_c_driver(context, output_path, template_path=None):
+    """
+    Render a C driver file from a Jinja2 template.
+    
+    Args:
+        context: Dictionary with template variables
+        output_path: Path where the generated code will be written
+        template_path: Path to the Jinja2 template file
+    """
+    if template_path is None:
+        template_path = os.path.join(
+            os.path.dirname(__file__), "_templates/c_driver.j2",
+        )
+
+    template_dir = os.path.dirname(template_path)
+    template_name = os.path.basename(template_path)
+
+    # Set up Jinja environment
+    env = jinja2.Environment(
+        loader=jinja2.FileSystemLoader(template_dir or '.'),
+        trim_blocks=True,
+        lstrip_blocks=True
+    )
+
+    # Load template
+    template = env.get_template(template_name)
+    
+    # Render template with context
+    rendered_code = template.render(**context)
+    
+    # Create directory if it doesn't exist
+    os.makedirs(os.path.dirname(os.path.abspath(output_path)), exist_ok=True)
+    
+    # Write output file
+    with open(output_path, 'w') as f:
+        f.write(rendered_code)
+    
+    print(f"Generated C driver at: {output_path}")
