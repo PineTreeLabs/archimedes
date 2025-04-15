@@ -1,11 +1,13 @@
+# ruff: noqa: N802, N803, N806, N815, N816
+
 import numpy as np
+
 import archimedes as arc
-from archimedes import struct
 
 
 def pid(x, e, Kp=1.0, Ki=0.0, Kd=0.0, Ts=0.01, N=10.0):
     """Discrete-time PID controller with filtered derivative
-    
+
     Args:
         x: Flattened state vector [e_prev, e_int, de_filt]
         e: Current error value
@@ -19,11 +21,11 @@ def pid(x, e, Kp=1.0, Ki=0.0, Kd=0.0, Ts=0.01, N=10.0):
         (x_new, u): Updated state vector and control output
     """
     e_prev, e_int, e_dot = x
-    
+
     # Calculate bilinear filter coefficients
     b = [2 * N, -2 * N]
     a = [(2 + N * Ts), (-2 + N * Ts)]
-    
+
     # Update integral term using trapezoidal rule
     e_int = e_int + (e + e_prev) * Ts / 2.0
 
@@ -54,7 +56,7 @@ kwargs = {
     "Ki": 0.1,
     "Kd": 0.01,
     "Ts": Ts,
-    "N": 1/Ts,
+    "N": 1 / Ts,
 }
 
 x, u = pid(x, e, **kwargs)
@@ -62,7 +64,6 @@ print(f"Updated state: {x}, Control output: {u}")
 
 c_driver_config = {
     "output_path": "main.c",
-
     # Optional: descriptions add comments to the generated code
     "input_descriptions": {
         "x": "State vector",
@@ -98,7 +99,6 @@ arc.codegen(
 arduino_driver_config = {
     "output_path": "arduino_codegen.ino",
     "sample_rate": Ts,
-
     # Optional: descriptions add comments to the generated code
     "input_descriptions": {
         "x": "State vector",

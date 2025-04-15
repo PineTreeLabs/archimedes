@@ -1,8 +1,9 @@
 """C code generation"""
+
 from __future__ import annotations
-import os
-from typing import TYPE_CHECKING, Any, Callable, Sequence, NamedTuple
+
 import dataclasses
+from typing import TYPE_CHECKING, Any, Callable, Sequence
 
 import numpy as np
 
@@ -196,9 +197,7 @@ def codegen(
     # Check that all arguments are arrays
     for arg in args:
         if not np.all(np.isreal(arg)):
-            raise TypeError(
-                f"Argument {arg} is not numeric or a NumPy array."
-            )
+            raise TypeError(f"Argument {arg} is not numeric or a NumPy array.")
 
     if not isinstance(func, FunctionCache):
         func = FunctionCache(
@@ -252,13 +251,13 @@ def codegen(
         "outputs": [],
     }
 
-    Ts = driver_config.pop("sample_rate", None)
-    if Ts is not None:
+    ts = driver_config.pop("sample_rate", None)
+    if ts is not None:
         context["sample_rate"] = {
-            "hz": int(1 / Ts),  # Approximate, used for comments
-            "s": Ts,  # Sample rate in seconds
-            "ms": int(Ts * 1e3),  # Sample rate in microseconds
-            "us": int(Ts * 1e6),  # Sample rate in microseconds
+            "hz": int(1 / ts),  # Approximate, used for comments
+            "s": ts,  # Sample rate in seconds
+            "ms": int(ts * 1e3),  # Sample rate in microseconds
+            "us": int(ts * 1e6),  # Sample rate in microseconds
         }
 
     input_helper = ContextHelper(

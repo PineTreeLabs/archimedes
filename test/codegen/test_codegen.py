@@ -1,15 +1,15 @@
-import pytest
-import tempfile
 import os
 import shutil
+import tempfile
 
 import numpy as np
+import pytest
 
 import archimedes as arc
 from archimedes._core._codegen._renderer import (
+    ArduinoRenderer,
     _extract_protected_regions,
     _render_template,
-    ArduinoRenderer,
 )
 
 # TODO:
@@ -23,7 +23,7 @@ from archimedes._core._codegen._renderer import (
 def temp_dir():
     """Create a temporary directory and file path for testing."""
     temp_dir = tempfile.mkdtemp()
-    output_path = os.path.join(temp_dir, 'test_output.c')
+    output_path = os.path.join(temp_dir, "test_output.c")
     yield output_path
     shutil.rmtree(temp_dir)
 
@@ -35,6 +35,7 @@ def myfunc():
 
     return func
 
+
 # Create arrays of the right shape and dtype
 x_type = np.array([1, 2], dtype=float)
 y_type = np.array(3, dtype=float)
@@ -45,63 +46,64 @@ def context():
     # Basic context for consistent driver template rendering
     # Note this needs to match the test_func above
     return {
-        'driver_name': 'test_driver',
-        'function_name': 'test_func',
-        'sample_rate': 0.01,
-        'float_type': 'float',
-        'int_type': 'int',
-        'inputs': [
+        "driver_name": "test_driver",
+        "function_name": "test_func",
+        "sample_rate": 0.01,
+        "float_type": "float",
+        "int_type": "int",
+        "inputs": [
             {
-                'type': 'float',
-                'name': 'x',
-                'dims': '2', 
-                'initial_value': '{1.0, 2.0}',
-                'is_addr': False,
+                "type": "float",
+                "name": "x",
+                "dims": "2",
+                "initial_value": "{1.0, 2.0}",
+                "is_addr": False,
             },
             {
-                'type': 'float',
-                'name': 'y',
-                'dims': None, 
-                'initial_value': '3.0',
-                'is_addr': True,
+                "type": "float",
+                "name": "y",
+                "dims": None,
+                "initial_value": "3.0",
+                "is_addr": True,
             },
         ],
-        'outputs': [
+        "outputs": [
             {
-                'type': 'float',
-                'name': 'x_new',
-                'dims': '2',
-                'is_addr': False,
+                "type": "float",
+                "name": "x_new",
+                "dims": "2",
+                "is_addr": False,
             },
             {
-                'type': 'float',
-                'name': 'z',
-                'dims': '2',
-                'is_addr': False,
+                "type": "float",
+                "name": "z",
+                "dims": "2",
+                "is_addr": False,
             },
-        ]
+        ],
     }
 
 
 def compare_files(expected_file, output_path):
-        expected_output = os.path.join(
-            os.path.dirname(__file__), f"fixtures/{expected_file}",
-        )
-        
-        # Load expected output
-        with open(expected_output, 'r') as f:
-            expected = f.read()
-        
-        # Load actual output
-        with open(output_path, 'r') as f:
-            actual = f.read()
+    expected_output = os.path.join(
+        os.path.dirname(__file__),
+        f"fixtures/{expected_file}",
+    )
 
-        # Compare (normalize whitespace to handle line endings)
-        assert expected.strip() == actual.strip()
+    # Load expected output
+    with open(expected_output, "r") as f:
+        expected = f.read()
+
+    # Load actual output
+    with open(output_path, "r") as f:
+        actual = f.read()
+
+    # Compare (normalize whitespace to handle line endings)
+    assert expected.strip() == actual.strip()
 
 
 def check_in_file(file, pattern):
-    with open(file, 'r') as f:
+    with open(file, "r") as f:
         content = f.read()
         assert pattern in content
 
@@ -174,14 +176,12 @@ class TestCodegen:
         os.remove(f"{file}.c")
         os.remove(f"{file}.h")
 
-
     def test_error_handling(self, temp_dir, myfunc):
         with pytest.raises(RuntimeError):
             self._gen_code(f"{temp_dir}/gen", myfunc)
 
 
 class TestExtractProtectedRegions:
-
     def test_basic_extraction(self):
         # Create a temporary file with test content
         content = """// Some code
@@ -193,7 +193,7 @@ class TestExtractProtectedRegions:
     printf("Hello World");
     // PROTECTED-REGION-END
     """
-        with tempfile.NamedTemporaryFile(mode='w+', delete=False) as temp:
+        with tempfile.NamedTemporaryFile(mode="w+", delete=False) as temp:
             temp.write(content)
             temp_path = temp.name
 
@@ -219,12 +219,15 @@ class TestExtractProtectedRegions:
 
 
 class TestRender:
-    @pytest.mark.parametrize("driver_type,expected_file", [
-        ("c", "expected_c_driver.c"),
-        ("arduino", "expected_arduino.ino"),
-    ])
+    @pytest.mark.parametrize(
+        "driver_type,expected_file",
+        [
+            ("c", "expected_c_driver.c"),
+            ("arduino", "expected_arduino.ino"),
+        ],
+    )
     def test_initial_render(self, driver_type, expected_file, temp_dir, context):
-        extension = expected_file.split('.')[-1]
+        extension = expected_file.split(".")[-1]
         filename = f"{context['driver_name']}.{extension}"
         output_path = os.path.join(temp_dir, filename)
 
@@ -238,6 +241,7 @@ class TestRender:
 
         # Check that the file exists with the default name
         assert os.path.exists(renderer.default_output_path)
+        os.remove(renderer.default_output_path)
 
     def test_invalid_renderer(self, context):
         with pytest.raises(ValueError, match=r"Template .* not found."):
@@ -248,36 +252,36 @@ class TestRender:
 
     def test_direct_renderer(self, temp_dir, context):
         # Pass the Arduino renderer directly
-        _render_template(ArduinoRenderer, context)
+        output_path = os.path.join(temp_dir, "sketch.ino")
+        _render_template(ArduinoRenderer, context, output_path=output_path)
 
     def test_preserve_protected(self, temp_dir, context):
         output_path = os.path.join(temp_dir, f"{context['driver_name']}.c")
 
         # Initial render
         _render_template("c", context, output_path=output_path)
-        
+
         # Modify a protected region
-        with open(output_path, 'r') as f:
+        with open(output_path, "r") as f:
             content = f.read()
 
         # Insert custom code into a protected region
         modified_content = content.replace(
             "// PROTECTED-REGION-START: main\n",
-            "// PROTECTED-REGION-START: main\n    printf(\"Custom code\\n\");\n"
+            '// PROTECTED-REGION-START: main\n    printf("Custom code\\n");\n',
         )
 
-        with open(output_path, 'w') as f:
+        with open(output_path, "w") as f:
             f.write(modified_content)
-        
+
         # Re-render with same context
         _render_template("c", context, output_path=output_path)
-        
-        # Verify protected region was preserved
-        with open(output_path, 'r') as f:
-            final_content = f.read()
-        
-        assert 'printf("Custom code\\n");' in final_content
 
+        # Verify protected region was preserved
+        with open(output_path, "r") as f:
+            final_content = f.read()
+
+        assert 'printf("Custom code\\n");' in final_content
 
     def test_context_changes(self, temp_dir, context):
         output_path = os.path.join(temp_dir, f"{context['driver_name']}.c")
@@ -286,30 +290,30 @@ class TestRender:
         _render_template("c", context, output_path=output_path)
 
         # Modify a protected region
-        with open(output_path, 'r') as f:
+        with open(output_path, "r") as f:
             content = f.read()
 
         modified_content = content.replace(
             "// PROTECTED-REGION-START: main\n",
-            "// PROTECTED-REGION-START: main\n    printf(\"Custom code\\n\");\n"
+            '// PROTECTED-REGION-START: main\n    printf("Custom code\\n");\n',
         )
 
-        with open(output_path, 'w') as f:
+        with open(output_path, "w") as f:
             f.write(modified_content)
-        
+
         # Updated context with different function name
-        context['function_name'] = 'func2'
-        
+        context["function_name"] = "func2"
+
         # Re-render with new context
         _render_template("c", context, output_path=output_path)
-        
+
         # Check results
-        with open(output_path, 'r') as f:
+        with open(output_path, "r") as f:
             final_content = f.read()
-        
+
         # Protected region should be preserved
         assert 'printf("Custom code\\n");' in final_content
-        
+
         # Function name should be updated
-        assert 'func2' in final_content
-        assert 'func1' not in final_content
+        assert "func2" in final_content
+        assert "func1" not in final_content

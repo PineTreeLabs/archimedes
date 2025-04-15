@@ -87,7 +87,9 @@ def _discretize_radau5(rhs, h, newton_solver="fast_newton"):
         f, k = np.reshape(f, (3 * n,)), np.reshape(k, (3 * n,))
         return f - k
 
-    F = FunctionCache(F, kind=sym_kind, arg_names=["k", "t", "y", "p"], return_names=["r"])
+    F = FunctionCache(
+        F, kind=sym_kind, arg_names=["k", "t", "y", "p"], return_names=["r"]
+    )
     solve = implicit(F, solver=newton_solver)
 
     def step(t, y, p):
