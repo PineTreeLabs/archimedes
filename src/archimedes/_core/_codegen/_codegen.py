@@ -1,5 +1,5 @@
 """C code generation"""
-
+from __future__ import annotations
 import os
 from typing import TYPE_CHECKING, Any, Callable, Sequence, NamedTuple
 import dataclasses
@@ -10,7 +10,7 @@ from .._function import FunctionCache
 from ._renderer import _render_template
 
 if TYPE_CHECKING:
-    pass
+    from ._renderer import RendererBase
 
 dtype_to_c = {
     float: "double",
@@ -47,12 +47,13 @@ def codegen(
     args: Sequence[Any],
     static_argnums: int | Sequence[int] | None = None,
     static_argnames: str | Sequence[str] | None = None,
+    return_names: Sequence[str] | None = None,
     kwargs: dict[str, Any] | None = None,
     float_type: type = float,
     int_type: type = int,
     options: dict[str, Any] | None = None,
-    template: str | None = None,
-    template_config: dict[str, str] | None = None,
+    driver: str | RendererBase | None = None,
+    driver_config: dict[str, str] | None = None,
 ) -> None:
     """Generate C/C++ code from a compiled function.
 
@@ -81,6 +82,10 @@ def codegen(
     static_argnames : tuple, optional
         The names of the static arguments to the function. Will be ignored if
         `func` is already a FunctionCache.
+    return_names : tuple, optional
+        The names of the return values of the function. Ignored if `func` is
+        already a FunctionCache. If not provided, the function will use default
+        names like ``y0``, ``y1``, etc.
     kwargs : dict, optional
         Keyword arguments to pass to the function during specialization.
     float_type : type, default=float
@@ -97,15 +102,21 @@ def codegen(
         - with_mem: If True, generate a simplified C API with memory helpers.
         - indent: The number of spaces to use for indentation in the generated code.
 
-    template : str, optional
-        Name of the template to use for generating driver code. If None, no
-        driver code will be generated.
-    template_config : dict[str, str], optional
-        Additional options for rendering the template.  This might include the
+    driver : str | RendererBase, optional
+        Name of the template to use for generating driver code, or a custom
+        implementation of ``RendererBase``. If None, no driver code will be generated.
+    driver_config : dict[str, str], optional
+        Additional options for rendering the driver template.  This might include the
         following keys:
 
         - template_path: Path to a custom template file, if not using the default.
         - output_path: Path where the generated code will be written.
+        - sample_rate: Sample rate for the loop function in seconds (not used by all
+          templates).
+        - input_descriptions: Dictionary mapping input names to descriptions.
+          Used for generating comments in the code.
+        - output_descriptions: Dictionary mapping output names to descriptions.
+          Used for generating comments in the code.
 
     Returns
     -------
@@ -132,7 +143,7 @@ def codegen(
     1. "Close over" the values in your function definition, or
     2. Pass them as hashable static arguments
 
-    Template generation:
+    Driver generation:
     Optionally, this function can also be used to generate templated "driver" code
     for different applications.  For example, this can be used to create a basic
     C program that allocates memory and calls the generated function, or to create
@@ -184,10 +195,9 @@ def codegen(
 
     # Check that all arguments are arrays
     for arg in args:
-        if not isinstance(arg, np.ndarray) and not np.isscalar(arg):
+        if not np.all(np.isreal(arg)):
             raise TypeError(
-                f"Argument {arg} is not a NumPy array. "
-                "Please provide NumPy arrays for code generation."
+                f"Argument {arg} is not numeric or a NumPy array."
             )
 
     if not isinstance(func, FunctionCache):
@@ -195,6 +205,7 @@ def codegen(
             func,
             static_argnums=static_argnums,
             static_argnames=static_argnames,
+            return_names=return_names,
         )
 
     if filename is None:
@@ -226,15 +237,14 @@ def codegen(
     specialized_func.codegen(filename, options)
 
     # Generate a template/driver file if requested
-    if template is None:
+    if driver is None:
         return
 
-    if template_config is None:
-        template_config = {}
+    if driver_config is None:
+        driver_config = {}
 
     # Build the context for the renderer
     context = {
-        "driver_name": os.path.splitext(os.path.basename(filename))[0],
         "function_name": func.name,
         "float_type": dtype_to_c[float_type],
         "int_type": dtype_to_c[int_type],
@@ -242,30 +252,41 @@ def codegen(
         "outputs": [],
     }
 
+    Ts = driver_config.pop("sample_rate", None)
+    if Ts is not None:
+        context["sample_rate"] = {
+            "hz": int(1 / Ts),  # Approximate, used for comments
+            "s": Ts,  # Sample rate in seconds
+            "ms": int(Ts * 1e3),  # Sample rate in microseconds
+            "us": int(Ts * 1e6),  # Sample rate in microseconds
+        }
+
     input_helper = ContextHelper(
-        float_type, int_type, template_config.pop("input_descriptions", None)
+        float_type, int_type, driver_config.pop("input_descriptions", {})
     )
-    for arg, name in zip(args, func.arg_names):
+    for name, arg in zip(func.arg_names, args):
         input_context = input_helper(arg, name)
         context["inputs"].append(input_context)
 
+    for name, val in kwargs.items():
+        input_context = input_helper(val, name)
+        context["inputs"].append(input_context)
+
     output_helper = ContextHelper(
-        float_type, int_type, template_config.pop("output_descriptions", None)
+        float_type, int_type, driver_config.pop("output_descriptions", {})
     )
-    for ret, name in zip(results, func.return_names):
+    for name, ret in zip(func.return_names, results):
         output_context = output_helper(ret, name)
         context["outputs"].append(output_context)
 
-    from pprint import pprint
-    pprint(context)
-    _render_template(template, context, **template_config)
+    _render_template(driver, context, **driver_config)
 
 
 @dataclasses.dataclass
 class ContextHelper:
     float_type: str
     int_type: str
-    descriptions: dict[str, str] = dataclasses.field(default_factory=dict)
+    descriptions: dict[str, str]
 
     def __call__(self, arg, name):
         arg = np.asarray(arg)

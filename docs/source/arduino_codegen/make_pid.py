@@ -3,19 +3,6 @@ import archimedes as arc
 from archimedes import struct
 
 
-
-# These will be declared as "static", hardcoding their values
-# in the generated C code.  We could also leave some of these
-# out to have them be arguments to the generated function
-static_args = {
-    "Kp": 1.0,
-    "Ki": 0.1,
-    "Kd": 0.01,
-    "Ts": 0.01,
-    "N": 100.0,
-}
-
-
 def pid(x, e, Kp=1.0, Ki=0.0, Kd=0.0, Ts=0.01, N=10.0):
     """Discrete-time PID controller with filtered derivative
     
@@ -53,22 +40,38 @@ def pid(x, e, Kp=1.0, Ki=0.0, Kd=0.0, Ts=0.01, N=10.0):
 
 
 # Create template args for the function
-x = np.zeros(3)
-e = 0.0
+# These are used to infer shape/dtype, but also used as the initial
+# values in the generated code
+x = np.array([1.0, 2.0, 3.0])
+e = 0.5
 template_args = (x, e)
 
-# Compile the function with specified static arguments and return names
-pid = arc.compile(
-    pid,
-    # static_argnames=tuple(static_args.keys()),
-    return_names=("x_new", "u"),
-)
+# Keyword arguments for the function - will also generate named variables
+# in the code
+Ts = 0.01  # Sample time, seconds
+kwargs = {
+    "Kp": 1.0,
+    "Ki": 0.1,
+    "Kd": 0.01,
+    "Ts": Ts,
+    "N": 1/Ts,
+}
 
-template_config = {
+x, u = pid(x, e, **kwargs)
+print(f"Updated state: {x}, Control output: {u}")
+
+c_driver_config = {
     "output_path": "main.c",
+
+    # Optional: descriptions add comments to the generated code
     "input_descriptions": {
         "x": "State vector",
         "e": "Error signal (scalar)",
+        "Kp": "Proportional gain",
+        "Ki": "Integral gain",
+        "Kd": "Derivative gain",
+        "Ts": "Sampling time in seconds",
+        "N": "Filter coefficient",
     },
     "output_descriptions": {
         "x_new": "Updated state",
@@ -76,70 +79,50 @@ template_config = {
     },
 }
 
+# Specifying the return names is optional, but will create meaningful names
+# in the generated code for the output variables.
+arc.codegen(
+    pid,
+    "pid.c",
+    template_args,
+    return_names=("x_new", "u"),
+    kwargs=kwargs,
+    float_type=np.float32,
+    int_type=np.int32,
+    driver="c",
+    driver_config=c_driver_config,
+)
+
+
+# Redo for arduino
+arduino_driver_config = {
+    "output_path": "arduino_codegen.ino",
+    "sample_rate": Ts,
+
+    # Optional: descriptions add comments to the generated code
+    "input_descriptions": {
+        "x": "State vector",
+        "e": "Error signal (scalar)",
+        "Kp": "Proportional gain",
+        "Ki": "Integral gain",
+        "Kd": "Derivative gain",
+        "Ts": "Sampling time in seconds",
+        "N": "Filter coefficient",
+    },
+    "output_descriptions": {
+        "x_new": "Updated state",
+        "u": "Output vector (scalar)",
+    },
+}
 
 arc.codegen(
     pid,
     "pid.c",
     template_args,
-    kwargs=static_args,
-    header=True,
+    return_names=("x_new", "u"),
+    kwargs=kwargs,
     float_type=np.float32,
     int_type=np.int32,
-    template="c",
-    template_config=template_config,
-    main=True,
+    driver="arduino",
+    driver_config=arduino_driver_config,
 )
-
-x = np.array([1.0, 2.0, 3.0])
-e = 0.5
-x, u = pid(x, e, **static_args)
-print(f"Updated state: {x}, Control output: {u}")
-
-
-# Generate C driver code
-
-# Example context for rendering main.c
-context = {
-    'driver_name': 'main',
-    'function_name': 'pid',
-    'float_type': 'float',
-    'int_type': 'int',
-    'inputs': [
-        {
-            'type': 'float', 
-            'name': 'x', 
-            'dims': '3', 
-            'initial_value': '{1.0, 2.0, 3.0}', 
-            'description': 'State vector',
-            'is_addr': False,
-        },
-        {
-            'type': 'float', 
-            'name': 'e', 
-            'dims': None, 
-            'initial_value': '0.5', 
-            'description': 'Error signal (scalar)',
-            'is_addr': True,
-        }
-    ],
-    'outputs': [
-        {
-            'type': 'float', 
-            'name': 'x_new', 
-            'dims': '3', 
-            'description': 'Updated state',
-            'is_addr': False,
-        },
-        {
-            'type': 'float', 
-            'name': 'u', 
-            'dims': None, 
-            'description': 'Output vector (scalar)',
-            'is_addr': True,
-        }
-    ],
-}
-
-# # Render the template
-# from archimedes._core._codegen._codegen import _render_c_driver
-# _render_c_driver(context, "main.c")

@@ -1,31 +1,26 @@
 #include <Arduino.h>
 #include <TimerOne.h>
-#include "pid.h"
+#include "test_func.h"
 
 // PROTECTED-REGION-START: imports
 // ... User-defined imports and includes
 // PROTECTED-REGION-END
 
-// Sampling rate: 100 Hz
-const unsigned long SAMPLE_RATE_US = 10000;
+// Sampling rate:  Hz
+const unsigned long SAMPLE_RATE_US = ;
 
 // Allocate memory for inputs and outputs
-float x[3] = {1.0, 2.0, 3.0};  // State vector
-float e = 0.5;  // Error signal (scalar)
-float Kp = 1.0;  // Proportional gain
-float Ki = 0.1;  // Integral gain
-float Kd = 0.01;  // Derivative gain
-float Ts = 0.01;  // Sampling time in seconds
-float N = 100.0;  // Filter coefficient
+float x[2] = {1.0, 2.0};
+float y = 3.0;
 
-float x_new[3] = {0};  // Updated state
-float u = {0};  // Output vector (scalar)
+float x_new[2] = {0};
+float z[2] = {0};
 
 // Prepare pointers to inputs, outputs, and work arrays
-const float* arg[pid_SZ_ARG] = {0};
-float* res[pid_SZ_RES] = {0};
-int iw[pid_SZ_IW];
-float w[pid_SZ_W];
+const float* arg[test_func_SZ_ARG] = {0};
+float* res[test_func_SZ_RES] = {0};
+int iw[test_func_SZ_IW];
+float w[test_func_SZ_W];
 
 // Flag for interrupt timer
 volatile bool control_loop_flag = false;
@@ -37,6 +32,7 @@ volatile bool control_loop_flag = false;
 // Timer interrupt handler
 void timerInterrupt() {
     // PROTECTED-REGION-START: interrupt
+    // Set flag for main loop to run control function
     control_loop_flag = true;
     // PROTECTED-REGION-END
 }
@@ -44,22 +40,17 @@ void timerInterrupt() {
 void setup(){
     // Set up input and output pointers
     arg[0] = x;
-    arg[1] = &e;
-    arg[2] = &Kp;
-    arg[3] = &Ki;
-    arg[4] = &Kd;
-    arg[5] = &Ts;
-    arg[6] = &N;
+    arg[1] = &y;
 
     res[0] = x_new;
-    res[1] = &u;
+    res[1] = z;
 
     // PROTECTED-REGION-START: setup
     // ... User-defined setup code
     Serial.begin(9600);
     // PROTECTED-REGION-END
 
-    // Initialize Timer1 for interrupts at 100 Hz
+    // Initialize Timer1 for interrupts at  Hz
     Timer1.initialize(SAMPLE_RATE_US);
     Timer1.attachInterrupt(timerInterrupt);
 }
@@ -71,12 +62,12 @@ void loop() {
         
         // PROTECTED-REGION-START: control_loop
         // ... User-defined timed code
-        pid(arg, res, iw, w, 0);
+        test_func(arg, res, iw, w, 0);
         // PROTECTED-REGION-END
     }
     
     // PROTECTED-REGION-START: loop
-    // ... User-defined non-critical loop code
+    // ... User-defined non-time-critical tasks
     delay(10);
     // PROTECTED-REGION-END
 }
