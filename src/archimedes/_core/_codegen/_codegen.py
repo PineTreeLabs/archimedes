@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING, Any, Callable, Sequence
 
 import numpy as np
 
-from ._compile import FunctionCache
+from .._function import FunctionCache
 
 if TYPE_CHECKING:
     pass
