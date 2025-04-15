@@ -1,4 +1,4 @@
-// gcc main.c pid.c -o main.c
+// gcc main.c pid.c
 
 #include "pid.h"
 
@@ -42,7 +42,7 @@ int main(int argc, char *argv[]) {
     res[1] = &u;
 
     // PROTECTED-REGION-START: main
-// ... User-defined program body
+    // ... User-defined program body
     pid(arg, res, iw, w, 0);
     // PROTECTED-REGION-END
 

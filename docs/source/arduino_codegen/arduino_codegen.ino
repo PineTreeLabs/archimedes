@@ -37,6 +37,7 @@ volatile bool control_loop_flag = false;
 // Timer interrupt handler
 void timerInterrupt() {
     // PROTECTED-REGION-START: interrupt
+    // Set flag for main loop to run control function
     control_loop_flag = true;
     // PROTECTED-REGION-END
 }
@@ -72,11 +73,17 @@ void loop() {
         // PROTECTED-REGION-START: control_loop
         // ... User-defined timed code
         pid(arg, res, iw, w, 0);
+
+        for (int i = 0; i < 3; i++) {
+            x[i] = x_new[i];
+        }
         // PROTECTED-REGION-END
     }
     
     // PROTECTED-REGION-START: loop
-    // ... User-defined non-critical loop code
-    delay(10);
+    // ... User-defined non-time-critical tasks
+    delay(100);
+    Serial.print("u:");
+    Serial.println(u);
     // PROTECTED-REGION-END
 }
