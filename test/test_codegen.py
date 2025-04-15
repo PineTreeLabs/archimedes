@@ -25,9 +25,9 @@ class TestCodegen:
 
         # Can't get code as a string yet
         with pytest.raises(ValueError):
-            arc.codegen(myfunc, None, (x_type, y_type), header=True)
+            arc.codegen(myfunc, None, (x_type, y_type))
 
-        arc.codegen(myfunc, f"{file}.c", (x_type, y_type), header=True)
+        arc.codegen(myfunc, f"{file}.c", (x_type, y_type))
 
         # Check that the file was created
         assert os.path.exists(f"{file}.c")

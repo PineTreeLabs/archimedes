@@ -2,6 +2,7 @@
 
 import os
 from typing import TYPE_CHECKING, Any, Callable, Sequence, NamedTuple
+import dataclasses
 
 import numpy as np
 
@@ -30,6 +31,15 @@ dtype_to_c = {
 }
 
 
+DEFAULT_OPTIONS = {
+    "verbose": False,
+    "cpp": False,
+    "main": False,
+    "with_header": True,
+    "with_mem": False,
+    "indent": 4,
+}
+
 
 def codegen(
     func: Callable | FunctionCache,
@@ -38,14 +48,9 @@ def codegen(
     static_argnums: int | Sequence[int] | None = None,
     static_argnames: str | Sequence[str] | None = None,
     kwargs: dict[str, Any] | None = None,
-    verbose: bool = False,
-    cpp: bool = False,
-    main: bool = False,
     float_type: type = float,
     int_type: type = int,
-    header: bool = True,
-    with_mem: bool = False,
-    indent: int = 4,
+    options: dict[str, Any] | None = None,
     template: str | None = None,
     template_config: dict[str, str] | None = None,
 ) -> None:
@@ -78,24 +83,23 @@ def codegen(
         `func` is already a FunctionCache.
     kwargs : dict, optional
         Keyword arguments to pass to the function during specialization.
-    verbose : bool, default=False
-        If True, include additional comments in the generated code.
-    cpp : bool, default=False
-        If True, generate C++ code instead of C code.
-    main : bool, default=False
-        If True, generate a main function entry point.
     float_type : type, default=float
         The C type to use for floating point numbers.
     int_type : type, default=int
         The C type to use for integers.
-    header : bool, default=True
-        If True, also generate a header file with the extension `.h`.
-    with_mem : bool, default=False
-        If True, generate a simplified C API with memory management helpers.
-    indent : int, default=4
-        The number of spaces to use for indentation in the generated code.
+    options : dict, optional
+        Additional options for code generation. This can include:
+
+        - verbose: If True, include additional comments in the generated code.
+        - cpp: If True, generate C++ code instead of C code.
+        - main: If True, generate a main function entry point.
+        - with_header: If True, also generate a header file with the extension `.h`.
+        - with_mem: If True, generate a simplified C API with memory helpers.
+        - indent: The number of spaces to use for indentation in the generated code.
+
     template : str, optional
-        TODO: Update docstring
+        Name of the template to use for generating driver code. If None, no
+        driver code will be generated.
     template_config : dict[str, str], optional
         Additional options for rendering the template.  This might include the
         following keys:
@@ -129,7 +133,10 @@ def codegen(
     2. Pass them as hashable static arguments
 
     Template generation:
-    TODO: Add to docstring
+    Optionally, this function can also be used to generate templated "driver" code
+    for different applications.  For example, this can be used to create a basic
+    C program that allocates memory and calls the generated function, or to create
+    code for deployment to an embedded system.
 
     Examples
     --------
@@ -150,8 +157,7 @@ def codegen(
     >>> theta_type = np.array(0.0, dtype=float)
     >>>
     >>> # Generate C code
-    >>> arc.codegen(rotate, "rotate_function.c", (x_type, theta_type),
-    ...            header=True, verbose=True)
+    >>> arc.codegen(rotate, "rotate_function.c", (x_type, theta_type))
 
     The above code will generate 'rotate_function.c' and 'rotate_function.h'
     files that implement the rotation function in C.
@@ -196,15 +202,14 @@ def codegen(
             "Must provide filename. Returning code as a string is not yet supported"
         )
 
+    if options is None:
+        options = {}
+
     options = {
-        "verbose": verbose,
-        "cpp": cpp,
-        "main": main,
+        **DEFAULT_OPTIONS,
         "casadi_real": dtype_to_c[float_type],
         "casadi_int": dtype_to_c[int_type],
-        "with_header": header,
-        "with_mem": with_mem,
-        "indent": indent,
+        **options,
     }
 
     # Next we have to compile the function to get the signature
@@ -256,13 +261,11 @@ def codegen(
     _render_template(template, context, **template_config)
 
 
+@dataclasses.dataclass
 class ContextHelper:
-    def __init__(self, float_type, int_type, descriptions=None):
-        self.float_type = float_type
-        self.int_type = int_type
-        if descriptions is None:
-            descriptions = {}
-        self.descriptions = descriptions
+    float_type: str
+    int_type: str
+    descriptions: dict[str, str] = dataclasses.field(default_factory=dict)
 
     def __call__(self, arg, name):
         arg = np.asarray(arg)

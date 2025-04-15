@@ -87,6 +87,7 @@ arc.codegen(
     int_type=np.int32,
     template="c",
     template_config=template_config,
+    main=True,
 )
 
 x = np.array([1.0, 2.0, 3.0])
