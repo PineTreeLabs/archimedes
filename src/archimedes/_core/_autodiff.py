@@ -804,19 +804,19 @@ def vjp(
     # The new function will be evaluated with "primal" data that has the same shape
     # as the inputs, and "cotangent" data that has the same shape as the output. The
     # names need to match.
-    no_ret_names = func.ret_names is None
-    if no_ret_names:
+    no_return_names = func.return_names is None
+    if no_return_names:
         # Since only a single return value is currently supported, we can just assume
         # that the function only outputs one value and give it an arbitrary name. If
         # the function actually returns multiple values, it will throw an error when
         # "compiled" later.
-        func.ret_names = ["y0"]
-    cotangent_names = [f"d{name}" for name in func.ret_names]
+        func.return_names = ["y0"]
+    cotangent_names = [f"d{name}" for name in func.return_names]
 
     # Reset to None so that the error about multiple returns is handled by
     # the VJP function and not by a mismatch in the number of return names.
-    if no_ret_names:
-        func.ret_names = None
+    if no_return_names:
+        func.return_names = None
 
     return FunctionCache(
         _vjp,

@@ -74,7 +74,7 @@ class TestNDInterp:
         assert f_lut.arg_names == [
             "x",
         ]
-        assert f_lut.ret_names == [
+        assert f_lut.return_names == [
             "y",
         ]
         assert f_lut.name == "f"
@@ -114,7 +114,7 @@ class TestNDInterp:
 
         # Check names
         assert lut.arg_names == ["x", "y"]
-        assert lut.ret_names == [
+        assert lut.return_names == [
             "z",
         ]
         assert lut.name == "f"

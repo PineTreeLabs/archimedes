@@ -233,6 +233,6 @@ def interpolant(
     return FunctionCache(
         _interp,
         arg_names=arg_names,
-        ret_names=[ret_name],
+        return_names=[ret_name],
         kind="MX",
     )

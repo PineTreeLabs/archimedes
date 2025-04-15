@@ -3,23 +3,6 @@ import archimedes as arc
 from archimedes import struct
 
 
-@arc.compile
-def test_func(t, x, u):
-    y, x_prev = x
-    y = y + x_prev + 0.5 * u
-    return y, (y, x_prev)
-
-
-template_args = (0.0, np.zeros((2,)), np.array(0.0))
-
-t = 1.0
-x = np.array([2.0, 3.0])
-u = 4.0
-print(test_func(t, x, u))
-
-arc.codegen(test_func, "test_func.c", template_args, header=True)
-
-
 
 # These will be declared as "static", hardcoding their values
 # in the generated C code.  We could also leave some of these
@@ -69,19 +52,23 @@ def pid(x, e, Kp=1.0, Ki=0.0, Kd=0.0, Ts=0.01, N=10.0):
     return x_new, u
 
 
-static_argnames = tuple(static_args.keys())
-
 # Create template args for the function
 x = np.zeros(3)
 e = 0.0
 template_args = (x, e)
 
+# Compile the function with specified static arguments and return names
+pid = arc.compile(
+    pid,
+    static_argnames=tuple(static_args.keys()),
+    return_names=("x_new", "u"),
+)
+
 arc.codegen(
     pid,
-    "sketch/pid.c",
+    "pid.c",
     template_args,
     kwargs=static_args,
-    static_argnames=static_argnames,
     header=True,
     float_type=np.float32,
     int_type=np.int32,
