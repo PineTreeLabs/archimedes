@@ -237,49 +237,52 @@ def codegen(
         "outputs": [],
     }
 
-    if "input_descriptions" in template_config:
-        input_descriptions = template_config.pop("input_descriptions")
-    else:
-        input_descriptions = {}
-    
-    if "output_descriptions" in template_config:
-        output_descriptions = template_config.pop("output_descriptions")
-    else:
-        output_descriptions = {}
-
+    input_helper = ContextHelper(
+        float_type, int_type, template_config.pop("input_descriptions", None)
+    )
     for arg, name in zip(args, func.arg_names):
-        input_context = _context_helper(arg, name, float_type, int_type)
+        input_context = input_helper(arg, name)
         context["inputs"].append(input_context)
-        if name in input_descriptions:
-            input_context["description"] = input_descriptions[name]
 
+    output_helper = ContextHelper(
+        float_type, int_type, template_config.pop("output_descriptions", None)
+    )
     for ret, name in zip(results, func.return_names):
-        output_context = _context_helper(ret, name, float_type, int_type)
+        output_context = output_helper(ret, name)
         context["outputs"].append(output_context)
-        if name in output_descriptions:
-            output_context["description"] = output_descriptions[name]
 
     from pprint import pprint
     pprint(context)
     _render_template(template, context, **template_config)
 
 
-def _context_helper(arg, name, float_type, int_type):
-    arg = np.asarray(arg)
-    dtype = float_type if np.issubdtype(arg.dtype, np.floating) else int_type
-    if np.isscalar(arg) or arg.shape == ():
-        initial_value = str(arg)
-        dims = None
-        is_addr = True
-    else:
-        initial_value = "{" + ", ".join(map(str, arg.flatten())) + "}"
-        dims = str(arg.size)
-        is_addr = False
-    return {
-        "type": dtype_to_c[dtype],
-        "name": name,
-        "dims": dims,
-        "initial_value": initial_value,
-        "description": None,
-        "is_addr": is_addr,
-    }
+class ContextHelper:
+    def __init__(self, float_type, int_type, descriptions=None):
+        self.float_type = float_type
+        self.int_type = int_type
+        if descriptions is None:
+            descriptions = {}
+        self.descriptions = descriptions
+
+    def __call__(self, arg, name):
+        arg = np.asarray(arg)
+        if np.issubdtype(arg.dtype, np.floating):
+            dtype = self.float_type
+        else:
+            dtype = self.int_type
+        if np.isscalar(arg) or arg.shape == ():
+            initial_value = str(arg)
+            dims = None
+            is_addr = True
+        else:
+            initial_value = "{" + ", ".join(map(str, arg.flatten())) + "}"
+            dims = str(arg.size)
+            is_addr = False
+        return {
+            "type": dtype_to_c[dtype],
+            "name": name,
+            "dims": dims,
+            "initial_value": initial_value,
+            "description": self.descriptions.get(name, None),
+            "is_addr": is_addr,
+        }
