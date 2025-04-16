@@ -1,10 +1,8 @@
 """Solving quadratic programming problems."""
 
-
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Callable, Sequence, cast, NamedTuple
-import inspect
+from typing import TYPE_CHECKING, Callable, Sequence, cast
 
 import casadi as cs
 import numpy as np
@@ -46,7 +44,7 @@ def qpsol(
     **options,
 ) -> FunctionCache:
     """Solve a quadratic programming problem
-    
+
     This function solves a quadratic problem of the form:
 
     .. code-block:: text
@@ -115,36 +113,36 @@ def qpsol(
     initial guess is used as the linearization point.
 
     This function supports code generation, but requires linking the OSQP C library
-    to the generated code. 
-    
+    to the generated code.
+
     Edge cases:
     - If the objective function is not convex (i.e., the Hessian is not positive
       semidefinite), OSQP may fail to find a solution.
     - For problems with equality constraints, set the same value for both the
       lower and upper bounds.
     - Currently only supports scalar and vector decision variables, not matrices.
-    
+
     Examples
     --------
     >>> import numpy as np
     >>> import archimedes as arc
-    >>> 
+    >>>
     >>> # Define a simple QP: minimize x^2 + y^2 subject to x + y >= 1
     >>> def obj(z):
     ...     return np.dot(z, z)
-    ... 
+    ...
     >>> def constr(z):
     ...     return z[0] + z[1]
-    ... 
+    ...
     >>> # Create initial guess and constraint bounds
     >>> z0 = np.array([0.0, 0.0])
     >>> lba = 1.0  # Lower bound for x + y >= 1
-    >>> 
+    >>>
     >>> # Create and solve the QP
     >>> sol = arc.qpsol(obj, constr, z0, lba=lba)
     >>> print(f"Optimal solution: x = {sol.x}")
     >>> print(f"Dual variables: λ = {sol.lam_a}")
-    
+
     See Also
     --------
     minimize : More general interface for nonlinear optimization problems
@@ -157,7 +155,7 @@ def qpsol(
         "osqp": {
             "verbose": verbose,
             **options,
-        }
+        },
     }
 
     if not isinstance(obj, FunctionCache):
@@ -169,8 +167,7 @@ def qpsol(
     # Check that arguments and static arguments are the same for both functions
     if not len(obj.arg_names) == len(constr.arg_names):
         raise ValueError(
-            "Objective and constraint functions must have the same number of "
-            "arguments"
+            "Objective and constraint functions must have the same number of arguments"
         )
 
     if not len(obj.static_argnums) == len(constr.static_argnums):
@@ -219,14 +216,15 @@ def qpsol(
     # Setup for evaluating the QP solver
     if lba is None:
         lba = -np.inf * np.ones(g.shape)
-    
+
     if uba is None:
         uba = np.inf * np.ones(g.shape)
 
     # Before calling the CasADi solver interface, make sure everything is
     # either a CasADi symbol or a NumPy array
     x0, lba, uba = map(
-        _as_casadi_array, (x0, lba, uba),
+        _as_casadi_array,
+        (x0, lba, uba),
     )
 
     kwargs = {
