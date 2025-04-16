@@ -63,7 +63,7 @@ Documentation
    :maxdepth: 1
    :caption: Examples
 
-   notebooks/multirotor00
+   notebooks/multirotor/multirotor00
 
 .. toctree::
    :maxdepth: 1

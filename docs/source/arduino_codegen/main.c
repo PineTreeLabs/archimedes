@@ -3,7 +3,11 @@
 #include "pid.h"
 
 // PROTECTED-REGION-START: imports
-// ... User-defined imports and includes
+#include <stdio.h>
+#include <stdlib.h>
+#include <time.h>
+#include <math.h>
+
 // PROTECTED-REGION-END
 
 // Allocate memory for inputs and outputs
@@ -42,8 +46,52 @@ int main(int argc, char *argv[]) {
     res[1] = &u;
 
     // PROTECTED-REGION-START: main
-    // ... User-defined program body
-    pid(arg, res, iw, w, 0);
+
+    const int n_iter = 100;
+    const int n_w = 100000;
+    double times[n_iter];
+    clock_t start, end;
+    double cpu_time_used;
+
+    printf("Running %d iterations and measuring execution time...\n", n_iter);
+    for (int i = 0; i < n_iter; i++) {
+        start = clock();
+
+        // Do work  --->
+        for (int j = 0; j < n_w; j++) {
+            pid(arg, res, iw, w, 0);
+    
+            for (int i = 0; i < sizeof(x) / sizeof(x[0]); i++) {
+                x[i] = x_new[i];
+            }
+        }
+        // <--- Do work
+
+        end = clock();
+        cpu_time_used = ((double) (end - start)) / CLOCKS_PER_SEC;
+        times[i] = cpu_time_used / n_w;
+    }
+    
+    // Calculate mean
+    double sum = 0.0;
+    for (int i = 0; i < n_iter; i++) {
+        sum += times[i];
+    }
+    double mean = sum / n_iter;
+    
+    // Calculate standard deviation
+    double sum_squared_diff = 0.0;
+    for (int i = 0; i < n_iter; i++) {
+        double diff = times[i] - mean;
+        sum_squared_diff += diff * diff;
+    }
+    double std_dev = sqrt(sum_squared_diff / n_iter);
+    
+    // Report results
+    printf("\nExecution Time Statistics:\n");
+    printf("Mean: %.6e μs\n", mean * 1e6);
+    printf("Standard Deviation: %.6e μs\n", std_dev * 1e6 );
+
     // PROTECTED-REGION-END
 
     return 0;

@@ -121,7 +121,7 @@ where $k_F$ and $k_M$ are force and moment coefficients, and we assume that each
 The sign of the moment will also be flipped if the rotor is spinning clockwise.
 The reference frames are summarized in the following figure:
 
-<img src="_static/multirotor/frames1.png" alt="reference_frames1" width="600"/>
+<img src="_static/frames1.png" alt="reference_frames1" width="600"/>
 
 The center of the rotor hub is offset from the body center of mass by $\mathbf{r}_B^j$, and we define the $x$-$y$ plane of the hub frame to be in the rotor plane with the $z$-axis pointing opposite to the direction of nominal thrust (i.e. downward).
 This may be inclined with respect to the body-frame $x$-$y$ plane if the rotor has a static "cant", in which case there will be a constant rotation matrix $ ~^B\!\mathbf{C}^{H_j}$ that transforms from the $j$-th hub frame to the body frame.

@@ -49,7 +49,7 @@ def process_markdown_files():
     directory = "source/generated/notebooks"
 
     # Process all markdown files
-    for md_file in glob.glob(f"{directory}/*.md"):
+    for md_file in glob.glob(f"{directory}/**/*.md", recursive=True):
         with open(md_file, "r") as f:
             content = f.read()
 
@@ -80,6 +80,39 @@ def process_markdown_files():
             f.write(modified_content)
 
 
+# Find and copy all _static directories
+def copy_static_directories():
+    # First, the main static directory
+    static_source = Path("source/notebooks/_static")
+    static_target = Path("source/generated/notebooks/_static")
+    if static_source.exists():
+        static_target.mkdir(exist_ok=True, parents=True)
+        for item in static_source.glob("*"):
+            target_item = static_target / item.name
+            if item.is_dir():
+                shutil.copytree(item, target_item, dirs_exist_ok=True)
+            else:
+                shutil.copy2(item, target_item)
+        print(f"Copied static files from {static_source} to {static_target}.")
+    
+    # Then, find any _static directories in subdirectories
+    for static_dir in Path("source/notebooks").glob("*/_static"):
+        # Get the parent directory name (the subdirectory name)
+        subdir_name = static_dir.parent.name
+        # Create the corresponding target directory
+        target_dir = Path(f"source/generated/notebooks/{subdir_name}/_static")
+        target_dir.mkdir(exist_ok=True, parents=True)
+        
+        # Copy all contents
+        for item in static_dir.glob("*"):
+            target_item = target_dir / item.name
+            if item.is_dir():
+                shutil.copytree(item, target_item, dirs_exist_ok=True)
+            else:
+                shutil.copy2(item, target_item)
+        print(f"Copied static files from {static_dir} to {target_dir}.")
+
+
 if __name__ == "__main__":
     # Usage
     source_directory = "source/generated/notebooks_dark"
@@ -91,14 +124,4 @@ if __name__ == "__main__":
 
     process_markdown_files()
 
-    # Recursively copy source/notebooks/_static to source/generated/notebooks/_static
-    static_source = Path("source/notebooks/_static")
-    static_target = Path("source/generated/notebooks/_static")
-    static_target.mkdir(exist_ok=True, parents=True)
-    for item in static_source.glob("*"):
-        target_item = static_target / item.name
-        if item.is_dir():
-            shutil.copytree(item, target_item, dirs_exist_ok=True)
-        else:
-            shutil.copy2(item, target_item)
-    print(f"Copied static files from {static_source} to {static_target}.")
+    copy_static_directories()
