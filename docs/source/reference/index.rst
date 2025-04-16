@@ -42,6 +42,7 @@ Core Functions
     minimize
     implicit
     root
+    qpsol
 
 
 Modules

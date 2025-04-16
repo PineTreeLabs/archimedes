@@ -9,7 +9,7 @@ import inspect
 import casadi as cs
 import numpy as np
 
-from archimedes import tree, struct
+from archimedes import tree
 from archimedes._core import (
     FunctionCache,
     SymbolicArray,
@@ -26,10 +26,9 @@ __all__ = [
 ]
 
 
-@struct.pytree_node
+@tree.struct.pytree_node
 class QPSolution:
     x: ArrayLike
-    lam_x: ArrayLike
     lam_a: ArrayLike
 
 
@@ -39,16 +38,14 @@ def qpsol(
     x0: ArrayLike,
     lba: ArrayLike | None = None,
     uba: ArrayLike | None = None,
-    lam_x0: ArrayLike | None = None,
     lam_a0: ArrayLike | None = None,
     args: Sequence = (),
-    static_argnames: str | Sequence[str] | None = None,
     verbose: bool = False,
     name: str | None = None,
     warm_start: bool = True,
     **options,
 ) -> FunctionCache:
-    """Create a reusable solver for a quadratic programming problem
+    """Solve a quadratic programming problem
     
     This function solves a quadratic problem of the form:
 
@@ -84,45 +81,74 @@ def qpsol(
     uba : array-like, optional
         Upper bounds for the constraints. If None, the upper bounds will be
         set to positive infinity.
-    lam_x0 : array-like, optional
-        Initial guess for the dual variables associated with the decision
-        variables. This is used to warm-start the QP solver.
     lam_a0 : array-like, optional
         Initial guess for the dual variables associated with the constraints.
         This is used to warm-start the QP solver.
-    static_argnames : tuple of str, optional
-        Names of arguments in ``obj`` and ``constr`` that should be treated
-        as static parameters rather than symbolic variables. Static arguments
-        are not differentiated through and the solver will be recompiled when
-        their values change.
+    verbose : bool, default=False
+        Print output from the solver, including number of iterations and convergence.
     name : str, optional
         Name for the resulting solver function. If None, a name will be
         generated based on the objective function name.
-    verbose : bool, default=False
-        Print output from the solver, including number of iterations and convergence.
+    warm_start : bool, default=True
+        Whether to enable warm starting. Default is True.
     **options : dict
         Additional options passed to the underlying QP solver (OSQP).
 
     Returns
     -------
     solution : QPSolution
-        A named tuple containing the solution to the QP problem, including
-        the optimal decision variables ``x``, the dual variables associated
-        with the decision variables ``lam_x``, and the dual variables
-        associated with the constraints ``lam_a``.
+        A named tuple containing the solution to the QP problem, including:
+
+        - ``x``: The optimal decision variables.
+        - ``lam_a``: The dual variables associated with the constraints.
 
     Notes
     -----
+    When to use this function:
+    - For solving convex quadratic optimization problems efficiently
+    - For embedding QP solvers in larger computational graphs
+    - As part of model predictive control (MPC) or trajectory optimization
+
     The solution to the quadratic program is unique, so the initial guess is less
     important than for more general nonlinear programming.  The exception is when
     the QP is the convex approximation to a nonlinear program, in which case the
     initial guess is used as the linearization point.
 
     This function supports code generation, but requires linking the OSQP C library
-    to the generated code. (TODO: Add details and instructions)
-
-    TODO: Finish docstring
+    to the generated code. 
     
+    Edge cases:
+    - If the objective function is not convex (i.e., the Hessian is not positive
+      semidefinite), OSQP may fail to find a solution.
+    - For problems with equality constraints, set the same value for both the
+      lower and upper bounds.
+    - Currently only supports scalar and vector decision variables, not matrices.
+    
+    Examples
+    --------
+    >>> import numpy as np
+    >>> import archimedes as arc
+    >>> 
+    >>> # Define a simple QP: minimize x^2 + y^2 subject to x + y >= 1
+    >>> def obj(z):
+    ...     return np.dot(z, z)
+    ... 
+    >>> def constr(z):
+    ...     return z[0] + z[1]
+    ... 
+    >>> # Create initial guess and constraint bounds
+    >>> z0 = np.array([0.0, 0.0])
+    >>> lba = 1.0  # Lower bound for x + y >= 1
+    >>> 
+    >>> # Create and solve the QP
+    >>> sol = arc.qpsol(obj, constr, z0, lba=lba)
+    >>> print(f"Optimal solution: x = {sol.x}")
+    >>> print(f"Dual variables: λ = {sol.lam_a}")
+    
+    See Also
+    --------
+    minimize : More general interface for nonlinear optimization problems
+    root : Function for solving systems of nonlinear equations
     """
 
     options = {
@@ -135,10 +161,10 @@ def qpsol(
     }
 
     if not isinstance(obj, FunctionCache):
-        obj = FunctionCache(obj, static_argnames=static_argnames)
+        obj = FunctionCache(obj)
 
     if not isinstance(constr, FunctionCache):
-        constr = FunctionCache(constr, static_argnames=static_argnames)
+        constr = FunctionCache(constr)
 
     # Check that arguments and static arguments are the same for both functions
     if not len(obj.arg_names) == len(constr.arg_names):
@@ -164,27 +190,16 @@ def qpsol(
             f"Got shape {ret_shape}"
         )
 
-    # We have to flatten all of the symbolic user-defined arguments
-    # into a single vector to pass to CasADi.  If there is static data,
-    # this needs to be stripped out and passed separately.
-    if static_argnames:
-        # The first argument is `x`, so skip this in checking
-        # for static arguments.
-        static_argnums = [i - 1 for i in obj.static_argnums]
-        _static_args, sym_args, _arg_types = obj.split_args(static_argnums, *args)
-
-    else:
-        # No static data - all arguments can be treated symbolically
-        sym_args = args
-
     # Flatten the arguments into a single array `p`.  If necessary,
     # this could be unflattened using `_param_struct.unravel`
-    p, _unravel = tree.ravel(sym_args)
+    p_flat, unravel = tree.ravel(args)
+    p_flat_sym = sym_like(p_flat, name="p", kind="MX")
+    sym_args = unravel(p_flat_sym)
 
     # Define a state variable for the optimization
     x = sym_like(x0, name="x", kind="MX")
-    f = obj(x, *args)
-    g = constr(x, *args)
+    f = obj(x, *sym_args)
+    g = constr(x, *sym_args)
 
     # For type checking
     f = cast(SymbolicArray, f)
@@ -196,9 +211,8 @@ def qpsol(
         "g": g._sym,
     }
 
-    if p.size != 0:
-        p = cast(SymbolicArray, p)
-        qp["p"] = p._sym
+    if p_flat.size != 0:
+        qp["p"] = p_flat_sym._sym
 
     solver = cs.qpsol("qp_solver", "osqp", qp, options)
 
@@ -211,9 +225,8 @@ def qpsol(
 
     # Before calling the CasADi solver interface, make sure everything is
     # either a CasADi symbol or a NumPy array
-    p_arg = False if p is None else p
-    x0, lba, uba, p_arg = map(
-        _as_casadi_array, (x0, lba, uba, p_arg),
+    x0, lba, uba = map(
+        _as_casadi_array, (x0, lba, uba),
     )
 
     kwargs = {
@@ -222,9 +235,10 @@ def qpsol(
         "ubg": uba,
     }
 
+    if p_flat.size != 0:
+        kwargs["p"] = _as_casadi_array(p_flat)
+
     # Add dual variables if provided
-    if lam_x0 is not None:
-        kwargs["lam_x0"] = _as_casadi_array(lam_x0)
     if lam_a0 is not None:
         kwargs["lam_g0"] = _as_casadi_array(lam_a0)
 
@@ -232,12 +246,7 @@ def qpsol(
     sol = solver(**kwargs)
 
     # Return the solution and dual variables
-    x = SymbolicArray(sol["x"], dtype=ret_dtype, shape=ret_shape)
-    lam_x = SymbolicArray(sol["lam_x"], dtype=ret_dtype, shape=ret_shape)
-    lam_a = SymbolicArray(sol["lam_g"], dtype=ret_dtype, shape=g.shape)
+    x = array(sol["x"], dtype=ret_dtype).reshape(ret_shape)
+    lam_a = array(sol["lam_g"], dtype=ret_dtype).reshape(g.shape)
 
-    return QPSolution(
-        x=x,
-        lam_x=lam_x,
-        lam_a=lam_a,
-    )
+    return QPSolution(x=x, lam_a=lam_a)
