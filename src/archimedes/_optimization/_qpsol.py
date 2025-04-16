@@ -42,7 +42,7 @@ def qpsol(
     name: str | None = None,
     warm_start: bool = True,
     **options,
-) -> FunctionCache:
+) -> QPSolution:
     """Solve a quadratic programming problem
 
     This function solves a quadratic problem of the form:
