@@ -4,7 +4,7 @@ from typing import Callable
 
 import numpy as np
 
-from archimedes import compile, minimize, vmap
+from archimedes import compile, minimize, vmap, array
 
 from .discretization import SplineDiscretization
 from .interpolation import LagrangePolynomial
@@ -135,11 +135,19 @@ class OptimalControlProblem(OCPBase):
     np: int = 0
     boundary_constraints: list[Constraint] = dataclasses.field(default_factory=list)
     path_constraints: list[Constraint] = dataclasses.field(default_factory=list)
+    start_time: float = None
+
+    @property
+    def nt(self) -> int:
+        if self.start_time is None:
+            return 2
+        else:
+            return 1
 
     def num_dvs(self, domain):
         N = domain.n_nodes
         nx, nu = self.nx, self.nu
-        return (N + 1) * nx + N * nu + 2 + self.np
+        return (N + 1) * nx + N * nu + self.nt + self.np
 
     def unpack_dvs(self, dvs, domain, order="C"):
         # Note on ordering: CasADi orders the symbolic variables in Fortran style,
@@ -154,7 +162,11 @@ class OptimalControlProblem(OCPBase):
         u = np.reshape(dvs[i0:i1], (N, nu), order=order)
         i0, i1 = i1, i1 + self.np
         p = dvs[i0:i1]
-        t0, tf = dvs[-2:]  # Time knots
+        if self.start_time is None:
+            t0, tf = dvs[-2:]  # Time knots
+        else:
+            t0 = self.start_time
+            tf = dvs[-1]
         return x, u, t0, tf, p
 
     def boundary_data(self, dvs, domain):
@@ -244,10 +256,19 @@ class OptimalControlProblem(OCPBase):
         if t_guess is None:
             t_guess = [0.0, 1.0]
 
+        t_guess = array(t_guess)
+        t0, tf = t_guess
+
+        if self.start_time is not None:
+            if t0 != self.start_time:
+                raise ValueError(
+                    "First element of t_guess must match start_time if provided"
+                )
+            t_guess = t_guess[1:]
+
         if p_guess is None:
             p_guess = np.zeros(self.np)
 
-        t0, tf = t_guess
         t = domain.time_nodes(t0, tf)
 
         if x_guess is None:
