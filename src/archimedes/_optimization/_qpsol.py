@@ -213,6 +213,7 @@ def qpsol(
     )
 
     Q, df = cs.hessian(f, x)
+    Q = 0.5 * (Q + Q.T)
     c = df - Q @ x
     A = cs.jacobian(g, x)
 
