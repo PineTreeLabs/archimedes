@@ -30,6 +30,169 @@ __all__ = [
 ]
 
 
+def _make_nlp_solver(
+    obj: Callable,
+    constr: Callable | None = None,
+    static_argnames: str | Sequence[str] | None = None,
+    constrain_x: bool = False,
+    name: str | None = None,
+    method: str = "ipopt",
+    options: dict | None = None,
+) -> FunctionCache:
+
+    if not isinstance(obj, FunctionCache):
+        obj = FunctionCache(obj, static_argnames=static_argnames)
+
+    if constr is not None:
+        if not isinstance(constr, FunctionCache):
+            constr = FunctionCache(constr, static_argnames=static_argnames)
+
+        # Check that arguments and static arguments are the same for both functions
+        if not len(obj.arg_names) == len(constr.arg_names):
+            raise ValueError(
+                "Objective and constraint functions must have the same number of "
+                "arguments"
+            )
+
+        if not len(obj.static_argnums) == len(constr.static_argnums):
+            raise ValueError(
+                "Objective and constraint functions must have the same number of "
+                "static arguments"
+            )
+
+    # Define a function that will solve the NLP
+    # This function will be evaluated with SymbolicArray objects.
+    def _solve(x0, lbx, ubx, lbg, ubg, *args) -> ArrayLike:
+        x0 = array(x0)
+        ret_shape = x0.shape
+        ret_dtype = x0.dtype
+
+        # TODO: Shape checking for bounds
+        if len(ret_shape) > 1 and ret_shape[1] > 1:
+            raise ValueError(
+                "Only scalar and vector decision variables are supported. "
+                f"Got shape {ret_shape}"
+            )
+
+        # We have to flatten all of the symbolic user-defined arguments
+        # into a single vector to pass to CasADi.  If there is static data,
+        # this needs to be stripped out and passed separately.
+        if static_argnames:
+            # The first argument is `x`, so skip this in checking
+            # for static arguments.
+            static_argnums = [i - 1 for i in obj.static_argnums]
+            _static_args, sym_args, _arg_types = obj.split_args(static_argnums, *args)
+
+        else:
+            # No static data - all arguments can be treated symbolically
+            sym_args = args
+
+        # Flatten the arguments into a single array `p`.  If necessary,
+        # this could be unflattened using `_param_struct.unravel`
+        p, _unravel = tree.ravel(sym_args)
+
+        # Define a state variable for the optimization
+        x = sym_like(x0, name="x", kind="MX")
+        f = obj(x, *args)
+
+        # For type checing
+        f = cast(SymbolicArray, f)
+
+        nlp = {
+            "x": x._sym,
+            "f": f._sym,
+        }
+
+        if p.size != 0:
+            p = cast(SymbolicArray, p)
+            nlp["p"] = p._sym
+
+        if constr is not None:
+            g = constr(x, *args)
+            g = cast(SymbolicArray, g)
+            nlp["g"] = g._sym
+
+        solver = cs.nlpsol("solver", method, nlp, options)
+
+        # Before calling the CasADi solver interface, make sure everything is
+        # either a CasADi symbol or a NumPy array
+        p_arg = False if p is None else p
+        x0, lbx, ubx, lbg, ubg, p_arg = map(
+            _as_casadi_array,
+            (x0, lbx, ubx, lbg, ubg, p_arg),
+        )
+
+        # The return is a dict with keys `f`, `g`, `x` (and dual variables)
+        sol = solver(
+            x0=x0,
+            lbx=lbx,
+            ubx=ubx,
+            lbg=lbg,
+            ubg=ubg,
+            p=p_arg,
+        )
+
+        # For now we only return the state variable `x`
+        return SymbolicArray(
+            sol["x"],
+            dtype=ret_dtype,
+            shape=ret_shape,
+        )
+
+    # The first arguments to the function will be the decision variables
+    # and constraints, otherwise the args will be user defined
+    arg_names = ["x0", "lbx", "ubx", "lbg", "ubg", *obj.arg_names[1:]]
+
+    # Close over unneeded arguments depending on the constraint configuration
+    # There are four possibilities for call signatures, depending on whether
+    # there are bounds on the decision variables and constraints - the need
+    # to explicitly enumerate these is a result of the way CasADi constructs
+    # the callable objects
+    constrain_g = constr is not None
+    if not constrain_x:
+        if not constrain_g:
+
+            def _solve_explicit(x0, *args):  # type: ignore[misc]
+                return _solve(x0, -np.inf, np.inf, -np.inf, np.inf, *args)
+
+            arg_names.remove("lbg")
+            arg_names.remove("ubg")
+
+        else:
+
+            def _solve_explicit(x0, lbg, ubg, *args):  # type: ignore[misc]
+                return _solve(x0, -np.inf, np.inf, lbg, ubg, *args)
+
+        arg_names.remove("lbx")
+        arg_names.remove("ubx")
+
+    else:
+        if not constrain_g:
+
+            def _solve_explicit(x0, lbx, ubx, *args):  # type: ignore[misc]
+                return _solve(x0, lbx, ubx, -np.inf, np.inf, *args)
+
+            arg_names.remove("lbg")
+            arg_names.remove("ubg")
+
+        else:
+
+            def _solve_explicit(x0, lbx, ubx, lbg, ubg, *args):  # type: ignore[misc]
+                return _solve(x0, lbx, ubx, lbg, ubg, *args)
+
+    if name is None:
+        name = f"{obj.name}_nlp"
+
+    _solve_explicit.__name__ = name
+
+    return FunctionCache(
+        _solve_explicit,
+        arg_names=tuple(arg_names),
+        static_argnames=static_argnames,
+        kind="MX",
+    )
+
+
 def nlp_solver(
     obj: Callable,
     constr: Callable | None = None,
@@ -152,157 +315,67 @@ def nlp_solver(
     # TODO: Inspect function signature
 
     options["ipopt.print_level"] = print_level
+    return _make_nlp_solver(
+        obj,
+        constr=constr,
+        static_argnames=static_argnames,
+        constrain_x=constrain_x,
+        name=name,
+        method="ipopt",
+        options=options,
+    )
 
-    if not isinstance(obj, FunctionCache):
-        obj = FunctionCache(obj, static_argnames=static_argnames)
 
-    if constr is not None:
-        if not isinstance(constr, FunctionCache):
-            constr = FunctionCache(constr, static_argnames=static_argnames)
+def sqp_solver(
+    obj: Callable,
+    constr: Callable | None = None,
+    static_argnames: str | Sequence[str] | None = None,
+    constrain_x: bool = False,
+    name: str | None = None,
+    verbose: bool = False,
+    method="default",  # "default", "blocksqp", "feasiblesqp"
+    qp_solver: str = "osqp",
+    qp_options: dict | None = None,
+    # min_iter: int = 0,
+    # max_iter: int = 50,
+    # hessian_approximation: str = "exact",
+    # convexify_strategy: str | None = None,
+    **options,
+) -> FunctionCache:
 
-        # Check that arguments and static arguments are the same for both functions
-        if not len(obj.arg_names) == len(constr.arg_names):
-            raise ValueError(
-                "Objective and constraint functions must have the same number of "
-                "arguments"
-            )
+    if method == "default":
+        method = "sqpmethod"
 
-        if not len(obj.static_argnums) == len(constr.static_argnums):
-            raise ValueError(
-                "Objective and constraint functions must have the same number of "
-                "static arguments"
-            )
-
-    # Define a function that will solve the NLP
-    # This function will be evaluated with SymbolicArray objects.
-    def _solve(x0, lbx, ubx, lbg, ubg, *args) -> ArrayLike:
-        x0 = array(x0)
-        ret_shape = x0.shape
-        ret_dtype = x0.dtype
-
-        # TODO: Shape checking for bounds
-        if len(ret_shape) > 1 and ret_shape[1] > 1:
-            raise ValueError(
-                "Only scalar and vector decision variables are supported. "
-                f"Got shape {ret_shape}"
-            )
-
-        # We have to flatten all of the symbolic user-defined arguments
-        # into a single vector to pass to CasADi.  If there is static data,
-        # this needs to be stripped out and passed separately.
-        if static_argnames:
-            # The first argument is `x`, so skip this in checking
-            # for static arguments.
-            static_argnums = [i - 1 for i in obj.static_argnums]
-            _static_args, sym_args, _arg_types = obj.split_args(static_argnums, *args)
-
-        else:
-            # No static data - all arguments can be treated symbolically
-            sym_args = args
-
-        # Flatten the arguments into a single array `p`.  If necessary,
-        # this could be unflattened using `_param_struct.unravel`
-        p, _unravel = tree.ravel(sym_args)
-
-        # Define a state variable for the optimization
-        x = sym_like(x0, name="x", kind="MX")
-        f = obj(x, *args)
-
-        # For type checing
-        f = cast(SymbolicArray, f)
-
-        nlp = {
-            "x": x._sym,
-            "f": f._sym,
+    if qp_solver == "osqp":
+        if qp_options is None:
+            qp_options = {}
+        warm_start = qp_options.get("warm_start", True)
+        osqp_options = qp_options.pop("osqp", {})
+        qp_options = {
+            "warm_start_primal": warm_start,
+            "warm_start_dual": warm_start,
+            "osqp": {
+                "verbose": verbose,
+                **osqp_options,
+            },
+            **qp_options,
         }
 
-        if p.size != 0:
-            p = cast(SymbolicArray, p)
-            nlp["p"] = p._sym
+    options = {
+        "qpsol": qp_solver,
+        "qpsol_options": qp_options,
+        "verbose": verbose,
+        **options,
+    }
 
-        if constr is not None:
-            g = constr(x, *args)
-            g = cast(SymbolicArray, g)
-            nlp["g"] = g._sym
-
-        solver = cs.nlpsol("solver", "ipopt", nlp, options)
-
-        # Before calling the CasADi solver interface, make sure everything is
-        # either a CasADi symbol or a NumPy array
-        p_arg = False if p is None else p
-        x0, lbx, ubx, lbg, ubg, p_arg = map(
-            _as_casadi_array,
-            (x0, lbx, ubx, lbg, ubg, p_arg),
-        )
-
-        # The return is a dict with keys `f`, `g`, `x` (and dual variables)
-        sol = solver(
-            x0=x0,
-            lbx=lbx,
-            ubx=ubx,
-            lbg=lbg,
-            ubg=ubg,
-            p=p_arg,
-        )
-
-        # For now we only return the state variable `x`
-        return SymbolicArray(
-            sol["x"],
-            dtype=ret_dtype,
-            shape=ret_shape,
-        )
-
-    # The first arguments to the function will be the decision variables
-    # and constraints, otherwise the args will be user defined
-    arg_names = ["x0", "lbx", "ubx", "lbg", "ubg", *obj.arg_names[1:]]
-
-    # Close over unneeded arguments depending on the constraint configuration
-    # There are four possibilities for call signatures, depending on whether
-    # there are bounds on the decision variables and constraints - the need
-    # to explicitly enumerate these is a result of the way CasADi constructs
-    # the callable objects
-    constrain_g = constr is not None
-    if not constrain_x:
-        if not constrain_g:
-
-            def _solve_explicit(x0, *args):  # type: ignore[misc]
-                return _solve(x0, -np.inf, np.inf, -np.inf, np.inf, *args)
-
-            arg_names.remove("lbg")
-            arg_names.remove("ubg")
-
-        else:
-
-            def _solve_explicit(x0, lbg, ubg, *args):  # type: ignore[misc]
-                return _solve(x0, -np.inf, np.inf, lbg, ubg, *args)
-
-        arg_names.remove("lbx")
-        arg_names.remove("ubx")
-
-    else:
-        if not constrain_g:
-
-            def _solve_explicit(x0, lbx, ubx, *args):  # type: ignore[misc]
-                return _solve(x0, lbx, ubx, -np.inf, np.inf, *args)
-
-            arg_names.remove("lbg")
-            arg_names.remove("ubg")
-
-        else:
-
-            def _solve_explicit(x0, lbx, ubx, lbg, ubg, *args):  # type: ignore[misc]
-                return _solve(x0, lbx, ubx, lbg, ubg, *args)
-
-    if name is None:
-        name = f"{obj.name}_nlp"
-
-    _solve_explicit.__name__ = name
-
-    return FunctionCache(
-        _solve_explicit,
-        arg_names=tuple(arg_names),
+    return _make_nlp_solver(
+        obj,
+        constr=constr,
         static_argnames=static_argnames,
-        kind="MX",
+        constrain_x=constrain_x,
+        name=name,
+        method=method,
+        options=options,
     )
 
 
