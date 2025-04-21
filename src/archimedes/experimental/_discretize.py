@@ -2,6 +2,7 @@
 
 import numpy as np
 
+from archimedes import scan
 from archimedes._core import FunctionCache
 from archimedes._optimization import implicit
 
@@ -34,17 +35,43 @@ from archimedes._optimization import implicit
 #     return step
 
 
-def _discretize_rk4(f, h):
+def _discretize_rk4(f, dt, n_steps=1):
     # Take a single RK4 step
     # TODO: Use scan here?
-    def step(t0, x0, p):
+    h = dt / n_steps
+
+    # def step(t0, x0, p):
+    #     k1 = f(t0, x0, p)
+    #     k2 = f(t0 + h / 2, x0 + h * k1 / 2, p)
+    #     k3 = f(t0 + h / 2, x0 + h * k2 / 2, p)
+    #     k4 = f(t0 + h, x0 + h * k3, p)
+    #     return x0 + h * (k1 + 2 * k2 + 2 * k3 + k4) / 6
+
+    def scan_fun(carry, i):
+        t0, x0, p = carry
+
         k1 = f(t0, x0, p)
         k2 = f(t0 + h / 2, x0 + h * k1 / 2, p)
         k3 = f(t0 + h / 2, x0 + h * k2 / 2, p)
         k4 = f(t0 + h, x0 + h * k3, p)
-        return x0 + h * (k1 + 2 * k2 + 2 * k3 + k4) / 6
+        x1 = x0 + h * (k1 + 2 * k2 + 2 * k3 + k4) / 6
 
-    return step
+        new_carry = (t0 + h, x1, p)
+        return new_carry, np.array([])
+
+    def step(t0, x0, p):
+        carry = (t0, x0, p)
+
+        if n_steps == 1:
+            # Slightly faster compilation if scan is not used
+            carry, _ = scan_fun(carry, 0)
+        else:
+            carry, _ = scan(scan_fun, carry, length=n_steps)
+
+        _, xf, _ = carry
+        return xf
+
+    return FunctionCache(step, name=f"rk4_{f.__name__}", arg_names=["t", "x", "p"])
 
 
 def _discretize_radau5(rhs, h, newton_solver="fast_newton"):
