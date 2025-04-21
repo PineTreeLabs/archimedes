@@ -52,8 +52,9 @@ def test_block_push():
 
     # Initial solution
     domain = cc.RadauFiniteElements(N=[5], knots=[])
+    ipopt_options = {"print_level": 0}
     sol = ocp.solve(
-        domain, t_guess=(t0, tf_guess), x_guess=x_guess, print_level=0, print_time=0
+        domain, t_guess=(t0, tf_guess), x_guess=x_guess, ipopt=ipopt_options
     )
 
     # Refine mesh
@@ -75,8 +76,7 @@ def test_block_push():
             t_guess=(sol.t0, sol.tf),
             x_guess=sol.x,
             u_guess=sol.u,
-            print_level=0,
-            print_time=0,
+            ipopt=ipopt_options,
         )
 
         if converged:
@@ -139,7 +139,7 @@ def test_moon_lander():
         domain,
         t_guess=(t0, tf_guess),
         x_guess=x_guess,
-        print_level=0,
+        ipopt={"print_level": 0},
         print_time=0,
     )
 
@@ -168,7 +168,7 @@ def test_moon_lander():
             t_guess=(sol.t0, sol.tf),
             x_guess=sol.x,
             u_guess=sol.u,
-            print_level=0,
+            ipopt={"print_level": 0},
             print_time=0,
         )
 

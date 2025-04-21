@@ -29,7 +29,8 @@ class TestMinimize:
         x_opt = minimize(f, x0=1.0, bounds=[-2.0, 2.0])
         assert np.allclose(x_opt, 0.0)
 
-    def test_minimize_constrained(self):
+    @pytest.mark.parametrize("method", ("ipopt", "sqpmethod"))
+    def test_minimize_constrained(self, method):
         # Test with function from the CasADi docs, using additional parameters
         def f(x, a, b):
             return x[0] ** 2 + a * x[2] ** 2
@@ -39,12 +40,17 @@ class TestMinimize:
 
         x0 = np.random.randn(3)
         args = (100.0, 1.0)
-        x_opt = minimize(f, constr=g, x0=x0, args=args)
+        x_opt = minimize(f, constr=g, x0=x0, args=args, method=method)
         assert np.allclose(x_opt, [0.0, 1.0, 0.0])
 
         # Test with bounds
         x_opt_bounded = minimize(
-            f, constr=g, x0=x0, args=args, bounds=(np.full(3, -10), np.full(3, 10))
+            f,
+            constr=g,
+            x0=x0,
+            args=args,
+            bounds=(np.full(3, -10), np.full(3, 10)),
+            method=method,
         )
         assert np.allclose(x_opt, x_opt_bounded)
 

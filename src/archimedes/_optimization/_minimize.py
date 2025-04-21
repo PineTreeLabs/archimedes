@@ -39,7 +39,6 @@ def _make_nlp_solver(
     method: str = "ipopt",
     options: dict | None = None,
 ) -> FunctionCache:
-
     if not isinstance(obj, FunctionCache):
         obj = FunctionCache(obj, static_argnames=static_argnames)
 
@@ -199,7 +198,7 @@ def nlp_solver(
     static_argnames: str | Sequence[str] | None = None,
     constrain_x: bool = False,
     name: str | None = None,
-    print_level: int = 5,
+    method: str = "ipopt",
     **options,
 ) -> FunctionCache:
     """Create a reusable solver for a nonlinear optimization problem.
@@ -235,11 +234,11 @@ def nlp_solver(
     name : str, optional
         Name for the resulting solver function. If None, a name will be
         generated based on the objective function name.
-    print_level : int, default=5
-        Verbosity level for the IPOPT solver (0-12). Higher values produce
-        more detailed output. Set to 0 to suppress all output.
+    method : str, optional
+        The optimization method to use. Default is "ipopt". See CasADi documentation
+        for available methods.
     **options : dict
-        Additional options passed to the underlying IPOPT solver.
+        Additional options passed to the underlying optimization solver.
         See CasADi documentation for available options.
 
     Returns
@@ -311,62 +310,7 @@ def nlp_solver(
     minimize : One-time solver for nonlinear optimization problems
     implicit : Create a function that solves F(x, p) = 0 for x
     """
-    # TODO: Support other "plugins" ("knitro", "snopt", etc.)
     # TODO: Inspect function signature
-
-    options["ipopt.print_level"] = print_level
-    return _make_nlp_solver(
-        obj,
-        constr=constr,
-        static_argnames=static_argnames,
-        constrain_x=constrain_x,
-        name=name,
-        method="ipopt",
-        options=options,
-    )
-
-
-def sqp_solver(
-    obj: Callable,
-    constr: Callable | None = None,
-    static_argnames: str | Sequence[str] | None = None,
-    constrain_x: bool = False,
-    name: str | None = None,
-    verbose: bool = False,
-    method="default",  # "default", "blocksqp", "feasiblesqp"
-    qp_solver: str = "osqp",
-    qp_options: dict | None = None,
-    # min_iter: int = 0,
-    # max_iter: int = 50,
-    # hessian_approximation: str = "exact",
-    # convexify_strategy: str | None = None,
-    **options,
-) -> FunctionCache:
-
-    if method == "default":
-        method = "sqpmethod"
-
-    if qp_solver == "osqp":
-        if qp_options is None:
-            qp_options = {}
-        warm_start = qp_options.get("warm_start", True)
-        osqp_options = qp_options.pop("osqp", {})
-        qp_options = {
-            "warm_start_primal": warm_start,
-            "warm_start_dual": warm_start,
-            "osqp": {
-                "verbose": verbose,
-                **osqp_options,
-            },
-            **qp_options,
-        }
-
-    options = {
-        "qpsol": qp_solver,
-        "qpsol_options": qp_options,
-        "verbose": verbose,
-        **options,
-    }
 
     return _make_nlp_solver(
         obj,
@@ -387,6 +331,7 @@ def minimize(
     constr=None,
     bounds=None,
     constr_bounds=None,
+    method="ipopt",
     **options,
 ):
     """
@@ -429,6 +374,10 @@ def minimize(
         Each bound can be a scalar or an array matching the shape of the
         constraint function output. If None and constr is provided,
         defaults to ``(0, 0)`` for equality constraints.
+    method : str, optional
+        The optimization method to use. Default is "ipopt". Other options
+        may be available depending on the installed solver. See the CasADi
+        documentation for available methods.
     **options : dict
         Additional options passed to the IPOPT solver through :py:func:`nlp_solver`.
         Common options include:
@@ -516,6 +465,7 @@ def minimize(
         constr=constr,
         static_argnames=static_argnames,
         constrain_x=bounds is not None,
+        method=method,
         **options,
     )
 
