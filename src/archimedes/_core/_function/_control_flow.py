@@ -222,8 +222,8 @@ def scan(
             f"The provided function returned {results_unravel}."
         )
 
-    carry_out, x_out = specialized_func(init_carry, xs[0])
-    _, unravel = tree.ravel(carry_out)
+    carry_out, x_out = func(init_carry, xs[0])
+    init_carry_flat, unravel = tree.ravel(init_carry)
 
     carry_in_treedef = tree.structure(init_carry)
     carry_out_treedef = tree.structure(carry_out)
@@ -246,7 +246,7 @@ def scan(
     # Convert arguments to either CasADi expressions or NumPy arrays
     # Note that CasADi will map over the _second_ axis of `xs`, so we need to
     # transpose the array before passing it.
-    cs_args = tuple(_as_casadi_array(arg) for arg in (init_carry, xs.T))
+    cs_args = tuple(_as_casadi_array(arg) for arg in (init_carry_flat, xs.T))
     cs_carry, cs_ys = scan_func(*cs_args)
 
     # Ensure that the return has shape and dtype consistent with the inputs

@@ -4,7 +4,7 @@ from typing import Callable
 
 import numpy as np
 
-from archimedes import compile, minimize, vmap
+from archimedes import compile, minimize, vmap, struct
 
 from .discretization import SplineDiscretization
 from .interpolation import LagrangePolynomial
@@ -76,14 +76,15 @@ def control_bounds(lb, ub):
     return Constraint(lambda t, x, u, p: u, len(lb), lower_bound=lb, upper_bound=ub)
 
 
-@dataclasses.dataclass
+@struct.pytree_node
 class OptimalControlSolution:
     xp: np.ndarray
     up: np.ndarray
     tp: np.ndarray
-    x: Callable
-    u: Callable
+    x: Callable = struct.field(static=True)
+    u: Callable = struct.field(static=True)
     p: np.ndarray
+    dvs: np.ndarray = None
 
     @property
     def t0(self):
@@ -289,7 +290,7 @@ class OptimalControlProblem(OCPBase):
         x, u, t0, tf, p = self.unpack_dvs(sol, domain, order="C")
         t = domain.time_nodes(t0, tf)
         x_fn, u_fn = domain.create_interpolants(x, u, t0, tf)
-        return OptimalControlSolution(x, u, t, x_fn, u_fn, p)
+        return OptimalControlSolution(x, u, t, x_fn, u_fn, p, dvs=sol)
 
     def dynamics_residual(self, sol, element, x, t0, tf):
         # Differentiate then interpolate

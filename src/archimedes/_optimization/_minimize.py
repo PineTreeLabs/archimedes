@@ -30,129 +30,15 @@ __all__ = [
 ]
 
 
-def nlp_solver(
+def _make_nlp_solver(
     obj: Callable,
     constr: Callable | None = None,
     static_argnames: str | Sequence[str] | None = None,
     constrain_x: bool = False,
     name: str | None = None,
-    print_level: int = 5,
-    **options,
+    method: str = "ipopt",
+    options: dict | None = None,
 ) -> FunctionCache:
-    """Create a reusable solver for a nonlinear optimization problem.
-
-    This function transforms an objective function and optional constraint function
-    into an efficient solver for nonlinear programming problems of the form:
-
-    .. code-block:: text
-
-        minimize        f(x, p)
-        subject to      lbx <= x <= ubx
-                        lbg <= g(x, p) <= ubg
-
-    where ``x`` represents decision variables and ``p`` represents parameters.
-
-    Parameters
-    ----------
-    obj : callable
-        Objective function to minimize with signature ``obj(x, *args)``.
-        Must return a scalar value.
-    constr : callable, optional
-        Constraint function with signature ``constr(x, *args)``.
-        Must return a vector of constraint values where the constraints
-        are interpreted as ``lbg <= constr(x, *args) <= ubg``.
-    static_argnames : tuple of str, optional
-        Names of arguments in ``obj`` and ``constr`` that should be treated
-        as static parameters rather than symbolic variables. Static arguments
-        are not differentiated through and the solver will be recompiled when
-        their values change.
-    constrain_x : bool, default=False
-        If True, the solver will accept bounds on decision variables ``(lbx, ubx)``.
-        If False, no bounds on ``x`` will be applied (equivalent to ``-∞ <= x <= ∞``).
-    name : str, optional
-        Name for the resulting solver function. If None, a name will be
-        generated based on the objective function name.
-    print_level : int, default=5
-        Verbosity level for the IPOPT solver (0-12). Higher values produce
-        more detailed output. Set to 0 to suppress all output.
-    **options : dict
-        Additional options passed to the underlying IPOPT solver.
-        See CasADi documentation for available options.
-
-    Returns
-    -------
-    solver : FunctionCache
-        A callable function that solves the nonlinear optimization problem.
-        The signature of this function depends on the values of ``constrain_x``
-        and whether a constraint function was provided:
-
-        - With constraints and x bounds: ``solver(x0, lbx, ubx, lbg, ubg, *args)``
-
-        - With constraints, no x bounds: ``solver(x0, lbg, ubg, *args)``
-
-        - With x bounds, no constraints: ``solver(x0, lbx, ubx, *args)``
-
-        - No constraints or x bounds: ``solver(x0, *args)``
-
-        The returned solver can be evaluated both numerically and symbolically.
-
-    Notes
-    -----
-    When to use this function:
-
-    - For solving optimization problems with differentiable objectives and constraints
-    - When you need to solve similar optimization problems with different parameters
-    - As part of larger computational graphs that include optimization steps
-    - For nonlinear model predictive control applications
-
-    The solver uses the IPOPT interior point method which is suitable for large-scale
-    nonlinear problems. The function leverages automatic differentiation to compute
-    exact derivatives of the objective and constraints.
-
-    Both ``obj` and `constr`` must accept the same arguments, and if
-    ``static_argnames`` is specified, the static arguments must be the same for both
-    functions.
-
-    Examples
-    --------
-    >>> import numpy as np
-    >>> import archimedes as arc
-    >>>
-    >>> # Define the Rosenbrock function
-    >>> def f(x):
-    ...     return 100 * (x[1] - x[0]**2)**2 + (1 - x[0])**2
-    >>>
-    >>> # Define a constraint function
-    >>> def g(x):
-    ...     g1 = (x[0] - 1)**3 - x[1] + 1
-    ...     g2 = x[0] + x[1] - 2
-    ...     return np.array([g1, g2], like=x)
-    >>>
-    >>> # Create the solver
-    >>> solver = arc.nlp_solver(f, constr=g)
-    >>>
-    >>> # Initial guess
-    >>> x0 = np.array([2.0, 0.0])
-    >>>
-    >>> # Constraint bounds: g <= 0
-    >>> lbg = -np.inf * np.ones(2)
-    >>> ubg = np.zeros(2)
-    >>>
-    >>> # Solve the problem
-    >>> x_opt = solver(x0, lbg, ubg)
-    >>> print(x_opt)
-    [0.99998266 1.00000688]
-
-    See Also
-    --------
-    minimize : One-time solver for nonlinear optimization problems
-    implicit : Create a function that solves F(x, p) = 0 for x
-    """
-    # TODO: Support other "plugins" ("knitro", "snopt", etc.)
-    # TODO: Inspect function signature
-
-    options["ipopt.print_level"] = print_level
-
     if not isinstance(obj, FunctionCache):
         obj = FunctionCache(obj, static_argnames=static_argnames)
 
@@ -225,7 +111,7 @@ def nlp_solver(
             g = cast(SymbolicArray, g)
             nlp["g"] = g._sym
 
-        solver = cs.nlpsol("solver", "ipopt", nlp, options)
+        solver = cs.nlpsol("solver", method, nlp, options)
 
         # Before calling the CasADi solver interface, make sure everything is
         # either a CasADi symbol or a NumPy array
@@ -306,6 +192,137 @@ def nlp_solver(
     )
 
 
+def nlp_solver(
+    obj: Callable,
+    constr: Callable | None = None,
+    static_argnames: str | Sequence[str] | None = None,
+    constrain_x: bool = False,
+    name: str | None = None,
+    method: str = "ipopt",
+    **options,
+) -> FunctionCache:
+    """Create a reusable solver for a nonlinear optimization problem.
+
+    This function transforms an objective function and optional constraint function
+    into an efficient solver for nonlinear programming problems of the form:
+
+    .. code-block:: text
+
+        minimize        f(x, p)
+        subject to      lbx <= x <= ubx
+                        lbg <= g(x, p) <= ubg
+
+    where ``x`` represents decision variables and ``p`` represents parameters.
+
+    Parameters
+    ----------
+    obj : callable
+        Objective function to minimize with signature ``obj(x, *args)``.
+        Must return a scalar value.
+    constr : callable, optional
+        Constraint function with signature ``constr(x, *args)``.
+        Must return a vector of constraint values where the constraints
+        are interpreted as ``lbg <= constr(x, *args) <= ubg``.
+    static_argnames : tuple of str, optional
+        Names of arguments in ``obj`` and ``constr`` that should be treated
+        as static parameters rather than symbolic variables. Static arguments
+        are not differentiated through and the solver will be recompiled when
+        their values change.
+    constrain_x : bool, default=False
+        If True, the solver will accept bounds on decision variables ``(lbx, ubx)``.
+        If False, no bounds on ``x`` will be applied (equivalent to ``-∞ <= x <= ∞``).
+    name : str, optional
+        Name for the resulting solver function. If None, a name will be
+        generated based on the objective function name.
+    method : str, optional
+        The optimization method to use. Default is "ipopt". See CasADi documentation
+        for available methods.
+    **options : dict
+        Additional options passed to the underlying optimization solver.
+        See CasADi documentation for available options.
+
+    Returns
+    -------
+    solver : FunctionCache
+        A callable function that solves the nonlinear optimization problem.
+        The signature of this function depends on the values of ``constrain_x``
+        and whether a constraint function was provided:
+
+        - With constraints and x bounds: ``solver(x0, lbx, ubx, lbg, ubg, *args)``
+
+        - With constraints, no x bounds: ``solver(x0, lbg, ubg, *args)``
+
+        - With x bounds, no constraints: ``solver(x0, lbx, ubx, *args)``
+
+        - No constraints or x bounds: ``solver(x0, *args)``
+
+        The returned solver can be evaluated both numerically and symbolically.
+
+    Notes
+    -----
+    When to use this function:
+
+    - For solving optimization problems with differentiable objectives and constraints
+    - When you need to solve similar optimization problems with different parameters
+    - As part of larger computational graphs that include optimization steps
+    - For nonlinear model predictive control applications
+
+    The solver uses the IPOPT interior point method which is suitable for large-scale
+    nonlinear problems. The function leverages automatic differentiation to compute
+    exact derivatives of the objective and constraints.
+
+    Both ``obj` and `constr`` must accept the same arguments, and if
+    ``static_argnames`` is specified, the static arguments must be the same for both
+    functions.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> import archimedes as arc
+    >>>
+    >>> # Define the Rosenbrock function
+    >>> def f(x):
+    ...     return 100 * (x[1] - x[0]**2)**2 + (1 - x[0])**2
+    >>>
+    >>> # Define a constraint function
+    >>> def g(x):
+    ...     g1 = (x[0] - 1)**3 - x[1] + 1
+    ...     g2 = x[0] + x[1] - 2
+    ...     return np.array([g1, g2], like=x)
+    >>>
+    >>> # Create the solver
+    >>> solver = arc.nlp_solver(f, constr=g)
+    >>>
+    >>> # Initial guess
+    >>> x0 = np.array([2.0, 0.0])
+    >>>
+    >>> # Constraint bounds: g <= 0
+    >>> lbg = -np.inf * np.ones(2)
+    >>> ubg = np.zeros(2)
+    >>>
+    >>> # Solve the problem
+    >>> x_opt = solver(x0, lbg, ubg)
+    >>> print(x_opt)
+    [0.99998266 1.00000688]
+
+    See Also
+    --------
+    minimize : One-time solver for nonlinear optimization problems
+    implicit : Create a function that solves F(x, p) = 0 for x
+    """
+    # TODO: Inspect function signature
+
+    return _make_nlp_solver(
+        obj,
+        constr=constr,
+        static_argnames=static_argnames,
+        constrain_x=constrain_x,
+        name=name,
+        method=method,
+        options=options,
+    )
+
+
 def minimize(
     obj,
     x0,
@@ -314,6 +331,7 @@ def minimize(
     constr=None,
     bounds=None,
     constr_bounds=None,
+    method="ipopt",
     **options,
 ):
     """
@@ -356,6 +374,10 @@ def minimize(
         Each bound can be a scalar or an array matching the shape of the
         constraint function output. If None and constr is provided,
         defaults to ``(0, 0)`` for equality constraints.
+    method : str, optional
+        The optimization method to use. Default is "ipopt". Other options
+        may be available depending on the installed solver. See the CasADi
+        documentation for available methods.
     **options : dict
         Additional options passed to the IPOPT solver through :py:func:`nlp_solver`.
         Common options include:
@@ -443,6 +465,7 @@ def minimize(
         constr=constr,
         static_argnames=static_argnames,
         constrain_x=bounds is not None,
+        method=method,
         **options,
     )
 
