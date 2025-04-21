@@ -7,7 +7,7 @@ also dispatches to IPOPT rather than solvers available in SciPy.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Callable, Sequence, cast
+from typing import TYPE_CHECKING, Callable, Sequence, Any, TypeVar, cast
 
 import casadi as cs
 import numpy as np
@@ -28,6 +28,8 @@ __all__ = [
     "nlp_solver",
     "minimize",
 ]
+
+T = TypeVar("T", bound=ArrayLike)
 
 
 def _make_nlp_solver(
@@ -239,7 +241,9 @@ def nlp_solver(
         for available methods.
     **options : dict
         Additional options passed to the underlying optimization solver.
-        See CasADi documentation for available options.
+        See :py:func:`minimize` and the
+        [CasADi documentation](https://web.casadi.org/python-api/#nlp) for available
+        options.
 
     Returns
     -------
@@ -260,16 +264,14 @@ def nlp_solver(
 
     Notes
     -----
-    When to use this function:
 
-    - For solving optimization problems with differentiable objectives and constraints
-    - When you need to solve similar optimization problems with different parameters
-    - As part of larger computational graphs that include optimization steps
-    - For nonlinear model predictive control applications
+    By default the NLP solver uses the IPOPT interior point method which is suitable
+    for large-scale nonlinear problems.  See the :py:func:`minimize` documentation for
+    additional solvers and configuration options.
 
-    The solver uses the IPOPT interior point method which is suitable for large-scale
-    nonlinear problems. The function leverages automatic differentiation to compute
-    exact derivatives of the objective and constraints.
+    The function leverages automatic differentiation to compute exact derivatives of
+    the objective and constraints, unless this behavior is overridden via configuration
+    (e.g. by passing a custom evaluation function or using an L-BFGS approximation).
 
     Both ``obj` and `constr`` must accept the same arguments, and if
     ``static_argnames`` is specified, the static arguments must be the same for both
@@ -324,16 +326,16 @@ def nlp_solver(
 
 
 def minimize(
-    obj,
-    x0,
-    args=(),
-    static_argnames=None,
-    constr=None,
-    bounds=None,
-    constr_bounds=None,
-    method="ipopt",
+    obj: Callable,
+    x0: T,
+    args: Sequence[Any] = (),
+    static_argnames:  str | Sequence[str] | None = None,
+    constr: Callable | None = None,
+    bounds: T | None = None,
+    constr_bounds: ArrayLike | None = None,
+    method: str = "ipopt",
     **options,
-):
+) -> T:
     """
     Minimize a scalar function with optional constraints.
 
@@ -346,8 +348,8 @@ def minimize(
         subject to      lbx <= x <= ubx
                         lbg <= g(x, p) <= ubg
 
-    This function provides a simplified interface to the IPOPT nonlinear optimization
-    solver for solving a single optimization problem.
+    This function provides a simplified interface to nonlinear optimization
+    solvers like IPOPT for solving a single optimization problem.
 
     Parameters
     ----------
@@ -379,14 +381,9 @@ def minimize(
         may be available depending on the installed solver. See the CasADi
         documentation for available methods.
     **options : dict
-        Additional options passed to the IPOPT solver through :py:func:`nlp_solver`.
-        Common options include:
-
-        - print_level : int, verbosity level (0-12)
-
-        - max_iter : int, maximum number of iterations
-
-        - tol : float, convergence tolerance
+        Additional options passed to the optimization solver through
+        :py:func:`nlp_solver`. Available options depend on the solver method.
+        See notes for examples.
 
     Returns
     -------
@@ -395,15 +392,58 @@ def minimize(
 
     Notes
     -----
-    When to use this function:
+    This function dispatches to different optimization methods depending on the
+    ``method`` argument.  By default, it uses the IPOPT interior point optimizer
+    which is effective for large-scale constrained nonlinear problems. IPOPT
+    requires derivatives of the objective and constraints, which are automatically
+    computed using automatic differentiation.
 
-    - For one-time optimization problems
-    - For both constrained and unconstrained problems
-    - For problems with smooth objective and constraint functions
+    For IPOPT, see the
+    [CasADi plugin documentation](https://web.casadi.org/python-api/#ipopt) for
+    options that may be passed directly as keyword arguments.  However, most IPOPT
+    configuration options documented in the
+    [IPOPT manual](https://coin-or.github.io/Ipopt/OPTIONS.html) must be passed as
+    an ``ipopt`` dictionary in the ``options`` argument.  For example, typical options
+    for IPOPT can be passed as follows:
 
-    This function uses the IPOPT interior point optimizer which is especially effective
-    for large-scale nonlinear problems. IPOPT requires derivatives of the objective and
-    constraints, which are automatically computed using automatic differentiation.
+    .. highlight:: python
+    .. code-block:: python
+
+        ipopt_options = {
+            "print_level": 0,
+            "max_iter": 100,
+            "tol": 1e-6,
+        }
+        minimize(obj, x0, ..., method="ipopt", options={"ipopt": ipopt_options})
+
+    Another common solver is the sequential quadratic programming (SQP) method,
+    available via the "sqpmethod", "blocksqp", or "feasiblesqpmethod" method names.
+    SQP methods require a quadratic programming (QP) solver to solve the QP
+    subproblems, specified via a ``qpsol`` keyword argument.  The default QP solver
+    is "qpoases", but other options include "osqp", "proxqp", and plugins for solvers
+    like "cplex" and "gurobi".
+
+    Typical configuration options for "sqpmethod" which may be passed directly as
+    keyword arguments include:
+
+    - ``hessian_approximation``:  "exact" (default, uses automatic differentiation) or
+        "limited-memory" (uses a limited-memory BFGS approximation).
+    - ``max_iter``: Maximum number of SQP iterations (default is 25).
+    - ``qpsol``: QP solver to use (default is "qpoases").
+    - ``qpsol_options``: Options for the QP solver, passed as a dictionary.
+    - ``tol_du``: Stopping tolerance for dual feasibility (default is 1e-6).
+    - ``tol_pr``: Stopping tolerance for primal feasibility (default is 1e-6).
+
+    For other configuration options, see the CasADi documentation for
+    ["sqpmethod"](https://web.casadi.org/python-api/#sqpmethod),
+    ["blocksqp"](https://web.casadi.org/python-api/#blocksqp), and
+    ["feasiblesqpmethod"](https://web.casadi.org/python-api/#feasiblesqpmethod).
+    For QP solver options, see the documentation for the specific QP solver
+    (e.g., [OSQP](https://osqp.org/docs/release-0.6.3/interfaces/solver_settings.html)
+    or [qpOASES](https://coin-or.github.io/qpOASES/doc/3.0/doxygen/classOptions.html)).
+
+    Note that the "sqpmethod" solver with OSQP is the only combination that supports
+    C code generation.
 
     For repeated optimization with different parameters, use :py:func:`nlp_solver`
     directly to avoid recompilation overhead.
@@ -449,6 +489,22 @@ def minimize(
     ... )
     >>> print(x_opt)
     array([0.50000001, 0.25000001])
+    >>>
+    >>> # Solving with sequential quadratic programming using OSQP
+    >>> x_opt = arc.minimize(
+    ...     f,
+    ...     x0=np.array([0.0, 0.0]),
+    ...     constr=g,
+    ...     constr_bounds=(-np.inf, 0),
+    ...     method="sqpmethod",
+    ...     qpsol="osqp",
+    ...     qpsol_options={"err_abs": 1e-6, "err_rel": 1e-6},
+    ...     tol_du=1e-3,
+    ...     tol_pr=1e-3,
+    ...     max_iter=10,
+    ...     hessian_approximation="limited-memory",
+    ... )
+
 
     See Also
     --------
