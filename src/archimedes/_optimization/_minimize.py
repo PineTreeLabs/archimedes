@@ -7,7 +7,7 @@ also dispatches to IPOPT rather than solvers available in SciPy.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Callable, Sequence, Any, TypeVar, cast
+from typing import TYPE_CHECKING, Any, Callable, Sequence, TypeVar, cast
 
 import casadi as cs
 import numpy as np
@@ -24,12 +24,12 @@ from archimedes._core import (
 if TYPE_CHECKING:
     from ..typing import ArrayLike
 
+    T = TypeVar("T", bound=ArrayLike)
+
 __all__ = [
     "nlp_solver",
     "minimize",
 ]
-
-T = TypeVar("T", bound=ArrayLike)
 
 
 def _make_nlp_solver(
@@ -329,7 +329,7 @@ def minimize(
     obj: Callable,
     x0: T,
     args: Sequence[Any] = (),
-    static_argnames:  str | Sequence[str] | None = None,
+    static_argnames: str | Sequence[str] | None = None,
     constr: Callable | None = None,
     bounds: T | None = None,
     constr_bounds: ArrayLike | None = None,
