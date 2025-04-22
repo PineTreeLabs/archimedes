@@ -116,7 +116,7 @@ class FunctionCache:
         self,
         func,
         arg_names=None,
-        ret_names=None,
+        return_names=None,
         static_argnums=None,
         static_argnames=None,
         jit=False,
@@ -150,7 +150,7 @@ class FunctionCache:
         # specified explicitly, it will be inferred using `inspect.signature`
         self.signature = _resolve_signature(func, arg_names)
 
-        self.ret_names = ret_names  # Can still be None at this point
+        self.return_names = return_names  # Can still be None at this point
 
         if static_argnums is not None and static_argnames is not None:
             raise ValueError(
@@ -244,13 +244,13 @@ class FunctionCache:
 
         cs_ret = [_as_casadi_array(x) for x in sym_ret_flat]
 
-        if self.ret_names is None:
-            self.ret_names = [f"y{i}" for i in range(len(sym_ret_flat))]
+        if self.return_names is None:
+            self.return_names = [f"y{i}" for i in range(len(sym_ret_flat))]
         else:
-            if len(self.ret_names) != len(sym_ret_flat):
+            if len(self.return_names) != len(sym_ret_flat):
                 raise ValueError(
                     f"Expected {len(sym_ret_flat)} return values, got "
-                    f"{len(self.ret_names)} in call to {self.name}"
+                    f"{len(self.return_names)} in call to {self.name}"
                 )
 
         options = {
@@ -258,7 +258,7 @@ class FunctionCache:
         }
         # print(f"Compiling {self.name} for {cs_args} -> {cs_ret}")
         _compiled_func = cs.Function(
-            self.name, cs_args, cs_ret, arg_names, self.ret_names, options
+            self.name, cs_args, cs_ret, arg_names, self.return_names, options
         )
 
         return CompiledFunction(_compiled_func, tuple(results_unravel))
@@ -327,6 +327,7 @@ def compile(
     *,
     static_argnums: int | Sequence[int] | None = None,
     static_argnames: str | Sequence[str] | None = None,
+    return_names: str | Sequence[str] | None = None,
     jit: bool = False,
     kind: str = DEFAULT_SYM_NAME,
     name: str | None = None,
@@ -349,6 +350,10 @@ def compile(
     static_argnames : str or sequence of str, optional
         Names of arguments to treat as static (constant) in the function.
         Alternative to static_argnums when using keyword arguments.
+    return_names : str or sequence of str, optional
+        Names of the return values of the function. If not specified, the return
+        values will be named ``y0``, ``y1``, etc. This does not need to be specified,
+        but is recommended for debugging and C code generation.
     jit : bool, default=False
         Whether to compile the function with JIT for additional performance.
         Not fully implemented in the current version.
@@ -461,18 +466,20 @@ def compile(
     codegen : Generate C code from compiled functions
     """
 
+    kwargs = {
+        "static_argnums": static_argnums,
+        "static_argnames": static_argnames,
+        "return_names": return_names,
+        "jit": jit,
+        "kind": kind,
+        "name": name,
+    }
+
     # If used as @compile(...)
     if func is None:
 
         def decorator(f):
-            return FunctionCache(
-                f,
-                static_argnums=static_argnums,
-                static_argnames=static_argnames,
-                jit=jit,
-                kind=kind,
-                name=name,
-            )
+            return FunctionCache(f, **kwargs)
 
         return decorator
 
@@ -480,11 +487,4 @@ def compile(
     if isinstance(func, FunctionCache):
         return func
 
-    return FunctionCache(
-        func,
-        static_argnums=static_argnums,
-        static_argnames=static_argnames,
-        jit=jit,
-        kind=kind,
-        name=name,
-    )
+    return FunctionCache(func, **kwargs)

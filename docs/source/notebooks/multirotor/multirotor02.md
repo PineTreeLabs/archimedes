@@ -80,7 +80,7 @@ class FlightVehicle:
         # Same as above, except now we can use `self.m`, `self.J_B`, etc
 ```
 
-While we will use this callable pattern for other components in our model, for consistency with [recommended design patterns in Archimedes](../generated/notebooks/modular-design), we will actually use the name `dynamics` to implement the ODE right-hand side calculation.
+While we will use this callable pattern for other components in our model, for consistency with [recommended design patterns in Archimedes](../../generated/notebooks/modular-design), we will actually use the name `dynamics` to implement the ODE right-hand side calculation.
 
 At first, it doesn't look like we've gained much with this approach.
 Along with external utility functions `dcm` and `euler_kinematics`, we still rely on separately defined functions to compute the inputs and net forces.
@@ -375,11 +375,11 @@ class QuadraticRotorModel(RotorModel):
 
 The full class hierarchy so far is summarized graphically below:
 
-```{image} _static/multirotor/class_hierarchy.png
+```{image} _static/class_hierarchy.png
 :class: only-light
 ```
 
-```{image} _static/multirotor/class_hierarchy_dark.png
+```{image} _static/class_hierarchy_dark.png
 :class: only-dark
 ```
 
@@ -450,12 +450,12 @@ This _does_ mean that the most efficient NumPy code you can write will likely lo
 Don't worry, though - the CasADi symbolic system is very efficient and good at figuring this kind of thing out.
 As a result, code that looks suboptimal in pure Python can still be very efficient in Archimedes
 
-Besides writing pure functions, keep in mind the usual [gotchas](../gotchas) related to control flow: basically, avoid `while` loops and `if/else` statements depending on variable data (tip: the latter can often be replaced with `np.where`).
+Besides writing pure functions, keep in mind the usual [gotchas](../../gotchas) related to control flow: basically, avoid `while` loops and `if/else` statements depending on variable data (tip: the latter can often be replaced with `np.where`).
 
 ## Built-in `FlightVehicle`
 
 Finally, although we have included `FlightVehicle` as part of our class hierarchy here, there is actually a generic `FlightVehicle` included with Archimedes that implements 6dof dynamics using either Euler angles or (by default) quaternions for attitude representation.
-The interface is the same as what we've shown here, and you can look at the source code in [multirotor.py](https://github.com/jcallaham/archimedes/tree/main/docs/source/notebooks/multirotor.py) to see how exactly it builds on the generic `FlightVehicle`.
+The interface is the same as what we've shown here, and you can look at the source code in [multirotor.py](https://github.com/jcallaham/archimedes/tree/main/docs/source/notebooks/multirotor/multirotor.py) to see how exactly it builds on the generic `FlightVehicle`.
 
 One difference with what we've shown here is that instead of using a flat 12-element vector to represent the state of the vehicle, the built-in `FlightVehicle` defines its own `State` class.
 This is another [`pytree_node`](#archimedes.tree.struct.pytree_node) with fields for each of the four groups of state variables: position (`State.p_N`), attitude (`State.att`), velocity (`State.v_B`), angular velocity (`State.w_B`), and any additional state variables (`State.aux`).
@@ -467,7 +467,7 @@ For instance, if we have a rotor model that includes unsteady aerodynamics, thes
 
 For more details on pure functions and PyTrees, see:
 
-* [Under the Hood](../under-the-hood)
-* [Working with PyTrees](../pytrees)
-* [Hierarchical Design Patterns](../generated/notebooks/modular-design)
-* [Quirks and Gotchas](../gotchas)
+* [Under the Hood](../../under-the-hood)
+* [Working with PyTrees](../../pytrees)
+* [Hierarchical Design Patterns](../../generated/notebooks/modular-design)
+* [Quirks and Gotchas](../../gotchas)

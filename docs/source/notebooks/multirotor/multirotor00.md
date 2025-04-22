@@ -18,9 +18,6 @@ In this tutorial, we will walk through the process of modeling a multirotor vehi
 <!-- Goals of the tutorial -->
 This tutorial will cover the following topics:
 
-
-This tutorial will cover the following topics:
-
 1. [**Fundamentals of multirotor dynamics**](multirotor01): 
    - 6-DOF rigid body dynamics
    - Rotorcraft aerodynamics
@@ -30,15 +27,15 @@ This tutorial will cover the following topics:
    - Designing a modular multirotor modeling framework
    - Adapting NumPy code to work with Archimedes
 
-3. [**Running the model**](../generated/notebooks/multirotor03):
+3. [**Running the model**](../../generated/notebooks/multirotor/multirotor03):
    - Simulating with a standard SciPy solver
    - Accelerating simulation with Archimedes
 
-4. [**Linear systems analysis**](../generated/notebooks/multirotor04): 
+4. [**Linear systems analysis**](../../generated/notebooks/multirotor/multirotor04): 
    - Efficient trim point identification
    - Linear stability analysis
 
-5. [**Blade-element momentum theory**](../generated/notebooks/multirotor05): 
+5. [**Blade-element momentum theory**](../../generated/notebooks/multirotor/multirotor05): 
    - Extending the initial model with a more accurate rotor dynamics model
 
 ## Prerequisites
@@ -56,7 +53,7 @@ Some basic Python knowledge will also be beneficial. Our code makes extensive us
 - [Callable objects](https://realpython.com/python-callable-instances/)
 
 To run the code, you'll need a Python environment configured with Archimedes and its dependencies (NumPy, SciPy, Matplotlib, and CasADi).
-You'll also need the [multirotor.py](https://github.com/jcallaham/archimedes/tree/main/docs/source/notebooks/multirotor.py) source code for the models.
+You'll also need the [multirotor.py](https://github.com/jcallaham/archimedes/tree/main/docs/source/notebooks/multirotor/multirotor.py) source code for the models.
 
 ## Demo contents
 
@@ -64,9 +61,9 @@ You'll also need the [multirotor.py](https://github.com/jcallaham/archimedes/tre
 :maxdepth: 1
 multirotor01
 multirotor02
-../generated/notebooks/multirotor03
-../generated/notebooks/multirotor04
-../generated/notebooks/multirotor05
+../../generated/notebooks/multirotor/multirotor03
+../../generated/notebooks/multirotor/multirotor04
+../../generated/notebooks/multirotor/multirotor05
 multirotor06
    
 ```

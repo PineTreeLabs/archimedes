@@ -1,0 +1,58 @@
+// gcc {{ driver_name }} {{ filename }}.c
+
+#include "{{ filename }}.h"
+
+// PROTECTED-REGION-START: imports
+{% if protected_regions and 'imports' in protected_regions %}
+{{ protected_regions['imports'] }}
+{% else %}
+// ... User-defined imports and includes
+{% endif %}
+// PROTECTED-REGION-END
+
+// Allocate memory for inputs and outputs
+{% for input in inputs %}
+{{ input.type }} {{ input.name }}{% if input.dims %}[{{ input.dims }}]{% endif %} = {{ input.initial_value }};{% if input.description %}  // {{ input.description }}{% endif %}
+
+{% endfor %}
+
+{% for output in outputs %}
+{{ output.type }} {{ output.name }}{% if output.dims %}[{{ output.dims }}]{% endif %} = {0};{% if output.description %}  // {{ output.description }}{% endif %}
+
+{% endfor %}
+
+// Prepare pointers to inputs, outputs, and work arrays
+const {{ float_type }}* arg[{{ function_name }}_SZ_ARG] = {0};
+{{ float_type }}* res[{{ function_name }}_SZ_RES] = {0};
+{{ int_type }} iw[{{ function_name }}_SZ_IW];
+{{ float_type }} w[{{ function_name }}_SZ_W];
+
+// PROTECTED-REGION-START: allocation
+{% if protected_regions and 'allocation' in protected_regions %}
+{{ protected_regions['allocation'] }}
+{% else %}
+// ... User-defined memory allocation and function declaration
+{% endif %}
+// PROTECTED-REGION-END
+
+int main(int argc, char *argv[]) {
+    // Set up input and output pointers
+    {% for input in inputs %}
+    arg[{{ loop.index0 }}] = {% if input.is_addr %}&{% endif %}{{ input.name }};
+    {% endfor %}
+
+    {% for output in outputs %}
+    res[{{ loop.index0 }}] = {% if output.is_addr %}&{% endif %}{{ output.name }};
+    {% endfor %}
+
+    // PROTECTED-REGION-START: main
+    {% if protected_regions and 'main' in protected_regions %}
+    {{ protected_regions['main'] }}
+    {% else %}
+    // ... User-defined program body
+    {{ function_name }}(arg, res, iw, w, 0);
+    {% endif %}
+    // PROTECTED-REGION-END
+
+    return 0;
+}

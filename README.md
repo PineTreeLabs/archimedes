@@ -195,8 +195,8 @@ uv run pytest --nbmake docs/source/notebooks/*.ipynb
 Linting and formatting is done with [ruff](https://docs.astral.sh/ruff/):
 
 ```bash
-uv run ruff check src test docs
-uv run ruff format --check src test docs
+uv run ruff check --fix src test docs
+uv run ruff format src test docs
 ```
 
 Finally, to build the documentation locally, run

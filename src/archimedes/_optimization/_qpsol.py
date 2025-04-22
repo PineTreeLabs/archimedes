@@ -89,16 +89,16 @@ def qpsol(
         generated based on the objective function name.
     warm_start : bool, default=True
         Whether to enable warm starting. Default is True.
-    **options : dict
+    options : dict
         Additional options passed to the underlying QP solver (OSQP).
 
     Returns
     -------
     solution : QPSolution
-        A named tuple containing the solution to the QP problem, including:
 
-        - ``x``: The optimal decision variables.
-        - ``lam_a``: The dual variables associated with the constraints.
+        A named tuple containing the solution to the QP problem, including:
+            - ``x``: The optimal decision variables.
+            - ``lam_a``: The dual variables associated with the constraints.
 
     Notes
     -----
@@ -117,9 +117,9 @@ def qpsol(
 
     Edge cases:
     - If the objective function is not convex (i.e., the Hessian is not positive
-      semidefinite), OSQP may fail to find a solution.
+    semidefinite), OSQP may fail to find a solution.
     - For problems with equality constraints, set the same value for both the
-      lower and upper bounds.
+    lower and upper bounds.
     - Currently only supports scalar and vector decision variables, not matrices.
 
     Examples

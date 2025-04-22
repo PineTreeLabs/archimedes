@@ -1,0 +1,103 @@
+#include <Arduino.h>
+#include <TimerOne.h>
+#include "{{ filename }}.h"
+
+// PROTECTED-REGION-START: imports
+{% if protected_regions and 'imports' in protected_regions %}
+{{ protected_regions['imports'] }}
+{% else %}
+// ... User-defined imports and includes
+{% endif %}
+// PROTECTED-REGION-END
+
+// Sampling rate: {{ sample_rate.hz }} Hz
+const unsigned long SAMPLE_RATE_US = {{ sample_rate.us }};
+
+// Allocate memory for inputs and outputs
+{% for input in inputs %}
+{{ input.type }} {{ input.name }}{% if input.dims %}[{{ input.dims }}]{% endif %} = {{ input.initial_value }};{% if input.description %}  // {{ input.description }}{% endif %}
+
+{% endfor %}
+
+{% for output in outputs %}
+{{ output.type }} {{ output.name }}{% if output.dims %}[{{ output.dims }}]{% endif %} = {0};{% if output.description %}  // {{ output.description }}{% endif %}
+
+{% endfor %}
+
+// Prepare pointers to inputs, outputs, and work arrays
+const {{ float_type }}* arg[{{ function_name }}_SZ_ARG] = {0};
+{{ float_type }}* res[{{ function_name }}_SZ_RES] = {0};
+{{ int_type }} iw[{{ function_name }}_SZ_IW];
+{{ float_type }} w[{{ function_name }}_SZ_W];
+
+// Flag for interrupt timer
+volatile bool control_loop_flag = false;
+
+// PROTECTED-REGION-START: allocation
+{% if protected_regions and 'allocation' in protected_regions %}
+{{ protected_regions['allocation'] }}
+{% else %}
+// ... User-defined memory allocation and function declaration
+{% endif %}
+// PROTECTED-REGION-END
+
+// Timer interrupt handler
+void timerInterrupt() {
+    // PROTECTED-REGION-START: interrupt
+    {% if protected_regions and 'interrupt' in protected_regions %}
+    {{ protected_regions['interrupt'] }}
+    {% else %}
+    // Set flag for main loop to run control function
+    control_loop_flag = true;
+    {% endif %}
+    // PROTECTED-REGION-END
+}
+
+void setup(){
+    // Set up input and output pointers
+    {% for input in inputs %}
+    arg[{{ loop.index0 }}] = {% if input.is_addr %}&{% endif %}{{ input.name }};
+    {% endfor %}
+
+    {% for output in outputs %}
+    res[{{ loop.index0 }}] = {% if output.is_addr %}&{% endif %}{{ output.name }};
+    {% endfor %}
+
+    // PROTECTED-REGION-START: setup
+    {% if protected_regions and 'setup' in protected_regions %}
+    {{ protected_regions['setup'] }}
+    {% else %}
+    // ... User-defined setup code
+    Serial.begin(9600);
+    {% endif %}
+    // PROTECTED-REGION-END
+
+    // Initialize Timer1 for interrupts at {{ sample_rate.hz }} Hz
+    Timer1.initialize(SAMPLE_RATE_US);
+    Timer1.attachInterrupt(timerInterrupt);
+}
+
+void loop() {
+    // Check if control loop should run (set by timer interrupt)
+    if (control_loop_flag) {
+        control_loop_flag = false;
+        
+        // PROTECTED-REGION-START: control_loop
+        {% if protected_regions and 'control_loop' in protected_regions %}
+        {{ protected_regions['control_loop'] }}
+        {% else %}
+        // ... User-defined timed code
+        {{ function_name }}(arg, res, iw, w, 0);
+        {% endif %}
+        // PROTECTED-REGION-END
+    }
+    
+    // PROTECTED-REGION-START: loop
+    {% if protected_regions and 'loop' in protected_regions %}
+    {{ protected_regions['loop'] }}
+    {% else %}
+    // ... User-defined non-time-critical tasks
+    delay(10);
+    {% endif %}
+    // PROTECTED-REGION-END
+}

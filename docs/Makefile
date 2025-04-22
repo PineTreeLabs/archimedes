@@ -20,14 +20,12 @@ help:
 	@$(SPHINXBUILD) -M $@ "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS) $(O)
 
 clean:
-	@rm -r build source/generated/*
+	@rm -rf build source/generated/*
 
 nbconvert:
-	@ARCHIMEDES_THEME="light" uv run jupyter nbconvert --to markdown \
-		--output-dir source/generated/notebooks --execute source/notebooks/*.ipynb
-
-	@ARCHIMEDES_THEME="dark" uv run jupyter nbconvert --to markdown \
-		--output-dir source/generated/notebooks_dark --execute source/notebooks/*.ipynb
+	@chmod +x convert_notebooks.sh
+	@./convert_notebooks.sh light source/generated/notebooks
+	@./convert_notebooks.sh dark source/generated/notebooks_dark
 
 	@python nbconvert_post.py
 	@rm -r source/generated/notebooks_dark

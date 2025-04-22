@@ -63,7 +63,8 @@ Documentation
    :maxdepth: 1
    :caption: Examples
 
-   notebooks/multirotor00
+   notebooks/multirotor/multirotor00
+   notebooks/deployment/deployment00
 
 .. toctree::
    :maxdepth: 1
@@ -71,6 +72,12 @@ Documentation
 
    gotchas
    reference/index
+
+.. toctree::
+   :maxdepth: 1
+   :caption: Development
+
+   roadmap
 
 
 Indices and Tables
