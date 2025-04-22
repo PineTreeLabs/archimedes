@@ -18,9 +18,6 @@ In this tutorial, we will walk through the process of modeling a multirotor vehi
 <!-- Goals of the tutorial -->
 This tutorial will cover the following topics:
 
-
-This tutorial will cover the following topics:
-
 1. [**Fundamentals of multirotor dynamics**](multirotor01): 
    - 6-DOF rigid body dynamics
    - Rotorcraft aerodynamics

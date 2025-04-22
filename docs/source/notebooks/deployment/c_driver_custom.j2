@@ -1,6 +1,7 @@
 // gcc {{ driver_name }} {{ filename }}.c
 
 #include "{{ filename }}.h"
+#include <unistd.h>
 
 // PROTECTED-REGION-START: imports
 {% if protected_regions and 'imports' in protected_regions %}
@@ -9,6 +10,9 @@
 // ... User-defined imports and includes
 {% endif %}
 // PROTECTED-REGION-END
+
+// Sampling rate: {{ sample_rate.hz }} Hz
+const unsigned long SAMPLE_RATE_US = {{ sample_rate.us }};
 
 // Allocate memory for inputs and outputs
 {% for input in inputs %}
@@ -45,14 +49,19 @@ int main(int argc, char *argv[]) {
     res[{{ loop.index0 }}] = {% if output.is_addr %}&{% endif %}{{ output.name }};
     {% endfor %}
 
-    // PROTECTED-REGION-START: main
-    {% if protected_regions and 'main' in protected_regions %}
-    {{ protected_regions['main'] }}
-    {% else %}
-    // ... User-defined program body
-    {{ function_name }}(arg, res, iw, w, 0);
-    {% endif %}
-    // PROTECTED-REGION-END
+    while (true) {
+        // PROTECTED-REGION-START: loop
+        {% if protected_regions and 'loop' in protected_regions %}
+        {{ protected_regions['loop'] }}
+        {% else %}
+        // ... User-defined program body
+        {{ function_name }}(arg, res, iw, w, 0);
+
+        // Sleep for the specified sample rate
+        usleep(SAMPLE_RATE_US);
+        {% endif %}
+        // PROTECTED-REGION-END
+    }
 
     return 0;
 }

@@ -55,6 +55,7 @@ def codegen(
     options: dict[str, Any] | None = None,
     driver: str | RendererBase | None = None,
     driver_config: dict[str, str] | None = None,
+    driver_context: dict[str, Any] | None = None,
 ) -> None:
     """Generate C/C++ code from a compiled function.
 
@@ -118,6 +119,11 @@ def codegen(
           Used for generating comments in the code.
         - output_descriptions: Dictionary mapping output names to descriptions.
           Used for generating comments in the code.
+
+    driver_context : dict, optional
+        Additional context for the driver template. This can include additional
+        variables that are used by custom templates. This context is passed directly
+        to the Jinja2 template renderer.
 
     Returns
     -------
@@ -242,8 +248,13 @@ def codegen(
     if driver_config is None:
         driver_config = {}
 
+    if driver_context is None:
+        driver_context = {}
+
     # Build the context for the renderer
     context = {
+        **driver_context,
+        "filename": filename.split(".")[0],
         "function_name": func.name,
         "float_type": dtype_to_c[float_type],
         "int_type": dtype_to_c[int_type],

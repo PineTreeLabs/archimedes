@@ -1,6 +1,6 @@
-// gcc test_driver.c test_func.c
+// gcc test_driver.c gen.c
 
-#include "test_func.h"
+#include "gen.h"
 
 // PROTECTED-REGION-START: imports
 // ... User-defined imports and includes
