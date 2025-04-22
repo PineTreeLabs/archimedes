@@ -94,7 +94,7 @@ def copy_static_directories():
             else:
                 shutil.copy2(item, target_item)
         print(f"Copied static files from {static_source} to {static_target}.")
-    
+
     # Then, find any _static directories in subdirectories
     for static_dir in Path("source/notebooks").glob("*/_static"):
         # Get the parent directory name (the subdirectory name)
@@ -102,7 +102,7 @@ def copy_static_directories():
         # Create the corresponding target directory
         target_dir = Path(f"source/generated/notebooks/{subdir_name}/_static")
         target_dir.mkdir(exist_ok=True, parents=True)
-        
+
         # Copy all contents
         for item in static_dir.glob("*"):
             target_item = target_dir / item.name

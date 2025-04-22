@@ -46,7 +46,7 @@ def context():
     # Basic context for consistent driver template rendering
     # Note this needs to match the test_func above
     return {
-        "filename": "gen", 
+        "filename": "gen",
         "driver_name": "test_driver",
         "function_name": "test_func",
         "sample_rate": 0.01,
