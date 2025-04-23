@@ -1,5 +1,11 @@
+from functools import partial
+
 import numpy as np
 from scipy.special import roots_jacobi, roots_legendre
+import casadi as cs
+
+import archimedes as arc
+from archimedes._core._array_impl import _as_casadi_array, SymbolicArray
 
 __all__ = [
     "gauss_legendre",
@@ -71,6 +77,63 @@ def barycentric_weights(x):
     return w
 
 
+@arc.compile
+def find_equal(x, xp, yp):
+    # Return the first value of yp[j] such that xp[j] >= x.
+
+    # Since this is a compiled function, we can assume that both are symbolic arrays
+    xp_cs = _as_casadi_array(xp)
+    x_cs = _as_casadi_array(x)
+
+    # Add a dummy value or CasADi will only go to the second-to-last element
+    inf_ = cs.MX.inf()  # low only supports MX
+    grid = cs.vcat([xp_cs, inf_])
+    i_cs = cs.low(grid, x_cs)
+    y_cs = yp._sym[i_cs, :]
+
+    # FIXME: This could be a more general function, but it would need much
+    # more careful shape checking.
+    return SymbolicArray(y_cs, shape=yp[0].shape, dtype=yp.dtype)
+
+
+@arc.compile
+def interpolate_helper(x, yp, xp, w):
+    # Quick exit for empty arrays
+    if yp.size == 0:
+        return np.array([], like=x)
+
+    n0 = len(xp)
+    if len(yp) != n0:
+        raise ValueError("Number of data points must match number of nodes")
+
+    # Reshape x to be a 1D array
+    x = arc.array(x).ravel()
+
+    n = x.size
+    m = 1 if len(yp.shape) == 1 == 1 else len(yp[0])
+
+    # Initialize arrays to store the numerator and denominator terms
+    num = np.zeros((n, m), dtype=float)
+    den = np.zeros(n, dtype=float)
+
+    # Compute the numerator and denominator terms for each x value
+    for j in range(n0):
+        xdiff = x - xp[j]
+        temp = np.where(xdiff == 0, 0.0, w[j] / xdiff)
+        num += np.outer(temp, yp[j])
+        den += temp
+
+    # Handle the case where x matches one of the nodes exactly
+    for i in range(n):
+        yp_i = find_equal(x[i], xp, yp)
+        is_match = sum(x[i] == xp)
+        num[i] = np.where(is_match, yp_i, num[i])
+        den[i] = np.where(is_match, 1.0, den[i])
+
+    result = num / den[:, None]
+    return result.squeeze()
+
+
 class LagrangePolynomial:
     def __init__(self, nodes):
         self.n = len(nodes) - 1
@@ -85,42 +148,7 @@ class LagrangePolynomial:
         `m` is the shape of `y0[0]`.  If the data is scalar-valued, the result will
         be a 1D array of length `n`.
         """
-
-        if len(y0) != self.n + 1:
-            raise ValueError("Number of data points must match number of nodes")
-
-        x0, w = self.nodes, self.weights
-
-        # Reshape x to be a 1D array
-        x = np.asarray(x).ravel()
-
-        n = len(x)
-        m = 1 if len(y0.shape) == 1 == 1 else len(y0[0])
-
-        # Initialize arrays to store the numerator and denominator terms
-        num = np.zeros((n, m), dtype=float)
-        den = np.zeros(n, dtype=float)
-
-        # Compute the numerator and denominator terms for each x value
-        for j in range(self.n + 1):
-            xdiff = x - x0[j]
-            mask = xdiff != 0  # Mask to avoid division by zero
-            temp = np.zeros_like(x)
-            temp[mask] = w[j] / xdiff[mask]
-            num += np.outer(temp, y0[j])
-            den += temp
-
-        # Handle the case where x matches one of the nodes exactly
-        mask = np.isin(x, x0)  # These are indexes into `x`
-        if np.any(mask):
-            for i in np.nonzero(mask)[0]:
-                i0 = np.where(x0 == x[i])[0][0]  # Index into `x0`
-                num[i] = y0[i0]
-                den[i] = 1.0
-
-        result = num / den[:, None]
-
-        return result.squeeze()
+        return interpolate_helper(x, y0, self.nodes, self.weights)
 
     @property
     def diff_matrix(self):
