@@ -96,18 +96,18 @@ def find_equal(x, xp, yp):
     return SymbolicArray(y_cs, shape=yp[0].shape, dtype=yp.dtype)
 
 
-@arc.compile
+# @arc.compile
 def interpolate_helper(x, yp, xp, w):
     # Quick exit for empty arrays
     if yp.size == 0:
-        return np.array([], like=x)
+        return np.array([])
 
     n0 = len(xp)
     if len(yp) != n0:
         raise ValueError("Number of data points must match number of nodes")
 
     # Reshape x to be a 1D array
-    x = arc.array(x).ravel()
+    x = np.atleast_1d(x).ravel()
 
     n = x.size
     m = 1 if len(yp.shape) == 1 == 1 else len(yp[0])
@@ -140,15 +140,15 @@ class LagrangePolynomial:
         self.nodes = nodes
         self.weights = barycentric_weights(nodes)
 
-    def interpolate(self, y0, x):
-        """Interpolate the polynomial at `x` when `f(nodes[i]) = y0[i]`
+    def interpolate(self, yp, x):
+        """Interpolate the polynomial at `x` when `f(nodes[i]) = yp[i]`
 
         If `x` is an array, it will be flattened before interpolation. The result
         will have the shape (n, m), where `n` is the number of elements in `x` and
-        `m` is the shape of `y0[0]`.  If the data is scalar-valued, the result will
+        `m` is the shape of `yp[0]`.  If the data is scalar-valued, the result will
         be a 1D array of length `n`.
         """
-        return interpolate_helper(x, y0, self.nodes, self.weights)
+        return interpolate_helper(x, yp, self.nodes, self.weights)
 
     @property
     def diff_matrix(self):

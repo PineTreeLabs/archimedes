@@ -3,6 +3,7 @@
 import numpy as np
 import pytest
 
+import archimedes as arc
 from archimedes.experimental import coco as cc
 from archimedes.experimental.coco.interpolation import (
     LagrangePolynomial,
@@ -48,7 +49,7 @@ def test_lagrange_polynomial_interpolate():
 
     y0 = np.array([1.0, 0.0, 1.0])
     x = np.linspace(-1, 1, 11)
-    y = poly.interpolate(y0, x)
+    y = arc.compile(poly.interpolate)(y0, x)
 
     assert np.isclose(y[0], 1.0)
     assert np.isclose(y[5], 0.0)
@@ -129,7 +130,7 @@ def test_interpolation():
 
     x = 0.5 * (nodes[5] + nodes[6])
     y = f(x)
-    y_interp = p.interpolate(y0, x)
+    y_interp = arc.compile(p.interpolate)(y0, x)
 
     assert np.allclose(y, y_interp, atol=1e-8)
 
