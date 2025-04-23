@@ -166,7 +166,8 @@ class RadauFiniteElements(SplineDiscretization):
             out = np.zeros((n, m))
             for k in range(self.n_elements):
                 idx = np.where(np.logical_and(t >= kt[k], t <= kt[k + 1]))[0]
-                out[idx] = np.reshape(x_fns[k](t[idx]), (len(idx), m))
+                if len(idx) > 0:
+                    out[idx] = np.reshape(x_fns[k](t[idx]), (len(idx), m))
 
             lo_idx = np.where(t < τ[0])[0]
             hi_idx = np.where(t > τ[-1])[0]
