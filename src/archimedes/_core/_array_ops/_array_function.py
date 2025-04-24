@@ -25,6 +25,7 @@ from ._array_ops import (
     binary_op,
     normalize_axis_index,
     unary_op,
+    _repmat,
 )
 from ._array_ufunc import SUPPORTED_UFUNCS, _dot
 
@@ -341,9 +342,21 @@ def _where(condition, x=None, y=None):
 
     # CasADi will broadcast scalars, otherwise we need to reshape manually
     # TODO: Use broadcast_to instead of manual reshaping
-    condition = (
-        condition if np.prod(condition.shape) <= 1 else np.reshape(condition, shape)
-    )
+    if np.prod(condition.shape) > 1:
+        if condition.shape[0] != shape[0]:
+            raise ValueError(
+                "Condition and x/y must have the same first dimension"
+            )
+        if condition.shape[1] != shape[1]:
+            if condition.shape[1] != 1:
+                raise ValueError(
+                    "Condition and x/y must be broadcastable along the second "
+                    "dimension"
+                )
+            condition = _repmat(condition, (1, shape[1]))
+        else:
+            condition = np.reshape(condition, shape)
+
     x = x if np.prod(x.shape) <= 1 else np.reshape(x, shape)
     y = y if np.prod(y.shape) <= 1 else np.reshape(y, shape)
 

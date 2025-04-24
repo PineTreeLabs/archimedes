@@ -96,7 +96,7 @@ def find_equal(x, xp, yp):
     return SymbolicArray(y_cs, shape=yp[0].shape, dtype=yp.dtype)
 
 
-# @arc.compile
+@arc.compile
 def interpolate_helper(x, yp, xp, w):
     # Quick exit for empty arrays
     if yp.size == 0:
@@ -148,7 +148,14 @@ class LagrangePolynomial:
         `m` is the shape of `yp[0]`.  If the data is scalar-valued, the result will
         be a 1D array of length `n`.
         """
-        return interpolate_helper(x, yp, self.nodes, self.weights)
+        x = np.atleast_1d(x).ravel()
+        if x.size > 1:
+            _interpolate_helper = arc.vmap(
+                interpolate_helper, in_axes=(0, None, None, None)
+            )
+        else:
+            _interpolate_helper = interpolate_helper
+        return _interpolate_helper(x, yp, self.nodes, self.weights)
 
     @property
     def diff_matrix(self):

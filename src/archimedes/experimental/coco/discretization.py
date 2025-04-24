@@ -3,6 +3,7 @@ import dataclasses
 
 import numpy as np
 
+import archimedes as arc
 from .interpolation import LagrangePolynomial, gauss_radau
 
 
@@ -149,36 +150,45 @@ class RadauFiniteElements(SplineDiscretization):
 
         return D
 
-    def create_interpolant(self, x_fns, x, t0, tf, extrapolation="flat"):
+    def create_interpolant(self, x_fns, xp, t0, tf, extrapolation="flat"):
         if extrapolation not in {"flat", "zero"}:
             raise ValueError(f"Unsupported extrapolation type: {extrapolation}")
 
         τ = self.time_nodes(t0, tf)  # Nodes scaled to (t0, tf)
         kt = self.knots * 0.5 * (tf - t0) + 0.5 * (tf + t0)  # Global knots
 
+        @arc.compile
         def global_interp(t):
             t = np.atleast_1d(t)
             n = len(t)
-            m = x.shape[1]
+            m = xp.shape[1]
 
             # Determine which interval each time point falls into and use
             # the element interpolant
             out = np.zeros((n, m))
             for k in range(self.n_elements):
-                idx = np.where(np.logical_and(t >= kt[k], t <= kt[k + 1]))[0]
-                if len(idx) > 0:
-                    out[idx] = np.reshape(x_fns[k](t[idx]), (len(idx), m))
+                # Find all indices of t such that kt[k] <= t < kt[k + 1]
+                idx = np.logical_and(t >= kt[k], t <= kt[k + 1])
 
-            lo_idx = np.where(t < τ[0])[0]
-            hi_idx = np.where(t > τ[-1])[0]
+                # Evaluate this interpolant at all time points
+                # This looks inefficient, but ends up being fast once compiled
+                x = x_fns[k](t)
+                if x.ndim == 1:
+                    x = x.reshape(-1, 1)  # Convert (n,) to (n, 1)
+
+                print(idx.shape, x.shape, out.shape)
+                out = np.where(idx[:, None], x, out)
+
+            low_idx = t < τ[0]
+            high_idx = t > τ[-1]
 
             if extrapolation == "flat":
-                out[lo_idx] = x[0]
-                out[hi_idx] = x[-1]
+                out = np.where(low_idx[:, None], xp[0], out)
+                out = np.where(high_idx[:, None], xp[-1], out)
 
             elif extrapolation == "zero":
-                out[lo_idx] = 0.0
-                out[hi_idx] = 0.0
+                out = np.where(low_idx[:, None], 0.0, out)
+                out = np.where(high_idx[:, None], 0.0, out)
 
             return out
 
