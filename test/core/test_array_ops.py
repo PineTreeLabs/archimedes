@@ -802,6 +802,7 @@ class TestSymbolicArrayFunctions:
         assert cs.is_equal(result._sym, cs.horzcat(x._sym.T, y._sym.T), 1)
 
     def test_where(self):
+        # Basic case - all arrays same shape
         x = sym("x", shape=(3,), dtype=np.int32)
         y = sym("y", shape=(3,), dtype=np.int32)
         c = sym("c", shape=(3,), dtype=bool)
@@ -811,15 +812,65 @@ class TestSymbolicArrayFunctions:
         assert result.shape == (3,)
         assert cs.is_equal(result._sym, cs.if_else(c._sym, x._sym, y._sym), 3)
 
-        # Test broadcasting
+        # Scalar condition with array operands
+        condition = sym("condition", shape=(), dtype=bool)
+        result = np.where(condition, x, y)
+        assert isinstance(result, SymbolicArray)
+        assert result.dtype == np.int32
+        assert result.shape == (3,)
+        assert cs.is_equal(result._sym, cs.if_else(condition._sym, x._sym, y._sym), 3)
+
+        # Test broadcasting between different shapes
         x = sym("x", shape=(1, 3), dtype=np.int32)
         y = sym("y", shape=(3,), dtype=np.int32)
         condition = sym("condition", shape=(), dtype=bool)
         result = np.where(condition, x, y)
         assert isinstance(result, SymbolicArray)
         assert result.dtype == np.int32
-        assert result.shape == (1, 3)
-        assert cs.is_equal(result._sym, cs.if_else(condition._sym, x._sym, y._sym.T), 3)
+        assert result.shape == (1, 3)  # Result should have broadcasted shape
+
+        # Test with all different shapes that can broadcast together
+        x = sym("x", shape=(2, 1), dtype=np.int32)
+        y = sym("y", shape=(1, 3), dtype=np.int32)
+        condition = sym("condition", shape=(1,), dtype=bool)
+        result = np.where(condition, x, y)
+        assert isinstance(result, SymbolicArray)
+        assert result.dtype == np.int32
+        assert result.shape == (2, 3)  # Result should be broadcast to (2,3)
+
+        # Test with scalar operands
+        x = sym("x", shape=(), dtype=np.int32)
+        y = sym("y", shape=(2, 3), dtype=np.int32)
+        condition = sym("condition", shape=(2, 3), dtype=bool)
+        result = np.where(condition, x, y)
+        assert isinstance(result, SymbolicArray)
+        assert result.dtype == np.int32
+        assert result.shape == (2, 3)
+
+        # Test with all scalar inputs
+        x = sym("x", shape=(), dtype=np.int32)
+        y = sym("y", shape=(), dtype=float)
+        condition = sym("condition", shape=(), dtype=bool)
+        result = np.where(condition, x, y)
+        assert isinstance(result, SymbolicArray)
+        assert result.dtype == np.float64  # Type promotion to float
+        assert result.shape == ()
+
+        # Test data type promotion
+        x = sym("x", shape=(3,), dtype=np.int32)
+        y = sym("y", shape=(3,), dtype=np.float64)
+        condition = sym("condition", shape=(3,), dtype=bool)
+        result = np.where(condition, x, y)
+        assert isinstance(result, SymbolicArray)
+        assert result.dtype == np.float64  # Should be promoted to float64
+        assert result.shape == (3,)
+
+        # Test incompatible shapes (should raise error)
+        x = sym("x", shape=(2, 3), dtype=np.int32)
+        y = sym("y", shape=(4, 3), dtype=np.int32)
+        condition = sym("condition", shape=(2, 3), dtype=bool)
+        with pytest.raises(ValueError):
+            np.where(condition, x, y)
 
         # TODO: Update when where with one arg is supported
         with pytest.raises(ValueError):

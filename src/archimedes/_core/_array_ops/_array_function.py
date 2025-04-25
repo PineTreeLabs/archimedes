@@ -432,11 +432,11 @@ def _where(condition, x=None, y=None):
     shape = shape_inference("broadcast", condition, x, y)
     dtype = _result_type(condition, x, y)
 
-    # CasADi will broadcast scalars, otherwise we need to reshape manually
-    # TODO: Use broadcast_to instead of manual reshaping
-    condition = (
-        condition if np.prod(condition.shape) <= 1 else np.reshape(condition, shape)
-    )
+    # CasADi will broadcast scalars, otherwise we need to handle broadcasting
+    x = np.broadcast_to(x, shape)
+    y = np.broadcast_to(y, shape)
+    condition = np.broadcast_to(condition, shape)
+
     x = x if np.prod(x.shape) <= 1 else np.reshape(x, shape)
     y = y if np.prod(y.shape) <= 1 else np.reshape(y, shape)
 
