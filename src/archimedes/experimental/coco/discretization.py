@@ -163,23 +163,27 @@ class RadauFiniteElements(SplineDiscretization):
             n = len(t)
             m = xp.shape[1]
 
+            print(t.shape, kt.shape)
+
             # Determine which interval each time point falls into and use
             # the element interpolant
-            out = np.zeros((n, m))
+            out = np.zeros((n, m))  # (nt, nx)
             for k in range(self.n_elements):
                 # Find all indices of t such that kt[k] <= t < kt[k + 1]
                 idx = np.logical_and(t >= kt[k], t <= kt[k + 1])
 
                 # Evaluate this interpolant at all time points
                 # This looks inefficient, but ends up being fast once compiled
-                x = x_fns[k](t)
+                x = x_fns[k](t)  # (nt, nx)
                 if x.ndim == 1:
-                    x = x[:, None]  # Convert (n,) to (n, 1)
+                    x = np.reshape(x, (n, m))  # Convert (n,) to (n, 1)
 
+                # print(idx.shape, x.shape, out.shape)
                 out = np.where(idx[:, None], x, out)
 
             low_idx = t < τ[0]
             high_idx = t > τ[-1]
+            # print(out.shape, low_idx.shape, high_idx.shape)
 
             if extrapolation == "flat":
                 out = np.where(low_idx[:, None], xp[0], out)
