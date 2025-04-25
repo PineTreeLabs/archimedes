@@ -15,6 +15,11 @@ from .flight_dynamics import (
     quaternion_to_euler,
     wind_frame,
 )
+from .sensors import (
+    Accelerometer,
+    Gyroscope,
+    LineOfSight,
+)
 
 __all__ = [
     "FlightVehicle",
@@ -32,4 +37,9 @@ __all__ = [
     "euler_kinematics",
     "GravityModel",
     "ConstantGravity",
+    "AtmosphereModel",
+    "ConstantAtmosphere",
+    "Accelerometer",
+    "Gyroscope",
+    "LineOfSight",
 ]

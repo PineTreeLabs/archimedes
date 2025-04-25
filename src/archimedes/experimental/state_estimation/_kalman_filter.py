@@ -3,6 +3,38 @@ import numpy as np
 from archimedes import jac
 
 
+def ekf_correct(h, t, x, z, P, R, args=None):
+    """Perform the "correct" step of the extended Kalman filter
+
+    Args:
+        h: function of (t, x, *args) that computes the measurement function
+        t: current time
+        x: state vector (typically the prediction from the forward model)
+        z: measurement
+        P: state covariance (typically the prediction from the forward model)
+        R: measurement noise covariance
+        args: additional arguments to pass to f and h
+
+    Returns:
+        x: updated state vector
+        P: updated state covariance
+        e: innovation or measurement residual
+    """
+
+    if args is None:
+        args = ()
+
+    H = jac(h, argnums=1)(t, x, *args)
+
+    e = z - h(t, x, *args)  # Innovation or measurement residual
+    S = H @ P @ H.T + R  # Innovation covariance
+    K = P @ H.T @ np.linalg.inv(S)  # Kalman gain
+    x = x + K @ e  # Updated state estimate
+    P = (np.eye(len(x)) - K @ H) @ P  # Updated state covariance
+
+    return x, P, e
+
+
 def ekf_step(f, h, t, x, z, P, Q, R, args=None):
     """Perform one step of the extended Kalman filter
 
@@ -26,19 +58,13 @@ def ekf_step(f, h, t, x, z, P, Q, R, args=None):
         args = ()
 
     F = jac(f, argnums=1)(t, x, *args)
-    H = jac(h, argnums=1)(t, x, *args)
 
     # Predict step
     x = f(t, x, *args)
-
     P = F @ P @ F.T + Q
 
     # Update step
-    e = z - h(t, x, *args)  # Innovation or measurement residual
-    S = H @ P @ H.T + R  # Innovation covariance
-    K = P @ H.T @ np.linalg.inv(S)  # Kalman gain
-    x = x + K @ e  # Updated state estimate
-    P = (np.eye(len(x)) - K @ H) @ P  # Updated state covariance
+    x, P, e = ekf_correct(h, t, x, z, P, R, args)
 
     return x, P, e
 

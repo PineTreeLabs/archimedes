@@ -248,7 +248,7 @@ class FlightVehicle(metaclass=abc.ABCMeta):
         p_N: np.ndarray  # Position of the center of mass in the Newtonian frame N
         att: np.ndarray  # Attitude (orientation) of the vehicle
         v_B: np.ndarray  # Velocity of the center of mass in body frame B
-        w_B: np.ndarray  # Roll-pitch-yaw rates in body frame (ω_B)
+        w_B: np.ndarray  # Angular velocity in body frame (ω_B)
         aux: PyTree = struct.field(default=None)  # Auxiliary state variables
 
     @abc.abstractmethod
@@ -287,7 +287,7 @@ class FlightVehicle(metaclass=abc.ABCMeta):
         # Unpack the state
         p_N = x.p_N  # Position of the center of mass in the Newtonian frame N
         v_B = x.v_B  # Velocity of the center of mass in body frame B
-        w_B = x.w_B  # Roll-pitch-yaw rates in body frame (ω_B)
+        w_B = x.w_B  # Angular velocity in body frame (ω_B)
 
         if self.attitude == "euler":
             rpy = x.att

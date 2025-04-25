@@ -1,6 +1,6 @@
-# ruff: noqa: N802
-# ruff: noqa: N803
-# ruff: noqa: N806
+# ruff: noqa: N802, N803, N806
+
+import re
 
 import casadi as cs
 import numpy as np
@@ -82,6 +82,86 @@ class TestSymbolicArrayUFuncs:
 
 
 class TestSymbolicArrayFunctions:
+    def test_broadcast_to(self):
+        # Test 0D array broadcast to 0D (no change)
+        x = sym("x", shape=(), dtype=np.int32)
+        result = np.broadcast_to(x, ())
+        assert isinstance(result, SymbolicArray)
+        assert result.dtype == np.int32
+        assert result.shape == ()
+        assert cs.is_equal(result._sym, x._sym, 1)
+
+        # Test 0D array broadcast to 1D
+        x = sym("x", shape=(), dtype=np.int32)
+        result = np.broadcast_to(x, (3,))
+        assert isinstance(result, SymbolicArray)
+        assert result.dtype == np.int32
+        assert result.shape == (3,)
+
+        # Test 0D array broadcast to 2D
+        x = sym("x", shape=(), dtype=np.int32)
+        result = np.broadcast_to(x, (2, 3))
+        assert isinstance(result, SymbolicArray)
+        assert result.dtype == np.int32
+        assert result.shape == (2, 3)
+
+        # Test 1D array broadcast to 1D (no change due to same shape)
+        x = sym("x", shape=(3,), dtype=np.int32)
+        result = np.broadcast_to(x, (3,))
+        assert isinstance(result, SymbolicArray)
+        assert result.dtype == np.int32
+        assert result.shape == (3,)
+        assert cs.is_equal(result._sym, x._sym, 1)
+
+        # Test 1D array broadcast to 2D
+        x = sym("x", shape=(3,), dtype=np.int32)
+        result = np.broadcast_to(x, (2, 3))
+        assert isinstance(result, SymbolicArray)
+        assert result.dtype == np.int32
+        assert result.shape == (2, 3)
+
+        # Test 2D array broadcast to 2D (expand dimension with size 1)
+        x = sym("x", shape=(1, 3), dtype=np.int32)
+        result = np.broadcast_to(x, (2, 3))
+        assert isinstance(result, SymbolicArray)
+        assert result.dtype == np.int32
+        assert result.shape == (2, 3)
+
+        # Test error cases
+
+        # Input has more dimensions than broadcast shape
+        x = sym("x", shape=(2, 3), dtype=np.int32)
+        msg = re.escape(
+            "input operand with shape (2, 3) has more dimensions than "
+            "the broadcast shape (3,)"
+        )
+        with pytest.raises(ValueError, match=msg):
+            np.broadcast_to(x, (3,))
+
+        # Cannot broadcast non-scalar to scalar
+        x = sym("x", shape=(3,), dtype=np.int32)
+        with pytest.raises(
+            ValueError, match="cannot broadcast a non-scalar to a scalar array"
+        ):
+            np.broadcast_to(x, ())
+
+        # Negative size in shape
+        x = sym("x", shape=(3,), dtype=np.int32)
+        with pytest.raises(
+            ValueError, match="all elements of broadcast shape must be non-negative"
+        ):
+            np.broadcast_to(x, (3, -1))
+
+        # More than 2D not supported
+        x = sym("x", shape=(2, 3), dtype=np.int32)
+        with pytest.raises(ValueError, match="Only 0-2D arrays are supported"):
+            np.broadcast_to(x, (2, 3, 4))
+
+        # Incompatible shapes
+        x = sym("x", shape=(2, 3), dtype=np.int32)
+        with pytest.raises(ValueError, match="Cannot broadcast"):
+            np.broadcast_to(x, (2, 4))
+
     def _dot_test(self, shape1, shape2, result_shape):
         x = sym("x", shape=shape1, dtype=np.int32)
 
@@ -542,6 +622,77 @@ class TestSymbolicArrayFunctions:
         with pytest.raises(IndexError):
             np.split(x, [2, 1])
 
+    def test_tile(self):
+        # Test 0D array tiling
+        x = sym("x", shape=(), dtype=np.int32)
+        result = np.tile(x, 3)
+        assert isinstance(result, SymbolicArray)
+        assert result.dtype == np.int32
+        assert result.shape == (3,)
+
+        # Test 1D array with scalar reps
+        x = sym("x", shape=(3,), dtype=np.int32)
+        result = np.tile(x, 2)
+        assert isinstance(result, SymbolicArray)
+        assert result.dtype == np.int32
+        assert result.shape == (6,)
+
+        # Test 1D array with 1D reps
+        x = sym("x", shape=(3,), dtype=np.int32)
+        result = np.tile(x, (2,))
+        assert isinstance(result, SymbolicArray)
+        assert result.dtype == np.int32
+        assert result.shape == (6,)
+
+        # Test 1D array with 2D reps
+        x = sym("x", shape=(3,), dtype=np.int32)
+        result = np.tile(x, (2, 3))
+        assert isinstance(result, SymbolicArray)
+        assert result.dtype == np.int32
+        assert result.shape == (2, 9)
+
+        # Test 2D array with scalar reps
+        x = sym("x", shape=(2, 3), dtype=np.int32)
+        result = np.tile(x, 2)
+        assert isinstance(result, SymbolicArray)
+        assert result.dtype == np.int32
+        assert result.shape == (2, 6)
+
+        # Test 2D array with 1D reps
+        x = sym("x", shape=(2, 3), dtype=np.int32)
+        result = np.tile(x, (2,))
+        assert isinstance(result, SymbolicArray)
+        assert result.dtype == np.int32
+        assert result.shape == (2, 6)
+
+        # Test 2D array with 2D reps
+        x = sym("x", shape=(2, 3), dtype=np.int32)
+        result = np.tile(x, (2, 2))
+        assert isinstance(result, SymbolicArray)
+        assert result.dtype == np.int32
+        assert result.shape == (4, 6)
+
+        # Test with reps=1
+        x = sym("x", shape=(2, 3), dtype=np.int32)
+        result = np.tile(x, 1)
+        assert isinstance(result, SymbolicArray)
+        assert result.dtype == np.int32
+        assert result.shape == (2, 3)
+        assert cs.is_equal(result._sym, x._sym, 1)
+
+        # Test with empty reps tuple
+        x = sym("x", shape=(2, 3), dtype=np.int32)
+        result = np.tile(x, ())
+        assert isinstance(result, SymbolicArray)
+        assert result.dtype == np.int32
+        assert result.shape == (2, 3)
+        assert cs.is_equal(result._sym, x._sym, 1)
+
+        # Test error case: more than 2D tiling
+        x = sym("x", shape=(2, 3), dtype=np.int32)
+        with pytest.raises(ValueError):
+            np.tile(x, (2, 2, 2))
+
     def test_atleast_1d(self):
         # Test 0D array
         x = sym("x", shape=(), dtype=np.int32)
@@ -651,6 +802,7 @@ class TestSymbolicArrayFunctions:
         assert cs.is_equal(result._sym, cs.horzcat(x._sym.T, y._sym.T), 1)
 
     def test_where(self):
+        # Basic case - all arrays same shape
         x = sym("x", shape=(3,), dtype=np.int32)
         y = sym("y", shape=(3,), dtype=np.int32)
         c = sym("c", shape=(3,), dtype=bool)
@@ -660,15 +812,65 @@ class TestSymbolicArrayFunctions:
         assert result.shape == (3,)
         assert cs.is_equal(result._sym, cs.if_else(c._sym, x._sym, y._sym), 3)
 
-        # Test broadcasting
+        # Scalar condition with array operands
+        condition = sym("condition", shape=(), dtype=bool)
+        result = np.where(condition, x, y)
+        assert isinstance(result, SymbolicArray)
+        assert result.dtype == np.int32
+        assert result.shape == (3,)
+        assert cs.is_equal(result._sym, cs.if_else(condition._sym, x._sym, y._sym), 3)
+
+        # Test broadcasting between different shapes
         x = sym("x", shape=(1, 3), dtype=np.int32)
         y = sym("y", shape=(3,), dtype=np.int32)
         condition = sym("condition", shape=(), dtype=bool)
         result = np.where(condition, x, y)
         assert isinstance(result, SymbolicArray)
         assert result.dtype == np.int32
-        assert result.shape == (1, 3)
-        assert cs.is_equal(result._sym, cs.if_else(condition._sym, x._sym, y._sym.T), 3)
+        assert result.shape == (1, 3)  # Result should have broadcasted shape
+
+        # Test with all different shapes that can broadcast together
+        x = sym("x", shape=(2, 1), dtype=np.int32)
+        y = sym("y", shape=(1, 3), dtype=np.int32)
+        condition = sym("condition", shape=(1,), dtype=bool)
+        result = np.where(condition, x, y)
+        assert isinstance(result, SymbolicArray)
+        assert result.dtype == np.int32
+        assert result.shape == (2, 3)  # Result should be broadcast to (2,3)
+
+        # Test with scalar operands
+        x = sym("x", shape=(), dtype=np.int32)
+        y = sym("y", shape=(2, 3), dtype=np.int32)
+        condition = sym("condition", shape=(2, 3), dtype=bool)
+        result = np.where(condition, x, y)
+        assert isinstance(result, SymbolicArray)
+        assert result.dtype == np.int32
+        assert result.shape == (2, 3)
+
+        # Test with all scalar inputs
+        x = sym("x", shape=(), dtype=np.int32)
+        y = sym("y", shape=(), dtype=float)
+        condition = sym("condition", shape=(), dtype=bool)
+        result = np.where(condition, x, y)
+        assert isinstance(result, SymbolicArray)
+        assert result.dtype == np.float64  # Type promotion to float
+        assert result.shape == ()
+
+        # Test data type promotion
+        x = sym("x", shape=(3,), dtype=np.int32)
+        y = sym("y", shape=(3,), dtype=np.float64)
+        condition = sym("condition", shape=(3,), dtype=bool)
+        result = np.where(condition, x, y)
+        assert isinstance(result, SymbolicArray)
+        assert result.dtype == np.float64  # Should be promoted to float64
+        assert result.shape == (3,)
+
+        # Test incompatible shapes (should raise error)
+        x = sym("x", shape=(2, 3), dtype=np.int32)
+        y = sym("y", shape=(4, 3), dtype=np.int32)
+        condition = sym("condition", shape=(2, 3), dtype=bool)
+        with pytest.raises(ValueError):
+            np.where(condition, x, y)
 
         # TODO: Update when where with one arg is supported
         with pytest.raises(ValueError):

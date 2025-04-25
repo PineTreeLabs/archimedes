@@ -47,6 +47,99 @@ def _ravel(x, order="C"):
     return np.reshape(x, (x.size,), order=order)
 
 
+def _tile(x, reps):
+    # This is the dispatch function for `np.tile`, so we can
+    # assume that x is a SymbolicArray.
+
+    # From NumPy docs:
+    # If reps has length d, the result will have dimension of max(d, A.ndim).
+    # If A.ndim < d, A is promoted to be d-dimensional by prepending new axes. So a
+    # shape (3,) array is promoted to (1, 3) for 2-D replication, or shape (1, 1, 3)
+    # for 3-D replication. If this is not the desired behavior, promote A to
+    # d-dimensions manually before calling this function.
+
+    # If A.ndim > d, reps is promoted to A.ndim by prepending 1’s to it. Thus for
+    # an A of shape (2, 3, 4, 5), a reps of (2, 2) is treated as (1, 1, 2, 2).
+    reps = tuple(reps) if np.iterable(reps) else (reps,)
+
+    if len(reps) > 2:
+        raise ValueError("Only 1D and 2D tiling is supported")
+
+    if len(reps) == 0:
+        return x
+
+    if all(rep == 1 for rep in reps):
+        return x
+
+    d = len(reps)
+    if d < x.ndim:
+        # Prepend 1's to reps
+        reps = (1,) * (x.ndim - d) + reps
+
+    elif d > x.ndim:
+        # Prepend 1's to x.shape
+        x = np.reshape(x, (1,) * (d - x.ndim) + x.shape)
+
+    ret_shape = tuple(int(x.shape[i] * reps[i]) for i in range(len(reps)))
+
+    x_cs = _as_casadi_array(x)
+    # CasADi arrays are always 2D, so we need might need to adjust the
+    # reps before calling cs.repmat
+    cs_reps = reps
+    if len(cs_reps) < 2:
+        cs_reps = (1,) * (2 - len(cs_reps)) + cs_reps
+
+    ret_cs = cs.repmat(x_cs, *cs_reps)
+    return SymbolicArray(ret_cs, dtype=x.dtype, shape=ret_shape)
+
+
+def _broadcast_to(x, shape):
+    shape = tuple(shape) if np.iterable(shape) else (shape,)
+
+    if not shape and x.shape:
+        raise ValueError("cannot broadcast a non-scalar to a scalar array")
+
+    if any(size < 0 for size in shape):
+        raise ValueError("all elements of broadcast shape must be non-negative")
+
+    if len(shape) > 2:
+        raise ValueError("Only 0-2D arrays are supported")
+
+    if len(shape) < x.ndim:
+        raise ValueError(
+            f"input operand with shape {x.shape} has more dimensions than the "
+            f"broadcast shape {shape}"
+        )
+
+    # From NumPy docs:
+    # NumPy compares their shapes element-wise. It starts with the trailing
+    # (i.e. rightmost) dimension and works its way left. Two dimensions are
+    # compatible when
+    # 1. they are equal, or
+    # 2. one of them is 1.
+
+    # If these conditions are not met, a ValueError: operands could not be
+    # broadcast together exception is thrown, indicating that the arrays
+    # have incompatible shapes.
+
+    # Prepend ones to the shape of x if necessary
+    x_shape = x.shape
+    if len(shape) > len(x_shape):
+        x_shape = (1,) * (len(shape) - len(x_shape)) + x_shape
+
+    # Uses `tile` for broadcasting (this is not how NumPy works, but it's fine
+    # with symbolic arrays).
+    reps = []
+    for i in range(len(shape)):
+        if x_shape[i] == shape[i]:
+            reps.append(1)
+        elif x_shape[i] == 1:
+            reps.append(shape[i])  # Repeat to match the target shape
+        else:
+            raise ValueError(f"Cannot broadcast {x_shape} to {shape}")
+    return _tile(x, tuple(reps))
+
+
 def _transpose(x):
     dtype = x.dtype
     shape = shape_inference("transpose", x)
@@ -340,22 +433,10 @@ def _where(condition, x=None, y=None):
     shape = shape_inference("broadcast", condition, x, y)
     dtype = _result_type(condition, x, y)
 
-    # CasADi will broadcast scalars, otherwise we need to reshape manually
-    # TODO: Use broadcast_to instead of manual reshaping
-    if np.prod(condition.shape) > 1:
-        if condition.shape[0] != shape[0]:
-            raise ValueError(
-                "Condition and x/y must have the same first dimension"
-            )
-        if condition.shape[1] != shape[1]:
-            if condition.shape[1] != 1:
-                raise ValueError(
-                    "Condition and x/y must be broadcastable along the second "
-                    "dimension"
-                )
-            condition = _repmat(condition, (1, shape[1]))
-        else:
-            condition = np.reshape(condition, shape)
+    # CasADi will broadcast scalars, otherwise we need to handle broadcasting
+    x = np.broadcast_to(x, shape)
+    y = np.broadcast_to(y, shape)
+    condition = np.broadcast_to(condition, shape)
 
     x = x if np.prod(x.shape) <= 1 else np.reshape(x, shape)
     y = y if np.prod(y.shape) <= 1 else np.reshape(y, shape)
@@ -660,7 +741,7 @@ SUPPORTED_FUNCTIONS = {
     "isreal": NotImplemented,
     "loadtxt": NotImplemented,
     "encode": NotImplemented,
-    "broadcast_to": NotImplemented,
+    "broadcast_to": _broadcast_to,
     "dstack": NotImplemented,
     "ifft": NotImplemented,
     "endswith": NotImplemented,
@@ -702,7 +783,7 @@ SUPPORTED_FUNCTIONS = {
     "common_type": NotImplemented,
     "alltrue": NotImplemented,
     "isdigit": NotImplemented,
-    "tile": NotImplemented,
+    "tile": _tile,
     "ifftn": NotImplemented,
     "diagflat": NotImplemented,
     "merge_arrays": NotImplemented,
