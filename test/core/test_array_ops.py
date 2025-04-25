@@ -82,6 +82,84 @@ class TestSymbolicArrayUFuncs:
 
 
 class TestSymbolicArrayFunctions:
+    def test_broadcast_to(self):
+        # Test 0D array broadcast to 0D (no change)
+        x = sym("x", shape=(), dtype=np.int32)
+        result = np.broadcast_to(x, ())
+        assert isinstance(result, SymbolicArray)
+        assert result.dtype == np.int32
+        assert result.shape == ()
+        assert cs.is_equal(result._sym, x._sym, 1)
+
+        # Test 0D array broadcast to 1D
+        x = sym("x", shape=(), dtype=np.int32)
+        result = np.broadcast_to(x, (3,))
+        assert isinstance(result, SymbolicArray)
+        assert result.dtype == np.int32
+        assert result.shape == (3,)
+
+        # Test 0D array broadcast to 2D
+        x = sym("x", shape=(), dtype=np.int32)
+        result = np.broadcast_to(x, (2, 3))
+        assert isinstance(result, SymbolicArray)
+        assert result.dtype == np.int32
+        assert result.shape == (2, 3)
+
+        # Test 1D array broadcast to 1D (no change due to same shape)
+        x = sym("x", shape=(3,), dtype=np.int32)
+        result = np.broadcast_to(x, (3,))
+        assert isinstance(result, SymbolicArray)
+        assert result.dtype == np.int32
+        assert result.shape == (3,)
+        assert cs.is_equal(result._sym, x._sym, 1)
+
+        # Test 1D array broadcast to 2D
+        x = sym("x", shape=(3,), dtype=np.int32)
+        result = np.broadcast_to(x, (2, 3))
+        assert isinstance(result, SymbolicArray)
+        assert result.dtype == np.int32
+        assert result.shape == (2, 3)
+
+        # Test 2D array broadcast to 2D (expand dimension with size 1)
+        x = sym("x", shape=(1, 3), dtype=np.int32)
+        result = np.broadcast_to(x, (2, 3))
+        assert isinstance(result, SymbolicArray)
+        assert result.dtype == np.int32
+        assert result.shape == (2, 3)
+
+        # Test error cases
+
+        # Input has more dimensions than broadcast shape
+        x = sym("x", shape=(2, 3), dtype=np.int32)
+        with pytest.raises(
+            ValueError, match="input operand has more dimensions than broadcast shape"
+        ):
+            np.broadcast_to(x, (3,))
+
+        # Cannot broadcast non-scalar to scalar
+        x = sym("x", shape=(3,), dtype=np.int32)
+        with pytest.raises(
+            ValueError, match="cannot broadcast a non-scalar to a scalar array"
+        ):
+            np.broadcast_to(x, ())
+
+        # Negative size in shape
+        x = sym("x", shape=(3,), dtype=np.int32)
+        with pytest.raises(
+            ValueError, match="all elements of broadcast shape must be non-negative"
+        ):
+            np.broadcast_to(x, (3, -1))
+
+        # More than 2D not supported
+        x = sym("x", shape=(2, 3), dtype=np.int32)
+        with pytest.raises(ValueError, match="Only 0-2D arrays are supported"):
+            np.broadcast_to(x, (2, 3, 4))
+
+        # Incompatible shapes
+        x = sym("x", shape=(2, 3), dtype=np.int32)
+        with pytest.raises(ValueError, match="Cannot broadcast"):
+            np.broadcast_to(x, (2, 4))
+
     def _dot_test(self, shape1, shape2, result_shape):
         x = sym("x", shape=shape1, dtype=np.int32)
 

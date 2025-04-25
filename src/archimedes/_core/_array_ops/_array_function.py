@@ -59,11 +59,7 @@ def _tile(x, reps):
 
     # If A.ndim > d, reps is promoted to A.ndim by prepending 1’s to it. Thus for
     # an A of shape (2, 3, 4, 5), a reps of (2, 2) is treated as (1, 1, 2, 2).
-
-    try:
-        reps = tuple(reps)
-    except TypeError:
-        reps = (reps,)
+    reps = tuple(reps) if np.iterable(reps) else (reps,)
 
     if len(reps) > 2:
         raise ValueError("Only 1D and 2D tiling is supported")
@@ -94,6 +90,50 @@ def _tile(x, reps):
 
     ret_cs = cs.repmat(x_cs, *cs_reps)
     return SymbolicArray(ret_cs, dtype=x.dtype, shape=ret_shape)
+
+
+def _broadcast_to(x, shape):
+    shape = tuple(shape) if np.iterable(shape) else (shape,)
+
+    if not shape and x.shape:
+        raise ValueError("cannot broadcast a non-scalar to a scalar array")
+
+    if any(size < 0 for size in shape):
+        raise ValueError("all elements of broadcast shape must be non-negative")
+
+    if len(shape) > 2:
+        raise ValueError("Only 0-2D arrays are supported")
+
+    if len(shape) < x.ndim:
+        raise ValueError("input operand has more dimensions than broadcast shape")
+
+    # From NumPy docs:
+    # NumPy compares their shapes element-wise. It starts with the trailing
+    # (i.e. rightmost) dimension and works its way left. Two dimensions are
+    # compatible when
+    # 1. they are equal, or
+    # 2. one of them is 1.
+
+    # If these conditions are not met, a ValueError: operands could not be
+    # broadcast together exception is thrown, indicating that the arrays
+    # have incompatible shapes.
+
+    # Prepend ones to the shape of x if necessary
+    x_shape = x.shape
+    if len(shape) > len(x_shape):
+        x_shape = (1,) * (len(shape) - len(x_shape)) + x_shape
+
+    # Uses `tile` for broadcasting (this is not how NumPy works, but it's fine
+    # with symbolic arrays).
+    reps = []
+    for i in range(len(shape)):
+        if x_shape[i] == shape[i]:
+            reps.append(1)
+        elif x_shape[i] == 1:
+            reps.append(shape[i])  # Repeat to match the target shape
+        else:
+            raise ValueError(f"Cannot broadcast {x_shape} to {shape}")
+    return _tile(x, tuple(reps))
 
 
 def _transpose(x):
@@ -697,7 +737,7 @@ SUPPORTED_FUNCTIONS = {
     "isreal": NotImplemented,
     "loadtxt": NotImplemented,
     "encode": NotImplemented,
-    "broadcast_to": NotImplemented,
+    "broadcast_to": _broadcast_to,
     "dstack": NotImplemented,
     "ifft": NotImplemented,
     "endswith": NotImplemented,
