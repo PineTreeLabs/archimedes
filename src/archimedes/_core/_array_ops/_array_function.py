@@ -106,7 +106,8 @@ def _broadcast_to(x, shape):
 
     if len(shape) < x.ndim:
         raise ValueError(
-            f"input operand with shape {x.shape} has more dimensions than the broadcast shape {shape}"
+            f"input operand with shape {x.shape} has more dimensions than the "
+            f"broadcast shape {shape}"
         )
 
     # From NumPy docs:
