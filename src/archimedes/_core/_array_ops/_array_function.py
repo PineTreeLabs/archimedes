@@ -105,7 +105,9 @@ def _broadcast_to(x, shape):
         raise ValueError("Only 0-2D arrays are supported")
 
     if len(shape) < x.ndim:
-        raise ValueError("input operand has more dimensions than broadcast shape")
+        raise ValueError(
+            f"input operand with shape {x.shape} has more dimensions than the broadcast shape {shape}"
+        )
 
     # From NumPy docs:
     # NumPy compares their shapes element-wise. It starts with the trailing
