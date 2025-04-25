@@ -46,6 +46,56 @@ def _ravel(x, order="C"):
     return np.reshape(x, (x.size,), order=order)
 
 
+def _tile(x, reps):
+    # This is the dispatch function for `np.tile`, so we can
+    # assume that x is a SymbolicArray.
+
+    # From NumPy docs:
+    # If reps has length d, the result will have dimension of max(d, A.ndim).
+    # If A.ndim < d, A is promoted to be d-dimensional by prepending new axes. So a
+    # shape (3,) array is promoted to (1, 3) for 2-D replication, or shape (1, 1, 3)
+    # for 3-D replication. If this is not the desired behavior, promote A to
+    # d-dimensions manually before calling this function.
+
+    # If A.ndim > d, reps is promoted to A.ndim by prepending 1’s to it. Thus for
+    # an A of shape (2, 3, 4, 5), a reps of (2, 2) is treated as (1, 1, 2, 2).
+
+    try:
+        reps = tuple(reps)
+    except TypeError:
+        reps = (reps,)
+
+    if len(reps) > 2:
+        raise ValueError("Only 1D and 2D tiling is supported")
+
+    if len(reps) == 0:
+        return x
+
+    if all(rep == 1 for rep in reps):
+        return x
+
+    d = len(reps)
+    if d < x.ndim:
+        # Prepend 1's to reps
+        reps = (1,) * (x.ndim - d) + reps
+
+    elif d > x.ndim:
+        # Prepend 1's to x.shape
+        x = np.reshape(x, (1,) * (d - x.ndim) + x.shape)
+
+    ret_shape = tuple(int(x.shape[i] * reps[i]) for i in range(len(reps)))
+
+    x_cs = _as_casadi_array(x)
+    # CasADi arrays are always 2D, so we need might need to adjust the
+    # reps before calling cs.repmat
+    cs_reps = reps
+    if len(cs_reps) < 2:
+        cs_reps = (1,) * (2 - len(cs_reps)) + cs_reps
+
+    ret_cs = cs.repmat(x_cs, *cs_reps)
+    return SymbolicArray(ret_cs, dtype=x.dtype, shape=ret_shape)
+
+
 def _transpose(x):
     dtype = x.dtype
     shape = shape_inference("transpose", x)
@@ -689,7 +739,7 @@ SUPPORTED_FUNCTIONS = {
     "common_type": NotImplemented,
     "alltrue": NotImplemented,
     "isdigit": NotImplemented,
-    "tile": NotImplemented,
+    "tile": _tile,
     "ifftn": NotImplemented,
     "diagflat": NotImplemented,
     "merge_arrays": NotImplemented,

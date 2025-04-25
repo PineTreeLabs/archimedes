@@ -542,6 +542,77 @@ class TestSymbolicArrayFunctions:
         with pytest.raises(IndexError):
             np.split(x, [2, 1])
 
+    def test_tile(self):
+        # Test 0D array tiling
+        x = sym("x", shape=(), dtype=np.int32)
+        result = np.tile(x, 3)
+        assert isinstance(result, SymbolicArray)
+        assert result.dtype == np.int32
+        assert result.shape == (3,)
+
+        # Test 1D array with scalar reps
+        x = sym("x", shape=(3,), dtype=np.int32)
+        result = np.tile(x, 2)
+        assert isinstance(result, SymbolicArray)
+        assert result.dtype == np.int32
+        assert result.shape == (6,)
+
+        # Test 1D array with 1D reps
+        x = sym("x", shape=(3,), dtype=np.int32)
+        result = np.tile(x, (2,))
+        assert isinstance(result, SymbolicArray)
+        assert result.dtype == np.int32
+        assert result.shape == (6,)
+
+        # Test 1D array with 2D reps
+        x = sym("x", shape=(3,), dtype=np.int32)
+        result = np.tile(x, (2, 3))
+        assert isinstance(result, SymbolicArray)
+        assert result.dtype == np.int32
+        assert result.shape == (2, 9)
+
+        # Test 2D array with scalar reps
+        x = sym("x", shape=(2, 3), dtype=np.int32)
+        result = np.tile(x, 2)
+        assert isinstance(result, SymbolicArray)
+        assert result.dtype == np.int32
+        assert result.shape == (2, 6)
+
+        # Test 2D array with 1D reps
+        x = sym("x", shape=(2, 3), dtype=np.int32)
+        result = np.tile(x, (2,))
+        assert isinstance(result, SymbolicArray)
+        assert result.dtype == np.int32
+        assert result.shape == (2, 6)
+
+        # Test 2D array with 2D reps
+        x = sym("x", shape=(2, 3), dtype=np.int32)
+        result = np.tile(x, (2, 2))
+        assert isinstance(result, SymbolicArray)
+        assert result.dtype == np.int32
+        assert result.shape == (4, 6)
+
+        # Test with reps=1 (should return a copy)
+        x = sym("x", shape=(2, 3), dtype=np.int32)
+        result = np.tile(x, 1)
+        assert isinstance(result, SymbolicArray)
+        assert result.dtype == np.int32
+        assert result.shape == (2, 3)
+        assert cs.is_equal(result._sym, x._sym, 1)
+
+        # Test with empty reps tuple (should return a copy)
+        x = sym("x", shape=(2, 3), dtype=np.int32)
+        result = np.tile(x, ())
+        assert isinstance(result, SymbolicArray)
+        assert result.dtype == np.int32
+        assert result.shape == (2, 3)
+        assert cs.is_equal(result._sym, x._sym, 1)
+
+        # Test error case: more than 2D tiling
+        x = sym("x", shape=(2, 3), dtype=np.int32)
+        with pytest.raises(ValueError):
+            np.tile(x, (2, 2, 2))
+
     def test_atleast_1d(self):
         # Test 0D array
         x = sym("x", shape=(), dtype=np.int32)

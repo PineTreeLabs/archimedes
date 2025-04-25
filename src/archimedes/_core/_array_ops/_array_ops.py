@@ -97,8 +97,9 @@ class BroadcastOp(SymbolicOp):
 
 
 def _repmat(x, reps):
-    # There is no NumPy function that does this - should be renamed to `tile`.
-    # For now it is only used internally.
+    # There is no NumPy function that does this - for external interfaces
+    # `np.tile` should be used instead.  This is only a helper function
+    # for broadcasting CasADi arrays.
     if isinstance(x, np.ndarray):
         return np.tile(x, reps)
     elif isinstance(x, (cs.SX, cs.MX)):

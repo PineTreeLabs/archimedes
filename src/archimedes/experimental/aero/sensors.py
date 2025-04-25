@@ -24,9 +24,10 @@ __all__ = [
 @struct.pytree_node
 class Accelerometer:
     """Basic three-axis accelerometer model
-    
+
     Currently assumes that the accel is located at the center of mass (CM) of the vehicle.
     """
+
     gravity: GravityModel = struct.field(default_factory=ConstantGravity)
     noise: float = 0.0  # Noise standard deviation [m/s^2]
 
@@ -49,9 +50,10 @@ class Accelerometer:
 @struct.pytree_node
 class Gyroscope:
     """Basic three-axis gyroscope model
-    
+
     Currently assumes that the gyro is located at the center of mass (CM) of the vehicle.
     """
+
     noise: float = 0.0  # Noise standard deviation [rad/s]
 
     def __call__(
@@ -63,10 +65,10 @@ class Gyroscope:
         return x.w_B + self.noise * w
 
 
-
 @struct.pytree_node
 class LineOfSight:
     """Basic line-of-sight sensor model"""
+
     noise: float = 0.0  # Noise standard deviation [rad]
 
     def __call__(
@@ -81,6 +83,5 @@ class LineOfSight:
         r_B = C_BN @ r_N  # Relative position in body-fixed coordinates
         az = np.atan2(r_B[1], r_B[0])  # Azimuth angle
         el = np.arctan2(r_B[2], np.sqrt(r_B[0] ** 2 + r_B[1] ** 2))  # Elevation angle
-    
-        return np.hstack([az, el]) + self.noise * w
 
+        return np.hstack([az, el]) + self.noise * w
