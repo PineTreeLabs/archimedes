@@ -35,7 +35,6 @@ def ekf_correct(h, t, x, z, P, R, args=None):
     return x, P, e
 
 
-
 def ekf_step(f, h, t, x, z, P, Q, R, args=None):
     """Perform one step of the extended Kalman filter
 
