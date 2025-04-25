@@ -1,6 +1,6 @@
-# ruff: noqa: N802
-# ruff: noqa: N803
-# ruff: noqa: N806
+# ruff: noqa: N802, N803, N806
+
+import re
 
 import casadi as cs
 import numpy as np
@@ -131,9 +131,11 @@ class TestSymbolicArrayFunctions:
 
         # Input has more dimensions than broadcast shape
         x = sym("x", shape=(2, 3), dtype=np.int32)
-        with pytest.raises(
-            ValueError, match="input operand has more dimensions than broadcast shape"
-        ):
+        msg = re.escape(
+            "input operand with shape (2, 3) has more dimensions than "
+            "the broadcast shape (3,)"
+        )
+        with pytest.raises(ValueError, match=msg):
             np.broadcast_to(x, (3,))
 
         # Cannot broadcast non-scalar to scalar
