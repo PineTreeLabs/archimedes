@@ -104,12 +104,6 @@ def _repmat(x, reps):
         return np.tile(x, reps)
     elif isinstance(x, (cs.SX, cs.MX)):
         return cs.repmat(x, *reps)
-    elif isinstance(x, SymbolicArray):
-        x_cs = _as_casadi_array(x)
-        x_cs = cs.repmat(x_cs, *reps)
-        # FIXME: The shape inference here seems like it wouldn't work for 1D
-        # arrays.. does NumPy?
-        return SymbolicArray(x_cs, dtype=x.dtype, shape=x_cs.shape)
     else:
         raise NotImplementedError(f"_repmat not implemented for {type(x)}")
 

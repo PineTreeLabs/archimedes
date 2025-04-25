@@ -159,11 +159,11 @@ class RadauFiniteElements(SplineDiscretization):
 
         @arc.compile
         def global_interp(t):
+            scalar_t = t.shape == ()
+
             t = np.atleast_1d(t)
             n = len(t)
             m = xp.shape[1]
-
-            print(t.shape, kt.shape)
 
             # Determine which interval each time point falls into and use
             # the element interpolant
@@ -192,6 +192,9 @@ class RadauFiniteElements(SplineDiscretization):
             elif extrapolation == "zero":
                 out = np.where(low_idx[:, None], 0.0, out)
                 out = np.where(high_idx[:, None], 0.0, out)
+
+            if scalar_t:
+                out = out[0]
 
             return out
 

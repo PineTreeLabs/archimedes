@@ -25,7 +25,6 @@ from ._array_ops import (
     binary_op,
     normalize_axis_index,
     unary_op,
-    _repmat,
 )
 from ._array_ufunc import SUPPORTED_UFUNCS, _dot
 
