@@ -592,7 +592,7 @@ class TestSymbolicArrayFunctions:
         assert result.dtype == np.int32
         assert result.shape == (4, 6)
 
-        # Test with reps=1 (should return a copy)
+        # Test with reps=1
         x = sym("x", shape=(2, 3), dtype=np.int32)
         result = np.tile(x, 1)
         assert isinstance(result, SymbolicArray)
@@ -600,7 +600,7 @@ class TestSymbolicArrayFunctions:
         assert result.shape == (2, 3)
         assert cs.is_equal(result._sym, x._sym, 1)
 
-        # Test with empty reps tuple (should return a copy)
+        # Test with empty reps tuple
         x = sym("x", shape=(2, 3), dtype=np.int32)
         result = np.tile(x, ())
         assert isinstance(result, SymbolicArray)
