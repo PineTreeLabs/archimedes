@@ -174,9 +174,8 @@ class RadauFiniteElements(SplineDiscretization):
                 # This looks inefficient, but ends up being fast once compiled
                 x = x_fns[k](t)
                 if x.ndim == 1:
-                    x = x.reshape(-1, 1)  # Convert (n,) to (n, 1)
+                    x = x[:, None]  # Convert (n,) to (n, 1)
 
-                print(idx.shape, x.shape, out.shape)
                 out = np.where(idx[:, None], x, out)
 
             low_idx = t < τ[0]
