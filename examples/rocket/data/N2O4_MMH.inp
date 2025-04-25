@@ -1,7 +1,0 @@
-#  N2O4-MMH COMBUSTION
-   problem case=N2O4-MMH hp  p(bar)=30,35,40,45,50,55,60, phi=0.9,0.95,1.0,1.05,1.1
-   reac
-     fuel= CH6N2(L)
-     oxid= N2O4(L)
-   end  
-
