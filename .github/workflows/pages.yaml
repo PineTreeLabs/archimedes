@@ -1,0 +1,43 @@
+name: Build and Deploy Docs
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    # Only run deployment on pushes to main, not on PRs
+    permissions:
+      contents: write
+    steps:
+    - uses: actions/checkout@v4
+  
+    - name: Install uv
+      uses: astral-sh/setup-uv@v5
+      with:
+          python-version: 3.12
+
+    - name: Install the project
+      run: |
+        uv sync --all-extras --dev
+        python -m ipykernel install --user --name archimedes
+
+    - name: Build documentation
+      run: |
+        cd docs
+        make nbconvert
+        make html
+    
+    # Only deploy when pushing to main, not on PRs
+    - name: Deploy to GitHub Pages
+      if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+      uses: JamesIves/github-pages-deploy-action@v4
+      with:
+        folder: docs/build/html  # Adjust if your build output is elsewhere
+        branch: gh-pages
+        clean: true  # Automatically remove deleted files from the deploy branch
+        # Add the CNAME file for your custom domain
+        cname: archimedes.sh
