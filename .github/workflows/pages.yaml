@@ -40,4 +40,4 @@ jobs:
         branch: gh-pages
         clean: true  # Automatically remove deleted files from the deploy branch
         # Add the CNAME file for your custom domain
-        cname: archimedes.sh
+        # cname: archimedes.sh
