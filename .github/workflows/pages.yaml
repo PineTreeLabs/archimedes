@@ -36,6 +36,6 @@ jobs:
       if: github.event_name == 'push' && github.ref == 'refs/heads/main'
       uses: JamesIves/github-pages-deploy-action@v4
       with:
-        folder: docs/build
+        folder: docs/build/html
         branch: gh-pages
         clean: true  # Automatically remove deleted files from the deploy branch
