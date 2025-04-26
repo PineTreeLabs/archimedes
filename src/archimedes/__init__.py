@@ -21,8 +21,8 @@ from ._core import (
     zeros,
     zeros_like,
 )
-from ._optimization import implicit, minimize, nlp_solver, qpsol, root
-from ._simulation import integrator, odeint
+from .optimize import implicit, minimize, nlp_solver, qpsol, root
+from .simulate import integrator, odeint
 from .theme import set_theme
 from .tree import struct
 

@@ -4,7 +4,7 @@
 
 import numpy as np
 
-from archimedes._optimization import implicit, root
+from archimedes.optimize import implicit, root
 from archimedes.error import ShapeDtypeError
 
 

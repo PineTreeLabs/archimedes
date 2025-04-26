@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 
 from archimedes._core import SymbolicArray, array, compile, sym
-from archimedes._optimization import minimize
+from archimedes.optimize import minimize
 
 
 class TestMinimize:

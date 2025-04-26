@@ -4,7 +4,7 @@ import numpy as np
 
 from archimedes import scan
 from archimedes._core import FunctionCache
-from archimedes._optimization import implicit
+from archimedes.optimize import implicit
 
 __all__ = ["discretize_rk4", "discretize_radau5"]
 

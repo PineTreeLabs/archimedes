@@ -5,7 +5,7 @@ import numpy as np
 import pytest
 
 from archimedes._core import SymbolicArray, jac, sym
-from archimedes._simulation import integrator, odeint
+from archimedes.simulate import integrator, odeint
 
 RTOL = 1e-10
 ATOL = 1e-12
