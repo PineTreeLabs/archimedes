@@ -2,7 +2,7 @@
 
 This page outlines the development priorities and future direction of Archimedes. As an open-source project, we welcome community input and contributions across any of these areas. In particular, feel free to create or contribute to a thread with the "RFC" (request for comments) tag on the [GitHub Discussions](https://github.com/PineTreeLabs/archimedes/discussions) page with your thoughts on the roadmap.
 
-### ⚠️ WARNING: PRE-RELEASE! ⚠️
+## ⚠️ WARNING: PRE-RELEASE! ⚠️
 
 If you are seeing this, it means that this project has not "officially" been released yet and this documentation page is incomplete.
 Check back soon for more details!

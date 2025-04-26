@@ -152,7 +152,7 @@ uv run pytest --cov=archimedes --cov-report=html
 Check that the notebooks run with
 
 ```bash
-uv run pytest --nbmake docs/source/notebooks/*.ipynb
+uv run pytest --nbmake docs/source/notebooks/**/*.ipynb
 ```
 
 Linting and formatting is done with [ruff](https://docs.astral.sh/ruff/):

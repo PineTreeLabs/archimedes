@@ -10,7 +10,7 @@ In particular, the API is still evolving and may change between minor versions, 
 ## [0.1.0] - 2025-04-26
 
 ### Added
-- Initial public release
+- Initial unofficial "public" release
 - Core functionality:
   - NumPy-compatible symbolic arrays
   - Function compilation with `@arc.compile`
@@ -18,6 +18,7 @@ In particular, the API is still evolving and may change between minor versions, 
   - ODE solvers and integration
   - Optimization and root-finding capabilities
   - PyTree data structures
+  - C code generation
 - Examples for:
   - Basic usage and function compilation
   - ODE integration (Lotka-Volterra, pendulum)
@@ -30,14 +31,4 @@ In particular, the API is still evolving and may change between minor versions, 
   - Conceptual framework explanation
   - "Under the hood" technical details
   - Common pitfalls and gotchas
-
-### Known Limitations
-- API is unstable and may change between minor versions
-- Not all NumPy functions are currently supported
-- [Any specific limitations you want to highlight]
-
-### Future Plans
-- Expanded NumPy function support
-- Improved PyTree integration with ODE solvers
-- C code generation enhancements
-- [Any other roadmap items you want to share]
+  - Extended tutorials for "multirotor dynamics" and "deploying to hardware"

@@ -7,7 +7,7 @@
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
 project = "Archimedes"
-copyright = "2025, Jared Callaham"
+copyright = "2025, Pine Tree Labs, LLC"
 author = "Jared Callaham"
 
 # -- General configuration ---------------------------------------------------
