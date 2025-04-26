@@ -78,8 +78,8 @@ Documentation
    :caption: Development
 
    roadmap
-
    community
+   licensing-model
 
 
 Indices and Tables

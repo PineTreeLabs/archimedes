@@ -193,6 +193,16 @@ We use [REUSE](https://reuse.software/) to track licensing.  By default all file
 uv run reuse lint
 ```
 
+# Licensing
+
+Archimedes is available under a dual-licensing model:
+
+The open-source code is licensed under the [GNU General Public License v3.0](LICENSE).
+For organizations that would like more flexible licensing, commercial licenses are available that permit use in proprietary applications.  Contact [info@archimedes.sh](mailto:info@archimedes.sh) for details.
+
+## Third-Party Components
+Archimedes incorporates code from several open source projects, including JAX (Apache 2.0), Flax (Apache 2.0), and NumPy (NumPy license). See [NOTICE.md](NOTICE.md) for a complete list of attributions, including licenses for key dependencies (CasADi and NumPy).
+
 # Getting involved
 
 We're excited to build a community around Archimedes - here's how you can get involved at this stage:
