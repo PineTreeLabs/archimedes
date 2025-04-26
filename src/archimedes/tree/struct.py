@@ -271,8 +271,8 @@ def pytree_node(cls: T | None = None, **kwargs) -> T | Callable:
     meta_fields = []
     data_fields = []
     for field_info in dataclasses.fields(data_cls):
-        if not field_info.init:
-            continue
+        # if not field_info.init:
+        #     continue
         is_static = field_info.metadata.get("static", False)
         if not is_static:
             data_fields.append(field_info.name)
