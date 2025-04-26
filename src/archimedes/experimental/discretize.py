@@ -6,6 +6,8 @@ from archimedes import scan
 from archimedes._core import FunctionCache
 from archimedes._optimization import implicit
 
+__all__ = ["discretize_rk4", "discretize_radau5"]
+
 # # NOTE: This implementation fails because alpha[i] is not allowed
 # # when i is symbolic.  In theory this would be a better way to do it
 # # because it has fewer "call sites" of the RHS function
@@ -35,7 +37,7 @@ from archimedes._optimization import implicit
 #     return step
 
 
-def _discretize_rk4(f, dt, n_steps=1):
+def discretize_rk4(f, dt, n_steps=1):
     # Take a single RK4 step
     # TODO: Use scan here?
     h = dt / n_steps
@@ -74,7 +76,7 @@ def _discretize_rk4(f, dt, n_steps=1):
     return FunctionCache(step, name=f"rk4_{f.__name__}", arg_names=["t", "x", "p"])
 
 
-def _discretize_radau5(rhs, h, newton_solver="fast_newton"):
+def discretize_radau5(rhs, h, newton_solver="fast_newton"):
     c = np.array([(4 - np.sqrt(6)) / 10, (4 + np.sqrt(6)) / 10, 1])
     b = np.array([(16 - np.sqrt(6)) / 36, (16 + np.sqrt(6)) / 36, 1 / 9])
     a = np.array(

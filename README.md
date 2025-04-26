@@ -25,6 +25,8 @@ By combining the powerful symbolic capabilities of [CasADi](https://web.casadi.o
 This project has not been "officially" released yet, although the source code has been made public as part of pre-release workflow testing.
 Feel free to try out the code, submit bug report, etc., but recognize that the project will be more unstable than usual until the formal release determination is made.
 
+**⚠️ API Stability Notice ⚠️**: Archimedes is currently pre-1.0 software. The API is still evolving and may change between minor versions. We'll aim to document breaking changes in the changelog, but you should expect some instability until version 1.0 is released.
+
 # Examples
 
 ### Automatic differentiation
