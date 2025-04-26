@@ -44,7 +44,7 @@ Here's how you can get involved and support the project at this stage:
 
 - **⭐ Star the Repository**: The simplest way to show support and help others discover the project
 - **🐛 Report Issues**: Detailed bug reports, documentation gaps, and feature requests are invaluable
-- **💬 Join Discussions**: Share your use cases, ask questions, or provide feedback in our [GitHub Discussions](github.com/pinetreelabs/archimedes/discussions)
+- **💬 Join Discussions**: Share your use cases, ask questions, or provide feedback in our [GitHub Discussions](https://github.com/pinetreelabs/archimedes/discussions)
 - **📢 Spread the Word**: Tell colleagues, mention us in relevant forums, or share on social media
 - **📝 Document Use Cases**: Share how you're using (or planning to use) Archimedes
 

@@ -22,6 +22,7 @@ We also discussed the design of a modular and extensible modeling framework, com
 
 With careful development and application of these modeling principles, Archimedes provides a powerful tool for aerospace engineering and beyond. We encourage you to explore Archimedes further:
 
-1. Visit our GitHub repository [link]() to access the full codebase and documentation
-2. Join our community forum [link]() to discuss your projects and get help from other users
-3. Stay tuned for upcoming tutorials on trajectory optimization, parameter estimation, and more
+1. Visit our [GitHub repository](https://github.com/pinetreelabs/archimedes) to access the full codebase
+2. Visit the [website](https://archimedes.sh/docs) site for tutorials and in-depth documentation
+3. Join our [community forum](https://github.com/pinetreelabs/archimedes/discussions) to discuss your projects and get help from other users
+4. Stay tuned for upcoming tutorials on trajectory optimization, parameter estimation, and more
