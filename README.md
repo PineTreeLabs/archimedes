@@ -187,7 +187,11 @@ uv run bandit -r src
 
 ## License annotation
 
-We use [REUSE](https://reuse.software/) to track licensing.
+We use [REUSE](https://reuse.software/) to track licensing.  By default all files tracked by git are licensed under the project license.  To confirm compliance with the REUSE standard, run
+
+```bash
+uv run reuse lint
+```
 
 # Getting involved
 
