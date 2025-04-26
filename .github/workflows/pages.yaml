@@ -30,6 +30,10 @@ jobs:
         cd docs
         make nbconvert
         make html
+
+    - name: Create CNAME file
+      run: |
+        echo "archimedes.sh" > docs/build/html/CNAME
     
     # Only deploy when pushing to main, not on PRs
     - name: Deploy to GitHub Pages
@@ -39,5 +43,3 @@ jobs:
         folder: docs/build/html  # Adjust if your build output is elsewhere
         branch: gh-pages
         clean: true  # Automatically remove deleted files from the deploy branch
-        # Add the CNAME file for your custom domain
-        cname: archimedes.sh
