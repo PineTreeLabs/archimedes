@@ -79,6 +79,8 @@ Documentation
 
    roadmap
 
+   community
+
 
 Indices and Tables
 -------------------

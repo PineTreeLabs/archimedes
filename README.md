@@ -18,6 +18,10 @@ By combining the powerful symbolic capabilities of [CasADi](https://web.casadi.o
 * JAX-style function transformations
 * PyTorch-style hierarchical data structures for parameters and dynamics modeling
 
+### WARNING: PRE-RELEASE!
+
+This project has not been "officially" released yet, although the source code has been made public as part of pre-release workflow testing.
+Feel free to try out the code, submit bug report, etc., but recognize that the project will be more unstable than usual until the formal release determination is made.
 
 # Examples
 
@@ -228,3 +232,14 @@ uv run bandit -r src
 # Current status
 
 Archimedes is still in active development, and the API is subject to change.  We are actively seeking feedback from users to help shape the direction of the project.  Key planned directions include hardware support (e.g. HIL testing) and extending physics modeling capabilities.  Please don't hesitate to reach out to us if you have any questions or feedback.
+
+### Contributing
+
+We're excited to build a community around this project, but at this early stage bandwidth is very constrained.
+
+- **We welcome issue reports** for bugs, documentation improvements, and feature requests
+- **We are not currently accepting pull requests** as we establish the project's foundation and processes
+- **We encourage discussions** in our GitHub Discussions area for questions, use cases, and general feedback
+
+That said, if you're using (or are interested in using) Archimedes, we definitely want to hear from you.
+The Discussions area is a great place to share what you'd like to use Archimedes for, what's keeping you from using it, or anything you've already built with it.
