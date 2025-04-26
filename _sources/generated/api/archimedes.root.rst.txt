@@ -1,0 +1,10 @@
+﻿
+
+archimedes.root
+===============
+
+.. currentmodule:: archimedes
+
+
+
+.. autofunction:: archimedes.root

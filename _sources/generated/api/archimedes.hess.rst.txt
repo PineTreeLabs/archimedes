@@ -1,0 +1,10 @@
+﻿
+
+archimedes.hess
+===============
+
+.. currentmodule:: archimedes
+
+
+
+.. autofunction:: archimedes.hess

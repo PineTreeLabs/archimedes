@@ -1,0 +1,22 @@
+archimedes.tree.struct.Callable
+===============================
+
+.. currentmodule:: archimedes.tree.struct
+
+.. autoclass:: Callable
+
+   
+   .. automethod:: __init__
+
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+   
+      ~Callable.__init__
+   
+   
+
+   
+   
+   

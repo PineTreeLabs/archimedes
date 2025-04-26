@@ -1,0 +1,6 @@
+archimedes.tree.reduce
+======================
+
+.. currentmodule:: archimedes.tree
+
+.. autofunction:: reduce

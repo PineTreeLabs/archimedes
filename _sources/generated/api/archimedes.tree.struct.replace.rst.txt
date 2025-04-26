@@ -1,0 +1,6 @@
+archimedes.tree.struct.replace
+==============================
+
+.. currentmodule:: archimedes.tree.struct
+
+.. autofunction:: replace

@@ -1,0 +1,36 @@
+﻿archimedes.tree
+===============
+
+.. automodule:: archimedes.tree
+
+   
+   
+   
+
+   
+   
+   .. rubric:: Functions
+
+   .. autosummary::
+      :toctree:
+   
+      all
+      flatten
+      leaves
+      map
+      ravel
+      reduce
+      register_dataclass
+      register_pytree_node
+      structure
+      unflatten
+   
+   
+
+   
+   
+   
+
+   
+   
+   

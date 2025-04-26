@@ -1,0 +1,43 @@
+﻿archimedes.tree.struct
+======================
+
+.. automodule:: archimedes.tree.struct
+
+   
+   
+   
+
+   
+   
+   .. rubric:: Functions
+
+   .. autosummary::
+      :toctree:
+   
+      dataclass_transform
+      field
+      fields
+      is_pytree_node
+      pytree_node
+      register_dataclass
+      replace
+   
+   
+
+   
+   
+   .. rubric:: Classes
+
+   .. autosummary::
+      :toctree:
+   
+      Any
+      Callable
+      InitVar
+      TypeVar
+   
+   
+
+   
+   
+   

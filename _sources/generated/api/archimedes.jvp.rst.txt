@@ -1,0 +1,10 @@
+﻿
+
+archimedes.jvp
+==============
+
+.. currentmodule:: archimedes
+
+
+
+.. autofunction:: archimedes.jvp

@@ -1,0 +1,10 @@
+﻿
+
+archimedes.array
+================
+
+.. currentmodule:: archimedes
+
+
+
+.. autofunction:: archimedes.array

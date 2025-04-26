@@ -1,0 +1,10 @@
+﻿
+
+archimedes.sym
+==============
+
+.. currentmodule:: archimedes
+
+
+
+.. autofunction:: archimedes.sym

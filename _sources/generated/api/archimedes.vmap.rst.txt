@@ -1,0 +1,10 @@
+﻿
+
+archimedes.vmap
+===============
+
+.. currentmodule:: archimedes
+
+
+
+.. autofunction:: archimedes.vmap

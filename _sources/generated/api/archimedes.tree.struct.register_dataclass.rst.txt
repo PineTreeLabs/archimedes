@@ -1,0 +1,6 @@
+archimedes.tree.struct.register\_dataclass
+==========================================
+
+.. currentmodule:: archimedes.tree.struct
+
+.. autofunction:: register_dataclass

@@ -1,0 +1,6 @@
+archimedes.tree.struct.dataclass\_transform
+===========================================
+
+.. currentmodule:: archimedes.tree.struct
+
+.. autofunction:: dataclass_transform

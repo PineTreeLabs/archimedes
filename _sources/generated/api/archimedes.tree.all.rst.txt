@@ -1,0 +1,6 @@
+archimedes.tree.all
+===================
+
+.. currentmodule:: archimedes.tree
+
+.. autofunction:: all

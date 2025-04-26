@@ -1,0 +1,6 @@
+archimedes.tree.ravel
+=====================
+
+.. currentmodule:: archimedes.tree
+
+.. autofunction:: ravel

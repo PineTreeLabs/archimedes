@@ -1,0 +1,22 @@
+archimedes.tree.struct.Any
+==========================
+
+.. currentmodule:: archimedes.tree.struct
+
+.. autoclass:: Any
+
+   
+   .. automethod:: __init__
+
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+   
+      ~Any.__init__
+   
+   
+
+   
+   
+   

@@ -1,0 +1,10 @@
+﻿
+
+archimedes.interpolant
+======================
+
+.. currentmodule:: archimedes
+
+
+
+.. autofunction:: archimedes.interpolant

@@ -1,0 +1,28 @@
+archimedes.tree.struct.InitVar
+==============================
+
+.. currentmodule:: archimedes.tree.struct
+
+.. autoclass:: InitVar
+
+   
+   .. automethod:: __init__
+
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+   
+      ~InitVar.__init__
+   
+   
+
+   
+   
+   .. rubric:: Attributes
+
+   .. autosummary::
+   
+      ~InitVar.type
+   
+   

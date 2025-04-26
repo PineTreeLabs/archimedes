@@ -1,0 +1,6 @@
+archimedes.tree.flatten
+=======================
+
+.. currentmodule:: archimedes.tree
+
+.. autofunction:: flatten

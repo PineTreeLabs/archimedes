@@ -1,0 +1,10 @@
+﻿
+
+archimedes.ones\_like
+=====================
+
+.. currentmodule:: archimedes
+
+
+
+.. autofunction:: archimedes.ones_like

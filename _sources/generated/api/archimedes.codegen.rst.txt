@@ -1,0 +1,10 @@
+﻿
+
+archimedes.codegen
+==================
+
+.. currentmodule:: archimedes
+
+
+
+.. autofunction:: archimedes.codegen

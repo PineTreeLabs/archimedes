@@ -1,0 +1,10 @@
+﻿
+
+archimedes.integrator
+=====================
+
+.. currentmodule:: archimedes
+
+
+
+.. autofunction:: archimedes.integrator

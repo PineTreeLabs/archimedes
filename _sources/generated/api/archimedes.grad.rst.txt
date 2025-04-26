@@ -1,0 +1,10 @@
+﻿
+
+archimedes.grad
+===============
+
+.. currentmodule:: archimedes
+
+
+
+.. autofunction:: archimedes.grad

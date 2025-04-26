@@ -1,0 +1,6 @@
+archimedes.tree.struct.pytree\_node
+===================================
+
+.. currentmodule:: archimedes.tree.struct
+
+.. autofunction:: pytree_node

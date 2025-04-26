@@ -1,0 +1,6 @@
+archimedes.tree.struct.field
+============================
+
+.. currentmodule:: archimedes.tree.struct
+
+.. autofunction:: field

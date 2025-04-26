@@ -1,0 +1,10 @@
+﻿
+
+archimedes.nlp\_solver
+======================
+
+.. currentmodule:: archimedes
+
+
+
+.. autofunction:: archimedes.nlp_solver

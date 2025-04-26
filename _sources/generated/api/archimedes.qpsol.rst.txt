@@ -1,0 +1,10 @@
+﻿
+
+archimedes.qpsol
+================
+
+.. currentmodule:: archimedes
+
+
+
+.. autofunction:: archimedes.qpsol

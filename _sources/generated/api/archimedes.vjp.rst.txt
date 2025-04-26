@@ -1,0 +1,10 @@
+﻿
+
+archimedes.vjp
+==============
+
+.. currentmodule:: archimedes
+
+
+
+.. autofunction:: archimedes.vjp

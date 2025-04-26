@@ -1,0 +1,10 @@
+﻿
+
+archimedes.odeint
+=================
+
+.. currentmodule:: archimedes
+
+
+
+.. autofunction:: archimedes.odeint

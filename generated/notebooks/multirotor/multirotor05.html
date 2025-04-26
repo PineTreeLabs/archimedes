@@ -1,0 +1,968 @@
+<!doctype html>
+<html class="no-js" lang="en" data-content_root="../../../">
+  <head><meta charset="utf-8"/>
+    <meta name="viewport" content="width=device-width,initial-scale=1"/>
+    <meta name="color-scheme" content="light dark"><meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="author" title="About these documents" href="../../../about.html" /><link rel="index" title="Index" href="../../../genindex.html" /><link rel="search" title="Search" href="../../../search.html" /><link rel="next" title="Conclusion" href="../../../notebooks/multirotor/multirotor06.html" /><link rel="prev" title="Part 4: Model analysis" href="multirotor04.html" />
+
+    <link rel="shortcut icon" href="../../../_static/favicon.ico"/><!-- Generated with Sphinx 8.2.3 and Furo 2024.08.06 -->
+        <title>Part 5: Revisiting the rotor model (optional) - Archimedes documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=8f2a1f02" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/styles/furo.css?v=354aac6f" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/styles/furo-extensions.css?v=302659d7" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/custom.css?v=c2950814" />
+    
+    
+
+
+<style>
+  body {
+    --color-code-background: #f8f8f8;
+  --color-code-foreground: black;
+  --color-brand-primary: #D35400;
+  --color-brand-content: #C0392B;
+  --color-admonition-background: rgba(211, 84, 0, 0.1);
+  --color-background-primary: #F5F5F5;
+  --color-background-secondary: #EEEEEE;
+  --color-foreground-primary: #2A2A2A;
+  --color-foreground-secondary: #5D4037;
+  --color-link: #C0392B;
+  --color-link-hover: #D35400;
+  
+  }
+  @media not print {
+    body[data-theme="dark"] {
+      --color-code-background: #202020;
+  --color-code-foreground: #d0d0d0;
+  --color-brand-primary: #F1C40F;
+  --color-brand-content: #D35400;
+  --color-admonition-background: rgba(241, 196, 15, 0.1);
+  --color-background-primary: #2A2A2A;
+  --color-background-secondary: #1A1A1A;
+  --color-foreground-primary: #F5F5F5;
+  --color-foreground-secondary: #DDDDDD;
+  --color-link: #D35400;
+  --color-link-hover: #F1C40F;
+  
+    }
+    @media (prefers-color-scheme: dark) {
+      body:not([data-theme="light"]) {
+        --color-code-background: #202020;
+  --color-code-foreground: #d0d0d0;
+  --color-brand-primary: #F1C40F;
+  --color-brand-content: #D35400;
+  --color-admonition-background: rgba(241, 196, 15, 0.1);
+  --color-background-primary: #2A2A2A;
+  --color-background-secondary: #1A1A1A;
+  --color-foreground-primary: #F5F5F5;
+  --color-foreground-secondary: #DDDDDD;
+  --color-link: #D35400;
+  --color-link-hover: #F1C40F;
+  
+      }
+    }
+  }
+</style></head>
+  <body>
+    
+    <script>
+      document.body.dataset.theme = localStorage.getItem("theme") || "auto";
+    </script>
+    
+
+<svg xmlns="http://www.w3.org/2000/svg" style="display: none;">
+  <symbol id="svg-toc" viewBox="0 0 24 24">
+    <title>Contents</title>
+    <svg stroke="currentColor" fill="currentColor" stroke-width="0" viewBox="0 0 1024 1024">
+      <path d="M408 442h480c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8H408c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8zm-8 204c0 4.4 3.6 8 8 8h480c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8H408c-4.4 0-8 3.6-8 8v56zm504-486H120c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h784c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zm0 632H120c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h784c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zM115.4 518.9L271.7 642c5.8 4.6 14.4.5 14.4-6.9V388.9c0-7.4-8.5-11.5-14.4-6.9L115.4 505.1a8.74 8.74 0 0 0 0 13.8z"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-menu" viewBox="0 0 24 24">
+    <title>Menu</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather-menu">
+      <line x1="3" y1="12" x2="21" y2="12"></line>
+      <line x1="3" y1="6" x2="21" y2="6"></line>
+      <line x1="3" y1="18" x2="21" y2="18"></line>
+    </svg>
+  </symbol>
+  <symbol id="svg-arrow-right" viewBox="0 0 24 24">
+    <title>Expand</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather-chevron-right">
+      <polyline points="9 18 15 12 9 6"></polyline>
+    </svg>
+  </symbol>
+  <symbol id="svg-sun" viewBox="0 0 24 24">
+    <title>Light mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="feather-sun">
+      <circle cx="12" cy="12" r="5"></circle>
+      <line x1="12" y1="1" x2="12" y2="3"></line>
+      <line x1="12" y1="21" x2="12" y2="23"></line>
+      <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+      <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+      <line x1="1" y1="12" x2="3" y2="12"></line>
+      <line x1="21" y1="12" x2="23" y2="12"></line>
+      <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+      <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+    </svg>
+  </symbol>
+  <symbol id="svg-moon" viewBox="0 0 24 24">
+    <title>Dark mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-moon">
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <path d="M12 3c.132 0 .263 0 .393 0a7.5 7.5 0 0 0 7.92 12.446a9 9 0 1 1 -8.313 -12.454z" />
+    </svg>
+  </symbol>
+  <symbol id="svg-sun-with-moon" viewBox="0 0 24 24">
+    <title>Auto light/dark, in light mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round"
+      class="icon-custom-derived-from-feather-sun-and-tabler-moon">
+      <path style="opacity: 50%" d="M 5.411 14.504 C 5.471 14.504 5.532 14.504 5.591 14.504 C 3.639 16.319 4.383 19.569 6.931 20.352 C 7.693 20.586 8.512 20.551 9.25 20.252 C 8.023 23.207 4.056 23.725 2.11 21.184 C 0.166 18.642 1.702 14.949 4.874 14.536 C 5.051 14.512 5.231 14.5 5.411 14.5 L 5.411 14.504 Z"/>
+      <line x1="14.5" y1="3.25" x2="14.5" y2="1.25"/>
+      <line x1="14.5" y1="15.85" x2="14.5" y2="17.85"/>
+      <line x1="10.044" y1="5.094" x2="8.63" y2="3.68"/>
+      <line x1="19" y1="14.05" x2="20.414" y2="15.464"/>
+      <line x1="8.2" y1="9.55" x2="6.2" y2="9.55"/>
+      <line x1="20.8" y1="9.55" x2="22.8" y2="9.55"/>
+      <line x1="10.044" y1="14.006" x2="8.63" y2="15.42"/>
+      <line x1="19" y1="5.05" x2="20.414" y2="3.636"/>
+      <circle cx="14.5" cy="9.55" r="3.6"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-moon-with-sun" viewBox="0 0 24 24">
+    <title>Auto light/dark, in dark mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round"
+      class="icon-custom-derived-from-feather-sun-and-tabler-moon">
+      <path d="M 8.282 7.007 C 8.385 7.007 8.494 7.007 8.595 7.007 C 5.18 10.184 6.481 15.869 10.942 17.24 C 12.275 17.648 13.706 17.589 15 17.066 C 12.851 22.236 5.91 23.143 2.505 18.696 C -0.897 14.249 1.791 7.786 7.342 7.063 C 7.652 7.021 7.965 7 8.282 7 L 8.282 7.007 Z"/>
+      <line style="opacity: 50%" x1="18" y1="3.705" x2="18" y2="2.5"/>
+      <line style="opacity: 50%" x1="18" y1="11.295" x2="18" y2="12.5"/>
+      <line style="opacity: 50%" x1="15.316" y1="4.816" x2="14.464" y2="3.964"/>
+      <line style="opacity: 50%" x1="20.711" y1="10.212" x2="21.563" y2="11.063"/>
+      <line style="opacity: 50%" x1="14.205" y1="7.5" x2="13.001" y2="7.5"/>
+      <line style="opacity: 50%" x1="21.795" y1="7.5" x2="23" y2="7.5"/>
+      <line style="opacity: 50%" x1="15.316" y1="10.184" x2="14.464" y2="11.036"/>
+      <line style="opacity: 50%" x1="20.711" y1="4.789" x2="21.563" y2="3.937"/>
+      <circle style="opacity: 50%" cx="18" cy="7.5" r="2.169"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-pencil" viewBox="0 0 24 24">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-pencil-code">
+      <path d="M4 20h4l10.5 -10.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4" />
+      <path d="M13.5 6.5l4 4" />
+      <path d="M20 21l2 -2l-2 -2" />
+      <path d="M17 17l-2 2l2 2" />
+    </svg>
+  </symbol>
+  <symbol id="svg-eye" viewBox="0 0 24 24">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-eye-code">
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <path d="M10 12a2 2 0 1 0 4 0a2 2 0 0 0 -4 0" />
+      <path
+        d="M11.11 17.958c-3.209 -.307 -5.91 -2.293 -8.11 -5.958c2.4 -4 5.4 -6 9 -6c3.6 0 6.6 2 9 6c-.21 .352 -.427 .688 -.647 1.008" />
+      <path d="M20 21l2 -2l-2 -2" />
+      <path d="M17 17l-2 2l2 2" />
+    </svg>
+  </symbol>
+</svg>
+
+<input type="checkbox" class="sidebar-toggle" name="__navigation" id="__navigation">
+<input type="checkbox" class="sidebar-toggle" name="__toc" id="__toc">
+<label class="overlay sidebar-overlay" for="__navigation">
+  <div class="visually-hidden">Hide navigation sidebar</div>
+</label>
+<label class="overlay toc-overlay" for="__toc">
+  <div class="visually-hidden">Hide table of contents sidebar</div>
+</label>
+
+<a class="skip-to-content muted-link" href="#furo-main-content">Skip to content</a>
+
+
+
+<div class="page">
+  <header class="mobile-header">
+    <div class="header-left">
+      <label class="nav-overlay-icon" for="__navigation">
+        <div class="visually-hidden">Toggle site navigation sidebar</div>
+        <i class="icon"><svg><use href="#svg-menu"></use></svg></i>
+      </label>
+    </div>
+    <div class="header-center">
+      <a href="../../../index.html"><div class="brand">Archimedes  documentation</div></a>
+    </div>
+    <div class="header-right">
+      <div class="theme-toggle-container theme-toggle-header">
+        <button class="theme-toggle">
+          <div class="visually-hidden">Toggle Light / Dark / Auto color theme</div>
+          <svg class="theme-icon-when-auto-light"><use href="#svg-sun-with-moon"></use></svg>
+          <svg class="theme-icon-when-auto-dark"><use href="#svg-moon-with-sun"></use></svg>
+          <svg class="theme-icon-when-dark"><use href="#svg-moon"></use></svg>
+          <svg class="theme-icon-when-light"><use href="#svg-sun"></use></svg>
+        </button>
+      </div>
+      <label class="toc-overlay-icon toc-header-icon" for="__toc">
+        <div class="visually-hidden">Toggle table of contents sidebar</div>
+        <i class="icon"><svg><use href="#svg-toc"></use></svg></i>
+      </label>
+    </div>
+  </header>
+  <aside class="sidebar-drawer">
+    <div class="sidebar-container">
+      
+      <div class="sidebar-sticky"><a class="sidebar-brand" href="../../../index.html">
+    <div class="sidebar-brand-container">
+      <img class="sidebar-logo" src="../../../_static/logo.png" alt="Logo"/>
+      <div class="sidebar-brand-text">Archimedes</div>
+    </div>
+  </a><form class="sidebar-search-container" method="get" action="../../../search.html" role="search">
+  <input class="sidebar-search" placeholder="Search" name="q" aria-label="Search">
+  <input type="hidden" name="check_keywords" value="yes">
+  <input type="hidden" name="area" value="default">
+</form>
+<div id="searchbox"></div><div class="sidebar-scroll"><div class="sidebar-tree">
+  <p class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../about.html">What is Archimedes?</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../getting-started.html">Getting Started</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Core Concepts</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../under-the-hood.html">Under the Hood</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../pytrees.html">Working with PyTrees</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../control-flow.html">Structured Control Flow</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../modular-design.html">Hierarchical Design Patterns</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Examples</span></p>
+<ul class="current">
+<li class="toctree-l1 current has-children"><a class="reference internal" href="../../../notebooks/multirotor/multirotor00.html">Multirotor Dynamics</a><input checked="" class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" role="switch" type="checkbox"/><label for="toctree-checkbox-1"><div class="visually-hidden">Toggle navigation of Multirotor Dynamics</div><i class="icon"><svg><use href="#svg-arrow-right"></use></svg></i></label><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../../../notebooks/multirotor/multirotor01.html">Part 1: Fundamentals of multirotor dynamics</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../notebooks/multirotor/multirotor02.html">Part 2: Implementation in Archimedes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="multirotor03.html">Part 3: Running the model</a></li>
+<li class="toctree-l2"><a class="reference internal" href="multirotor04.html">Part 4: Model analysis</a></li>
+<li class="toctree-l2 current current-page"><a class="current reference internal" href="#">Part 5: Revisiting the rotor model (optional)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../notebooks/multirotor/multirotor06.html">Conclusion</a></li>
+</ul>
+</li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../../notebooks/deployment/deployment00.html">Deploying to Hardware</a><input class="toctree-checkbox" id="toctree-checkbox-2" name="toctree-checkbox-2" role="switch" type="checkbox"/><label for="toctree-checkbox-2"><div class="visually-hidden">Toggle navigation of Deploying to Hardware</div><i class="icon"><svg><use href="#svg-arrow-right"></use></svg></i></label><ul>
+<li class="toctree-l2"><a class="reference internal" href="../deployment/deployment01.html">Generating C code</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../deployment/deployment02.html">Generating driver code</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../deployment/deployment03.html">Platform-specific deployment templates</a></li>
+</ul>
+</li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../gotchas.html">🔪 Quirks and Gotchas</a></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../../reference/index.html">📚 API Reference</a><input class="toctree-checkbox" id="toctree-checkbox-3" name="toctree-checkbox-3" role="switch" type="checkbox"/><label for="toctree-checkbox-3"><div class="visually-hidden">Toggle navigation of 📚 API Reference</div><i class="icon"><svg><use href="#svg-arrow-right"></use></svg></i></label><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../api/archimedes.codegen.html">archimedes.codegen</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../api/archimedes.array.html">archimedes.array</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../api/archimedes.sym.html">archimedes.sym</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../api/archimedes.sym_like.html">archimedes.sym_like</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../api/archimedes.zeros.html">archimedes.zeros</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../api/archimedes.ones.html">archimedes.ones</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../api/archimedes.zeros_like.html">archimedes.zeros_like</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../api/archimedes.ones_like.html">archimedes.ones_like</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../api/archimedes.eye.html">archimedes.eye</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../api/archimedes.scan.html">archimedes.scan</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../api/archimedes.switch.html">archimedes.switch</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../api/archimedes.vmap.html">archimedes.vmap</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../api/archimedes.compile.html">archimedes.compile</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../api/archimedes.callback.html">archimedes.callback</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../api/archimedes.grad.html">archimedes.grad</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../api/archimedes.jac.html">archimedes.jac</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../api/archimedes.hess.html">archimedes.hess</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../api/archimedes.jvp.html">archimedes.jvp</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../api/archimedes.vjp.html">archimedes.vjp</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../api/archimedes.interpolant.html">archimedes.interpolant</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../api/archimedes.integrator.html">archimedes.integrator</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../api/archimedes.odeint.html">archimedes.odeint</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../api/archimedes.nlp_solver.html">archimedes.nlp_solver</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../api/archimedes.minimize.html">archimedes.minimize</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../api/archimedes.implicit.html">archimedes.implicit</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../api/archimedes.root.html">archimedes.root</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../api/archimedes.qpsol.html">archimedes.qpsol</a></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../api/archimedes.tree.html">archimedes.tree</a><input class="toctree-checkbox" id="toctree-checkbox-4" name="toctree-checkbox-4" role="switch" type="checkbox"/><label for="toctree-checkbox-4"><div class="visually-hidden">Toggle navigation of archimedes.tree</div><i class="icon"><svg><use href="#svg-arrow-right"></use></svg></i></label><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../api/archimedes.tree.all.html">archimedes.tree.all</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../api/archimedes.tree.flatten.html">archimedes.tree.flatten</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../api/archimedes.tree.leaves.html">archimedes.tree.leaves</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../api/archimedes.tree.map.html">archimedes.tree.map</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../api/archimedes.tree.ravel.html">archimedes.tree.ravel</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../api/archimedes.tree.reduce.html">archimedes.tree.reduce</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../api/archimedes.tree.register_dataclass.html">archimedes.tree.register_dataclass</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../api/archimedes.tree.register_pytree_node.html">archimedes.tree.register_pytree_node</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../api/archimedes.tree.structure.html">archimedes.tree.structure</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../api/archimedes.tree.unflatten.html">archimedes.tree.unflatten</a></li>
+</ul>
+</li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../api/archimedes.tree.struct.html">archimedes.tree.struct</a><input class="toctree-checkbox" id="toctree-checkbox-5" name="toctree-checkbox-5" role="switch" type="checkbox"/><label for="toctree-checkbox-5"><div class="visually-hidden">Toggle navigation of archimedes.tree.struct</div><i class="icon"><svg><use href="#svg-arrow-right"></use></svg></i></label><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../api/archimedes.tree.struct.dataclass_transform.html">archimedes.tree.struct.dataclass_transform</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../api/archimedes.tree.struct.field.html">archimedes.tree.struct.field</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../api/archimedes.tree.struct.fields.html">archimedes.tree.struct.fields</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../api/archimedes.tree.struct.is_pytree_node.html">archimedes.tree.struct.is_pytree_node</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../api/archimedes.tree.struct.pytree_node.html">archimedes.tree.struct.pytree_node</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../api/archimedes.tree.struct.register_dataclass.html">archimedes.tree.struct.register_dataclass</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../api/archimedes.tree.struct.replace.html">archimedes.tree.struct.replace</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../api/archimedes.tree.struct.Any.html">archimedes.tree.struct.Any</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../api/archimedes.tree.struct.Callable.html">archimedes.tree.struct.Callable</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../api/archimedes.tree.struct.InitVar.html">archimedes.tree.struct.InitVar</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../api/archimedes.tree.struct.TypeVar.html">archimedes.tree.struct.TypeVar</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Development</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../roadmap.html">Development Roadmap</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../community.html">Community</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../licensing-model.html">Licensing model</a></li>
+</ul>
+
+</div>
+</div>
+
+      </div>
+      
+    </div>
+  </aside>
+  <div class="main">
+    <div class="content">
+      <div class="article-container">
+        <a href="#" class="back-to-top muted-link">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+            <path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8v12z"></path>
+          </svg>
+          <span>Back to top</span>
+        </a>
+        <div class="content-icon-container">
+          <div class="view-this-page">
+  <a class="muted-link" href="../../../_sources/generated/notebooks/multirotor/multirotor05.md.txt" title="View this page">
+    <svg><use href="#svg-eye"></use></svg>
+    <span class="visually-hidden">View this page</span>
+  </a>
+</div>
+<div class="theme-toggle-container theme-toggle-content">
+            <button class="theme-toggle">
+              <div class="visually-hidden">Toggle Light / Dark / Auto color theme</div>
+              <svg class="theme-icon-when-auto-light"><use href="#svg-sun-with-moon"></use></svg>
+              <svg class="theme-icon-when-auto-dark"><use href="#svg-moon-with-sun"></use></svg>
+              <svg class="theme-icon-when-dark"><use href="#svg-moon"></use></svg>
+              <svg class="theme-icon-when-light"><use href="#svg-sun"></use></svg>
+            </button>
+          </div>
+          <label class="toc-overlay-icon toc-content-icon" for="__toc">
+            <div class="visually-hidden">Toggle table of contents sidebar</div>
+            <i class="icon"><svg><use href="#svg-toc"></use></svg></i>
+          </label>
+        </div>
+        <article role="main" id="furo-main-content">
+          <section class="tex2jax_ignore mathjax_ignore" id="part-5-revisiting-the-rotor-model-optional">
+<h1>Part 5: Revisiting the rotor model (optional)<a class="headerlink" href="#part-5-revisiting-the-rotor-model-optional" title="Link to this heading">¶</a></h1>
+<p>In this section we will extend and improve the rotor aerodynamics model, at this point likely the least accurate part of our multirotor model.
+We will use the widely used blade element momentum theory (BEMT), in which we approximate the forces and moments as the integrals of contributions from 2D airfoil slices.
+The new rotor aerodynamics model can be implemented in the same framework we have been using up to this point, enabling us to re-use all of our existing code and create highly configurable vehicle models.</p>
+<p>A key step of the BEMT solver is the determination of an inflow parameter that is consistent with both the integrated 2D airfoil contributions and an overall momentum balance.
+Typically this is accomplished with nested iterative solves, but we will see how the implicit function capabilities of Archimedes can make the implementation both simpler and more efficient.</p>
+<section id="blade-element-theory">
+<h2>Blade element theory<a class="headerlink" href="#blade-element-theory" title="Link to this heading">¶</a></h2>
+<p>So far we have been using the quadratic model</p>
+<div class="math-wrapper docutils container">
+<div class="math notranslate nohighlight">
+\[\begin{split}
+\begin{align*}
+\mathbf{F}_{H_j}^j &amp;= -k_F \Omega_j^2 \hat{\mathbf{z}} \\
+\mathbf{M}_{H_j}^j &amp;= k_M \Omega_j^2 \hat{\mathbf{z}},
+\end{align*}
+\end{split}\]</div>
+</div>
+<p>where <span class="math notranslate nohighlight">\(\hat{\mathbf{z}}\)</span> is a unit vector along the hub-frame <span class="math notranslate nohighlight">\(z\)</span>-axis and <span class="math notranslate nohighlight">\(H_j\)</span> is the hub reference frame for the <span class="math notranslate nohighlight">\(j\)</span>-th rotor.
+The problem with this model is that it does not account for the actual airflow across the rotor in any way.
+For instance, if the vehicle is moving forward, the rotor can experience a significantly increased airflow on the advancing side and reduced airflow on the retreating side, which can have a pronounced effect on the generated forces and moments.</p>
+<p>The basic idea of blade element theory is to consider a thin “slice” of the blade with infinitesimal thickness <span class="math notranslate nohighlight">\(dr\)</span> as a 2D airfoil and calculate its contribution to the net force and moment produced by the rotor.
+To facilitate this, we must introduce two new reference frames related to the rotor hub frame <span class="math notranslate nohighlight">\(H\)</span>.
+We will drop the subscript <span class="math notranslate nohighlight">\(j\)</span> since we are focusing on a single rotor for now; the <code class="docutils literal notranslate"><span class="pre">MultiRotorVehicle</span></code> class will still take care of summing the contributions from each of the rotors.</p>
+<p>The new first reference frame is the “wind frame” W, defined so that the <span class="math notranslate nohighlight">\(x-y\)</span> plane is still coincident with the rotor plane, but the incoming airflow is in the <span class="math notranslate nohighlight">\(x-z\)</span> plane.
+Specifically, if we ignore any true “wind” and assume the ambient air is still in the inertial reference frame, then the relative motion of the air with respect to the hub frame is the negative of the body-frame velocity, rotated into the hub frame:</p>
+<div class="math-wrapper docutils container">
+<div class="math notranslate nohighlight">
+\[
+\mathbf{w}_H = - ~^H\!\mathbf{C}^B \mathbf{v}_B.
+\]</div>
+</div>
+<p>Then the incident wind angle with respect to the hub-frame <span class="math notranslate nohighlight">\(x\)</span>-axis is</p>
+<div class="math-wrapper docutils container">
+<div class="math notranslate nohighlight">
+\[
+\psi_w = \tan^{-1}(w_H^y / w_H^x)
+\]</div>
+</div>
+<p>and the (time-varying) rotation matrix from the hub frame to the wind frame <span class="math notranslate nohighlight">\(~^W\!\mathbf{C}^H\)</span> is defined by a right-handed rotation of <span class="math notranslate nohighlight">\(\psi_w\)</span> about the hub-frame <span class="math notranslate nohighlight">\(z\)</span>-axis:</p>
+<div class="math-wrapper docutils container">
+<div class="math notranslate nohighlight">
+\[\begin{split}
+~^W\!\mathbf{C}^H =
+\begin{bmatrix}
+\cos \psi_w &amp; \sin \psi_w &amp; 0 \\
+-\sin \psi_w &amp; \cos \psi_w &amp; 0 \\
+0 &amp; 0 &amp; 1
+\end{bmatrix}
+\end{split}\]</div>
+</div>
+<p>The final reference frame we will need is the “blade” frame.  If a single rotor blade is at azimuthal location <span class="math notranslate nohighlight">\(\psi\)</span> (defined with respect to the negative wind-frame <span class="math notranslate nohighlight">\(x\)</span>-axis) and we consider a cross-sectional slice of the blade at radial location <span class="math notranslate nohighlight">\(r\)</span>, we can attach a reference frame <span class="math notranslate nohighlight">\(b\)</span> at the point <span class="math notranslate nohighlight">\((r, \psi)\)</span>, defined so that the <span class="math notranslate nohighlight">\(x\)</span>-axis is oriented opposite to the rotation of the blade and the <span class="math notranslate nohighlight">\(z\)</span>-axis is opposite to the wind-frame <span class="math notranslate nohighlight">\(z\)</span>-axis (i.e. up).
+The new reference frames are illustrated in the following figure:</p>
+<img alt="../../../_images/frames2.png" class="only-light" src="../../../_images/frames2.png" />
+<img alt="../../../_images/frames2_dark.png" class="only-dark" src="../../../_images/frames2_dark.png" />
+<p>In summary, to consider a single rotor blade we have five reference frames to contend with:</p>
+<ol class="arabic simple">
+<li><p>The Newtonian or inertial frame <span class="math notranslate nohighlight">\(N\)</span></p></li>
+<li><p>The body-fixed frame <span class="math notranslate nohighlight">\(B\)</span>, offset and oriented with respect to <span class="math notranslate nohighlight">\(N\)</span> according to the state variables <span class="math notranslate nohighlight">\(\mathbf{p}_N\)</span> and <span class="math notranslate nohighlight">\(\mathbf{\Phi}\)</span>.</p></li>
+<li><p>The rotor hub frame <span class="math notranslate nohighlight">\(H\)</span>, offset and canted with respect to <span class="math notranslate nohighlight">\(B\)</span> by fixed geometric parameters</p></li>
+<li><p>The wind frame <span class="math notranslate nohighlight">\(W\)</span>, defined by a time-varying rotation about the hub-frame <span class="math notranslate nohighlight">\(z\)</span>-axis by <span class="math notranslate nohighlight">\(\psi_w\)</span></p></li>
+<li><p>The blade frame <span class="math notranslate nohighlight">\(b\)</span>, defined relative to the wind frame according to the polar coordinates <span class="math notranslate nohighlight">\((r, \psi)\)</span>.</p></li>
+</ol>
+<p>With these frames defined, we can calculate infinitesimal contributions to lift, drag, and moment due to the 2D airfoil section at <span class="math notranslate nohighlight">\((r, \psi)\)</span> in the blade frame.
+In general the dimensionless sectional aerodynamic coefficients <span class="math notranslate nohighlight">\(C_L\)</span>, <span class="math notranslate nohighlight">\(C_D\)</span>, and <span class="math notranslate nohighlight">\(C_M\)</span> are taken to be functions of angle of attack <span class="math notranslate nohighlight">\(\alpha\)</span>, Reynolds number, and Mach number, although the dependence on Reynolds and Mach number is often treated with empirical corrections or neglected.
+The aerodynamic coefficients can be looked up in tabulated experimental or CFD data, or approximated with an analytic form like thin airfoil theory.</p>
+<p>The angle of attack is a function of both the fixed blade pitch <span class="math notranslate nohighlight">\(\theta_b\)</span>, which typically varies along the span of the blade and the “inflow angle” <span class="math notranslate nohighlight">\(\gamma\)</span>, corresponding to the “flight path angle” used in fixed-wing flight dynamics.
+The inflow angle is the inclination with respect to the blade-frame <span class="math notranslate nohighlight">\(x\)</span>-axis of the blade-relative airflow <span class="math notranslate nohighlight">\(\mathbf{u}_b\)</span>, which is <em>not the same</em> as the blade-frame wind vector <span class="math notranslate nohighlight">\(\mathbf{w}_b\)</span>.
+If the instantaneous rotor angular velocity is <span class="math notranslate nohighlight">\(\Omega\)</span>, the blade-relative airflow is calculated as follows:</p>
+<div class="math-wrapper docutils container">
+<div class="math notranslate nohighlight">
+\[\begin{split}
+\begin{align*}
+u_b^x &amp;= w_b^x \sin \psi - r \omega_b^z + \Omega r \\
+u_b^z &amp;= -w_b^z  + r \omega_b^y - \lambda \Omega R,
+\end{align*}
+\end{split}\]</div>
+</div>
+<p>where <span class="math notranslate nohighlight">\(\mathbf{\omega}_b\)</span> is the blade-frame angular velocity of the vehicle and <span class="math notranslate nohighlight">\(\lambda\)</span> is a dimensionless “inflow ratio” that accounts for the induced vertical velocity required by conservation of momentum when the rotor is producing thrust.
+Generally <span class="math notranslate nohighlight">\(\lambda\)</span> will depend on the translational and angular velocity of the vehicle, the location <span class="math notranslate nohighlight">\((r, \psi)\)</span> of the blade element, and the instantaneous state of the wake if this is taken into account.
+The determination of <span class="math notranslate nohighlight">\(\lambda\)</span> is the most difficult aspect of blade element theory; we will return to this shortly.</p>
+<p>Once the blade-relative airflow is computed, the inflow angle is given by</p>
+<div class="math-wrapper docutils container">
+<div class="math notranslate nohighlight">
+\[
+\gamma = \tan^{-1} (-u_b^z/u_b^x)
+\]</div>
+</div>
+<p>and the angle of attack is simply</p>
+<div class="math-wrapper docutils container">
+<div class="math notranslate nohighlight">
+\[
+\alpha = \theta_b(r) - \gamma.
+\]</div>
+</div>
+<p>This value is then used in conjunction with the local Reynolds and Mach numbers to determine the lift, drag, and moment coefficients <span class="math notranslate nohighlight">\(C_L\)</span>, <span class="math notranslate nohighlight">\(C_D\)</span>, and <span class="math notranslate nohighlight">\(C_M\)</span>.
+The infinitesimal contributions to lift, drag, and moment from this 2D blade section with are</p>
+<div class="math-wrapper docutils container">
+<div class="math notranslate nohighlight">
+\[\begin{split}
+\begin{align*}
+dL &amp;= \frac{1}{2} \rho c U_\infty^2 C_L ~ dr \\
+dD &amp;= \frac{1}{2} \rho c U_\infty^2 C_D ~ dr \\
+dM &amp;= \frac{1}{2} \rho c^2 U_\infty^2 C_M,
+\end{align*}
+\end{split}\]</div>
+</div>
+<p>where <span class="math notranslate nohighlight">\(U_\infty^2 = ||\mathbf{u}_b||^2\)</span> is the freestream velocity, <span class="math notranslate nohighlight">\(\rho\)</span> is the air density, and <span class="math notranslate nohighlight">\(c\)</span> is the local blade chord (which may also vary as a function of radial location <span class="math notranslate nohighlight">\(r\)</span>).</p>
+<p>By definition, the drag is in the direction of the inflow <span class="math notranslate nohighlight">\(\mathbf{u}_b\)</span> and the lift is perpendicular to it.
+These must be rotated about the blade-frame <span class="math notranslate nohighlight">\(y\)</span>-axis by the inflow angle <span class="math notranslate nohighlight">\(\gamma\)</span> to retrieve the infinitesimal blade-frame forces:</p>
+<div class="math-wrapper docutils container">
+<div class="math notranslate nohighlight">
+\[\begin{split}
+d\mathbf{F}_b
+=
+\begin{bmatrix}
+\cos \gamma &amp; 0 &amp; -\sin \gamma\\
+0 &amp; 1 &amp; 0 \\
+\sin \gamma &amp; 0 &amp; \cos \gamma
+\end{bmatrix}
+\begin{bmatrix}
+dL \\ 0 \\ dD
+\end{bmatrix}.
+\end{split}\]</div>
+</div>
+<p>Here the “blade frame” is no longer well-defined since we have removed the radial position, so this force should be taken as located at the blade root with orientation still consistent with the azimuthal coordinate <span class="math notranslate nohighlight">\(\psi\)</span>.
+The net force and moment due to a rotor blade at azimuthal location <span class="math notranslate nohighlight">\(\psi\)</span> can then be calculated by integrating over the blade span:</p>
+<div class="math-wrapper docutils container">
+<div class="math notranslate nohighlight">
+\[\begin{split}
+\begin{align*}
+\mathbf{F}_b(\psi) &amp;= \int d\mathbf{F}_b \\
+\mathbf{M}_b(\psi) &amp;= \int \hat{\mathbf{y}} dM + \int r\hat{\mathbf{y}} \times d\mathbf{F}_b.
+\end{align*}
+\end{split}\]</div>
+</div>
+<p>These forces can be rotated into consistent wind frame forces and moments <span class="math notranslate nohighlight">\(\mathbf{F}_W(\psi)\)</span> and <span class="math notranslate nohighlight">\(\mathbf{M}_W(\psi)\)</span> with the rotation matrix <span class="math notranslate nohighlight">\(~^W\!\mathbf{C}^b\)</span>, which is constant along the blade span.</p>
+<p>Finally, since the rotors are typically spinning much faster than any relevant vehicle dynamics, it is common to average these forces over one rotation of the rotor blade, and scale the result by the number of rotor blades <span class="math notranslate nohighlight">\(N_b\)</span>:</p>
+<div class="math-wrapper docutils container">
+<div class="math notranslate nohighlight">
+\[\begin{split}
+\begin{align*}
+\overline{\mathbf{F}}_W(\psi) &amp;= \frac{N_b}{2 \pi} \int_0^{2\pi} \mathbf{F}_W(\psi) ~ d \psi \\
+\overline{\mathbf{M}}_W(\psi) &amp;= \frac{N_b}{2 \pi} \int_0^{2\pi} \mathbf{M}_W(\psi) ~ d \psi.
+\end{align*}
+\end{split}\]</div>
+</div>
+<p>If the rotor is spinning clockwise, then the same analysis applies but the sign is reversed on <span class="math notranslate nohighlight">\(\overline{F}_W^y\)</span>, <span class="math notranslate nohighlight">\(\overline{M}_W^x\)</span>, and <span class="math notranslate nohighlight">\(\overline{M}_W^z\)</span>.</p>
+<p>Numerically, these integrals can be evaluated with Gaussian quadrature; the radial and azimuthal nodes are determined ahead of time and the infinitesimal forces can be evaluated at each <span class="math notranslate nohighlight">\((r, \psi)\)</span> node location, then summed with the quadrature weights to approximate the integral.</p>
+</section>
+<section id="uniform-inflow-approximation-momentum-theory">
+<h2>Uniform inflow approximation: momentum theory<a class="headerlink" href="#uniform-inflow-approximation-momentum-theory" title="Link to this heading">¶</a></h2>
+<p>We now return to the final ingredient in the blade element theory: the inflow ratio <span class="math notranslate nohighlight">\(\lambda\)</span>.
+While there are a number of models to choose from that treat the wake with varying degrees of fidelity, perhaps the simplest is momentum theory.
+The basic premise of momentum theory is Newton’s third law: every action has an equal and opposite reaction.
+More precisely for present purposes, if the rotor is imparting thrust (a change in momentum over time) to the vehicle, the momentum of the surrounding air must also be increased by the same amount.</p>
+<p>The basic approximation of momentum theory is that the inflow ratio <span class="math notranslate nohighlight">\(\lambda\)</span> is constant across the rotor disk.
+In the case of steady hover or forward flight a basic momentum balance calculation can be carried out (see for instance the reference text by Leishman) for any value of <span class="math notranslate nohighlight">\(\lambda\)</span> to determine a corresponding thrust coefficient <span class="math notranslate nohighlight">\(C_T^\mathrm{mom}\)</span>.
+Defining <span class="math notranslate nohighlight">\(\mu_x = w_W^x / \Omega R\)</span> and <span class="math notranslate nohighlight">\(\mu_z = w_W^z / \Omega R\)</span> as the relative velocities nondimensionalized by tip speed <span class="math notranslate nohighlight">\(\Omega R\)</span>, momentum balance predicts a thrust coefficient</p>
+<div class="math-wrapper docutils container">
+<div class="math notranslate nohighlight">
+\[
+C_T^\mathrm{mom}(\lambda) = 2(\lambda - \mu_z) \sqrt{\mu_x^2 - \lambda^2}.
+\]</div>
+</div>
+<p>On the other hand, for the same value of <span class="math notranslate nohighlight">\(\lambda\)</span> the blade element method independently determines a value of the thrust coefficient by nondimensionalizing the predicted <span class="math notranslate nohighlight">\(z\)</span>-component of wind-frame force:</p>
+<div class="math-wrapper docutils container">
+<div class="math notranslate nohighlight">
+\[
+\overline{F}_W^z(\lambda) = \rho A \left(\Omega R\right)^2 C_T^\mathrm{bem},
+\]</div>
+</div>
+<p>where <span class="math notranslate nohighlight">\(A = \pi R^2\)</span> is the rotor disk area.</p>
+<p>If we require that <span class="math notranslate nohighlight">\(\lambda\)</span> must have a value such that <span class="math notranslate nohighlight">\(C_T^\mathrm{mom}\)</span> and <span class="math notranslate nohighlight">\(C_T^\mathrm{bem}\)</span> are consistent for the instantaneous velocity (i.e. assuming the vehicle were to be in steady level flight at that velocity), this gives us two equations in two unknowns.  In other words, by requiring that <span class="math notranslate nohighlight">\(C_T^\mathrm{mom} = C_T^\mathrm{bem}\)</span>, we have a single equation that implicitly defines <span class="math notranslate nohighlight">\(\lambda\)</span>:</p>
+<div class="math-wrapper docutils container">
+<div class="math notranslate nohighlight">
+\[
+2(\lambda - \mu_z) \sqrt{\mu_x^2 - \lambda^2} = \frac{\overline{F}_W^z(\lambda)}{\rho \pi \Omega^2 R^4}.
+\]</div>
+</div>
+<p>Specifically, given the vehicle state <span class="math notranslate nohighlight">\(\mathbf{x}\)</span> and the rotor velocity <span class="math notranslate nohighlight">\(\Omega\)</span>, we can define a “residual” function that should be zero when the value of <span class="math notranslate nohighlight">\(\lambda\)</span> is consistent with both the blade element method and momentum balance:</p>
+<div class="math-wrapper docutils container">
+<div class="math notranslate nohighlight">
+\[
+F(\lambda, \mathbf{x}, \Omega) = C_T^\mathrm{mom} - C_T^\mathrm{bem} = 0.
+\]</div>
+</div>
+<p>This can be viewed as an implicit function <span class="math notranslate nohighlight">\(\lambda = f(\mathbf{x}, \Omega)\)</span>, where we cannot write a closed-form expression for <span class="math notranslate nohighlight">\(f\)</span>.
+In principle, a single root solve using for instance the Newton-Raphson method could be used to find the zero of the function <span class="math notranslate nohighlight">\(F\)</span> for given <span class="math notranslate nohighlight">\(\mathbf{x}\)</span> and <span class="math notranslate nohighlight">\(\Omega\)</span>, thereby determining <span class="math notranslate nohighlight">\(\lambda\)</span>.
+However, this would require being able to efficiently compute the Jacobians <span class="math notranslate nohighlight">\(\partial F/ \partial \lambda\)</span>, <span class="math notranslate nohighlight">\(\partial F / \partial \mathbf{x}\)</span>, and <span class="math notranslate nohighlight">\(\partial F / \partial \Omega\)</span>, which requires differentiating through both the momentum balance equation (which is straightforward) and the blade element thrust calculation (which is not).</p>
+<p>As a result, in practice an appropriate value of <span class="math notranslate nohighlight">\(\lambda\)</span> is typically determined with nested iterative solvers.
+First, for a candidate value of the thrust coefficient <span class="math notranslate nohighlight">\(C_T^\mathrm{mom}\)</span> and the current values of <span class="math notranslate nohighlight">\(\mu_x\)</span> and <span class="math notranslate nohighlight">\(\mu_z\)</span>, the Newton-Raphson method is used to solve for the corresponding value <span class="math notranslate nohighlight">\(\lambda\)</span> required by momentum balance.
+This value of <span class="math notranslate nohighlight">\(\lambda\)</span> is then used for the thrust calculation in the blade element method, which in general will result in a <em>different</em> value of the thrust coefficient, i.e. <span class="math notranslate nohighlight">\(C_T^\mathrm{bem} \neq C_T^\mathrm{mom}\)</span>.
+Some combination of the new and old values of the thrust coefficient are then used for the next iteration of the Newton-Raphson solver.</p>
+<p>Archimedes can significantly simplify this process with its implicit function capabilities, which combine automatic differentiation with root solving to easily and efficiently solve this kind of equation.
+If we have a function like <span class="math notranslate nohighlight">\(F(x, z) = 0\)</span> which we want to use as an implicit function <span class="math notranslate nohighlight">\(x = f(z)\)</span> without writing <span class="math notranslate nohighlight">\(f\)</span>, in Archimedes we can simply do the following:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">F</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">z</span><span class="p">):</span>
+    <span class="c1"># ... compute and return residual</span>
+    
+<span class="n">f</span> <span class="o">=</span> <span class="n">arc</span><span class="o">.</span><span class="n">implicit</span><span class="p">(</span><span class="n">F</span><span class="p">)</span>
+<span class="n">x</span> <span class="o">=</span> <span class="n">f</span><span class="p">(</span><span class="n">z</span><span class="p">)</span>  <span class="c1"># Find x such that F(x, z) = 0</span>
+</pre></div>
+</div>
+<p>The <code class="docutils literal notranslate"><span class="pre">implicit</span></code> function creates and returns a new function with the first argument removed (in this case <code class="docutils literal notranslate"><span class="pre">x</span></code>).
+Under the hood, this function calls a Newton solver and uses CasADi’s powerful automatic differentiation capabilities to evaluate the required Jacobians.</p>
+<p>For the induced inflow ratio calculation, the implementation will look something like the following, where <code class="docutils literal notranslate"><span class="pre">v_W</span></code> is the wind-frame vehicle translational velocity <span class="math notranslate nohighlight">\(\mathbf{v}_W\)</span> and <code class="docutils literal notranslate"><span class="pre">w_W</span></code> is the wind-frame vehicle angular velocity <span class="math notranslate nohighlight">\(\mathbf{\omega}_W\)</span>:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">CT_residual</span><span class="p">(</span><span class="n">lambda_</span><span class="p">,</span> <span class="n">v_W</span><span class="p">,</span> <span class="n">w_W</span><span class="p">,</span> <span class="n">Omega</span><span class="p">):</span>
+    <span class="n">mu_x</span> <span class="o">=</span> <span class="o">-</span><span class="n">v_W</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">/</span> <span class="p">(</span><span class="n">Omega</span> <span class="o">*</span> <span class="n">R</span><span class="p">)</span>
+    <span class="n">mu_z</span> <span class="o">=</span> <span class="o">-</span><span class="n">v_W</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span> <span class="o">/</span> <span class="p">(</span><span class="n">Omega</span> <span class="o">*</span> <span class="n">R</span><span class="p">)</span>
+    <span class="n">CT_mom</span> <span class="o">=</span> <span class="mi">2</span> <span class="o">*</span> <span class="p">(</span><span class="n">lambda_</span> <span class="o">-</span> <span class="n">mu_z</span><span class="p">)</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">mu_x</span> <span class="o">**</span> <span class="mi">2</span> <span class="o">+</span> <span class="n">lambda_</span> <span class="o">**</span> <span class="mi">2</span><span class="p">)</span>
+    <span class="n">CT_bem</span> <span class="o">=</span> <span class="n">calc_thrust</span><span class="p">(</span><span class="n">v_W</span><span class="p">,</span> <span class="n">w_W</span><span class="p">,</span> <span class="n">Omega</span><span class="p">,</span> <span class="n">lambda_</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">CT_mom</span> <span class="o">-</span> <span class="n">CT_bem</span>
+
+<span class="n">inflow_ratio</span> <span class="o">=</span> <span class="n">arc</span><span class="o">.</span><span class="n">implicit</span><span class="p">(</span><span class="n">CT_residual</span><span class="p">)</span>
+<span class="n">lambda_</span> <span class="o">=</span> <span class="n">inflow_ratio</span><span class="p">(</span><span class="n">v_W</span><span class="p">,</span> <span class="n">w_W</span><span class="p">,</span> <span class="n">Omega</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>This value of <span class="math notranslate nohighlight">\(\lambda\)</span> is then used for the full blade-element calculation; the combination of this uniform inflow based on momentum balance with the blade-element method is called blade element momentum theory (BEMT).
+If used with proper airfoil data it can be a fairly accurate approximation for steady flight, although the assumptions required by the momentum theory become fairly limiting for more aggressive maneuvers.</p>
+</section>
+<section id="implementation">
+<h2>Implementation<a class="headerlink" href="#implementation" title="Link to this heading">¶</a></h2>
+<p>The blade element model fits neatly into the class structure we’ve already defined above, as a new implementation of the <code class="docutils literal notranslate"><span class="pre">RotorModel</span></code> interface.
+We just need to implement the <code class="docutils literal notranslate"><span class="pre">wind_frame_loads</span></code> method, which computes the wind-frame loads <span class="math notranslate nohighlight">\(\mathbf{F}_W\)</span> and <span class="math notranslate nohighlight">\(\mathbf{M}_W\)</span> given the wind-frame vehicle translational and angular velocities <span class="math notranslate nohighlight">\(\mathbf{v}_W\)</span> and <span class="math notranslate nohighlight">\(\mathbf{\omega}_W\)</span>, rotor speed <span class="math notranslate nohighlight">\(\Omega\)</span>, and the <code class="docutils literal notranslate"><span class="pre">RotorGeometry</span></code> struct.
+The actual implementation of this class is relatively involved, though it closely follows the preceding math; see the source code in <code class="docutils literal notranslate"><span class="pre">multirotor.py</span></code> for details.
+Although the <code class="docutils literal notranslate"><span class="pre">BladeElementModel</span></code> implements the BEMT method described above, it is also written to be extensible for variable inflow ratio models or “dynamic inflow” models that have auxiliary state variables.</p>
+<p>One new addition to the classes in our framework is an <code class="docutils literal notranslate"><span class="pre">AirfoilModel</span></code> used to compute the aerodynamic coefficients <span class="math notranslate nohighlight">\(C_L\)</span>, <span class="math notranslate nohighlight">\(C_D\)</span>, <span class="math notranslate nohighlight">\(C_M\)</span> for a 2D “blade element” as a function of angle of attack, Reynolds number, and freestream Mach number:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">class</span><span class="w"> </span><span class="nc">AirfoilModel</span><span class="p">(</span><span class="n">metaclass</span><span class="o">=</span><span class="n">abc</span><span class="o">.</span><span class="n">ABCMeta</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Model for aerodynamics of a 2D subsonic airfoil section.&quot;&quot;&quot;</span>
+
+    <span class="n">compressibility_model</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span>
+
+    <span class="nd">@abc</span><span class="o">.</span><span class="n">abstractmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">alpha</span><span class="p">,</span> <span class="n">Re</span><span class="p">,</span> <span class="n">M_inf</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns lift, drag, and moment coefficients for the given angle of attack</span>
+<span class="sd">        </span>
+<span class="sd">        Args:</span>
+<span class="sd">            alpha: angle of attack [rad]</span>
+<span class="sd">            Re: Reynolds number</span>
+<span class="sd">            M_inf: freestream Mach number</span>
+<span class="sd">        </span>
+<span class="sd">        Returns:</span>
+<span class="sd">            Cl: lift coefficient</span>
+<span class="sd">            Cd: drag coefficient</span>
+<span class="sd">            Cm: quarter-chord moment coefficient</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+</pre></div>
+</div>
+<p>As with gravity, vehicle drag, and the rotor aerodynamics, creating a well-defined interface allows us to create very different models that are compatible with the rest of the framework.
+For instance, the tutorial module <code class="docutils literal notranslate"><span class="pre">multirotor.py</span></code> contains a simple <code class="docutils literal notranslate"><span class="pre">ThinAirfoil</span></code> class that will compute coefficients consistent with ideal-fluid aerodynamics solutions for thin airfoils with small angle of attack.
+It also implements a <code class="docutils literal notranslate"><span class="pre">TabulatedAirfoil</span></code> class which uses lookup tables to estimate the aerodynamic coefficients based on experimental or CFD data.
+As a more computationally intensive example, a vortex panel code similar to XFOIL could also be implemented in the same interface and used in conjunction with automatic differentiation for design optimization.</p>
+<img alt="../../../_images/class_hierarchy2.png" class="only-light" src="../../../_images/class_hierarchy2.png" />
+<img alt="../../../_images/class_hierarchy2_dark.png" class="only-dark" src="../../../_images/class_hierarchy2_dark.png" />
+</section>
+<section id="running-the-blade-element-model">
+<h2>Running the blade element model<a class="headerlink" href="#running-the-blade-element-model" title="Link to this heading">¶</a></h2>
+<p>Because the BEMT rotor model simply extends the existing framework, we can create the model just as we did with the quadratic rotor model except with the additional initialization required for the BEMT model.</p>
+<p>This example uses the <code class="docutils literal notranslate"><span class="pre">TabulatedAirfoil</span></code> model with lookup tables derived from the open-source CFD code <a class="reference external" href="https://su2code.github.io/">SU2</a> using the NACA 0012 profile.
+As a word of caution, typical rotor blades have significant camber, so this data is likely not representative of any particular rotor blade aerodynamics.
+It should be used for illustrative purposes only.</p>
+<p>Using the NACA 0012 data, we will initialize the blade element model using a linearly twisted blade from <span class="math notranslate nohighlight">\(20^\circ\)</span> at the root to <span class="math notranslate nohighlight">\(10^\circ\)</span> at the tip.  The chord length also varies linearly from 30 mm at the root to 10 mm at the tip.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># ruff: noqa: N802, N803, N806, N815, N816</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">control</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">matplotlib.pyplot</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">plt</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">multirotor</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">archimedes</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">arc</span>
+
+<span class="n">THEME</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;ARCHIMEDES_THEME&quot;</span><span class="p">,</span> <span class="s2">&quot;dark&quot;</span><span class="p">)</span>
+<span class="n">arc</span><span class="o">.</span><span class="n">theme</span><span class="o">.</span><span class="n">set_theme</span><span class="p">(</span><span class="n">THEME</span><span class="p">)</span>
+
+<span class="n">np</span><span class="o">.</span><span class="n">set_printoptions</span><span class="p">(</span><span class="n">precision</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span> <span class="n">suppress</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+</pre></div>
+</div>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Inertia matrix of a cylinder with mass m, radius r, and height h</span>
+<span class="n">m</span> <span class="o">=</span> <span class="mf">2.0</span>
+<span class="n">g0</span> <span class="o">=</span> <span class="mf">9.81</span>
+<span class="n">R</span> <span class="o">=</span> <span class="mf">0.15</span>  <span class="c1"># Rotor radius (also boom length)</span>
+<span class="n">H</span> <span class="o">=</span> <span class="mf">0.15</span>  <span class="c1"># Body height</span>
+<span class="n">J_B</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span>
+    <span class="p">[</span>
+        <span class="p">[</span><span class="n">m</span> <span class="o">/</span> <span class="mi">12</span> <span class="o">*</span> <span class="p">(</span><span class="mi">3</span> <span class="o">*</span> <span class="n">R</span><span class="o">**</span><span class="mi">2</span> <span class="o">+</span> <span class="n">H</span><span class="o">**</span><span class="mi">2</span><span class="p">),</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">],</span>
+        <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="n">m</span> <span class="o">/</span> <span class="mi">12</span> <span class="o">*</span> <span class="p">(</span><span class="mi">3</span> <span class="o">*</span> <span class="n">R</span><span class="o">**</span><span class="mi">2</span> <span class="o">+</span> <span class="n">H</span><span class="o">**</span><span class="mi">2</span><span class="p">),</span> <span class="mi">0</span><span class="p">],</span>
+        <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="n">m</span> <span class="o">/</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">R</span><span class="o">**</span><span class="mi">2</span><span class="p">],</span>
+    <span class="p">]</span>
+<span class="p">)</span>
+<span class="n">L</span> <span class="o">=</span> <span class="mf">0.30</span>  <span class="c1"># Rotor arm length</span>
+
+<span class="c1"># Four rotors mounted at 45, 135, 225, and 315 degrees</span>
+<span class="c1"># No canting and alternating spin directions</span>
+<span class="n">rotors</span> <span class="o">=</span> <span class="p">[]</span>
+<span class="n">theta</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">pi</span> <span class="o">/</span> <span class="mi">4</span>
+<span class="n">ccw</span> <span class="o">=</span> <span class="kc">True</span>
+<span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">4</span><span class="p">):</span>
+    <span class="n">rotors</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+        <span class="n">multirotor</span><span class="o">.</span><span class="n">RotorGeometry</span><span class="p">(</span>
+            <span class="n">offset</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">L</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">cos</span><span class="p">(</span><span class="n">theta</span><span class="p">),</span> <span class="n">L</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="n">theta</span><span class="p">),</span> <span class="mi">0</span><span class="p">]),</span>
+            <span class="n">ccw</span><span class="o">=</span><span class="n">ccw</span><span class="p">,</span>
+        <span class="p">)</span>
+    <span class="p">)</span>
+    <span class="n">theta</span> <span class="o">+=</span> <span class="n">np</span><span class="o">.</span><span class="n">pi</span> <span class="o">/</span> <span class="mi">2</span>
+    <span class="n">ccw</span> <span class="o">=</span> <span class="ow">not</span> <span class="n">ccw</span>
+
+<span class="n">drag_model</span> <span class="o">=</span> <span class="n">multirotor</span><span class="o">.</span><span class="n">QuadraticDragModel</span><span class="p">(</span>
+    <span class="n">rho</span><span class="o">=</span><span class="mf">1.225</span><span class="p">,</span>
+    <span class="n">Cd</span><span class="o">=</span><span class="mf">1.6</span><span class="p">,</span>
+    <span class="n">A</span><span class="o">=</span><span class="n">R</span> <span class="o">*</span> <span class="n">H</span><span class="p">,</span>
+<span class="p">)</span>
+
+<span class="n">gravity_model</span> <span class="o">=</span> <span class="n">multirotor</span><span class="o">.</span><span class="n">ConstantGravity</span><span class="p">(</span><span class="n">g0</span><span class="o">=</span><span class="n">g0</span><span class="p">)</span>
+
+<span class="n">c0</span> <span class="o">=</span> <span class="mf">0.03</span>  <span class="c1"># Root chord</span>
+<span class="n">th0</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">deg2rad</span><span class="p">(</span><span class="mf">20.0</span><span class="p">)</span>  <span class="c1"># Root pitch</span>
+<span class="n">ct</span> <span class="o">=</span> <span class="mf">0.01</span>  <span class="c1"># Tip chord</span>
+<span class="n">tht</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">deg2rad</span><span class="p">(</span><span class="o">-</span><span class="mf">10.0</span><span class="p">)</span>  <span class="c1"># Twist per unit length</span>
+<span class="n">e</span> <span class="o">=</span> <span class="mf">0.1</span>  <span class="c1"># Root cut-out ratio</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">chord</span><span class="p">(</span><span class="n">r_</span><span class="p">):</span>
+    <span class="n">r_bar</span> <span class="o">=</span> <span class="n">r_</span> <span class="o">/</span> <span class="n">R</span>
+    <span class="k">return</span> <span class="p">(</span><span class="n">c0</span> <span class="o">*</span> <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="n">r_bar</span><span class="p">)</span> <span class="o">+</span> <span class="n">ct</span> <span class="o">*</span> <span class="p">(</span><span class="n">r_bar</span> <span class="o">-</span> <span class="n">e</span><span class="p">))</span> <span class="o">/</span> <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="n">e</span><span class="p">)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">pitch</span><span class="p">(</span><span class="n">r_</span><span class="p">):</span>
+    <span class="n">r_bar</span> <span class="o">=</span> <span class="n">r_</span> <span class="o">/</span> <span class="n">R</span>
+    <span class="k">return</span> <span class="n">th0</span> <span class="o">+</span> <span class="n">tht</span> <span class="o">*</span> <span class="p">(</span><span class="n">r_bar</span> <span class="o">-</span> <span class="n">e</span><span class="p">)</span> <span class="o">/</span> <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="n">e</span><span class="p">)</span>
+
+
+<span class="n">airfoil_model</span> <span class="o">=</span> <span class="n">multirotor</span><span class="o">.</span><span class="n">TabulatedAirfoil</span><span class="p">(</span>
+    <span class="n">airfoil_data</span><span class="o">=</span><span class="p">[</span><span class="n">multirotor</span><span class="o">.</span><span class="n">NACA_0012</span><span class="p">,</span> <span class="n">multirotor</span><span class="o">.</span><span class="n">NACA_0012</span><span class="p">],</span>
+    <span class="n">rad_loc</span><span class="o">=</span><span class="p">[</span><span class="n">e</span> <span class="o">*</span> <span class="n">R</span><span class="p">,</span> <span class="n">R</span><span class="p">],</span>
+<span class="p">)</span>
+
+<span class="n">T0</span> <span class="o">=</span> <span class="n">m</span> <span class="o">*</span> <span class="n">g0</span> <span class="o">/</span> <span class="nb">len</span><span class="p">(</span><span class="n">rotors</span><span class="p">)</span>  <span class="c1"># Initial guess for trim thrust</span>
+<span class="n">rotor_model</span> <span class="o">=</span> <span class="n">multirotor</span><span class="o">.</span><span class="n">BladeElementModel</span><span class="p">(</span>
+    <span class="n">R</span><span class="o">=</span><span class="n">R</span><span class="p">,</span>
+    <span class="n">e</span><span class="o">=</span><span class="n">e</span><span class="p">,</span>
+    <span class="n">T0</span><span class="o">=</span><span class="n">T0</span><span class="p">,</span>
+    <span class="n">airfoil_model</span><span class="o">=</span><span class="n">airfoil_model</span><span class="p">,</span>
+    <span class="n">chord</span><span class="o">=</span><span class="n">chord</span><span class="p">,</span>
+    <span class="n">blade_pitch</span><span class="o">=</span><span class="n">pitch</span><span class="p">,</span>
+<span class="p">)</span>
+
+<span class="n">vehicle</span> <span class="o">=</span> <span class="n">multirotor</span><span class="o">.</span><span class="n">MultiRotorVehicle</span><span class="p">(</span>
+    <span class="n">m</span><span class="o">=</span><span class="n">m</span><span class="p">,</span>
+    <span class="n">J_B</span><span class="o">=</span><span class="n">J_B</span><span class="p">,</span>
+    <span class="n">rotors</span><span class="o">=</span><span class="n">rotors</span><span class="p">,</span>
+    <span class="n">drag_model</span><span class="o">=</span><span class="n">drag_model</span><span class="p">,</span>
+    <span class="n">rotor_model</span><span class="o">=</span><span class="n">rotor_model</span><span class="p">,</span>
+    <span class="n">gravity_model</span><span class="o">=</span><span class="n">gravity_model</span><span class="p">,</span>
+    <span class="n">attitude</span><span class="o">=</span><span class="s2">&quot;euler&quot;</span><span class="p">,</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+<p>As before, we will use a constant angular velocity close to hover.
+The only difference now has to do with the use of the lookup tables.
+The symbolic interpolant used behind the scenes by CasADi is not compatible with the default scalar (“SX”) symbolic type and requires the matrix (“MX”) symbolic type.
+Hence, we have to explicitly create an “MX” symbolic function before calling the <code class="docutils literal notranslate"><span class="pre">odeint</span></code> function:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">u0</span> <span class="o">=</span> <span class="mf">500.0</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="mi">4</span><span class="p">)</span>  <span class="c1"># Rotor angular velocity (rad/s)</span>
+
+<span class="n">t0</span> <span class="o">=</span> <span class="mf">0.0</span>
+<span class="n">t1</span> <span class="o">=</span> <span class="mf">20.0</span>
+
+
+<span class="c1"># Initial state for simulation</span>
+<span class="n">x0</span> <span class="o">=</span> <span class="n">vehicle</span><span class="o">.</span><span class="n">State</span><span class="p">(</span>
+    <span class="n">p_N</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="mi">3</span><span class="p">),</span>  <span class="c1"># Initial position [m]</span>
+    <span class="n">att</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="mi">3</span><span class="p">),</span>  <span class="c1"># Initial roll-pitch-yaw [rad]</span>
+    <span class="n">v_B</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="mi">3</span><span class="p">),</span>  <span class="c1"># Initial velocity [m/s]</span>
+    <span class="n">w_B</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="mi">3</span><span class="p">),</span>  <span class="c1"># Initial angular velocity [rad/s]</span>
+<span class="p">)</span>
+<span class="n">x0_flat</span><span class="p">,</span> <span class="n">unravel</span> <span class="o">=</span> <span class="n">arc</span><span class="o">.</span><span class="n">tree</span><span class="o">.</span><span class="n">ravel</span><span class="p">(</span><span class="n">x0</span><span class="p">)</span>
+
+<span class="c1"># vmap_unravel will convert a flat solution (x, t) to a vehicle.State</span>
+<span class="n">vmap_unravel</span> <span class="o">=</span> <span class="n">arc</span><span class="o">.</span><span class="n">vmap</span><span class="p">(</span><span class="n">unravel</span><span class="p">,</span> <span class="n">in_axes</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">out_axes</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+
+
+<span class="c1"># Wrap the vehicle dynamics model in a function with</span>
+<span class="c1"># the signature `xdot = f(t, x)`</span>
+<span class="nd">@arc</span><span class="o">.</span><span class="n">compile</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">f</span><span class="p">(</span><span class="n">t</span><span class="p">,</span> <span class="n">x_flat</span><span class="p">):</span>
+    <span class="n">x</span> <span class="o">=</span> <span class="n">unravel</span><span class="p">(</span><span class="n">x_flat</span><span class="p">)</span>
+    <span class="n">x_t</span> <span class="o">=</span> <span class="n">vehicle</span><span class="o">.</span><span class="n">dynamics</span><span class="p">(</span><span class="n">t</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">u0</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">arc</span><span class="o">.</span><span class="n">tree</span><span class="o">.</span><span class="n">ravel</span><span class="p">(</span><span class="n">x_t</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>  <span class="c1"># Return only the flattened state</span>
+
+
+<span class="n">t_span</span> <span class="o">=</span> <span class="p">(</span><span class="n">t0</span><span class="p">,</span> <span class="n">t1</span><span class="p">)</span>
+<span class="n">t_eval</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="o">*</span><span class="n">t_span</span><span class="p">,</span> <span class="mi">1000</span><span class="p">)</span>
+<span class="n">xs_flat</span> <span class="o">=</span> <span class="n">arc</span><span class="o">.</span><span class="n">odeint</span><span class="p">(</span><span class="n">f</span><span class="p">,</span> <span class="n">t_span</span><span class="p">,</span> <span class="n">x0_flat</span><span class="p">,</span> <span class="n">t_eval</span><span class="o">=</span><span class="n">t_eval</span><span class="p">)</span>
+<span class="n">xs</span> <span class="o">=</span> <span class="n">vmap_unravel</span><span class="p">(</span><span class="n">xs_flat</span><span class="p">)</span>  <span class="c1"># Return to vehicle.State format</span>
+
+<span class="n">fig</span><span class="p">,</span> <span class="n">ax</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">7</span><span class="p">,</span> <span class="mi">4</span><span class="p">),</span> <span class="n">sharex</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="n">ax</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">t_eval</span><span class="p">,</span> <span class="n">xs</span><span class="o">.</span><span class="n">p_N</span><span class="p">[</span><span class="mi">2</span><span class="p">])</span>
+<span class="n">ax</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">grid</span><span class="p">()</span>
+<span class="n">ax</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">set_ylabel</span><span class="p">(</span><span class="s2">&quot;z_N [m]&quot;</span><span class="p">)</span>
+<span class="n">ax</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">t_eval</span><span class="p">,</span> <span class="n">xs</span><span class="o">.</span><span class="n">v_B</span><span class="p">[</span><span class="mi">2</span><span class="p">])</span>
+<span class="n">ax</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">grid</span><span class="p">()</span>
+<span class="n">ax</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">set_ylabel</span><span class="p">(</span><span class="s2">&quot;vz_B [m/s]&quot;</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">xlabel</span><span class="p">(</span><span class="s2">&quot;Time [s]&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>Text(0.5, 0, &#39;Time [s]&#39;)
+</pre></div>
+</div>
+<img alt="../../../_images/multirotor05_4_1.png" class="only-light" src="../../../_images/multirotor05_4_1.png" />
+<img alt="../../../_images/multirotor05_4_1_dark.png" class="only-dark" src="../../../_images/multirotor05_4_1_dark.png" />
+<p>The same idea about “MX” symbolics apply to identifying a trim point and performing linear stability analysis.
+As a general rule, it’s safe to use the default “MX” symbolics - if you want to try improving performance you can experiment with creating “SX” functions, provided they don’t contain unsupported operations like root-finding or interpolation.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Trim point identification</span>
+
+<span class="n">v_N</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">10.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">])</span>  <span class="c1"># Target forward velocity in the inertial frame</span>
+<span class="n">p_N</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="mi">3</span><span class="p">)</span>  <span class="c1"># Arbitrary position</span>
+<span class="n">w_B</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="mi">3</span><span class="p">)</span>  <span class="c1"># Target angular velocity in the body frame</span>
+
+
+<span class="nd">@arc</span><span class="o">.</span><span class="n">compile</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">residual</span><span class="p">(</span><span class="n">p</span><span class="p">):</span>
+    <span class="n">phi</span><span class="p">,</span> <span class="n">theta</span> <span class="o">=</span> <span class="n">p</span><span class="p">[:</span><span class="mi">2</span><span class="p">]</span>  <span class="c1"># (pitch, roll) angles</span>
+    <span class="n">u</span> <span class="o">=</span> <span class="n">p</span><span class="p">[</span><span class="mi">2</span><span class="p">:]</span>  <span class="c1"># Rotor angular velocities</span>
+    <span class="n">rpy</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">phi</span><span class="p">,</span> <span class="n">theta</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">],</span> <span class="n">like</span><span class="o">=</span><span class="n">p</span><span class="p">)</span>
+    <span class="n">C_BN</span> <span class="o">=</span> <span class="n">multirotor</span><span class="o">.</span><span class="n">dcm</span><span class="p">(</span><span class="n">rpy</span><span class="p">)</span>
+    <span class="n">v_B</span> <span class="o">=</span> <span class="n">C_BN</span> <span class="o">@</span> <span class="n">v_N</span>
+    <span class="n">x</span> <span class="o">=</span> <span class="n">vehicle</span><span class="o">.</span><span class="n">State</span><span class="p">(</span><span class="n">p_N</span><span class="p">,</span> <span class="n">rpy</span><span class="p">,</span> <span class="n">v_B</span><span class="p">,</span> <span class="n">w_B</span><span class="p">)</span>
+    <span class="n">x_t</span> <span class="o">=</span> <span class="n">vehicle</span><span class="o">.</span><span class="n">dynamics</span><span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">u</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">hstack</span><span class="p">([</span><span class="n">x_t</span><span class="o">.</span><span class="n">v_B</span><span class="p">,</span> <span class="n">x_t</span><span class="o">.</span><span class="n">w_B</span><span class="p">])</span>  <span class="c1"># Residuals of dynamics equations only</span>
+
+
+<span class="n">u0</span> <span class="o">=</span> <span class="mf">500.0</span>
+<span class="n">p0</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="n">u0</span><span class="p">,</span> <span class="n">u0</span><span class="p">,</span> <span class="n">u0</span><span class="p">,</span> <span class="n">u0</span><span class="p">])</span>
+
+<span class="n">p_trim</span> <span class="o">=</span> <span class="n">arc</span><span class="o">.</span><span class="n">root</span><span class="p">(</span><span class="n">residual</span><span class="p">,</span> <span class="n">p0</span><span class="p">)</span>
+
+<span class="n">phi_trim</span> <span class="o">=</span> <span class="n">p_trim</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+<span class="n">theta_trim</span> <span class="o">=</span> <span class="n">p_trim</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+<span class="n">u_trim</span> <span class="o">=</span> <span class="n">p_trim</span><span class="p">[</span><span class="mi">2</span><span class="p">:]</span>
+
+<span class="n">rpy_trim</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">phi_trim</span><span class="p">,</span> <span class="n">theta_trim</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">])</span>
+<span class="n">C_BN</span> <span class="o">=</span> <span class="n">multirotor</span><span class="o">.</span><span class="n">dcm</span><span class="p">(</span><span class="n">rpy_trim</span><span class="p">)</span>
+<span class="n">v_B_trim</span> <span class="o">=</span> <span class="n">C_BN</span> <span class="o">@</span> <span class="n">v_N</span>
+
+<span class="n">x_trim</span> <span class="o">=</span> <span class="n">vehicle</span><span class="o">.</span><span class="n">State</span><span class="p">(</span><span class="n">p_N</span><span class="p">,</span> <span class="n">rpy_trim</span><span class="p">,</span> <span class="n">v_B_trim</span><span class="p">,</span> <span class="n">w_B</span><span class="p">)</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;roll: </span><span class="si">{</span><span class="n">np</span><span class="o">.</span><span class="n">rad2deg</span><span class="p">(</span><span class="n">phi_trim</span><span class="p">)</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2"> deg&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;pitch: </span><span class="si">{</span><span class="n">np</span><span class="o">.</span><span class="n">rad2deg</span><span class="p">(</span><span class="n">theta_trim</span><span class="p">)</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2"> deg&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;v_B: </span><span class="si">{</span><span class="n">v_B_trim</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;u: </span><span class="si">{</span><span class="n">u_trim</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>roll: -0.00 deg
+pitch: -8.83 deg
+v_B: [ 9.881  0.    -1.535]
+u: [512.53  512.517 512.517 512.53 ]
+</pre></div>
+</div>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Longitudinal dynamics include surge (vx), heave (vz), pitch (theta),</span>
+<span class="c1"># and pitch rate (q). The other states are assumed to be in trim</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">longitudinal_dofs</span><span class="p">(</span><span class="n">x</span><span class="p">):</span>
+    <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">hstack</span><span class="p">(</span>
+        <span class="p">[</span>
+            <span class="n">x</span><span class="o">.</span><span class="n">att</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span>  <span class="c1"># theta</span>
+            <span class="n">x</span><span class="o">.</span><span class="n">v_B</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span>  <span class="c1"># vx</span>
+            <span class="n">x</span><span class="o">.</span><span class="n">v_B</span><span class="p">[</span><span class="mi">2</span><span class="p">],</span>  <span class="c1"># vz</span>
+            <span class="n">x</span><span class="o">.</span><span class="n">w_B</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span>  <span class="c1"># q</span>
+        <span class="p">]</span>
+    <span class="p">)</span>
+
+
+<span class="c1"># Right-hand side function for the longitudinal dynamics</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">f_lon</span><span class="p">(</span><span class="n">x_lon</span><span class="p">,</span> <span class="n">u</span><span class="p">):</span>
+    <span class="n">theta</span><span class="p">,</span> <span class="n">vx</span><span class="p">,</span> <span class="n">vz</span><span class="p">,</span> <span class="n">q</span> <span class="o">=</span> <span class="n">x_lon</span>  <span class="c1"># Longitudinal degrees of freedom</span>
+    <span class="n">x</span> <span class="o">=</span> <span class="n">vehicle</span><span class="o">.</span><span class="n">State</span><span class="p">(</span>
+        <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="mi">3</span><span class="p">),</span>
+        <span class="n">np</span><span class="o">.</span><span class="n">hstack</span><span class="p">([</span><span class="n">phi_trim</span><span class="p">,</span> <span class="n">theta</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">]),</span>
+        <span class="n">np</span><span class="o">.</span><span class="n">hstack</span><span class="p">([</span><span class="n">vx</span><span class="p">,</span> <span class="n">v_B_trim</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">vz</span><span class="p">]),</span>
+        <span class="n">np</span><span class="o">.</span><span class="n">hstack</span><span class="p">([</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">q</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">]),</span>
+    <span class="p">)</span>
+    <span class="n">x_t</span> <span class="o">=</span> <span class="n">vehicle</span><span class="o">.</span><span class="n">dynamics</span><span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">u</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">longitudinal_dofs</span><span class="p">(</span><span class="n">x_t</span><span class="p">)</span>
+
+
+<span class="n">x_lon_trim</span> <span class="o">=</span> <span class="n">longitudinal_dofs</span><span class="p">(</span><span class="n">x_trim</span><span class="p">)</span>
+
+<span class="c1"># Linearized state-space matrices</span>
+<span class="n">A_lon</span> <span class="o">=</span> <span class="n">arc</span><span class="o">.</span><span class="n">jac</span><span class="p">(</span><span class="n">f_lon</span><span class="p">,</span> <span class="mi">0</span><span class="p">)(</span><span class="n">x_lon_trim</span><span class="p">,</span> <span class="n">u_trim</span><span class="p">)</span>
+<span class="n">B_lon</span> <span class="o">=</span> <span class="n">arc</span><span class="o">.</span><span class="n">jac</span><span class="p">(</span><span class="n">f_lon</span><span class="p">,</span> <span class="mi">1</span><span class="p">)(</span><span class="n">x_lon_trim</span><span class="p">,</span> <span class="n">u_trim</span><span class="p">)</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;A_lon:</span><span class="se">\n</span><span class="si">{</span><span class="n">A_lon</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">B_lon:</span><span class="se">\n</span><span class="si">{</span><span class="n">B_lon</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>A_lon:
+[[ 0.     0.     0.     1.   ]
+ [-9.694 -0.259  0.03   1.535]
+ [ 1.506 -0.288 -2.135  9.882]
+ [ 0.    -0.004  0.011 -0.958]]
+
+B_lon:
+[[ 0.     0.     0.     0.   ]
+ [-0.    -0.    -0.    -0.   ]
+ [-0.01  -0.01  -0.01  -0.01 ]
+ [ 0.274 -0.273 -0.273  0.274]]
+</pre></div>
+</div>
+<p>As a result of the much richer aerodynamics model, the longitudinal dynamics are more strongly coupled, as seen in the more interesting behavior of the transfer functions between a uniform input to all four rotors and the longitudinal state variables:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">C_hat</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">eye</span><span class="p">(</span><span class="mi">4</span><span class="p">)</span>
+<span class="n">B_hat</span> <span class="o">=</span> <span class="n">B_lon</span> <span class="o">@</span> <span class="n">np</span><span class="o">.</span><span class="n">ones</span><span class="p">((</span><span class="mi">4</span><span class="p">,</span> <span class="mi">1</span><span class="p">))</span>
+<span class="n">D_lon</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="n">C_hat</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="mi">1</span><span class="p">))</span>
+
+<span class="n">lti_sys</span> <span class="o">=</span> <span class="n">control</span><span class="o">.</span><span class="n">StateSpace</span><span class="p">(</span><span class="n">A_lon</span><span class="p">,</span> <span class="n">B_hat</span><span class="p">,</span> <span class="n">C_hat</span><span class="p">,</span> <span class="n">D_lon</span><span class="p">)</span>
+<span class="n">fig</span><span class="p">,</span> <span class="n">ax</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span> <span class="mi">6</span><span class="p">),</span> <span class="n">sharex</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="n">control</span><span class="o">.</span><span class="n">bode_plot</span><span class="p">(</span><span class="n">lti_sys</span><span class="p">,</span> <span class="n">ax</span><span class="o">=</span><span class="n">ax</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+</pre></div>
+</div>
+<img alt="../../../_images/multirotor05_9_0.png" class="only-light" src="../../../_images/multirotor05_9_0.png" />
+<img alt="../../../_images/multirotor05_9_0_dark.png" class="only-dark" src="../../../_images/multirotor05_9_0_dark.png" />
+</section>
+</section>
+
+        </article>
+      </div>
+      <footer>
+        
+        <div class="related-pages">
+          <a class="next-page" href="../../../notebooks/multirotor/multirotor06.html">
+              <div class="page-info">
+                <div class="context">
+                  <span>Next</span>
+                </div>
+                <div class="title">Conclusion</div>
+              </div>
+              <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
+            </a>
+          <a class="prev-page" href="multirotor04.html">
+              <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
+              <div class="page-info">
+                <div class="context">
+                  <span>Previous</span>
+                </div>
+                
+                <div class="title">Part 4: Model analysis</div>
+                
+              </div>
+            </a>
+        </div>
+        <div class="bottom-of-page">
+          <div class="left-details">
+            <div class="copyright">
+                Copyright &#169; 2025, Pine Tree Labs, LLC
+            </div>
+            Made with <a href="https://www.sphinx-doc.org/">Sphinx</a> and <a class="muted-link" href="https://pradyunsg.me">@pradyunsg</a>'s
+            
+            <a href="https://github.com/pradyunsg/furo">Furo</a>
+            
+          </div>
+          <div class="right-details">
+            
+          </div>
+        </div>
+        
+      </footer>
+    </div>
+    <aside class="toc-drawer">
+      
+      
+      <div class="toc-sticky toc-scroll">
+        <div class="toc-title-container">
+          <span class="toc-title">
+            On this page
+          </span>
+        </div>
+        <div class="toc-tree-container">
+          <div class="toc-tree">
+            <ul>
+<li><a class="reference internal" href="#">Part 5: Revisiting the rotor model (optional)</a><ul>
+<li><a class="reference internal" href="#blade-element-theory">Blade element theory</a></li>
+<li><a class="reference internal" href="#uniform-inflow-approximation-momentum-theory">Uniform inflow approximation: momentum theory</a></li>
+<li><a class="reference internal" href="#implementation">Implementation</a></li>
+<li><a class="reference internal" href="#running-the-blade-element-model">Running the blade element model</a></li>
+</ul>
+</li>
+</ul>
+
+          </div>
+        </div>
+      </div>
+      
+      
+    </aside>
+  </div>
+</div><script src="../../../_static/documentation_options.js?v=5929fcd5"></script>
+    <script src="../../../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../_static/scripts/furo.js?v=5fa4622c"></script>
+    <script>window.MathJax = {"options": {"processHtmlClass": "tex2jax_process|mathjax_process|math|output_area"}}</script>
+    <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    </body>
+</html>

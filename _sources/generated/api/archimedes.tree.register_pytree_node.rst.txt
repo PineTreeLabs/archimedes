@@ -1,0 +1,6 @@
+archimedes.tree.register\_pytree\_node
+======================================
+
+.. currentmodule:: archimedes.tree
+
+.. autofunction:: register_pytree_node

@@ -1,0 +1,6 @@
+archimedes.tree.map
+===================
+
+.. currentmodule:: archimedes.tree
+
+.. autofunction:: map

@@ -1,0 +1,6 @@
+archimedes.tree.leaves
+======================
+
+.. currentmodule:: archimedes.tree
+
+.. autofunction:: leaves

@@ -1,0 +1,10 @@
+﻿
+
+archimedes.compile
+==================
+
+.. currentmodule:: archimedes
+
+
+
+.. autofunction:: archimedes.compile

@@ -1,0 +1,588 @@
+<!doctype html>
+<html class="no-js" lang="en" data-content_root="../../">
+  <head><meta charset="utf-8"/>
+    <meta name="viewport" content="width=device-width,initial-scale=1"/>
+    <meta name="color-scheme" content="light dark"><meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="author" title="About these documents" href="../../about.html" /><link rel="index" title="Index" href="../../genindex.html" /><link rel="search" title="Search" href="../../search.html" /><link rel="next" title="Part 2: Implementation in Archimedes" href="multirotor02.html" /><link rel="prev" title="Multirotor Dynamics" href="multirotor00.html" />
+
+    <link rel="shortcut icon" href="../../_static/favicon.ico"/><!-- Generated with Sphinx 8.2.3 and Furo 2024.08.06 -->
+        <title>Part 1: Fundamentals of multirotor dynamics - Archimedes documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=8f2a1f02" />
+    <link rel="stylesheet" type="text/css" href="../../_static/styles/furo.css?v=354aac6f" />
+    <link rel="stylesheet" type="text/css" href="../../_static/styles/furo-extensions.css?v=302659d7" />
+    <link rel="stylesheet" type="text/css" href="../../_static/custom.css?v=c2950814" />
+    
+    
+
+
+<style>
+  body {
+    --color-code-background: #f8f8f8;
+  --color-code-foreground: black;
+  --color-brand-primary: #D35400;
+  --color-brand-content: #C0392B;
+  --color-admonition-background: rgba(211, 84, 0, 0.1);
+  --color-background-primary: #F5F5F5;
+  --color-background-secondary: #EEEEEE;
+  --color-foreground-primary: #2A2A2A;
+  --color-foreground-secondary: #5D4037;
+  --color-link: #C0392B;
+  --color-link-hover: #D35400;
+  
+  }
+  @media not print {
+    body[data-theme="dark"] {
+      --color-code-background: #202020;
+  --color-code-foreground: #d0d0d0;
+  --color-brand-primary: #F1C40F;
+  --color-brand-content: #D35400;
+  --color-admonition-background: rgba(241, 196, 15, 0.1);
+  --color-background-primary: #2A2A2A;
+  --color-background-secondary: #1A1A1A;
+  --color-foreground-primary: #F5F5F5;
+  --color-foreground-secondary: #DDDDDD;
+  --color-link: #D35400;
+  --color-link-hover: #F1C40F;
+  
+    }
+    @media (prefers-color-scheme: dark) {
+      body:not([data-theme="light"]) {
+        --color-code-background: #202020;
+  --color-code-foreground: #d0d0d0;
+  --color-brand-primary: #F1C40F;
+  --color-brand-content: #D35400;
+  --color-admonition-background: rgba(241, 196, 15, 0.1);
+  --color-background-primary: #2A2A2A;
+  --color-background-secondary: #1A1A1A;
+  --color-foreground-primary: #F5F5F5;
+  --color-foreground-secondary: #DDDDDD;
+  --color-link: #D35400;
+  --color-link-hover: #F1C40F;
+  
+      }
+    }
+  }
+</style></head>
+  <body>
+    
+    <script>
+      document.body.dataset.theme = localStorage.getItem("theme") || "auto";
+    </script>
+    
+
+<svg xmlns="http://www.w3.org/2000/svg" style="display: none;">
+  <symbol id="svg-toc" viewBox="0 0 24 24">
+    <title>Contents</title>
+    <svg stroke="currentColor" fill="currentColor" stroke-width="0" viewBox="0 0 1024 1024">
+      <path d="M408 442h480c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8H408c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8zm-8 204c0 4.4 3.6 8 8 8h480c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8H408c-4.4 0-8 3.6-8 8v56zm504-486H120c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h784c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zm0 632H120c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h784c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zM115.4 518.9L271.7 642c5.8 4.6 14.4.5 14.4-6.9V388.9c0-7.4-8.5-11.5-14.4-6.9L115.4 505.1a8.74 8.74 0 0 0 0 13.8z"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-menu" viewBox="0 0 24 24">
+    <title>Menu</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather-menu">
+      <line x1="3" y1="12" x2="21" y2="12"></line>
+      <line x1="3" y1="6" x2="21" y2="6"></line>
+      <line x1="3" y1="18" x2="21" y2="18"></line>
+    </svg>
+  </symbol>
+  <symbol id="svg-arrow-right" viewBox="0 0 24 24">
+    <title>Expand</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather-chevron-right">
+      <polyline points="9 18 15 12 9 6"></polyline>
+    </svg>
+  </symbol>
+  <symbol id="svg-sun" viewBox="0 0 24 24">
+    <title>Light mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="feather-sun">
+      <circle cx="12" cy="12" r="5"></circle>
+      <line x1="12" y1="1" x2="12" y2="3"></line>
+      <line x1="12" y1="21" x2="12" y2="23"></line>
+      <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+      <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+      <line x1="1" y1="12" x2="3" y2="12"></line>
+      <line x1="21" y1="12" x2="23" y2="12"></line>
+      <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+      <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+    </svg>
+  </symbol>
+  <symbol id="svg-moon" viewBox="0 0 24 24">
+    <title>Dark mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-moon">
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <path d="M12 3c.132 0 .263 0 .393 0a7.5 7.5 0 0 0 7.92 12.446a9 9 0 1 1 -8.313 -12.454z" />
+    </svg>
+  </symbol>
+  <symbol id="svg-sun-with-moon" viewBox="0 0 24 24">
+    <title>Auto light/dark, in light mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round"
+      class="icon-custom-derived-from-feather-sun-and-tabler-moon">
+      <path style="opacity: 50%" d="M 5.411 14.504 C 5.471 14.504 5.532 14.504 5.591 14.504 C 3.639 16.319 4.383 19.569 6.931 20.352 C 7.693 20.586 8.512 20.551 9.25 20.252 C 8.023 23.207 4.056 23.725 2.11 21.184 C 0.166 18.642 1.702 14.949 4.874 14.536 C 5.051 14.512 5.231 14.5 5.411 14.5 L 5.411 14.504 Z"/>
+      <line x1="14.5" y1="3.25" x2="14.5" y2="1.25"/>
+      <line x1="14.5" y1="15.85" x2="14.5" y2="17.85"/>
+      <line x1="10.044" y1="5.094" x2="8.63" y2="3.68"/>
+      <line x1="19" y1="14.05" x2="20.414" y2="15.464"/>
+      <line x1="8.2" y1="9.55" x2="6.2" y2="9.55"/>
+      <line x1="20.8" y1="9.55" x2="22.8" y2="9.55"/>
+      <line x1="10.044" y1="14.006" x2="8.63" y2="15.42"/>
+      <line x1="19" y1="5.05" x2="20.414" y2="3.636"/>
+      <circle cx="14.5" cy="9.55" r="3.6"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-moon-with-sun" viewBox="0 0 24 24">
+    <title>Auto light/dark, in dark mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round"
+      class="icon-custom-derived-from-feather-sun-and-tabler-moon">
+      <path d="M 8.282 7.007 C 8.385 7.007 8.494 7.007 8.595 7.007 C 5.18 10.184 6.481 15.869 10.942 17.24 C 12.275 17.648 13.706 17.589 15 17.066 C 12.851 22.236 5.91 23.143 2.505 18.696 C -0.897 14.249 1.791 7.786 7.342 7.063 C 7.652 7.021 7.965 7 8.282 7 L 8.282 7.007 Z"/>
+      <line style="opacity: 50%" x1="18" y1="3.705" x2="18" y2="2.5"/>
+      <line style="opacity: 50%" x1="18" y1="11.295" x2="18" y2="12.5"/>
+      <line style="opacity: 50%" x1="15.316" y1="4.816" x2="14.464" y2="3.964"/>
+      <line style="opacity: 50%" x1="20.711" y1="10.212" x2="21.563" y2="11.063"/>
+      <line style="opacity: 50%" x1="14.205" y1="7.5" x2="13.001" y2="7.5"/>
+      <line style="opacity: 50%" x1="21.795" y1="7.5" x2="23" y2="7.5"/>
+      <line style="opacity: 50%" x1="15.316" y1="10.184" x2="14.464" y2="11.036"/>
+      <line style="opacity: 50%" x1="20.711" y1="4.789" x2="21.563" y2="3.937"/>
+      <circle style="opacity: 50%" cx="18" cy="7.5" r="2.169"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-pencil" viewBox="0 0 24 24">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-pencil-code">
+      <path d="M4 20h4l10.5 -10.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4" />
+      <path d="M13.5 6.5l4 4" />
+      <path d="M20 21l2 -2l-2 -2" />
+      <path d="M17 17l-2 2l2 2" />
+    </svg>
+  </symbol>
+  <symbol id="svg-eye" viewBox="0 0 24 24">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-eye-code">
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <path d="M10 12a2 2 0 1 0 4 0a2 2 0 0 0 -4 0" />
+      <path
+        d="M11.11 17.958c-3.209 -.307 -5.91 -2.293 -8.11 -5.958c2.4 -4 5.4 -6 9 -6c3.6 0 6.6 2 9 6c-.21 .352 -.427 .688 -.647 1.008" />
+      <path d="M20 21l2 -2l-2 -2" />
+      <path d="M17 17l-2 2l2 2" />
+    </svg>
+  </symbol>
+</svg>
+
+<input type="checkbox" class="sidebar-toggle" name="__navigation" id="__navigation">
+<input type="checkbox" class="sidebar-toggle" name="__toc" id="__toc">
+<label class="overlay sidebar-overlay" for="__navigation">
+  <div class="visually-hidden">Hide navigation sidebar</div>
+</label>
+<label class="overlay toc-overlay" for="__toc">
+  <div class="visually-hidden">Hide table of contents sidebar</div>
+</label>
+
+<a class="skip-to-content muted-link" href="#furo-main-content">Skip to content</a>
+
+
+
+<div class="page">
+  <header class="mobile-header">
+    <div class="header-left">
+      <label class="nav-overlay-icon" for="__navigation">
+        <div class="visually-hidden">Toggle site navigation sidebar</div>
+        <i class="icon"><svg><use href="#svg-menu"></use></svg></i>
+      </label>
+    </div>
+    <div class="header-center">
+      <a href="../../index.html"><div class="brand">Archimedes  documentation</div></a>
+    </div>
+    <div class="header-right">
+      <div class="theme-toggle-container theme-toggle-header">
+        <button class="theme-toggle">
+          <div class="visually-hidden">Toggle Light / Dark / Auto color theme</div>
+          <svg class="theme-icon-when-auto-light"><use href="#svg-sun-with-moon"></use></svg>
+          <svg class="theme-icon-when-auto-dark"><use href="#svg-moon-with-sun"></use></svg>
+          <svg class="theme-icon-when-dark"><use href="#svg-moon"></use></svg>
+          <svg class="theme-icon-when-light"><use href="#svg-sun"></use></svg>
+        </button>
+      </div>
+      <label class="toc-overlay-icon toc-header-icon" for="__toc">
+        <div class="visually-hidden">Toggle table of contents sidebar</div>
+        <i class="icon"><svg><use href="#svg-toc"></use></svg></i>
+      </label>
+    </div>
+  </header>
+  <aside class="sidebar-drawer">
+    <div class="sidebar-container">
+      
+      <div class="sidebar-sticky"><a class="sidebar-brand" href="../../index.html">
+    <div class="sidebar-brand-container">
+      <img class="sidebar-logo" src="../../_static/logo.png" alt="Logo"/>
+      <div class="sidebar-brand-text">Archimedes</div>
+    </div>
+  </a><form class="sidebar-search-container" method="get" action="../../search.html" role="search">
+  <input class="sidebar-search" placeholder="Search" name="q" aria-label="Search">
+  <input type="hidden" name="check_keywords" value="yes">
+  <input type="hidden" name="area" value="default">
+</form>
+<div id="searchbox"></div><div class="sidebar-scroll"><div class="sidebar-tree">
+  <p class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../about.html">What is Archimedes?</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../getting-started.html">Getting Started</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Core Concepts</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../under-the-hood.html">Under the Hood</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../pytrees.html">Working with PyTrees</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../generated/notebooks/control-flow.html">Structured Control Flow</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../generated/notebooks/modular-design.html">Hierarchical Design Patterns</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Examples</span></p>
+<ul class="current">
+<li class="toctree-l1 current has-children"><a class="reference internal" href="multirotor00.html">Multirotor Dynamics</a><input checked="" class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" role="switch" type="checkbox"/><label for="toctree-checkbox-1"><div class="visually-hidden">Toggle navigation of Multirotor Dynamics</div><i class="icon"><svg><use href="#svg-arrow-right"></use></svg></i></label><ul class="current">
+<li class="toctree-l2 current current-page"><a class="current reference internal" href="#">Part 1: Fundamentals of multirotor dynamics</a></li>
+<li class="toctree-l2"><a class="reference internal" href="multirotor02.html">Part 2: Implementation in Archimedes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../generated/notebooks/multirotor/multirotor03.html">Part 3: Running the model</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../generated/notebooks/multirotor/multirotor04.html">Part 4: Model analysis</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../generated/notebooks/multirotor/multirotor05.html">Part 5: Revisiting the rotor model (optional)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="multirotor06.html">Conclusion</a></li>
+</ul>
+</li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../deployment/deployment00.html">Deploying to Hardware</a><input class="toctree-checkbox" id="toctree-checkbox-2" name="toctree-checkbox-2" role="switch" type="checkbox"/><label for="toctree-checkbox-2"><div class="visually-hidden">Toggle navigation of Deploying to Hardware</div><i class="icon"><svg><use href="#svg-arrow-right"></use></svg></i></label><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../generated/notebooks/deployment/deployment01.html">Generating C code</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../generated/notebooks/deployment/deployment02.html">Generating driver code</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../generated/notebooks/deployment/deployment03.html">Platform-specific deployment templates</a></li>
+</ul>
+</li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../gotchas.html">🔪 Quirks and Gotchas</a></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../reference/index.html">📚 API Reference</a><input class="toctree-checkbox" id="toctree-checkbox-3" name="toctree-checkbox-3" role="switch" type="checkbox"/><label for="toctree-checkbox-3"><div class="visually-hidden">Toggle navigation of 📚 API Reference</div><i class="icon"><svg><use href="#svg-arrow-right"></use></svg></i></label><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../generated/api/archimedes.codegen.html">archimedes.codegen</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../generated/api/archimedes.array.html">archimedes.array</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../generated/api/archimedes.sym.html">archimedes.sym</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../generated/api/archimedes.sym_like.html">archimedes.sym_like</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../generated/api/archimedes.zeros.html">archimedes.zeros</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../generated/api/archimedes.ones.html">archimedes.ones</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../generated/api/archimedes.zeros_like.html">archimedes.zeros_like</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../generated/api/archimedes.ones_like.html">archimedes.ones_like</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../generated/api/archimedes.eye.html">archimedes.eye</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../generated/api/archimedes.scan.html">archimedes.scan</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../generated/api/archimedes.switch.html">archimedes.switch</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../generated/api/archimedes.vmap.html">archimedes.vmap</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../generated/api/archimedes.compile.html">archimedes.compile</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../generated/api/archimedes.callback.html">archimedes.callback</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../generated/api/archimedes.grad.html">archimedes.grad</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../generated/api/archimedes.jac.html">archimedes.jac</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../generated/api/archimedes.hess.html">archimedes.hess</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../generated/api/archimedes.jvp.html">archimedes.jvp</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../generated/api/archimedes.vjp.html">archimedes.vjp</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../generated/api/archimedes.interpolant.html">archimedes.interpolant</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../generated/api/archimedes.integrator.html">archimedes.integrator</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../generated/api/archimedes.odeint.html">archimedes.odeint</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../generated/api/archimedes.nlp_solver.html">archimedes.nlp_solver</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../generated/api/archimedes.minimize.html">archimedes.minimize</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../generated/api/archimedes.implicit.html">archimedes.implicit</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../generated/api/archimedes.root.html">archimedes.root</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../generated/api/archimedes.qpsol.html">archimedes.qpsol</a></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../generated/api/archimedes.tree.html">archimedes.tree</a><input class="toctree-checkbox" id="toctree-checkbox-4" name="toctree-checkbox-4" role="switch" type="checkbox"/><label for="toctree-checkbox-4"><div class="visually-hidden">Toggle navigation of archimedes.tree</div><i class="icon"><svg><use href="#svg-arrow-right"></use></svg></i></label><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../generated/api/archimedes.tree.all.html">archimedes.tree.all</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../generated/api/archimedes.tree.flatten.html">archimedes.tree.flatten</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../generated/api/archimedes.tree.leaves.html">archimedes.tree.leaves</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../generated/api/archimedes.tree.map.html">archimedes.tree.map</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../generated/api/archimedes.tree.ravel.html">archimedes.tree.ravel</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../generated/api/archimedes.tree.reduce.html">archimedes.tree.reduce</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../generated/api/archimedes.tree.register_dataclass.html">archimedes.tree.register_dataclass</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../generated/api/archimedes.tree.register_pytree_node.html">archimedes.tree.register_pytree_node</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../generated/api/archimedes.tree.structure.html">archimedes.tree.structure</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../generated/api/archimedes.tree.unflatten.html">archimedes.tree.unflatten</a></li>
+</ul>
+</li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../generated/api/archimedes.tree.struct.html">archimedes.tree.struct</a><input class="toctree-checkbox" id="toctree-checkbox-5" name="toctree-checkbox-5" role="switch" type="checkbox"/><label for="toctree-checkbox-5"><div class="visually-hidden">Toggle navigation of archimedes.tree.struct</div><i class="icon"><svg><use href="#svg-arrow-right"></use></svg></i></label><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../generated/api/archimedes.tree.struct.dataclass_transform.html">archimedes.tree.struct.dataclass_transform</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../generated/api/archimedes.tree.struct.field.html">archimedes.tree.struct.field</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../generated/api/archimedes.tree.struct.fields.html">archimedes.tree.struct.fields</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../generated/api/archimedes.tree.struct.is_pytree_node.html">archimedes.tree.struct.is_pytree_node</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../generated/api/archimedes.tree.struct.pytree_node.html">archimedes.tree.struct.pytree_node</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../generated/api/archimedes.tree.struct.register_dataclass.html">archimedes.tree.struct.register_dataclass</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../generated/api/archimedes.tree.struct.replace.html">archimedes.tree.struct.replace</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../generated/api/archimedes.tree.struct.Any.html">archimedes.tree.struct.Any</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../generated/api/archimedes.tree.struct.Callable.html">archimedes.tree.struct.Callable</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../generated/api/archimedes.tree.struct.InitVar.html">archimedes.tree.struct.InitVar</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../generated/api/archimedes.tree.struct.TypeVar.html">archimedes.tree.struct.TypeVar</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Development</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../roadmap.html">Development Roadmap</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../community.html">Community</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../licensing-model.html">Licensing model</a></li>
+</ul>
+
+</div>
+</div>
+
+      </div>
+      
+    </div>
+  </aside>
+  <div class="main">
+    <div class="content">
+      <div class="article-container">
+        <a href="#" class="back-to-top muted-link">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+            <path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8v12z"></path>
+          </svg>
+          <span>Back to top</span>
+        </a>
+        <div class="content-icon-container">
+          <div class="view-this-page">
+  <a class="muted-link" href="../../_sources/notebooks/multirotor/multirotor01.md.txt" title="View this page">
+    <svg><use href="#svg-eye"></use></svg>
+    <span class="visually-hidden">View this page</span>
+  </a>
+</div>
+<div class="theme-toggle-container theme-toggle-content">
+            <button class="theme-toggle">
+              <div class="visually-hidden">Toggle Light / Dark / Auto color theme</div>
+              <svg class="theme-icon-when-auto-light"><use href="#svg-sun-with-moon"></use></svg>
+              <svg class="theme-icon-when-auto-dark"><use href="#svg-moon-with-sun"></use></svg>
+              <svg class="theme-icon-when-dark"><use href="#svg-moon"></use></svg>
+              <svg class="theme-icon-when-light"><use href="#svg-sun"></use></svg>
+            </button>
+          </div>
+          <label class="toc-overlay-icon toc-content-icon" for="__toc">
+            <div class="visually-hidden">Toggle table of contents sidebar</div>
+            <i class="icon"><svg><use href="#svg-toc"></use></svg></i>
+          </label>
+        </div>
+        <article role="main" id="furo-main-content">
+          <section class="tex2jax_ignore mathjax_ignore" id="part-1-fundamentals-of-multirotor-dynamics">
+<h1>Part 1: Fundamentals of multirotor dynamics<a class="headerlink" href="#part-1-fundamentals-of-multirotor-dynamics" title="Link to this heading">¶</a></h1>
+<p>Before we get into more accurate aerodynamics modeling, it’s easiest to start with the basic kinematic equations and a highly simplified dynamics model.  Then we can develop our modeling framework with a view towards extensibility.</p>
+<section id="dof-rigid-body-dynamics">
+<h2>6-dof rigid body dynamics<a class="headerlink" href="#dof-rigid-body-dynamics" title="Link to this heading">¶</a></h2>
+<p>Let’s start with the basics of rigid body dynamics.  Our goal is to develop a set of equations that will fully determine the evolution of a rigid body if we know the applied forces and moments.  To do so we will work primarily with two reference frames:</p>
+<ul class="simple">
+<li><p>The “world” frame: an inertial or Newtonian frame denoted N, in which the <span class="math notranslate nohighlight">\(x\)</span>-<span class="math notranslate nohighlight">\(y\)</span>-<span class="math notranslate nohighlight">\(z\)</span> axes are defined with the North-East-Down (NED) convention</p></li>
+<li><p>The “body” frame: a non-inertial body-fixed reference frame denoted B whose origin is at the body center of mass and with axes defined according to the Forward-Right-Down (FRD) convention</p></li>
+</ul>
+<p>The position of the center of mass of the vehicle in the “world” frame is <span class="math notranslate nohighlight">\(\mathbf{p}_N\)</span> (and clearly the body-relative position is always <span class="math notranslate nohighlight">\(\mathbf{p}_B = 0\)</span>).  For the sake of simplicity we will represent orientation using Euler angles in the yaw-pitch-roll sequence, i.e. the transformation from the world frame to the body frame takes place as a sequence of three rotations:</p>
+<ol class="arabic simple">
+<li><p>Right-handed rotation about the world-frame <span class="math notranslate nohighlight">\(\hat{z}\)</span> axis by the yaw angle <span class="math notranslate nohighlight">\(\psi\)</span></p></li>
+<li><p>Right-handed rotation about the <em>new</em> <span class="math notranslate nohighlight">\(\hat{y}\)</span> axis by the pitch angle <span class="math notranslate nohighlight">\(\theta\)</span></p></li>
+<li><p>Right-handed rotation about the <em>new</em> <span class="math notranslate nohighlight">\(\hat{x}\)</span> axis by the roll angle <span class="math notranslate nohighlight">\(\phi\)</span></p></li>
+</ol>
+<p>From these three Euler angles <span class="math notranslate nohighlight">\((\phi, \theta, \psi)\)</span> we can construct the <span class="math notranslate nohighlight">\(3 \times 3\)</span> rotation matrix <span class="math notranslate nohighlight">\(~^B\!\mathbf{C}^N(\phi, \theta, \psi)\)</span>, which relates any vector <span class="math notranslate nohighlight">\(\mathbf{p}_N\)</span> expressed world-frame coordinates to the same vector in body-frame coordinates according to the relations</p>
+<div class="math-wrapper docutils container">
+<div class="math notranslate nohighlight">
+\[\begin{split}
+\begin{align*}
+\mathbf{p}_B &amp;= ~^B\!\mathbf{C}^N \mathbf{p}_N \\
+\mathbf{p}_N &amp;= ~^N\!\mathbf{C}^B \mathbf{p}_B = [~^B\!C^N]^T \mathbf{p}_B.
+\end{align*}
+\end{split}\]</div>
+</div>
+<p>That is, the rotation matrix <span class="math notranslate nohighlight">\(~^B\!\mathbf{C}^N\)</span> satisfies the orthogonal matrix property that the inverse transformation is <span class="math notranslate nohighlight">\(~^N\!\mathbf{C}^B = [~^B\!\mathbf{C}^N]^{-1} = [~^B\!\mathbf{C}^N]^T\)</span>.</p>
+<p>The combination of the position <span class="math notranslate nohighlight">\(\mathbf{p}_N\)</span> with the Euler angles <span class="math notranslate nohighlight">\(\mathbf{\Phi} = \begin{bmatrix} \phi &amp; \theta &amp; \psi \end{bmatrix}^T\)</span> comprises the six “degrees of freedom” of the rigid body.
+However, to fully specify the state of the system we also need to know the velocity and angular velocity of the body.  It is generally more convenient to work with these quantities in the body-fixed reference frame even though this frame is non-inertial, for instance because this means that the inertia matrix does not vary in time (unless the weight or mass distribution changes, which we will not consider here).  Defining the body-frame velocity <span class="math notranslate nohighlight">\(\mathbf{v}_B\)</span> and angular velocity <span class="math notranslate nohighlight">\(\mathbf{\omega}_B\)</span>, the full state has 12 elements:</p>
+<div class="math-wrapper docutils container">
+<div class="math notranslate nohighlight">
+\[
+\mathbf{x} = \begin{bmatrix} \mathbf{p}_N &amp; \mathbf{\Phi} &amp; \mathbf{v}_B &amp; \mathbf{\omega}_B \end{bmatrix}^T.
+\]</div>
+</div>
+</section>
+<section id="kinematic-relations">
+<h2>Kinematic relations<a class="headerlink" href="#kinematic-relations" title="Link to this heading">¶</a></h2>
+<p>The evolution equations for this state are complicated by two factors.  First, the velocities and positions are expressed in different reference frames, so for instance it is not the case that <span class="math notranslate nohighlight">\(\dot{\mathbf{p}}_N = \mathbf{v}_B\)</span>.  Second, the Euler angles do not make up a vector and <em>the time derivatives of the Euler angles are not equal to the angular velocity in any reference frame.</em>
+Instead, the two are related according to the “Euler kinematical equations”, derived for instance in Sec 1.4 of Stevens, Lewis, and Johnson.</p>
+<div class="math-wrapper docutils container">
+<div class="math notranslate nohighlight">
+\[\begin{split}
+\dot{\mathbf{\Phi}} = \begin{bmatrix}
+1 &amp; \sin \phi \tan \theta &amp; \cos \phi \tan \theta \\
+0 &amp; \cos \phi &amp; -\sin \phi \\
+0 &amp; \sin \phi / \cos \theta &amp; \cos \phi / \cos \theta
+\end{bmatrix}
+\mathbf{\omega}_B \equiv H(\phi, \theta) \mathbf{\omega}_B
+\end{split}\]</div>
+</div>
+<p>Note that the matrix <span class="math notranslate nohighlight">\(H(\phi, \theta)\)</span> becomes singular at <span class="math notranslate nohighlight">\(\pm 90\)</span> degrees pitch, leading to the issue known as “gimbal lock”.
+As a result quaternion representations of rotations are generally preferable, but here we will use Euler angles for the sake of simplicity and interpretability and remember to avoid overly aggressive maneuvers.</p>
+<p>The time derivative of world-frame position, on the other hand, is just related to the body-frame velocity by the rotation matrix:</p>
+<div class="math-wrapper docutils container">
+<div class="math notranslate nohighlight">
+\[
+\dot{\mathbf{p}}_N = ~^N\!\mathbf{C}^B \mathbf{v}_B.
+\]</div>
+</div>
+<p>Finally, since the velocity and angular velocity are expressed in the non-inertial body frame, Newton’s laws have to be augmented with “pseudo” forces and moments, which we will give here without derivation:</p>
+<div class="math-wrapper docutils container">
+<div class="math notranslate nohighlight">
+\[\begin{split}
+\begin{align*}
+\dot{\mathbf{v}}_B &amp;= \frac{1}{m} \mathbf{F}_B - \mathbf{\omega}_B \times \mathbf{v}_B \\
+\dot{\mathbf{\omega}}_B &amp;= J_B^{-1} \left[ \mathbf{M}_B - \mathbf{\omega}_B \times J_B \times \mathbf{\omega}_B \right],
+\end{align*}
+\end{split}\]</div>
+</div>
+<p>in which <span class="math notranslate nohighlight">\(m\)</span> is the mass of the body, <span class="math notranslate nohighlight">\(J_B\)</span> is its inertia matrix, and <span class="math notranslate nohighlight">\(\mathbf{F}_B\)</span> and <span class="math notranslate nohighlight">\(\mathbf{M}_B\)</span> are the net body-referenced force and moment, respectively.  Remember that gravity is typically most easily defined in the <em>world</em> frame, and so must be rotated into the body frame before its contribution is added to the net force.  This set of four vector equations fully defines the 6-dof rigid body equations of motion for a flight vehicle, although they will not hold in all cases, for instance if:</p>
+<ul class="simple">
+<li><p>The distances considered are long enough that the curvature of the Earth is significant</p></li>
+<li><p>The mass or inertia matrix of the body is time-varying</p></li>
+<li><p>The body cannot be considered a single rigid object, for instance if the motion of flight control surfaces cannot be safely neglected.</p></li>
+</ul>
+</section>
+<section id="simplified-dynamics-model">
+<h2>Simplified dynamics model<a class="headerlink" href="#simplified-dynamics-model" title="Link to this heading">¶</a></h2>
+<p>The preceding derivation is fairly general, and could be adapted to helicopters, drones, fixed-wing aircraft, missiles, etc.
+The dynamics of these vehicles are distinguished by the forces and moments to which they are subject, and by the effect of external controls.</p>
+<p>In our multirotor model we will primarily consider three sources of external influence:</p>
+<ol class="arabic simple">
+<li><p><strong>Gravity:</strong> Modeled as a constant force <span class="math notranslate nohighlight">\(m g_0\)</span> in the inertial-frame <span class="math notranslate nohighlight">\(\hat{z}\)</span>-direction</p></li>
+<li><p><strong>Drag:</strong> A single force applied at the center of pressure of the vehicle <span class="math notranslate nohighlight">\(\mathbf{r}_B^{CoP}\)</span>, generally dependent on the airspeed of the vehicle and its orientation with respect to this “wind”</p></li>
+<li><p><strong>Rotors:</strong> A force and moment produced by each rotor, in general dependent on aerodynamics and rotor speeds</p></li>
+</ol>
+<p>The net force in the body frame</p>
+<div class="math-wrapper docutils container">
+<div class="math notranslate nohighlight">
+\[
+\mathbf{F}_B^\mathrm{net} = \mathbf{F}_B^D + \sum_{j=1}^{N} \mathbf{F}_B^j + ^BC^N \mathbf{F}_N^g,
+\]</div>
+</div>
+<p>where <span class="math notranslate nohighlight">\(\mathbf{F}_B^D\)</span> is the drag force, <span class="math notranslate nohighlight">\(\mathbf{F}_N^g\)</span> is the inertial-frame gravity force, and <span class="math notranslate nohighlight">\(\mathbf{F}_B^j\)</span> is the force from the <span class="math notranslate nohighlight">\(j\)</span>-th rotor.</p>
+<p>The net moment in the body frame contains only contributions from drag (if the center of pressure is not collocated with the center of mass) and the rotors.  The rotor contributions</p>
+<div class="math-wrapper docutils container">
+<div class="math notranslate nohighlight">
+\[
+\mathbf{M}_B^\mathrm{net} = \mathbf{r}_B^{CoP} \times \mathbf{F}_B^D + \sum_{j=1}^N \left( 
+\mathbf{M}_H^j + \mathbf{r}_B^j \times \mathbf{F}_B^j,
+\right)
+\]</div>
+</div>
+<p>where <span class="math notranslate nohighlight">\(\mathbf{M}_B^j\)</span> are the moments due to the <span class="math notranslate nohighlight">\(j\)</span>-th rotor motion (e.g. torque) and <span class="math notranslate nohighlight">\(\mathbf{r}_B^j\)</span> is the offset of the center of the <span class="math notranslate nohighlight">\(j\)</span>-th rotor (the lever arm).</p>
+<p>Later we will introduce additional “hub” reference frames to model the rotor dynamics in more detail, but at this stage we will use simple models that can easily be written in body-fixed coordinates.</p>
+<p>For the drag force, we will neglect any variability with respect to angle of attack or sideslip angle and assume that the body drag force can be written in terms of the air density <span class="math notranslate nohighlight">\(\rho\)</span>, characteristic cross-sectional area <span class="math notranslate nohighlight">\(A\)</span>, and dimensionless drag coefficient <span class="math notranslate nohighlight">\(C_D\)</span> by</p>
+<div class="math-wrapper docutils container">
+<div class="math notranslate nohighlight">
+\[
+\mathbf{F}_B^D = -\frac{1}{2} \rho C_D A ||\mathbf{v}_B|| \mathbf{v}_B
+\]</div>
+</div>
+<p>A simplified rotor model assumes a quadratic dependence on rotor angular velocity.  That is, if <span class="math notranslate nohighlight">\(\Omega_j\)</span> is the angular velocity of the <span class="math notranslate nohighlight">\(j\)</span>-th rotor in rad/s and <span class="math notranslate nohighlight">\(H_j\)</span> is a reference frame attached to the <span class="math notranslate nohighlight">\(j\)</span>-th rotor hub, we will assume that</p>
+<div class="math-wrapper docutils container">
+<div class="math notranslate nohighlight">
+\[\begin{split}
+\begin{align*}
+\mathbf{F}_{H_j}^j &amp;= -k_F \Omega_j^2 \hat{\mathbf{z}} \\
+\mathbf{M}_{H_j}^j &amp;= k_M \Omega_j^2 \hat{\mathbf{z}},
+\end{align*}
+\end{split}\]</div>
+</div>
+<p>where <span class="math notranslate nohighlight">\(k_F\)</span> and <span class="math notranslate nohighlight">\(k_M\)</span> are force and moment coefficients, and we assume that each is purely in the <em>hub</em>-frame <span class="math notranslate nohighlight">\(z\)</span>-direction.
+The sign of the moment will also be flipped if the rotor is spinning clockwise.
+The reference frames are summarized in the following figure:</p>
+<a class="reference internal image-reference" href="../../_images/frames1.png"><img alt="reference_frames1" src="../../_images/frames1.png" style="width: 600px;" />
+</a>
+<p>The center of the rotor hub is offset from the body center of mass by <span class="math notranslate nohighlight">\(\mathbf{r}_B^j\)</span>, and we define the <span class="math notranslate nohighlight">\(x\)</span>-<span class="math notranslate nohighlight">\(y\)</span> plane of the hub frame to be in the rotor plane with the <span class="math notranslate nohighlight">\(z\)</span>-axis pointing opposite to the direction of nominal thrust (i.e. downward).
+This may be inclined with respect to the body-frame <span class="math notranslate nohighlight">\(x\)</span>-<span class="math notranslate nohighlight">\(y\)</span> plane if the rotor has a static “cant”, in which case there will be a constant rotation matrix <span class="math notranslate nohighlight">\( ~^B\!\mathbf{C}^{H_j}\)</span> that transforms from the <span class="math notranslate nohighlight">\(j\)</span>-th hub frame to the body frame.
+The force and moment in the body frame are then</p>
+<div class="math-wrapper docutils container">
+<div class="math notranslate nohighlight">
+\[\begin{split}
+\begin{align*}
+\mathbf{F}_B^j &amp;= ~^B\!\mathbf{C}^{H_j} \mathbf{F}_{H_j}^j \\
+\mathbf{M}_B^j &amp;= ~^B\!\mathbf{C}^{H_j} \mathbf{M}_{H_j}^j + \mathbf{r}_B^j \times \mathbf{F}_B^j,
+\end{align*}
+\end{split}\]</div>
+</div>
+<p>This rotor model will tend to be approximately correct near hover, but will generally be too simplistic to properly predict the rotor loads in other maneuvers.
+Later we will revisit the rotor model, but for the time being this set of equations is enough to build a full multirotor dynamics model.</p>
+</section>
+</section>
+
+        </article>
+      </div>
+      <footer>
+        
+        <div class="related-pages">
+          <a class="next-page" href="multirotor02.html">
+              <div class="page-info">
+                <div class="context">
+                  <span>Next</span>
+                </div>
+                <div class="title">Part 2: Implementation in Archimedes</div>
+              </div>
+              <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
+            </a>
+          <a class="prev-page" href="multirotor00.html">
+              <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
+              <div class="page-info">
+                <div class="context">
+                  <span>Previous</span>
+                </div>
+                
+                <div class="title">Multirotor Dynamics</div>
+                
+              </div>
+            </a>
+        </div>
+        <div class="bottom-of-page">
+          <div class="left-details">
+            <div class="copyright">
+                Copyright &#169; 2025, Pine Tree Labs, LLC
+            </div>
+            Made with <a href="https://www.sphinx-doc.org/">Sphinx</a> and <a class="muted-link" href="https://pradyunsg.me">@pradyunsg</a>'s
+            
+            <a href="https://github.com/pradyunsg/furo">Furo</a>
+            
+          </div>
+          <div class="right-details">
+            
+          </div>
+        </div>
+        
+      </footer>
+    </div>
+    <aside class="toc-drawer">
+      
+      
+      <div class="toc-sticky toc-scroll">
+        <div class="toc-title-container">
+          <span class="toc-title">
+            On this page
+          </span>
+        </div>
+        <div class="toc-tree-container">
+          <div class="toc-tree">
+            <ul>
+<li><a class="reference internal" href="#">Part 1: Fundamentals of multirotor dynamics</a><ul>
+<li><a class="reference internal" href="#dof-rigid-body-dynamics">6-dof rigid body dynamics</a></li>
+<li><a class="reference internal" href="#kinematic-relations">Kinematic relations</a></li>
+<li><a class="reference internal" href="#simplified-dynamics-model">Simplified dynamics model</a></li>
+</ul>
+</li>
+</ul>
+
+          </div>
+        </div>
+      </div>
+      
+      
+    </aside>
+  </div>
+</div><script src="../../_static/documentation_options.js?v=5929fcd5"></script>
+    <script src="../../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../_static/scripts/furo.js?v=5fa4622c"></script>
+    <script>window.MathJax = {"options": {"processHtmlClass": "tex2jax_process|mathjax_process|math|output_area"}}</script>
+    <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    </body>
+</html>

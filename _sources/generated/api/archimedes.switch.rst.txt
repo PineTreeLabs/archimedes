@@ -1,0 +1,10 @@
+﻿
+
+archimedes.switch
+=================
+
+.. currentmodule:: archimedes
+
+
+
+.. autofunction:: archimedes.switch

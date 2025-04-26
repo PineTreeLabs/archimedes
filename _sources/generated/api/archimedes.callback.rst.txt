@@ -1,0 +1,10 @@
+﻿
+
+archimedes.callback
+===================
+
+.. currentmodule:: archimedes
+
+
+
+.. autofunction:: archimedes.callback

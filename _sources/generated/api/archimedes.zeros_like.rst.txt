@@ -1,0 +1,10 @@
+﻿
+
+archimedes.zeros\_like
+======================
+
+.. currentmodule:: archimedes
+
+
+
+.. autofunction:: archimedes.zeros_like

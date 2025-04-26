@@ -1,0 +1,10 @@
+﻿
+
+archimedes.implicit
+===================
+
+.. currentmodule:: archimedes
+
+
+
+.. autofunction:: archimedes.implicit

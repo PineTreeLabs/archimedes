@@ -1,0 +1,10 @@
+﻿
+
+archimedes.minimize
+===================
+
+.. currentmodule:: archimedes
+
+
+
+.. autofunction:: archimedes.minimize

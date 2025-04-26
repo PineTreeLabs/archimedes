@@ -1,0 +1,10 @@
+﻿
+
+archimedes.jac
+==============
+
+.. currentmodule:: archimedes
+
+
+
+.. autofunction:: archimedes.jac
