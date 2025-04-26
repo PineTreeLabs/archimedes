@@ -40,5 +40,15 @@ We'd especially like to hearing from you if you'd be interested in using Archime
 
 ## Support
 
-Besides the GitHub-based community support process, we may have some capacity for more hands-on consulting and support, depending on the project and the scope.
+Here's how you can get involved and support the project at this stage:
+
+- **⭐ Star the Repository**: The simplest way to show support and help others discover the project
+- **🐛 Report Issues**: Detailed bug reports, documentation gaps, and feature requests are invaluable
+- **💬 Join Discussions**: Share your use cases, ask questions, or provide feedback in our [GitHub Discussions](github.com/pinetreelabs/archimedes/discussions)
+- **📢 Spread the Word**: Tell colleagues, mention us in relevant forums, or share on social media
+- **📝 Document Use Cases**: Share how you're using (or planning to use) Archimedes
+
+If you've built something with Archimedes or are planning to, we definitely want to hear about it! Your real-world use cases directly inform our development priorities.
+
+Besides the GitHub-based community support process, we may also have some capacity for more hands-on consulting and support, depending on the project and the scope.
 For inquiries, please reach out to [info@archimedes.sh](mailto:info@archimedes.sh)

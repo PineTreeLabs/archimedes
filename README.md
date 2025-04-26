@@ -6,6 +6,8 @@
 
 Archimedes is an open-source Python framework designed to simplify complex modeling and simulation tasks, with the ultimate goal of making it possible to do practical hardware engineering with Python.
 
+For more details, see the [documentation site](archimedes.sh/docs)
+
 ### Key features
 
 By combining the powerful symbolic capabilities of [CasADi](https://web.casadi.org/docs/) with the intuitive interface designs of NumPy, PyTorch, and JAX, Archimedes provides a number of key features:
@@ -18,7 +20,7 @@ By combining the powerful symbolic capabilities of [CasADi](https://web.casadi.o
 * JAX-style function transformations
 * PyTorch-style hierarchical data structures for parameters and dynamics modeling
 
-### WARNING: PRE-RELEASE!
+### ⚠️ WARNING: PRE-RELEASE! ⚠️
 
 This project has not been "officially" released yet, although the source code has been made public as part of pre-release workflow testing.
 Feel free to try out the code, submit bug report, etc., but recognize that the project will be more unstable than usual until the formal release determination is made.
@@ -122,51 +124,6 @@ To install the Jupyter notebook kernel, if you have installed `[all]` dependenci
 uv run ipython kernel install --user --env VIRTUAL_ENV $(pwd)/.venv --name=archimedes
 ```
 
-<!-- 
-
-# Target demos
-
-### Minimal
-
-- [x] Accelerated ODE solves and optimization vs SciPy
-- [x] C code generation for Arduino (IIR filter design in SciPy)
-- [ ] Simulink-style block diagram?
-
-### Basic
-
-- [ ] Hybrid dynamics modeling (collisions)
-- [ ] Modelica-style physical modeling (mass-spring-damper or RC circuit)
-- [ ] Optimal control via direct collocation (CartPole swing-up)
-
-### Advanced
-
-- [ ] Indirect (Pontryagin) optimal control (orbit transfer)
-- [x] Optimal control via pseudospectral collocation
-- [x] Neural network training
-- [ ] Embedded MPC/LQG deployment
-- [ ] Rigid body mechanics and multibody systems (Featherstone algorithms?)
-- [ ] UQ with polynomial chaos
-- [ ] Parameter estimation
-- [ ] 1D FEA models (structural, thermal, fluid, beam equations)
-- [ ] Model reduction
-
-### Future
-
-- [ ] PDE systems with UFL + DOLFINx
-- [ ] Reinforcement learning
-- [ ] Requirements tracking
-
-### Applications
-
-- [ ] Rocket engine
-- [ ] Battery model
-- [ ] Quadrotor (multifidelity aero models)
-- [ ] Walking robot (MuJoCo "humanoid")
-- [ ] Manipulator robot (iiwa?)
-
--->
-
-
 # Testing and development
 
 You can run a version of the CI test workflow locally as follows.
@@ -228,18 +185,22 @@ Then run [Bandit](https://bandit.readthedocs.io/) to do a static analysis of the
 uv run bandit -r src
 ```
 
+# Getting involved
 
-# Current status
+We're excited to build a community around Archimedes - here's how you can get involved at this stage:
 
-Archimedes is still in active development, and the API is subject to change.  We are actively seeking feedback from users to help shape the direction of the project.  Key planned directions include hardware support (e.g. HIL testing) and extending physics modeling capabilities.  Please don't hesitate to reach out to us if you have any questions or feedback.
+- **⭐ Star the Repository**: The simplest way to show support and help others discover the project
+- **🐛 Report Issues**: Detailed bug reports, documentation gaps, and feature requests are invaluable
+- **💬 Join Discussions**: Share your use cases, ask questions, or provide feedback in our [GitHub Discussions](github.com/pinetreelabs/archimedes/discussions)
+- **📢 Spread the Word**: Tell colleagues, mention us in relevant forums, or share on social media
+- **📝 Document Use Cases**: Share how you're using (or planning to use) Archimedes
 
-### Contributing
+At this early stage of development:
 
-We're excited to build a community around this project, but at this early stage bandwidth is very constrained.
+- **👍 We welcome issue reports** with specific bugs, documentation improvements, and feature requests
+- **⏳ We are not currently accepting pull requests** as we establish the project's foundation and architecture
+- **❓ We encourage discussions** about potential applications, implementation questions, and project direction
 
-- **We welcome issue reports** for bugs, documentation improvements, and feature requests
-- **We are not currently accepting pull requests** as we establish the project's foundation and processes
-- **We encourage discussions** in our GitHub Discussions area for questions, use cases, and general feedback
+If you've built something with Archimedes or are planning to, we definitely want to hear about it! Your real-world use cases directly inform our development priorities.
 
-That said, if you're using (or are interested in using) Archimedes, we definitely want to hear from you.
-The Discussions area is a great place to share what you'd like to use Archimedes for, what's keeping you from using it, or anything you've already built with it.
+We appreciate your interest and support as we grow this project together!
