@@ -520,14 +520,14 @@ On the other hand, the Archimedes version will evaluate the exact same sequence 
 <span class="n">solve_ivp</span><span class="p">(</span><span class="n">f</span><span class="p">,</span> <span class="n">t_span</span><span class="p">,</span> <span class="n">x0_flat</span><span class="p">,</span> <span class="n">t_eval</span><span class="o">=</span><span class="n">t_eval</span><span class="p">)</span>
 </pre></div>
 </div>
-<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>37 ms ± 534 μs per loop (mean ± std. dev. of 7 runs, 10 loops each)
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>37 ms ± 206 μs per loop (mean ± std. dev. of 7 runs, 10 loops each)
 </pre></div>
 </div>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">%%</span><span class="n">timeit</span>
 <span class="n">ys</span> <span class="o">=</span> <span class="n">arc</span><span class="o">.</span><span class="n">odeint</span><span class="p">(</span><span class="n">f</span><span class="p">,</span> <span class="n">t_span</span><span class="p">,</span> <span class="n">x0_flat</span><span class="p">,</span> <span class="n">t_eval</span><span class="o">=</span><span class="n">t_eval</span><span class="p">)</span>
 </pre></div>
 </div>
-<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>5.26 ms ± 6.55 μs per loop (mean ± std. dev. of 7 runs, 100 loops each)
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>5.29 ms ± 3.99 μs per loop (mean ± std. dev. of 7 runs, 100 loops each)
 </pre></div>
 </div>
 <p>Here we see about a 5x speedup by running the exact same model with Archimedes instead of pure Python.
