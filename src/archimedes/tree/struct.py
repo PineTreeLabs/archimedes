@@ -7,6 +7,10 @@
 # Modifications and additions to the original code:
 # Copyright (c) 2025 Pine Tree Labs, LLC
 # Licensed under the GNU General Public License v3.0
+
+# SPDX-FileCopyrightText: 2024 The Flax Authors
+# SPDX-FileCopyrightText: 2025 Pine Tree Labs, LLC
+# SPDX-License-Identifier: GPL-3.0-or-later
 #
 # As a combined work, use of this code requires compliance with the GNU GPL v3.0.
 # The original license terms are included below for attribution:

@@ -37,6 +37,7 @@ dev = [
     "pip-audit>=2.9.0",
     "pytest>=8.3.5",
     "pytest-cov>=6.0.0",
+    "reuse>=5.0.2",
     "ruff>=0.11.2",
     "sphinx>=8.2.3",
 ]

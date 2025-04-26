@@ -1,3 +1,7 @@
+# Third-party libraries and explicitly local files
+third_party/
+local/
+
 **/.DS_Store
 
 # Byte-compiled / optimized / DLL files

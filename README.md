@@ -185,6 +185,10 @@ Then run [Bandit](https://bandit.readthedocs.io/) to do a static analysis of the
 uv run bandit -r src
 ```
 
+## License annotation
+
+We use [REUSE](https://reuse.software/) to track licensing.
+
 # Getting involved
 
 We're excited to build a community around Archimedes - here's how you can get involved at this stage:
