@@ -1,7 +1,7 @@
 #
 # Copyright (c) 2025 Pine Tree Labs, LLC.
 #
-# This file is part of Archimedes 
+# This file is part of Archimedes
 # (see github.com/pinetreelabs/archimedes).
 #
 # This program is free software: you can redistribute it and/or modify

@@ -4,8 +4,8 @@
 
 import numpy as np
 
-from archimedes.optimize import implicit, root
 from archimedes.error import ShapeDtypeError
+from archimedes.optimize import implicit, root
 
 
 class TestImplicitFunction:
