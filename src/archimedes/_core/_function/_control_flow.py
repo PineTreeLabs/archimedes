@@ -6,7 +6,7 @@
 # https://github.com/jax-ml/jax
 
 # Modifications and additions to the original code:
-# Copyright (c) 2025 Jared Callaham
+# Copyright (c) 2025 Pine Tree Labs, LLC
 # Licensed under the GNU General Public License v3.0
 
 # As a combined work, use of this code requires compliance with the GNU GPL v3.0.
