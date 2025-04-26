@@ -1,0 +1,9 @@
+
+blank_issues_enabled: false
+contact_links:
+  - name: General Questions
+    url: https://github.com/pinetreelabs/archimedes/discussions
+    about: Please ask and answer questions here instead of opening an issue.
+  - name: Documentation
+    url: https://archimedes.sh/docs
+    about: Check if your question is already answered in the documentation.
