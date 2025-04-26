@@ -9,9 +9,13 @@ on:
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
-    # Only run deployment on pushes to main, not on PRs
     permissions:
-      contents: write
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
     steps:
     - uses: actions/checkout@v4
   
@@ -31,11 +35,15 @@ jobs:
         make nbconvert
         make html
     
-    # Only deploy when pushing to main, not on PRs
-    - name: Deploy 🚀
-      if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-      uses: JamesIves/github-pages-deploy-action@v4
+    - name: Setup Pages
+      uses: actions/configure-pages@v4
+    
+    - name: Upload artifact
+      uses: actions/upload-pages-artifact@v3
       with:
-        folder: docs/build/html
-        branch: gh-pages
-        clean: true  # Automatically remove deleted files from the deploy branch
+        path: 'docs/build/html'  # Adjust to your actual build output directory
+    
+    - name: Deploy to GitHub Pages
+      id: deployment
+      if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+      uses: actions/deploy-pages@v4
