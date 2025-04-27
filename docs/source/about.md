@@ -147,8 +147,8 @@ def f(x, y):
     return x + np.sin(y)
 
 # Create templates with appropriate shapes and dtypes
-x_type = np.empty((), dtype=float)
-y_type = np.empty((2,), dtype=float)
+x_type = np.zeros((), dtype=float)
+y_type = np.zeros((2,), dtype=float)
 
 arc.codegen(f, "func.c", (x_type, y_type), header=True)
 ```
