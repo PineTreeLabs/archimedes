@@ -1,6 +1,6 @@
 import numpy as np
 
-from archimedes.experimental.discretize import discretize_radau5, discretize_rk4
+from archimedes.experimental.discretize import discretize
 
 
 def rk4_step(f, t, x, p, h):
@@ -17,7 +17,7 @@ class TestRK4:
             return np.stack([x[1], -x[0]])
 
         h = 1e-2
-        step = discretize_rk4(f, h)
+        step = discretize(f, h, method="rk4")
 
         x0 = np.array([1, 0])
         t0 = 0
@@ -45,7 +45,7 @@ class TestRadau5:
             return np.stack([x[1], -x[0]])
 
         h = 1e-1
-        step = discretize_radau5(f, h)
+        step = discretize(f, h, method="radau5")
 
         x0 = np.array([1, 0])
         t0 = 0

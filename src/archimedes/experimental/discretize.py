@@ -37,17 +37,8 @@ __all__ = ["discretize_rk4", "discretize_radau5"]
 #     return step
 
 
-def discretize_rk4(f, dt, n_steps=1):
+def _rk4(f, h):
     # Take a single RK4 step
-    # TODO: Use scan here?
-    h = dt / n_steps
-
-    # def step(t0, x0, p):
-    #     k1 = f(t0, x0, p)
-    #     k2 = f(t0 + h / 2, x0 + h * k1 / 2, p)
-    #     k3 = f(t0 + h / 2, x0 + h * k2 / 2, p)
-    #     k4 = f(t0 + h, x0 + h * k3, p)
-    #     return x0 + h * (k1 + 2 * k2 + 2 * k3 + k4) / 6
 
     def scan_fun(carry, i):
         t0, x0, p = carry
@@ -61,22 +52,13 @@ def discretize_rk4(f, dt, n_steps=1):
         new_carry = (t0 + h, x1, p)
         return new_carry, np.array([])
 
-    def step(t0, x0, p):
-        carry = (t0, x0, p)
-
-        if n_steps == 1:
-            # Slightly faster compilation if scan is not used
-            carry, _ = scan_fun(carry, 0)
-        else:
-            carry, _ = scan(scan_fun, carry, length=n_steps)
-
-        _, xf, _ = carry
-        return xf
-
-    return FunctionCache(step, name=f"rk4_{f.__name__}", arg_names=["t", "x", "p"])
+    return scan_fun
 
 
-def discretize_radau5(rhs, h, newton_solver="fast_newton"):
+def _radau5(rhs, h, newton_solver="fast_newton"):
+    # Take a single Radau5 step
+
+    # Radau5 Butcher tableau
     c = np.array([(4 - np.sqrt(6)) / 10, (4 + np.sqrt(6)) / 10, 1])
     b = np.array([(16 - np.sqrt(6)) / 36, (16 + np.sqrt(6)) / 36, 1 / 9])
     a = np.array(
@@ -121,12 +103,53 @@ def discretize_radau5(rhs, h, newton_solver="fast_newton"):
     )
     solve = implicit(F, solver=newton_solver)
 
-    def step(t, y, p):
-        n = y.size
+    def scan_fun(carry, i):
+        t, x0, p = carry
+        n = x0.size
         # Solve the nonlinear system using Newton's method
-        k0 = np.hstack([y, y, y])
-        k = solve(k0, t, y, p)
+        k0 = np.hstack([x0, x0, x0])
+        k = solve(k0, t, x0, p)
         k = np.reshape(k, (3, n))
-        return y + h * np.dot(b, k)
+        t1 = t + h
+        x1 = x0 + h * np.dot(b, k)
+        new_carry = (t1, x1, p)
+        return new_carry, np.array([])
 
-    return step
+    return scan_fun
+
+
+def discretize(
+    func,
+    dt,
+    method="rk4",
+    n_steps=1,
+    name=None,
+    **options
+):
+    h = dt / n_steps
+
+    if not isinstance(func, FunctionCache):
+        func = FunctionCache(func)
+
+    if name is None:
+        name = f"{method}_{func.name}"
+
+    h = dt / n_steps
+    scan_fun = {
+        "rk4": _rk4,
+        "radau5": _radau5,
+    }[method](func, h, **options)
+
+    def step(t0, x0, p):
+        carry = (t0, x0, p)
+
+        if n_steps == 1:
+            # Slightly faster compilation if scan is not used
+            carry, _ = scan_fun(carry, 0)
+        else:
+            carry, _ = scan(scan_fun, carry, length=n_steps)
+
+        _, xf, _ = carry
+        return xf
+
+    return FunctionCache(step, name=name, arg_names=["t", "x", "p"])
