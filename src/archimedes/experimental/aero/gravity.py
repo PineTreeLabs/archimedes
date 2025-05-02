@@ -66,6 +66,7 @@ class PointGravity(GravityModel):
             RE * np.sin(lat),
         ])
 
+        # TODO: Use a built-in DCM function
         R_EN = np.array([
             [-np.sin(lat)*np.cos(lon), -np.sin(lon), -np.cos(lat)*np.cos(lon)],
             [-np.sin(lat)*np.sin(lon),  np.cos(lon), -np.cos(lat)*np.sin(lon)],

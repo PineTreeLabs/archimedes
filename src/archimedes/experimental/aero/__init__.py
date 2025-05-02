@@ -8,8 +8,7 @@ from .atmosphere import (
     ConstantAtmosphere,
     StandardAtmosphere1976,
 )
-from .flight_dynamics import (
-    FlightVehicle,
+from .rotations import (
     dcm_from_euler,
     x_dcm,
     y_dcm,
@@ -21,6 +20,9 @@ from .flight_dynamics import (
     quaternion_inverse,
     quaternion_multiply,
     quaternion_to_euler,
+)
+from .flight_dynamics import (
+    FlightVehicle,
     wind_frame,
 )
 from .sensors import (
