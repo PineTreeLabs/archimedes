@@ -1,5 +1,13 @@
-from .gravity import GravityModel, ConstantGravity
-from .atmosphere import AtmosphereModel, ConstantAtmosphere
+from .gravity import (
+    GravityModel,
+    ConstantGravity,
+    PointGravity,
+)
+from .atmosphere import (
+    AtmosphereModel,
+    ConstantAtmosphere,
+    StandardAtmosphere1976,
+)
 from .flight_dynamics import (
     FlightVehicle,
     dcm_from_euler,
@@ -37,8 +45,10 @@ __all__ = [
     "euler_kinematics",
     "GravityModel",
     "ConstantGravity",
+    "PointGravity",
     "AtmosphereModel",
     "ConstantAtmosphere",
+    "StandardAtmosphere1976",
     "Accelerometer",
     "Gyroscope",
     "LineOfSight",
