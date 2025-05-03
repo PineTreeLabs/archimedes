@@ -66,25 +66,8 @@ class FlightVehicle(metaclass=abc.ABCMeta):
             aux_state_derivs: time derivatives of auxiliary state variables
         """
 
-    def dynamics(self, t, x, u):
-        """
-        Flat-earth 6-dof dynamics for a multirotor vehicle
-
-        Based on equations 1.7-18 from Lewis, Johnson, Stevens
-
-        The input should be a function of time and state: u(t, x) -> u
-
-        Args:
-            t: time
-            x: state vector
-            u: rotor speeds
-
-        Returns:
-            xdot: time derivative of the state vector
-        """
-
+    def calc_kinematics(self, x):
         # Unpack the state
-        p_N = x.p_N  # Position of the center of mass in the Newtonian frame N
         v_B = x.v_B  # Velocity of the center of mass in body frame B
         w_B = x.w_B  # Angular velocity in body frame (ω_B)
 
@@ -114,10 +97,15 @@ class FlightVehicle(metaclass=abc.ABCMeta):
             # Time derivative of the quaternion
             att_deriv = quaternion_derivative(q, w_B)
 
-        F_B, M_B, aux_state_derivs = self.net_forces(t, x, u, C_BN)
-
         # Velocity in the Newtonian frame
         dp_N = C_BN.T @ v_B
+
+        return dp_N, att_deriv, C_BN
+
+    def calc_dynamics(self, t, x, F_B, M_B):
+        # Unpack the state
+        v_B = x.v_B  # Velocity of the center of mass in body frame B
+        w_B = x.w_B  # Angular velocity in body frame (ω_B)
 
         # Acceleration in body frame
         dv_B = (F_B / self.m) - np.cross(w_B, v_B)
@@ -126,6 +114,30 @@ class FlightVehicle(metaclass=abc.ABCMeta):
         # solve Euler dynamics equation 𝛕 = I α + ω × (I ω)  for α
         # dw_B = np.linalg.inv(self.J_B) @ (M_B - np.cross(w_B, self.J_B @ w_B))
         dw_B = np.linalg.solve(self.J_B, M_B - np.cross(w_B, self.J_B @ w_B))
+
+        return dv_B, dw_B
+
+
+    def dynamics(self, t, x, u):
+        """
+        Flat-earth 6-dof dynamics for a multirotor vehicle
+
+        Based on equations 1.7-18 from Lewis, Johnson, Stevens
+
+        The input should be a function of time and state: u(t, x) -> u
+
+        Args:
+            t: time
+            x: state vector
+            u: rotor speeds
+
+        Returns:
+            xdot: time derivative of the state vector
+        """
+
+        dp_N, att_deriv, C_BN = self.calc_kinematics(x)
+        F_B, M_B, aux_state_derivs = self.net_forces(t, x, u, C_BN)
+        dv_B, dw_B = self.calc_dynamics(t, x, F_B, M_B)
 
         # Pack the state derivatives
         return self.State(

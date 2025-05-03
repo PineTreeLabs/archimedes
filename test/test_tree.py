@@ -63,7 +63,7 @@ import pytest
 
 from archimedes import struct, tree
 from archimedes._core import SymbolicArray, compile, sym
-from archimedes.tree._tree_util import LEAF
+from archimedes.tree._tree_util import LEAF, NONE_DEF
 
 
 def tree_equal(a, b):
@@ -158,7 +158,7 @@ def test_reduce():
 def test_flatten_none():
     flat, treedef = tree.flatten(None)
     assert flat == []
-    assert treedef is LEAF
+    assert treedef is NONE_DEF
 
 
 def test_flatten_namedtuple():

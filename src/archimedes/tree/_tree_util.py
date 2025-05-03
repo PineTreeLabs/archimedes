@@ -69,6 +69,7 @@ class PyTreeDef(NamedTuple):
 
 
 LEAF = PyTreeDef(None, (), 1)
+NONE_DEF = PyTreeDef(None, (), 0)
 
 
 #
@@ -151,7 +152,7 @@ def _tree_flatten(
     x: PyTree, is_leaf: Callable[[Any], bool] | None
 ) -> tuple[Iterable, PyTreeDef]:
     if x is None:
-        return [], LEAF
+        return [], NONE_DEF
 
     _tree_flatten_leaf = partial(_tree_flatten, is_leaf=is_leaf)
 
@@ -237,6 +238,8 @@ def tree_unflatten(treedef: PyTreeDef, xs: list[ArrayLike]) -> PyTree:
 
 
 def _tree_unflatten(treedef: PyTreeDef, xs: Iterator) -> PyTree:
+    if treedef is NONE_DEF:
+        return None  # Special case for None
     if treedef.node_data is None:
         try:
             return next(xs)
