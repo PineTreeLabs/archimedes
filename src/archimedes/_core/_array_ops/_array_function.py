@@ -663,6 +663,14 @@ def _swapaxes(a, axis1, axis2):
     return a.T
 
 
+def _clip(a, a_min=None, a_max=None):
+    if a_min is not None:
+        a = np.fmax(a, a_min)
+    if a_max is not None:
+        a = np.fmin(a, a_max)
+    return a
+
+
 # List from numpy.testing.overrides.get_overridable_numpy_array_functions()
 SUPPORTED_FUNCTIONS = {
     "array": _dispatch_array,
@@ -949,7 +957,7 @@ SUPPORTED_FUNCTIONS = {
     "rpartition": NotImplemented,
     "linspace": NotImplemented,
     "angle": NotImplemented,
-    "clip": NotImplemented,
+    "clip": _clip,
     "assign_fields_by_name": NotImplemented,
     "copyto": NotImplemented,
     "convolve": NotImplemented,
