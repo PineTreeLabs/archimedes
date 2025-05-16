@@ -92,14 +92,14 @@ def balanced_truncation(A, B, C, D=None, r=None, tol=1e-5):
     try:
         # Use the Bartels-Stewart algorithm (more stable than the default method)
         Wc = linalg.solve_continuous_lyapunov(A, -B @ B.T, method="sg")
-    except:
+    except linalg.LinAlgError:
         # Fallback to default method
         Wc = linalg.solve_continuous_lyapunov(A, -B @ B.T)
 
     # For observability Gramian: A^TWo + WoA + C^TC = 0
     try:
         Wo = linalg.solve_continuous_lyapunov(A.T, -C.T @ C, method="sg")
-    except:
+    except linalg.LinAlgError:
         Wo = linalg.solve_continuous_lyapunov(A.T, -C.T @ C)
 
     # Ensure symmetry (numerical stability)
