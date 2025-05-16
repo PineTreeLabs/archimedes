@@ -927,6 +927,46 @@ class TestSymbolicArrayFunctions:
         assert result.shape == (3, 4)
         assert cs.is_equal(result._sym, cs.cross(x._sym, y._sym, 2).T, 2)
 
+    def test_clip(self):
+        # Test 1D array
+        x = sym("x", shape=(3,))
+        result = np.clip(x, 0, 1)
+        assert isinstance(result, SymbolicArray)
+        assert result.shape == (3,)
+        assert cs.is_equal(result._sym, cs.fmin(cs.fmax(x._sym, 0), 1), 2)
+
+        # Test 2D array
+        x = sym("x", shape=(2, 3))
+        result = np.clip(x, 0, 1)
+        assert isinstance(result, SymbolicArray)
+        assert result.shape == (2, 3)
+        assert cs.is_equal(result._sym, cs.fmin(cs.fmax(x._sym, 0), 1), 2)
+
+        # Test symbolic clip
+        x_max = sym("x_max", shape=())
+        result = np.clip(x, 0, x_max)
+        assert isinstance(result, SymbolicArray)
+        assert result.shape == (2, 3)
+        assert cs.is_equal(result._sym, cs.fmin(cs.fmax(x._sym, 0), x_max._sym), 2)
+
+        # Test no lower bound
+        result = np.clip(x, None, 1)
+        assert isinstance(result, SymbolicArray)
+        assert result.shape == (2, 3)
+        assert cs.is_equal(result._sym, cs.fmin(x._sym, 1), 2)
+
+        # Test no upper bound
+        result = np.clip(x, 0, None)
+        assert isinstance(result, SymbolicArray)
+        assert result.shape == (2, 3)
+        assert cs.is_equal(result._sym, cs.fmax(x._sym, 0), 2)
+
+        # Test no bounds
+        result = np.clip(x, None, None)
+        assert isinstance(result, SymbolicArray)
+        assert result.shape == (2, 3)
+        assert cs.is_equal(result._sym, x._sym, 2)
+
     def test_norm(self):
         # Vector norm
         x = sym("x", shape=(3,), dtype=np.int32)

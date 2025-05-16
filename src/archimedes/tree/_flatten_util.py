@@ -205,6 +205,6 @@ def _unravel_list(indices, shapes, from_dtypes, to_dtype, arr):
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")  # ignore complex-to-real cast warning
         return [
-            np.astype(chunk.reshape(shape), dtype)
+            chunk.reshape(shape).astype(dtype)
             for chunk, shape, dtype in zip(chunks, shapes, from_dtypes)
         ]

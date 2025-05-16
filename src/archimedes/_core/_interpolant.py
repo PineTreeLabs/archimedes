@@ -52,7 +52,6 @@ def _eval_interpolant(x, cs_interp, grid, data, name) -> ArrayLike:
 
 # TODO:
 # - extrapolation handling?
-# - Flatten data inside the function - should accept the grid-structured data
 def interpolant(
     grid: list[np.ndarray],
     data: np.ndarray,

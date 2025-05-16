@@ -1,6 +1,4 @@
-# ruff: noqa: N802
-# ruff: noqa: N803
-# ruff: noqa: N806
+# ruff: noqa: N802, N803, N806
 
 import numpy as np
 import numpy.testing as npt
