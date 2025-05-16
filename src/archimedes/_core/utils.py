@@ -1,8 +1,7 @@
-import numpy as np
 import casadi as cs
 
 import archimedes as arc
-from archimedes._core._array_impl import _as_casadi_array, SymbolicArray
+from archimedes._core._array_impl import SymbolicArray, _as_casadi_array
 
 
 @arc.compile

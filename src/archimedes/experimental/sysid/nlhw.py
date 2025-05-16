@@ -29,7 +29,7 @@ class StateSpace:
     C: np.ndarray
     D: np.ndarray
 
-    State: ClassVar[type] = NewType('State', np.ndarray)
+    State: ClassVar[type] = NewType("State", np.ndarray)
 
     def dynamics(self, t, x, u):
         x = np.atleast_1d(x)

@@ -41,4 +41,3 @@ class ContinuousEKF:
         P_t = F @ P + P @ F.T - K @ H @ P + self.Q
         P_t = P_t.flatten()
         return self.State(x=x_t, P=P_t)
-

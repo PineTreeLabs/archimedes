@@ -1,7 +1,8 @@
+# ruff: noqa: N802, N803, N806, E741
 #
 # Copyright (c) 2025 Pine Tree Labs, LLC.
 #
-# This file is part of Archimedes 
+# This file is part of Archimedes
 # (see github.com/pinetreelabs/archimedes).
 #
 # This program is free software: you can redistribute it and/or modify
@@ -123,7 +124,7 @@ def test_balanced_truncation(plot=False):
     # Calculate error metrics
     max_hsv_truncated = hsv[r:].max() if len(hsv) > r else 0
     print(f"Largest truncated Hankel singular value: {max_hsv_truncated:.6e}")
-    print(f"This is an upper bound on the H∞ norm of the error system.")
+    print("This is an upper bound on the H∞ norm of the error system.")
 
     return sys_full, sys_reduced, hsv
 

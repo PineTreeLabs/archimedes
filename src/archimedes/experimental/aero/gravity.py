@@ -60,17 +60,21 @@ class PointGravity(GravityModel):
         lat = np.deg2rad(lat)
         lon = np.deg2rad(lon)
 
-        p_EN = np.array([
-            RE * np.cos(lat) * np.cos(lon),
-            RE * np.cos(lat) * np.sin(lon),
-            RE * np.sin(lat),
-        ])
+        p_EN = np.array(
+            [
+                RE * np.cos(lat) * np.cos(lon),
+                RE * np.cos(lat) * np.sin(lon),
+                RE * np.sin(lat),
+            ]
+        )
 
         # TODO: Use a built-in DCM function
-        R_EN = np.array([
-            [-np.sin(lat)*np.cos(lon), -np.sin(lon), -np.cos(lat)*np.cos(lon)],
-            [-np.sin(lat)*np.sin(lon),  np.cos(lon), -np.cos(lat)*np.sin(lon)],
-            [np.cos(lat), 0, -np.sin(lat)],
-        ])
+        R_EN = np.array(
+            [
+                [-np.sin(lat) * np.cos(lon), -np.sin(lon), -np.cos(lat) * np.cos(lon)],
+                [-np.sin(lat) * np.sin(lon), np.cos(lon), -np.cos(lat) * np.sin(lon)],
+                [np.cos(lat), 0, -np.sin(lat)],
+            ]
+        )
 
         return cls(p_EN, R_EN)

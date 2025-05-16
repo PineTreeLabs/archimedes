@@ -78,8 +78,6 @@ def barycentric_weights(x):
     return w
 
 
-
-
 @arc.compile
 def interpolate_helper(x, yp, xp, w):
     # Quick exit for empty arrays

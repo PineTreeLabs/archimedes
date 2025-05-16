@@ -63,7 +63,7 @@ import pytest
 
 from archimedes import struct, tree
 from archimedes._core import SymbolicArray, compile, sym
-from archimedes.tree._tree_util import LEAF, NONE_DEF
+from archimedes.tree._tree_util import NONE_DEF
 
 
 def tree_equal(a, b):

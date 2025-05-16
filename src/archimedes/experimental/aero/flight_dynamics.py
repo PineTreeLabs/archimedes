@@ -117,7 +117,6 @@ class FlightVehicle(metaclass=abc.ABCMeta):
 
         return dv_B, dw_B
 
-
     def dynamics(self, t, x, u):
         """
         Flat-earth 6-dof dynamics for a multirotor vehicle

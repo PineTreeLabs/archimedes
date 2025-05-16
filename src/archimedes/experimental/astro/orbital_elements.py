@@ -10,6 +10,7 @@ from ..aero.rotations import x_dcm, y_dcm, z_dcm
 @struct.pytree_node
 class KeplerElements:
     """Class to represent Keplerian orbital elements."""
+
     a: float
     e: float
     i: float
@@ -21,25 +22,24 @@ class KeplerElements:
 @struct.pytree_node
 class CartesianState:
     """Class to represent a Cartesian state vector."""
+
     r: np.ndarray
     v: np.ndarray
 
     @classmethod
-    def from_kepler(cls, kepler: KeplerElements, mu: float = EARTH_MU) -> CartesianState:
+    def from_kepler(
+        cls, kepler: KeplerElements, mu: float = EARTH_MU
+    ) -> CartesianState:
         """Convert Kepler elements to Cartesian state vector."""
         return kepler_to_cartesian(
-            kepler.a,
-            kepler.e,
-            kepler.i,
-            kepler.omega,
-            kepler.RAAN,
-            kepler.nu,
-            mu=mu
+            kepler.a, kepler.e, kepler.i, kepler.omega, kepler.RAAN, kepler.nu, mu=mu
         )
 
 
 def kepler_to_cartesian(
-    oe: KeplerElements, mu: float = EARTH_MU, tol: float = 1e-8,
+    oe: KeplerElements,
+    mu: float = EARTH_MU,
+    tol: float = 1e-8,
 ) -> tuple[np.ndarray, np.ndarray]:
     """Transform the Kepler elements to a state vector in the ECI frame
 
@@ -83,25 +83,29 @@ def kepler_to_cartesian(
     ω = np.where(circular, 0, ω)
 
     # Position and velocity in the perifocal frame
-    r_PQW = (p / (1 + e * np.cos(ν))) * np.hstack([
-        np.cos(ν),
-        np.sin(ν),
-        0,
-    ])
-    v_PQW = np.sqrt(abs(mu / p)) * np.hstack([
-        -np.sin(ν),
-        e + np.cos(ν),
-        0,
-    ])
+    r_PQW = (p / (1 + e * np.cos(ν))) * np.hstack(
+        [
+            np.cos(ν),
+            np.sin(ν),
+            0,
+        ]
+    )
+    v_PQW = np.sqrt(abs(mu / p)) * np.hstack(
+        [
+            -np.sin(ν),
+            e + np.cos(ν),
+            0,
+        ]
+    )
 
-	# Rotation matrix from perifocal to ECI frame.  Note that this is not the most
-	# efficient way to do this, but since this will primarily be evaluated
-	# symbolically, we're basically relying on CasADi to generate
-	# optimized code.
+    # Rotation matrix from perifocal to ECI frame.  Note that this is not the most
+    # efficient way to do this, but since this will primarily be evaluated
+    # symbolically, we're basically relying on CasADi to generate
+    # optimized code.
 
-	# R = Rz(Ω) * Rx(i) * Rz(ω)
-	# R = Rotations.RotZXZ(Ω, i, ω)
-	# R = inv(angle_to_dcm(Ω, i, ω, :ZXZ))
+    # R = Rz(Ω) * Rx(i) * Rz(ω)
+    # R = Rotations.RotZXZ(Ω, i, ω)
+    # R = inv(angle_to_dcm(Ω, i, ω, :ZXZ))
     R = z_dcm(Ω).T @ x_dcm(i).T @ z_dcm(ω).T
     r_ECI = R @ r_PQW
     v_ECI = R @ v_PQW
@@ -109,10 +113,7 @@ def kepler_to_cartesian(
 
 
 def _e_vec(r, v, mu):
-    return (1 / mu) * (
-        (np.dot(v, v) - mu / np.linalg.norm(r)) * r
-        - np.dot(r, v) * v
-    )
+    return (1 / mu) * ((np.dot(v, v) - mu / np.linalg.norm(r)) * r - np.dot(r, v) * v)
 
 
 def eccentricity(r, v, mu):
@@ -124,9 +125,9 @@ def eccentricity(r, v, mu):
 def semi_major_axis(r, v, mu):
     """Calculate the semi-major axis from the position and velocity vectors."""
     h = np.cross(r, v)
-    p = np.linalg.norm(h)**2 / mu
+    p = np.linalg.norm(h) ** 2 / mu
     e = eccentricity(r, v, mu)
-    return p / (1 - e ** 2)  # Semi-major axis
+    return p / (1 - e**2)  # Semi-major axis
 
 
 def inclination(r, v):
@@ -154,9 +155,9 @@ def cartesian_to_kepler(
     n = np.cross(k_hat, h)  # Node vector
     e = _e_vec(r, v, mu)  # Eccentricity vector
 
-    p = h_mag ** 2 / mu  # Semi-latus rectum
+    p = h_mag**2 / mu  # Semi-latus rectum
     e_mag = np.linalg.norm(e)  # Eccentricity magnitude
-    a = p / (1 - e_mag ** 2)  # Semi-major axis
+    a = p / (1 - e_mag**2)  # Semi-major axis
     n_mag = np.linalg.norm(n)  # Node vector magnitude
 
     # Inclination (0 to 180 degrees)
@@ -176,8 +177,8 @@ def cartesian_to_kepler(
     ω = np.arccos(np.clip(arg, -1.0, 1.0))
     ω = np.where(e[2] < 0, 2 * np.pi - ω, ω)
 
-	# True anomaly (ranges from 0 to 180 if r⋅v > 0, otherwise from 180 to 360)
-	# Undefined for circular orbits (no periapsis)
+    # True anomaly (ranges from 0 to 180 if r⋅v > 0, otherwise from 180 to 360)
+    # Undefined for circular orbits (no periapsis)
     arg = np.dot(e, r) / (e_mag * r_mag)
     # Clip to avoid floating point errors out of acos domain
     nu = np.arccos(np.clip(arg, -1.0, 1.0))
@@ -212,5 +213,3 @@ def cartesian_to_kepler(
     ω = np.where(circular, 0, ω)
 
     return KeplerElements(a, e_mag, i, ω, Ω, nu)
-
-

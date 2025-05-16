@@ -20,7 +20,6 @@ g0 = 9.80665  # Gravity constant m/s^2
 
 @struct.pytree_node
 class AtmosphereModel(metaclass=abc.ABCMeta):
-
     @abc.abstractmethod
     def calc_p(self, alt: float) -> float:
         """Compute pressure at given altitude."""
@@ -46,7 +45,7 @@ class ConstantAtmosphere(AtmosphereModel):
     # Defaults based on US Standard Atmosphere, 1976: 20km altitude
     p: float = 5474.89  # Pressure [Pa]
     T: float = 216.65  # Temperature [K]
-    
+
     def calc_p(self, alt: float) -> float:
         """Return constant pressure"""
         return self.p
@@ -77,7 +76,8 @@ class StandardAtmosphere1976(AtmosphereModel):
         p1 = find_equal(alt, h_USSA1976, p_USSA1976)
         L = find_equal(alt, h_USSA1976, L_USSA1976)
 
-        return np.where(L == 0,
+        return np.where(
+            L == 0,
             p1 * np.exp(-g0 * (alt - h1) / (Rs * T1)),
             p1 * (T1 / (T1 + L * (alt - h1))) ** (g0 / (Rs * L)),
         )

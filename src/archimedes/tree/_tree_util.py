@@ -241,10 +241,14 @@ def _tree_unflatten(treedef: PyTreeDef, xs: Iterator) -> PyTree:
     if treedef is NONE_DEF:
         return None  # Special case for None
     if treedef.node_data is None:
-        try:
-            return next(xs)
-        except StopIteration:
-            return None
+        return next(xs)
+        # The following was the original code, but test coverage
+        # shows its's not used and it doesn't seem to be necessary
+        # after introducing NONE_DEF.
+        # try:
+        #     return next(xs)
+        # except StopIteration:
+        #     return None
     else:
         children = tuple(_tree_unflatten(t, xs) for t in treedef.children)
         node_type, node_metadata = treedef.node_data
