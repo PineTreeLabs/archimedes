@@ -56,7 +56,7 @@ class PointGravity(GravityModel):
 
     @classmethod
     def from_lat_lon(cls, lat: float, lon: float):
-        RE = 6.378e6  # Earth radius [m]
+        RE = 6.3781e6  # Earth radius [m]
         lat = np.deg2rad(lat)
         lon = np.deg2rad(lon)
 
