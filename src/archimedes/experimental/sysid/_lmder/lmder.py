@@ -2,12 +2,6 @@ import numpy as np
 from typing import Dict, Tuple, Optional, Callable, Any
 
 
-# Helper functions
-def enorm(x):
-    """Calculate the Euclidean norm of a vector."""
-    return np.sqrt(np.sum(x**2))
-
-
 def compute_step(hess, grad, diag, lambda_val):
     """
     Compute the Levenberg-Marquardt step by solving the damped normal equations.
@@ -55,9 +49,12 @@ def compute_step(hess, grad, diag, lambda_val):
     return step
 
 
-def compute_predicted_reduction(grad, step, hess):
+def compute_predicted_reduction(grad, step, hess, current_objective=None):
     """
     Compute the predicted reduction in the objective function.
+    
+    For the quadratic model q(p) = f + g^T·p + 0.5·p^T·H·p,
+    the predicted reduction is: pred_red = -(g^T·p + 0.5·p^T·H·p)
     
     Parameters
     ----------
@@ -67,19 +64,25 @@ def compute_predicted_reduction(grad, step, hess):
         Proposed step
     hess : ndarray, shape (n, n)
         Hessian matrix or approximation
+    current_objective : float, optional
+        Current objective function value for scaling (if provided)
         
     Returns
     -------
     pred_red : float
         Predicted reduction in the objective function
     """
-    # Predicted reduction = -g^T·p - 0.5·p^T·H·p
-    # This is derived from the quadratic model q(p) = f(x) + g^T·p + 0.5·p^T·H·p
-    linear_term = np.dot(grad, step)  # g^T·p (note: step is already negative)
-    quadratic_term = 0.5 * np.dot(step, hess @ step)  # 0.5·p^T·H·p
+    # For step computed from (H + λI)p = -g, we expect:
+    # pred_red = -g^T·p - 0.5·p^T·H·p
+    linear_term = np.dot(grad, step)
+    quadratic_term = 0.5 * np.dot(step, hess @ step)
+    pred_red = -(linear_term + quadratic_term)
     
-    # The predicted reduction is the negative of the change in q
-    pred_red = -linear_term - quadratic_term
+    # Scale by current objective to make it relative (like MINPACK does with residual norm)
+    if current_objective is not None and current_objective > 0:
+        # Add small epsilon to prevent division by zero near optimum
+        epsilon = 1e-16
+        pred_red = pred_red / (current_objective + epsilon)
     
     return pred_red
 
@@ -188,7 +191,7 @@ def lmder(
             diag = np.sqrt(np.maximum(np.diag(hess), 1e-8))
         
         # Calculate scaled vector norm
-        xnorm = enorm(diag * x)
+        xnorm = np.linalg.norm(diag * x)
         
         # Check gradient convergence
         if g_norm <= gtol:
@@ -204,7 +207,7 @@ def lmder(
             x_new = x + step
             
             # Compute scaled step norm
-            pnorm = enorm(diag * step)
+            pnorm = np.linalg.norm(diag * step)
             
             # Evaluate function at trial point
             cost_new, grad_new, hess_new = func(x_new, *args)
@@ -216,7 +219,7 @@ def lmder(
                 actred = 1.0 - cost_new / cost
             
             # Compute predicted reduction using quadratic model
-            prered = compute_predicted_reduction(grad, step, hess)
+            prered = compute_predicted_reduction(grad, step, hess, cost)
             
             # Compute ratio of actual to predicted reduction
             ratio = 0.0
@@ -224,14 +227,16 @@ def lmder(
                 ratio = actred / prered
             
             # Update lambda based on ratio (Trust region update)
-            if ratio < 0.25:  # Poor agreement: increase damping (smaller step)
-                lambda_val = lambda_val * 10.0
-            elif ratio > 0.75:  # Good agreement: decrease damping (larger step)
-                lambda_val = lambda_val / 10.0
+            # Use more conservative updates similar to MINPACK
+            if ratio < 0.25:  # Poor agreement: increase damping
+                lambda_val = lambda_val * 4.0
+            elif ratio > 0.75:  # Good agreement: decrease damping  
+                lambda_val = lambda_val * 0.5
+            # For 0.25 <= ratio <= 0.75, keep lambda unchanged
             
             # Ensure lambda stays reasonably bounded
-            lambda_val = max(lambda_val, 1e-10)
-            lambda_val = min(lambda_val, 1e10)
+            lambda_val = max(lambda_val, 1e-12)
+            lambda_val = min(lambda_val, 1e12)
             
             # Test for successful iteration
             if ratio >= 1.0e-4:  # Step provides sufficient decrease
@@ -239,7 +244,7 @@ def lmder(
                 x = x_new
                 cost, grad, hess = cost_new, grad_new, hess_new
                 g_norm = np.linalg.norm(grad, np.inf)
-                xnorm = enorm(diag * x)
+                xnorm = np.linalg.norm(diag * x)
                 iter += 1
                 break
             
@@ -252,6 +257,10 @@ def lmder(
             if nfev >= maxfev:
                 info = 5
                 break
+        
+        # Check if we exited inner loop due to max function evaluations
+        if info == 5:
+            break
         
         # Test convergence conditions
         # 1. Function value convergence (ftol)
@@ -283,6 +292,10 @@ def lmder(
         
         if info != 0:
             break
+    
+    # Final check for max function evaluations if we exited the main loop
+    if info == 0 and nfev >= maxfev:
+        info = 5
     
     # Set final message based on info code
     messages = {
@@ -317,96 +330,3 @@ def lmder(
     return result
 
 
-def lmder_ORIGINAL(
-    initial_params,
-    func,
-    max_iter=100,
-    lambda_init=1.0,
-    lambda_max=1e8,
-    lambda_min=1e-8,
-    tol=1e-6,
-):
-    """
-    Efficient Levenberg-Marquardt implementation using pre-computed derivatives
-    
-    Args:
-        initial_params: Initial parameter vector
-        func: Function that returns (V, J, H) - objective, gradient, and Hessian
-        max_iter: Maximum iterations
-        lambda_init: Initial LM damping parameter
-        lambda_max/min: Bounds for the damping parameter
-        tol: Convergence tolerance
-    
-    Returns:
-        Optimized parameters
-    """
-    theta = initial_params.copy()
-    d = len(theta)
-    lambda_val = lambda_init
-    
-    # Initial evaluation
-    V, J, H = func(theta)
-
-    print("Iteration    Total nfev     Cost       Optimality")
-    print("----------   ----------  ----------    ----------")
-    fmt = "  {:>2}             {:>2}     {:>8.4e}        {:>10.4f}"
-
-    # cost = 0.5 * np.dot(f, f)
-    # g = J.T.dot(f)
-    # g_norm = norm(g, ord=np.inf)
-    
-    iteration = 0
-    nfev = 1
-    while iteration < max_iter:
-        # Apply Levenberg-Marquardt regularization to Hessian approximation
-        H_lm = H + lambda_val * np.eye(d)
-
-        # Compute step direction
-        try:
-            delta = np.linalg.solve(H_lm, J)
-        except np.linalg.LinAlgError:
-            print("Matrix is singular, using fallback")
-            # Fallback if matrix is singular
-            delta = J / (np.linalg.norm(J) + 1e-8)
-
-        # Compute proposed new parameters
-        theta_new = theta + delta
-
-        # Evaluate at new parameters
-        V_new, J_new, H_new = func(theta_new)
-        nfev += 1
-        # print(lambda_val)
-
-        # Accept/reject step and adjust lambda
-        if V_new < V:
-            # print("Step accepted")
-            # Success - accept step
-            improvement_ratio = (V - V_new) / (0.5 * np.dot(delta, J))  # Actual vs. predicted reduction
-
-            # Update parameters and derivatives
-            theta = theta_new
-            V, J, H = V_new, J_new, H_new
-
-            # Adjust lambda based on improvement
-            if improvement_ratio > 0.75:
-                lambda_val = max(lambda_val / 10, lambda_min)
-            elif improvement_ratio < 0.25:
-                lambda_val = min(lambda_val * 2, lambda_max)
-
-            # Print status
-            iteration += 1
-            print(fmt.format(iteration, nfev, V, 0.0))
-
-        else:
-            # Failure - reject step and increase lambda
-            lambda_val = min(lambda_val * 10, lambda_max)
-
-        # Check convergence
-        if np.linalg.norm(delta) < tol * (np.linalg.norm(theta) + tol):
-            break
-
-        # Also check gradient norm for convergence
-        if np.linalg.norm(J) < tol:
-            break
-
-    return theta
