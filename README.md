@@ -241,4 +241,4 @@ At this early stage of development:
 
 If you've built something with Archimedes or are planning to, we definitely want to hear about it! Your real-world use cases directly inform our development priorities.
 
-We appreciate your interest and support as we grow this project together!
+We appreciate your interest and support!

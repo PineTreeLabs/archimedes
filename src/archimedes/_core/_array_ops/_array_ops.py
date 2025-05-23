@@ -212,7 +212,7 @@ def _broadcast_binary_operation(operation, arr1, arr2, shape1, shape2, common_sh
         return operation(arr1, arr2)
 
     # Cases 2, 3, 8, 9: broadcast scalar to vector/matrix - handled automatically
-    if len(shape1) == 0 or len(shape2) == 0:
+    if len(shape1) == 0 or len(shape2) == 0 or shape1 == (1,) or shape2 == (1,):
         return operation(arr1, arr2)
 
     # Case 6 is a duplicate of case 5 with arguments reversed
