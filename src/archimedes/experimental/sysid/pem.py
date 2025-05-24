@@ -48,7 +48,9 @@ def make_pem(
 
         V = 0.0  # Cost function
         J = np.zeros((na,), like=x0)  # Jacobian-like term: sum_{i=1}^N psi[i]
-        H = np.zeros((na, na), like=x0)  # Hessian-like term: sum_{i=1}^N psi[i].T @ psi[i]
+        H = np.zeros(
+            (na, na), like=x0
+        )  # Hessian-like term: sum_{i=1}^N psi[i].T @ psi[i]
         init_carry, unravel_carry = tree.ravel((x0, P0, args, V, J, H))
 
         # Predicted measurement (used for sensitivity analysis)

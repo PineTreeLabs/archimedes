@@ -118,14 +118,7 @@ def _radau5(rhs, h, newton_solver="fast_newton"):
     return scan_fun
 
 
-def discretize(
-    func,
-    dt,
-    method="rk4",
-    n_steps=1,
-    name=None,
-    **options
-):
+def discretize(func, dt, method="rk4", n_steps=1, name=None, **options):
     h = dt / n_steps
 
     if not isinstance(func, FunctionCache):

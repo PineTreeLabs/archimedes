@@ -1,10 +1,11 @@
 from typing import TYPE_CHECKING, Any, Tuple, TypeAlias
-from numpy.typing import DTypeLike, NDArray
 
 import casadi as cs
+from numpy.typing import DTypeLike, NDArray
 
 if TYPE_CHECKING:
     from ._core import SymbolicArray
+
     ArrayLike: TypeAlias = NDArray | SymbolicArray
 
 
