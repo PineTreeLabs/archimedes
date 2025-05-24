@@ -1,4 +1,4 @@
-# /Users/jared/Dropbox/projects/archimedes/test/experimental/sysid/test_lm.py
+# ruff: noqa: N802, N803, N806, E741
 
 import numpy as np
 
@@ -45,24 +45,24 @@ class TestLM:
         result = lmder(rosenbrock_func, x0, maxfev=1000)
 
         # Check result - the solution should be close to [1.0, 1.0]
-        print(f"Optimization result: {result['x']}")
-        print(f"Final objective: {result['fun']}")
-        print(f"Success: {result['success']}")
-        print(f"Message: {result['message']}")
-        print(f"Iterations: {result['nit']}")
-        print(f"Function evaluations: {result['nfev']}")
+        print(f"Optimization result: {result.x}")
+        print(f"Final objective: {result.fun}")
+        print(f"Success: {result.success}")
+        print(f"Message: {result.message}")
+        print(f"Iterations: {result.nit}")
+        print(f"Function evaluations: {result.nfev}")
 
         # Test that optimization was successful
-        assert result["success"], f"Optimization failed: {result['message']}"
+        assert result.success, f"Optimization failed: {result.message}"
 
         # Test that solution is close to the known optimum [1.0, 1.0]
-        assert np.allclose(result["x"], np.array([1.0, 1.0]), rtol=1e-4, atol=1e-4), (
-            f"Solution {result['x']} not close to expected [1.0, 1.0]"
+        assert np.allclose(result.x, np.array([1.0, 1.0]), rtol=1e-4, atol=1e-4), (
+            f"Solution {result.x} not close to expected [1.0, 1.0]"
         )
 
         # Test that final objective is close to zero
-        assert result["fun"] < 1e-6, (
-            f"Final objective {result['fun']} not close to zero"
+        assert result.fun < 1e-6, (
+            f"Final objective {result.fun} not close to zero"
         )
 
     def test_compute_step_well_conditioned(self):
@@ -216,20 +216,21 @@ class TestLM:
 
         # Test assertions
         expected_solution = np.array([0.0, 0.0, 0.0, 0.0])
-        solution_error = np.linalg.norm(result["x"] - expected_solution)
+        solution_error = np.linalg.norm(result.x - expected_solution)
 
-        assert result["success"], (
-            f"Powell optimization should succeed, got: {result['message']}"
+        assert result.success, (
+            f"Powell optimization should succeed, got: {result.message}"
         )
 
-        # Powell's function is notoriously challenging due to singular Jacobian at solution
-        # A solution error of ~1e-3 is actually quite good for this problem
+        # Powell's function is notoriously challenging due to singular Jacobian
+        # at solution: ~1e-3 is actually quite good for this problem
         assert solution_error < 5e-3, (
-            f"Solution {result['x']} not close enough to [0,0,0,0] (error: {solution_error:.6e})"
+            f"Solution {result.x} not close enough to [0,0,0,0] (error: "
+            f"{solution_error:.6e})"
         )
 
-        assert result["fun"] < 1e-6, (
-            f"Final objective {result['fun']:.6e} should be close to zero"
+        assert result.fun < 1e-6, (
+            f"Final objective {result.fun:.6e} should be close to zero"
         )
 
     def test_convergence_criteria(self):
@@ -253,11 +254,11 @@ class TestLM:
             gtol=1e-8,
             maxfev=200,
         )
-        assert result["success"], (
-            f"Optimization should succeed, got: {result['message']}"
+        assert result.success, (
+            f"Optimization should succeed, got: {result.message}"
         )
-        assert result["status"] in [1, 2, 3, 4], (
-            f"Should have valid convergence status, got {result['status']}"
+        assert result.status in [1, 2, 3, 4], (
+            f"Should have valid convergence status, got {result.status}"
         )
 
         # Test 2: Verify we can hit maximum iterations
@@ -269,8 +270,8 @@ class TestLM:
             gtol=1e-15,
             maxfev=5,
         )
-        assert result["status"] == 5, (
-            f"Should hit max iterations, got status {result['status']}: {result['message']}"
+        assert result.status == 5, (
+            f"Should hit max iterations, got status {result.status}: {result.message}"
         )
 
         # Test 3: Verify tolerances work (looser tolerances should still converge)
@@ -282,8 +283,8 @@ class TestLM:
             gtol=1e-2,
             maxfev=200,
         )
-        assert result["success"], (
-            f"Should converge with loose tolerances, got: {result['message']}"
+        assert result.success, (
+            f"Should converge with loose tolerances, got: {result.message}"
         )
 
     def test_wood_function(self):
@@ -292,7 +293,8 @@ class TestLM:
         def wood_func(x):
             """
             Wood's function (4D optimization test problem):
-            f(x) = 100(x2-x1²)² + (1-x1)² + 90(x4-x3²)² + (1-x3)² + 10.1((x2-1)² + (x4-1)²) + 19.8(x2-1)(x4-1)
+            f(x) = 100(x2-x1²)² + (1-x1)² + 90(x4-x3²)² + (1-x3)² + 10.1((x2-1)²
+                   + (x4-1)²) + 19.8(x2-1)(x4-1)
 
             Formulated as least squares with residuals + cross term:
             r1 = 10(x2 - x1²)
@@ -366,27 +368,19 @@ class TestLM:
         # Standard starting point for Wood's function
         x0 = np.array([-3.0, -1.0, -3.0, -1.0])
 
-        # Run optimization with reasonable limits and history collection
-        result = lmder(
-            wood_func,
-            x0,
-            maxfev=1000,
-            ftol=1e-10,
-            xtol=1e-10,
-            gtol=1e-8,
-            collect_history=True,
-        )
+        # Run optimization with reasonable limits
+        result = lmder(wood_func, x0, maxfev=1000, ftol=1e-10, xtol=1e-10, gtol=1e-8)
 
         # Print results for diagnostic purposes
         print("\nWood's Function Results (Standard Starting Point):")
         print(f"Initial point: {x0}")
-        print(f"Final solution: {result['x']}")
-        print(f"Final objective: {result['fun']:.2e}")
-        print(f"Success: {result['success']}")
-        print(f"Status: {result['status']} - {result['message']}")
-        print(f"Iterations: {result['nit']}")
-        print(f"Function evaluations: {result['nfev']}")
-        print(f"Final gradient norm: {result['history'][-1]['grad_norm']:.6e}")
+        print(f"Final solution: {result.x}")
+        print(f"Final objective: {result.fun:.2e}")
+        print(f"Success: {result.success}")
+        print(f"Status: {result.status} - {result.message}")
+        print(f"Iterations: {result.nit}")
+        print(f"Function evaluations: {result.nfev}")
+        print(f"Final gradient norm: {result.history[-1]['grad_norm']:.6e}")
 
         # Test starting near global minimum for comparison
         x0_global = np.array([1.1, 1.1, 1.1, 1.1])
@@ -396,35 +390,38 @@ class TestLM:
 
         print("\nWood's Function Results (Near-Global Starting Point):")
         print(f"Initial point: {x0_global}")
-        print(f"Final solution: {result_global['x']}")
-        print(f"Final objective: {result_global['fun']:.2e}")
-        print(f"Success: {result_global['success']}")
-        print(f"Iterations: {result_global['nit']}")
+        print(f"Final solution: {result_global.x}")
+        print(f"Final objective: {result_global.fun:.2e}")
+        print(f"Success: {result_global.success}")
+        print(f"Iterations: {result_global.nit}")
 
         # Test assertions - Modified to account for local vs global minima
         expected_solution = np.array([1.0, 1.0, 1.0, 1.0])
-        solution_error = np.linalg.norm(result["x"] - expected_solution)
-        solution_error_global = np.linalg.norm(result_global["x"] - expected_solution)
+        solution_error_global = np.linalg.norm(result_global.x - expected_solution)
 
         # Basic convergence assertion
-        assert result["success"], (
-            f"Wood optimization should succeed, got: {result['message']}"
+        assert result.success, (
+            f"Wood optimization should succeed, got: {result.message}"
         )
-        assert result_global["success"], (
-            f"Wood optimization from global start should succeed, got: {result_global['message']}"
+        assert result_global.success, (
+            f"Wood optimization from global start should succeed, got: "
+            f"{result_global.message}"
         )
 
         # The algorithm should find the global minimum when started near it
         assert solution_error_global < 1e-3, (
-            f"Solution from global start {result_global['x']} not close enough to [1,1,1,1] (error: {solution_error_global:.6e})"
+            f"Solution from global start {result_global.x} not close enough to "
+            "[1,1,1,1] (error: {solution_error_global:.6e})"
         )
-        assert result_global["fun"] < 1e-6, (
-            f"Final objective from global start {result_global['fun']:.6e} should be close to zero"
+        assert result_global.fun < 1e-6, (
+            f"Final objective from global start {result_global.fun:.6e} should be "
+            "close to zero"
         )
 
         # For the standard start, we expect to find a local minimum (critical point)
-        # The key test is that we found a critical point (small gradient), not necessarily the global minimum
-        final_grad_norm = result["history"][-1]["grad_norm"]
+        # The key test is that we found a critical point (small gradient), not
+        # necessarily the global minimum
+        final_grad_norm = result.history[-1]["grad_norm"]
         assert final_grad_norm < 1e-4, (
             f"Should converge to critical point (grad norm: {final_grad_norm:.6e})"
         )
@@ -432,7 +429,8 @@ class TestLM:
         print("\nTest Results:")
         print("✓ Both optimizations converged successfully")
         print(
-            f"✓ Near-global start found global minimum (error: {solution_error_global:.2e})"
+            f"✓ Near-global start found global minimum (error: "
+            f"{solution_error_global:.2e})"
         )
         print(
             f"✓ Standard start found critical point (grad norm: {final_grad_norm:.2e})"
@@ -498,32 +496,33 @@ class TestLM:
         # Print results for diagnostic purposes
         print("\nBeale's Function Results:")
         print(f"Initial point: {x0}")
-        print(f"Final solution: {result['x']}")
-        print(f"Final objective: {result['fun']:.2e}")
-        print(f"Success: {result['success']}")
-        print(f"Status: {result['status']} - {result['message']}")
-        print(f"Iterations: {result['nit']}")
-        print(f"Function evaluations: {result['nfev']}")
+        print(f"Final solution: {result.x}")
+        print(f"Final objective: {result.fun:.2e}")
+        print(f"Success: {result.success}")
+        print(f"Status: {result.status} - {result.message}")
+        print(f"Iterations: {result.nit}")
+        print(f"Function evaluations: {result.nfev}")
 
         # Test assertions
         expected_solution = np.array([3.0, 0.5])
-        solution_error = np.linalg.norm(result["x"] - expected_solution)
+        solution_error = np.linalg.norm(result.x - expected_solution)
 
-        assert result["success"], (
-            f"Beale optimization should succeed, got: {result['message']}"
+        assert result.success, (
+            f"Beale optimization should succeed, got: {result.message}"
         )
 
         # Beale's function should converge to the known solution
         assert solution_error < 1e-3, (
-            f"Solution {result['x']} not close enough to [3,0.5] (error: {solution_error:.6e})"
+            f"Solution {result.x} not close enough to [3,0.5] (error: "
+            f"{solution_error:.6e})"
         )
 
-        assert result["fun"] < 1e-6, (
-            f"Final objective {result['fun']:.6e} should be close to zero"
+        assert result.fun < 1e-6, (
+            f"Final objective {result.fun:.6e} should be close to zero"
         )
 
         # Additional validation: verify original function value
-        x_final, y_final = result["x"]
+        x_final, y_final = result.x
         original_beale = (
             (1.5 - x_final + x_final * y_final) ** 2
             + (2.25 - x_final + x_final * y_final**2) ** 2
@@ -532,7 +531,8 @@ class TestLM:
 
         print(f"Original Beale function value: {original_beale:.6e}")
         assert original_beale < 1e-6, (
-            f"Original Beale function value should be close to zero: {original_beale:.6e}"
+            f"Original Beale function value should be close to zero: "
+            f"{original_beale:.6e}"
         )
 
     def test_iteration_history(self):
@@ -547,7 +547,7 @@ class TestLM:
             H = np.eye(len(x))  # Hessian
             return V, g, H
 
-        # Test with history collection enabled
+        # Test with history collection (always enabled now)
         result = lmder(
             simple_quadratic,
             np.array([5.0]),
@@ -555,30 +555,28 @@ class TestLM:
             xtol=1e-8,
             gtol=1e-8,
             maxfev=50,
-            collect_history=True,
         )
 
         # Verify basic optimization success
-        assert result["success"], (
-            f"Optimization should succeed, got: {result['message']}"
+        assert result.success, (
+            f"Optimization should succeed, got: {result.message}"
         )
-        assert np.isclose(result["x"][0], 2.0, atol=1e-6), (
-            f"Solution should be close to 2.0, got {result['x'][0]}"
+        assert np.isclose(result.x[0], 2.0, atol=1e-6), (
+            f"Solution should be close to 2.0, got {result.x[0]}"
         )
 
         # Verify history collection
-        assert "history" in result, (
-            "History should be collected when collect_history=True"
-        )
-        history = result["history"]
+        history = result.history
 
         # Basic history validation
         assert len(history) > 0, "History should contain at least one iteration"
-        # History records the start of each iteration, including the final one where convergence is detected
-        # So history length should be iterations + 1 (we record iter 0, 1, 2, ..., final_iter)
-        expected_history_length = result["nit"] + 1
+        # History records the start of each iteration, including the final one where
+        # convergence is detected. So history length should be iterations + 1
+        # (we record iter 0, 1, 2, ..., final_iter)
+        expected_history_length = result.nit + 1
         assert len(history) == expected_history_length, (
-            f"History length ({len(history)}) should be iterations + 1 ({expected_history_length})"
+            f"History length ({len(history)}) should be iterations + 1 "
+            f"({expected_history_length})"
         )
 
         # Check history structure
@@ -597,7 +595,8 @@ class TestLM:
             # Verify convergence trend (cost should generally decrease)
             if i > 0:
                 assert hist_entry["cost"] <= history[0]["cost"], (
-                    f"Cost should not increase from initial: {hist_entry['cost']} > {history[0]['cost']}"
+                    f"Cost should not increase from initial: {hist_entry['cost']} > "
+                    f"{history[0]['cost']}"
                 )
 
         # Check that step details are recorded (for successful steps)
@@ -606,23 +605,8 @@ class TestLM:
             "At least one step should have detailed step information"
         )
 
-        # Test without history collection (should not include history)
-        result_no_history = lmder(
-            simple_quadratic,
-            np.array([5.0]),
-            ftol=1e-8,
-            xtol=1e-8,
-            gtol=1e-8,
-            maxfev=50,
-            collect_history=False,
-        )
-
-        assert "history" not in result_no_history, (
-            "History should not be collected when collect_history=False"
-        )
-
         print("History Collection Test Results:")
-        print(f"Iterations completed: {result['nit']}")
+        print(f"Iterations completed: {result.nit}")
         print(f"History entries recorded: {len(history)}")
         print(f"Initial cost: {history[0]['cost']:.6e}")
         print(f"Final cost: {history[-1]['cost']:.6e}")
@@ -636,11 +620,6 @@ class TestLM:
                     print(f"  {key}: {value}")
                 else:
                     print(f"  {key}: {value:.6e}")
-
-    def test_compare_with_scipy(self):
-        """Benchmark against SciPy's implementation."""
-        # ...test implementation...
-        pass
 
 
 if __name__ == "__main__":

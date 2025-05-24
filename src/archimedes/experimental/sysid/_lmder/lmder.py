@@ -1,5 +1,47 @@
 import numpy as np
-from typing import Dict, Tuple, Optional, Callable, Any
+from typing import Dict, Tuple, Optional, Callable, Any, List, NamedTuple
+
+
+class LMResult(NamedTuple):
+    """Result of Levenberg-Marquardt optimization.
+
+    Attributes
+    ----------
+    x : ndarray
+        Solution array
+    success : bool
+        Whether optimization succeeded
+    status : int
+        Integer status code
+    message : str
+        Description of termination reason
+    fun : float
+        Final objective function value
+    jac : ndarray
+        Final gradient vector
+    hess : ndarray
+        Final Hessian matrix
+    nfev : int
+        Number of function evaluations
+    njev : int
+        Number of Jacobian evaluations
+    nit : int
+        Number of iterations
+    history : List[Dict[str, Any]]
+        Iteration history with convergence details
+    """
+
+    x: np.ndarray
+    success: bool
+    status: int
+    message: str
+    fun: float
+    jac: np.ndarray
+    hess: np.ndarray
+    nfev: int
+    njev: int
+    nit: int
+    history: List[Dict[str, Any]]
 
 
 def compute_step(hess, grad, diag, lambda_val):
@@ -97,59 +139,45 @@ def lmder(
     gtol=1e-8,
     maxfev=100,
     diag=None,
-    mode=1,
     factor=100.0,
     nprint=0,
-    collect_history=False,
     **options,
-) -> Dict[str, Any]:
+) -> LMResult:
     """
-    Solve nonlinear least squares problems using Levenberg-Marquardt with analytical Jacobian.
+    Solve nonlinear least squares problems using Levenberg-Marquardt.
 
     Parameters
     ----------
     func : callable
         Function with signature func(params) -> (objective, gradient, hessian)
-        - objective: scalar value of the objective function (0.5 * sum of squared residuals)
+        - objective: scalar value (0.5 * sum of squared residuals)
         - gradient: gradient vector of the objective
-        - hessian: Hessian matrix of the objective or approximation (e.g., J.T @ J)
+        - hessian: Hessian matrix or approximation (e.g., J.T @ J)
     x0 : ndarray, shape (n,)
         Initial guess to the parameters
     args : tuple, optional
-        Extra arguments passed to func and jac
+        Extra arguments passed to func
     ftol : float, optional
         Relative error desired in the sum of squares
     xtol : float, optional
         Relative error desired in the approximate solution
     gtol : float, optional
-        Orthogonality desired between the function vector and the columns of the Jacobian
+        Orthogonality desired between function vector and Jacobian columns
     maxfev : int, optional
         Maximum number of function evaluations
     diag : ndarray, optional
-        N-element array of scaling factors for the variables
-    mode : int, optional
-        If 1, variables are scaled internally. If 2, variables are scaled by diag
+        N-element array of scaling factors. If None, automatic scaling used.
     factor : float, optional
         Initial step bound factor
     nprint : int, optional
         Print progress every nprint iterations
-    collect_history : bool, optional
-        If True, collect detailed iteration history
     **options : dict, optional
         Additional options
 
     Returns
     -------
-    result : OptimizeResult
-        Optimization result with fields:
-        - x: solution array
-        - success: boolean indicating success
-        - status: integer status code
-        - message: description of the termination reason
-        - fun: final value of the objective function
-        - jac: final Jacobian matrix
-        - nfev: number of function evaluations
-        - njev: number of Jacobian evaluations
+    result : LMResult
+        Optimization result with solution, convergence info, and history
     """
     # Constants
     MACHEP = np.finfo(float).eps  # Machine precision
@@ -158,6 +186,8 @@ def lmder(
     x = np.asarray(x0).copy()
     n = len(x)
 
+    # Auto-detect scaling: if diag is None, use automatic scaling
+    auto_scale = diag is None
     if diag is None:
         diag = np.ones(n)
     else:
@@ -169,8 +199,8 @@ def lmder(
     iter = 0  # Iteration counter
     info = 0  # Convergence info
 
-    # Initialize history collection
-    history = [] if collect_history else None
+    # Always collect iteration history
+    history = []
 
     # Initial evaluation
     cost, grad, hess = func(x, *args)
@@ -189,23 +219,22 @@ def lmder(
             print(f"Iteration {iter}, Cost: {cost}, Grad norm: {g_norm}")
 
         # Record iteration history before computing step
-        if collect_history:
-            history.append(
-                {
-                    "iter": iter,
-                    "cost": float(cost),
-                    "grad_norm": float(g_norm),
-                    "lambda": float(lambda_val),
-                    "x": x.copy(),  # Current parameter values
-                }
-            )
+        history.append(
+            {
+                "iter": iter,
+                "cost": float(cost),
+                "grad_norm": float(g_norm),
+                "lambda": float(lambda_val),
+                "x": x.copy(),  # Current parameter values
+            }
+        )
 
         # Increment Jacobian evaluations counter
         njev += 1
 
-        # If first iteration or mode=1, update diagonal scaling
-        if iter == 0 and mode == 1:
-            # In our case, we can use the diagonal of the Hessian for scaling
+        # Update diagonal scaling if using automatic scaling
+        if iter == 0 and auto_scale:
+            # Use the diagonal of the Hessian for scaling
             diag = np.sqrt(np.maximum(np.diag(hess), 1e-8))
 
         # Calculate scaled vector norm
@@ -264,18 +293,16 @@ def lmder(
                 g_norm = np.linalg.norm(grad, np.inf)
                 xnorm = np.linalg.norm(diag * x)
 
-                # Record detailed step information if collecting history
-                if collect_history and len(history) > 0:
-                    # Update the current iteration's history with step details
+                # Record detailed step information in history
+                if len(history) > 0:
+                    # Update current iteration's history with step details
                     history[-1].update(
                         {
                             "step_norm": float(pnorm),
                             "actred": float(actred),
                             "prered": float(prered),
                             "ratio": float(ratio),
-                            "lambda_next": float(
-                                lambda_val
-                            ),  # Updated lambda for next iteration
+                            "lambda_next": float(lambda_val),
                         }
                     )
 
@@ -347,22 +374,17 @@ def lmder(
     success = info in (1, 2, 3, 4)  # Check if convergence criteria met
     message = messages.get(info, "Unknown error")
 
-    # Create and return result object similar to SciPy's OptimizeResult
-    result = {
-        "x": x,
-        "success": success,
-        "status": info,
-        "message": message,
-        "fun": cost,
-        "jac": grad,  # This is not the Jacobian but the gradient
-        "hess": hess,  # Added Hessian information
-        "nfev": nfev,
-        "njev": njev,
-        "nit": iter,
-    }
-
-    # Add history if it was collected
-    if collect_history:
-        result["history"] = history
-
-    return result
+    # Create and return LMResult
+    return LMResult(
+        x=x,
+        success=success,
+        status=info,
+        message=message,
+        fun=cost,
+        jac=grad,  # This is the gradient
+        hess=hess,
+        nfev=nfev,
+        njev=njev,
+        nit=iter,
+        history=history,
+    )
