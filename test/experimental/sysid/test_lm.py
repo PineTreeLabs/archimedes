@@ -3,7 +3,7 @@
 import numpy as np
 
 import archimedes as arc
-from archimedes.experimental.sysid._lmder.lmder import lmder
+from archimedes.experimental.sysid import lm_solve
 
 
 class TestLM:
@@ -39,7 +39,7 @@ class TestLM:
         x0 = np.array([-1.2, 1.0])
 
         # Run optimization (correct function signature: func first, then x0)
-        result = lmder(rosenbrock_func, x0, maxfev=1000)
+        result = lm_solve(rosenbrock_func, x0, maxfev=1000)
 
         # Check result - the solution should be close to [1.0, 1.0]
         print(f"Optimization result: {result.x}")
@@ -64,7 +64,7 @@ class TestLM:
 
     def test_compute_step_well_conditioned(self):
         """Test compute_step with a well-conditioned matrix."""
-        from archimedes.experimental.sysid._lmder.lmder import compute_step
+        from archimedes.experimental.sysid._lm.lm_solve import compute_step
 
         # Simple 2x2 case with known solution
         hess = np.array([[4.0, 1.0], [1.0, 3.0]])  # SPD matrix
@@ -81,7 +81,7 @@ class TestLM:
 
     def test_compute_step_ill_conditioned(self):
         """Test compute_step with an ill-conditioned matrix."""
-        from archimedes.experimental.sysid._lmder.lmder import compute_step
+        from archimedes.experimental.sysid._lm.lm_solve import compute_step
 
         # Ill-conditioned matrix (near-singular)
         hess = np.array([[1.0, 1.0], [1.0, 1.0001]])
@@ -97,7 +97,7 @@ class TestLM:
 
     def test_compute_step_singular(self):
         """Test compute_step with a singular matrix."""
-        from archimedes.experimental.sysid._lmder.lmder import compute_step
+        from archimedes.experimental.sysid._lm.lm_solve import compute_step
 
         # Singular matrix
         hess = np.array([[1.0, 1.0], [1.0, 1.0]])
@@ -112,7 +112,7 @@ class TestLM:
 
     def test_compute_predicted_reduction(self):
         """Test predicted reduction calculation."""
-        from archimedes.experimental.sysid._lmder.lmder import (
+        from archimedes.experimental.sysid._lm.lm_solve import (
             compute_predicted_reduction,
         )
 
@@ -194,7 +194,7 @@ class TestLM:
         V0, g0, H0 = powell_func(x0)
 
         # Run optimization with generous limits since this is a harder problem
-        result = lmder(powell_func, x0, maxfev=1000, ftol=1e-12, xtol=1e-12, gtol=1e-8)
+        result = lm_solve(powell_func, x0, maxfev=1000, ftol=1e-12, xtol=1e-12, gtol=1e-8)
 
         # Test assertions
         expected_solution = np.array([0.0, 0.0, 0.0, 0.0])
@@ -228,7 +228,7 @@ class TestLM:
             return V, g, H
 
         # Test 1: Normal convergence (any success status is fine)
-        result = lmder(
+        result = lm_solve(
             simple_quadratic,
             np.array([5.0]),
             ftol=1e-8,
@@ -244,7 +244,7 @@ class TestLM:
         )
 
         # Test 2: Verify we can hit maximum iterations
-        result = lmder(
+        result = lm_solve(
             simple_quadratic,
             np.array([5.0]),
             ftol=1e-15,
@@ -257,7 +257,7 @@ class TestLM:
         )
 
         # Test 3: Verify tolerances work (looser tolerances should still converge)
-        result = lmder(
+        result = lm_solve(
             simple_quadratic,
             np.array([5.0]),
             ftol=1e-2,
@@ -333,7 +333,7 @@ class TestLM:
         x0 = np.array([-3.0, -1.0, -3.0, -1.0])
 
         # Run optimization with reasonable limits
-        result = lmder(wood_func, x0, maxfev=1000, ftol=1e-10, xtol=1e-10, gtol=1e-8)
+        result = lm_solve(wood_func, x0, maxfev=1000, ftol=1e-10, xtol=1e-10, gtol=1e-8)
 
         # Print results for diagnostic purposes
         print("\nWood's Function Results (Standard Starting Point):")
@@ -348,7 +348,7 @@ class TestLM:
 
         # Test starting near global minimum for comparison
         x0_global = np.array([1.1, 1.1, 1.1, 1.1])
-        result_global = lmder(
+        result_global = lm_solve(
             wood_func, x0_global, maxfev=1000, ftol=1e-10, xtol=1e-10, gtol=1e-8
         )
 
@@ -447,7 +447,7 @@ class TestLM:
         x0 = np.array([1.0, 1.0])
 
         # Run optimization with reasonable limits
-        result = lmder(beale_func, x0, maxfev=1000, ftol=1e-10, xtol=1e-10, gtol=1e-8)
+        result = lm_solve(beale_func, x0, maxfev=1000, ftol=1e-10, xtol=1e-10, gtol=1e-8)
 
         # Print results for diagnostic purposes
         print("\nBeale's Function Results:")
@@ -504,7 +504,7 @@ class TestLM:
             return V, g, H
 
         # Test with history collection (always enabled now)
-        result = lmder(
+        result = lm_solve(
             simple_quadratic,
             np.array([5.0]),
             ftol=1e-8,

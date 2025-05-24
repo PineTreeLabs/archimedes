@@ -73,7 +73,7 @@ def make_pem(
 
             # Accumulate cost function, Jacobian, and Hessian
             V += np.sum(e**2)
-            J += psi.T @ e
+            J -= psi.T @ e
             H += psi.T @ psi
 
             carry, _ = tree.ravel((x, P, args, V, J, H))

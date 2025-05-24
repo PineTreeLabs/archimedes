@@ -129,7 +129,7 @@ def compute_predicted_reduction(grad, step, hess, current_objective=None):
     return pred_red
 
 
-def lmder(
+def lm_solve(
     func,
     x0,
     jac=None,
@@ -139,7 +139,7 @@ def lmder(
     gtol=1e-8,
     maxfev=100,
     diag=None,
-    factor=100.0,
+    lambda0=1e-3,
     nprint=0,
     **options,
 ) -> LMResult:
@@ -167,8 +167,8 @@ def lmder(
         Maximum number of function evaluations
     diag : ndarray, optional
         N-element array of scaling factors. If None, automatic scaling used.
-    factor : float, optional
-        Initial step bound factor
+    lambda0 : float, optional
+        Initial LM damping parameter
     nprint : int, optional
         Print progress every nprint iterations
     **options : dict, optional
@@ -210,7 +210,7 @@ def lmder(
     g_norm = np.linalg.norm(grad, np.inf)
 
     # Initialize the Levenberg-Marquardt parameter
-    lambda_val = 0.001  # Initial damping parameter
+    lambda_val = lambda0  # Initial damping parameter
 
     # Main iteration loop
     while nfev < maxfev:
