@@ -2,6 +2,7 @@
 
 import numpy as np
 
+import archimedes as arc
 from archimedes.experimental.sysid._lmder.lmder import lmder
 
 
@@ -15,17 +16,13 @@ class TestLM:
         # f(x) = 100(x[1] - x[0]²)² + (1 - x[0])²
         # We define residuals: r1 = 10*(x[1] - x[0]²), r2 = (1 - x[0])
         # So that f(x) = 0.5 * (r1² + r2²)
-        def rosenbrock_func(x):
-            # Residuals
-            r = np.array([10.0 * (x[1] - x[0] ** 2), 1.0 - x[0]])
+        def rosenbrock_res(x):
+            return np.hstack([10.0 * (x[1] - x[0] ** 2), 1.0 - x[0]])
 
-            # Jacobian of residuals
-            J = np.array(
-                [
-                    [-20.0 * x[0], 10.0],  # ∂r1/∂x
-                    [-1.0, 0.0],
-                ]
-            )  # ∂r2/∂x
+        def rosenbrock_func(x):
+            # Residuals and Jacobian
+            r = rosenbrock_res(x)
+            J = arc.jac(rosenbrock_res)(x)
 
             # Objective (half sum of squares)
             V = 0.5 * np.sum(r**2)
@@ -152,7 +149,7 @@ class TestLM:
     def test_powell_singular(self):
         """Test optimization of Powell's singular function."""
 
-        def powell_func(x):
+        def powell_res(x):
             """
             Powell's singular function:
             f(x) = (x1 + 10*x2)² + 5*(x3 - x4)² + (x2 - 2*x3)⁴ + 10*(x1 - x4)⁴
@@ -166,7 +163,6 @@ class TestLM:
             Standard starting point: [3, -1, 0, 1]
             Known solution: [0, 0, 0, 0] with f(x*) = 0
             """
-            x = np.asarray(x)
 
             # Residuals
             r1 = x[0] + 10.0 * x[1]
@@ -174,25 +170,11 @@ class TestLM:
             r3 = (x[1] - 2.0 * x[2]) ** 2
             r4 = np.sqrt(10.0) * (x[0] - x[3]) ** 2
 
-            r = np.array([r1, r2, r3, r4])
+            return np.hstack([r1, r2, r3, r4])
 
-            # Jacobian matrix: J[i,j] = ∂rᵢ/∂xⱼ
-            J = np.zeros((4, 4))
-
-            # ∂r1/∂x: [1, 10, 0, 0]
-            J[0, :] = [1.0, 10.0, 0.0, 0.0]
-
-            # ∂r2/∂x: [0, 0, √5, -√5]
-            J[1, :] = [0.0, 0.0, np.sqrt(5.0), -np.sqrt(5.0)]
-
-            # ∂r3/∂x: [0, 2*(x2-2*x3), -4*(x2-2*x3), 0]
-            diff_23 = x[1] - 2.0 * x[2]
-            J[2, :] = [0.0, 2.0 * diff_23, -4.0 * diff_23, 0.0]
-
-            # ∂r4/∂x: [2*√10*(x1-x4), 0, 0, -2*√10*(x1-x4)]
-            diff_14 = x[0] - x[3]
-            coeff_4 = 2.0 * np.sqrt(10.0) * diff_14
-            J[3, :] = [coeff_4, 0.0, 0.0, -coeff_4]
+        def powell_func(x):
+            r = powell_res(x)
+            J = arc.jac(powell_res)(x)
 
             # Objective: V = 0.5 * ||r||²
             V = 0.5 * np.sum(r**2)
@@ -290,7 +272,7 @@ class TestLM:
     def test_wood_function(self):
         """Test optimization of Wood's function."""
 
-        def wood_func(x):
+        def wood_res(x):
             """
             Wood's function (4D optimization test problem):
             f(x) = 100(x2-x1²)² + (1-x1)² + 90(x4-x3²)² + (1-x3)² + 10.1((x2-1)²
@@ -308,8 +290,6 @@ class TestLM:
             Standard starting point: [-3, -1, -3, -1]
             Known solution: [1, 1, 1, 1] with f(x*) = 0
             """
-            x = np.asarray(x)
-
             # Residuals from the main terms
             r1 = 10.0 * (x[1] - x[0] ** 2)
             r2 = 1.0 - x[0]
@@ -318,28 +298,12 @@ class TestLM:
             r5 = np.sqrt(10.1) * (x[1] - 1.0)
             r6 = np.sqrt(10.1) * (x[3] - 1.0)
 
-            r = np.array([r1, r2, r3, r4, r5, r6])
+            return np.hstack([r1, r2, r3, r4, r5, r6])
 
-            # Jacobian matrix: J[i,j] = ∂rᵢ/∂xⱼ
-            J = np.zeros((6, 4))
-
-            # ∂r1/∂x: [-20*x1, 10, 0, 0]
-            J[0, :] = [-20.0 * x[0], 10.0, 0.0, 0.0]
-
-            # ∂r2/∂x: [-1, 0, 0, 0]
-            J[1, :] = [-1.0, 0.0, 0.0, 0.0]
-
-            # ∂r3/∂x: [0, 0, -6√10*x3, 3√10]
-            J[2, :] = [0.0, 0.0, -6.0 * np.sqrt(10.0) * x[2], 3.0 * np.sqrt(10.0)]
-
-            # ∂r4/∂x: [0, 0, -1, 0]
-            J[3, :] = [0.0, 0.0, -1.0, 0.0]
-
-            # ∂r5/∂x: [0, √10.1, 0, 0]
-            J[4, :] = [0.0, np.sqrt(10.1), 0.0, 0.0]
-
-            # ∂r6/∂x: [0, 0, 0, √10.1]
-            J[5, :] = [0.0, 0.0, 0.0, np.sqrt(10.1)]
+        def wood_func(x):
+            # Residuals and Jacobian from the main terms
+            r = wood_res(x)
+            J = arc.jac(wood_res)(x)
 
             # Cross term: 19.8(x2-1)(x4-1)
             cross_term = 19.8 * (x[1] - 1.0) * (x[3] - 1.0)
@@ -439,7 +403,7 @@ class TestLM:
     def test_beale_function(self):
         """Test optimization of Beale's function."""
 
-        def beale_func(x):
+        def beale_res(x):
             """
             Beale's function (2D optimization test problem):
             f(x,y) = (1.5 - x + xy)² + (2.25 - x + xy²)² + (2.625 - x + xy³)²
@@ -452,7 +416,6 @@ class TestLM:
             Standard starting point: [1, 1]
             Known solution: [3, 0.5] with f(x*) = 0
             """
-            x = np.asarray(x)
 
             # Extract variables for clarity
             x_var, y_var = x[0], x[1]
@@ -462,19 +425,12 @@ class TestLM:
             r2 = 2.25 - x_var + x_var * y_var**2
             r3 = 2.625 - x_var + x_var * y_var**3
 
-            r = np.array([r1, r2, r3])
+            return np.hstack([r1, r2, r3])
 
-            # Jacobian matrix: J[i,j] = ∂rᵢ/∂xⱼ
-            J = np.zeros((3, 2))
 
-            # ∂r1/∂x = -1 + y, ∂r1/∂y = x
-            J[0, :] = [-1.0 + y_var, x_var]
-
-            # ∂r2/∂x = -1 + y², ∂r2/∂y = 2xy
-            J[1, :] = [-1.0 + y_var**2, 2.0 * x_var * y_var]
-
-            # ∂r3/∂x = -1 + y³, ∂r3/∂y = 3xy²
-            J[2, :] = [-1.0 + y_var**3, 3.0 * x_var * y_var**2]
+        def beale_func(x):
+            r = beale_res(x)
+            J = arc.jac(beale_res)(x)
 
             # Objective: V = 0.5 * ||r||²
             V = 0.5 * np.sum(r**2)
