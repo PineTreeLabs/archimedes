@@ -141,7 +141,6 @@ def lm_solve(
     diag=None,
     lambda0=1e-3,
     nprint=0,
-    **options,
 ) -> LMResult:
     """
     Solve nonlinear least squares problems using Levenberg-Marquardt.
@@ -171,8 +170,6 @@ def lm_solve(
         Initial LM damping parameter
     nprint : int, optional
         Print progress every nprint iterations
-    **options : dict, optional
-        Additional options
 
     Returns
     -------
