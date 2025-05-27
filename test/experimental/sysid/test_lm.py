@@ -309,12 +309,12 @@ class TestLM:
             cross_term = 19.8 * (x[1] - 1.0) * (x[3] - 1.0)
 
             # Gradient of cross term
-            cross_grad = np.zeros(4)
+            cross_grad = np.zeros(4, like=x)
             cross_grad[1] = 19.8 * (x[3] - 1.0)  # ∂/∂x2
             cross_grad[3] = 19.8 * (x[1] - 1.0)  # ∂/∂x4
 
             # Hessian of cross term (only non-zero element is the mixed derivative)
-            cross_hess = np.zeros((4, 4))
+            cross_hess = np.zeros((4, 4), like=x)
             cross_hess[1, 3] = 19.8  # ∂²/∂x2∂x4
             cross_hess[3, 1] = 19.8  # ∂²/∂x4∂x2 (symmetric)
 

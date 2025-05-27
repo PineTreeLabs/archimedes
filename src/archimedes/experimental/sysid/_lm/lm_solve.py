@@ -1,7 +1,7 @@
 import numpy as np
 from typing import Dict, Tuple, Optional, Callable, Any, List, NamedTuple
 
-from archimedes import tree
+from archimedes import tree, compile
 
 
 class LMResult(NamedTuple):
@@ -190,7 +190,7 @@ def lm_solve(
     n = len(x)
 
     # Wrap the original function to apply the transform
-    _func = func
+    _func = compile(func)
     def func(x_flat, *args):
         x = unravel(x_flat)
         return _func(x, *args)

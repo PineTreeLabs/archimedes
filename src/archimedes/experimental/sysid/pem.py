@@ -18,7 +18,7 @@ class PEMObjective:
     ts: np.ndarray = struct.field(static=True)
     ys: np.ndarray = struct.field(static=True)
     us: np.ndarray = struct.field(static=True)
-    optimize_x0: bool = struct.field(static=True)
+    x0: np.ndarray = struct.field(static=True, default=None)
 
     @property
     def kf_step(self) -> Callable:
@@ -101,7 +101,8 @@ class PEMObjective:
         J /= ts.size
         H /= ts.size
 
-        if not self.optimize_x0:
+        # If not jointly optimizing x0, trim from gradients
+        if self.x0 is not None:
             J = J[nx:]
             H = H[nx:, nx:]
 
@@ -113,12 +114,11 @@ class PEMObjective:
             "H": H,
         }
 
-    def __call__(self, x0: np.ndarray, args: tuple) -> tuple:
+    def __call__(self, decision_variables: np.ndarray) -> tuple:
         """Evaluate the residuals
 
         Args:
-            x0: initial state
-            args: additional arguments for the state transition and measurement functions
+            decision_variables: optimization parameters
 
         Returns:
             tuple of (V, J, H)
@@ -126,7 +126,14 @@ class PEMObjective:
             - J: Jacobian
             - H: Hessian approximation
         """
-        results = self.forward(x0, args)
+        if self.x0 is not None:
+            x0 = self.x0
+            params = decision_variables
+        else:
+            x0 = decision_variables["x0"]
+            params = decision_variables["params"]
+
+        results = self.forward(x0, params)
         V = results["V"]
         J = results["J"]
         H = results["H"]
@@ -141,9 +148,9 @@ def make_pem(
     ys,
     Q,
     R,
+    x0=None,
     P0=None,
     kf_method="ekf",
-    optimize_x0=False,
 ):
     """Create a function to evaluate the residuals
 
@@ -155,10 +162,9 @@ def make_pem(
         ys: measurements (ny, nt)
         Q: process noise covariance
         R: measurement noise covariance
+        x0: initial state (optional, defaults to None)
         P0: initial state covariance (optional, defaults to identity)
         kf_method: "ekf" or "ukf" (optional, defaults to "ekf")
-        optimize_x0: whether to optimize the initial state (optional,
-            defaults to False)
 
     Returns:
         function of (x0, args) that computes the residuals
@@ -173,5 +179,5 @@ def make_pem(
         ts=ts,
         ys=ys,
         us=us,
-        optimize_x0=optimize_x0,
+        x0=x0,
     )
