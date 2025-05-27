@@ -82,7 +82,7 @@ python_functions = "test_*"
 [tool.coverage.run]
 source = ["archimedes"]
 omit = [
-    "*/archimedes/experimental/*",
+    # "*/archimedes/experimental/*",
     "*/archimedes/typing.py",
     "*/archimedes/theme.py",
 ]

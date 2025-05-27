@@ -219,13 +219,25 @@ def integrator(
             # The first two arguments are (t, x), so skip these in checking
             # for static arguments.
             static_argnums = [i - 2 for i in func.static_argnums]
-            _static_args, sym_args, _arg_types = func.split_args(static_argnums, *args)
+            static_args, sym_args, _arg_types = func.split_args(static_argnums, *args)
 
         else:
             # No static data - all arguments can be treated symbolically
+            static_argnums = []
             sym_args = args
 
-        p, _unravel = tree.ravel(sym_args)
+        # We cannot use a concatenation of various symbolic variables as an input to
+        # the integrator, so we need to create a fresh symbolic variable for this
+        p_orig, unravel = tree.ravel(sym_args)
+        p = sym("p", kind="MX", shape=p_orig.shape, dtype=p_orig.dtype)
+
+        # Create a new set of "args" that includes the fresh symbolic parameters
+        # for use in evaluating the ODE function symbolically.
+        args = list(unravel(p))
+        # If the function has static arguments, we need to interleave them back in the
+        # original order.
+        for i in static_argnums:
+            args.insert(i, static_args[i])
 
         # Define consistent time and state variables
         t, x = sym("t", kind="MX"), sym_like(x0, name="x0", kind="MX")
@@ -248,7 +260,7 @@ def integrator(
 
         # Before calling the CasADi solver interface, make sure everything is
         # either a CasADi symbol or a NumPy array
-        p_arg = False if p is None else p
+        p_arg = False if p_orig is None else p_orig
         x0, p_arg = map(_as_casadi_array, (x0, p_arg))  # type: ignore[assignment]
 
         # The return is a dictionary with the final state of the system

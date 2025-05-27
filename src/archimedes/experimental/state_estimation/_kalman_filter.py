@@ -25,6 +25,7 @@ def ekf_correct(h, t, x, y, P, R, args=None):
         args = ()
 
     H = jac(h, argnums=1)(t, x, *args)
+    H = np.atleast_2d(H)  # Ensure H is a 2D array
 
     e = y - h(t, x, *args)  # Innovation or measurement residual
     S = H @ P @ H.T + R  # Innovation covariance
