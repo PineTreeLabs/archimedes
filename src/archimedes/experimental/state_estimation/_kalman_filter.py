@@ -3,14 +3,14 @@ import numpy as np
 from archimedes import jac
 
 
-def ekf_correct(h, t, x, z, P, R, args=None):
+def ekf_correct(h, t, x, y, P, R, args=None):
     """Perform the "correct" step of the extended Kalman filter
 
     Args:
         h: function of (t, x, *args) that computes the measurement function
         t: current time
         x: state vector (typically the prediction from the forward model)
-        z: measurement
+        y: measurement
         P: state covariance (typically the prediction from the forward model)
         R: measurement noise covariance
         args: additional arguments to pass to f and h
@@ -26,7 +26,7 @@ def ekf_correct(h, t, x, z, P, R, args=None):
 
     H = jac(h, argnums=1)(t, x, *args)
 
-    e = z - h(t, x, *args)  # Innovation or measurement residual
+    e = y - h(t, x, *args)  # Innovation or measurement residual
     S = H @ P @ H.T + R  # Innovation covariance
     K = P @ H.T @ np.linalg.inv(S)  # Kalman gain
     x = x + K @ e  # Updated state estimate
@@ -35,7 +35,7 @@ def ekf_correct(h, t, x, z, P, R, args=None):
     return x, P, e
 
 
-def ekf_step(f, h, t, x, z, P, Q, R, args=None):
+def ekf_step(f, h, t, x, y, P, Q, R, args=None):
     """Perform one step of the extended Kalman filter
 
     Args:
@@ -43,7 +43,7 @@ def ekf_step(f, h, t, x, z, P, Q, R, args=None):
         h: function of (t, x, *args) that computes the measurement function
         t: current time
         x: state vector
-        z: measurement
+        y: measurement
         P: state covariance
         Q: process noise covariance
         R: measurement noise covariance
@@ -64,12 +64,12 @@ def ekf_step(f, h, t, x, z, P, Q, R, args=None):
     P = F @ P @ F.T + Q
 
     # Update step
-    x, P, e = ekf_correct(h, t, x, z, P, R, args)
+    x, P, e = ekf_correct(h, t, x, y, P, R, args)
 
     return x, P, e
 
 
-def ukf_step(f, h, t, x, z, P, Q, R, *args):
+def ukf_step(f, h, t, x, y, P, Q, R, *args):
     """Perform one step of the unscented Kalman filter
 
     Args:
@@ -77,7 +77,7 @@ def ukf_step(f, h, t, x, z, P, Q, R, *args):
         h: function of (t, x, *args) that computes the measurement function
         t: current time
         x: state vector
-        z: measurement
+        y: measurement
         P: state covariance
         Q: process noise covariance
         R: measurement noise covariance
@@ -115,19 +115,19 @@ def ukf_step(f, h, t, x, z, P, Q, R, *args):
     )
 
     # Update step
-    z_pred = [h(t, s[i], *args) for i in range(n)]
-    z_hat = sum(
-        [w_a[i] * z_pred[i] for i in range(n)]
+    y_pred = [h(t, s[i], *args) for i in range(n)]
+    y_hat = sum(
+        [w_a[i] * y_pred[i] for i in range(n)]
     )  # Empirical mean of measurements
     S_hat = R + sum(
-        [w_c[i] * np.outer(z_pred[i] - z_hat, z_pred[i] - z_hat) for i in range(n)]
+        [w_c[i] * np.outer(y_pred[i] - y_hat, y_pred[i] - y_hat) for i in range(n)]
     )  # Empirical covariance
     Cxz = sum(
-        [w_c[i] * np.outer(x_pred[i] - x_hat, z_pred[i] - z_hat) for i in range(n)]
+        [w_c[i] * np.outer(x_pred[i] - x_hat, y_pred[i] - y_hat) for i in range(n)]
     )  # Cross-covariance
 
     K = Cxz @ np.linalg.inv(S_hat)  # Kalman gain
-    e = z - z_hat  # Innovation or measurement residual
+    e = y - y_hat  # Innovation or measurement residual
     x = x_hat + K @ e  # Updated state estimate
     P = P - K @ S_hat @ K.T  # Updated state covariance
 

@@ -1,6 +1,8 @@
 import numpy as np
 from typing import Dict, Tuple, Optional, Callable, Any, List, NamedTuple
 
+from archimedes import tree
+
 
 class LMResult(NamedTuple):
     """Result of Levenberg-Marquardt optimization.
@@ -139,6 +141,7 @@ def lm_solve(
     gtol=1e-8,
     maxfev=100,
     diag=None,
+    transform=None,
     lambda0=1e-3,
     nprint=0,
 ) -> LMResult:
@@ -179,9 +182,18 @@ def lm_solve(
     # Constants
     MACHEP = np.finfo(float).eps  # Machine precision
 
+    # By default, just flatten/unflatten the PyTree
+    x0_flat, unravel = tree.ravel(x0)
+
     # Initialize parameters and arrays
-    x = np.asarray(x0).copy()
+    x = x0_flat.copy()  # Start with the flattened initial guess
     n = len(x)
+
+    # Wrap the original function to apply the transform
+    _func = func
+    def func(x_flat, *args):
+        x = unravel(x_flat)
+        return _func(x, *args)
 
     # Auto-detect scaling: if diag is None, use automatic scaling
     auto_scale = diag is None
@@ -370,6 +382,9 @@ def lm_solve(
 
     success = info in (1, 2, 3, 4)  # Check if convergence criteria met
     message = messages.get(info, "Unknown error")
+
+    # Unravel and transform the final solution
+    x = unravel(x)
 
     # Create and return LMResult
     return LMResult(
