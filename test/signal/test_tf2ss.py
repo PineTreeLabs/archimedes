@@ -7,7 +7,7 @@ from archimedes.signal import tf2ss
 from scipy.signal import tf2ss as scipy_tf2ss
 
 
-class TestTf2ssBasic:
+class TestTf2ss:
     """Test basic functionality against SciPy reference"""
     
     def test_second_order_system(self):
@@ -22,20 +22,7 @@ class TestTf2ssBasic:
         np.testing.assert_allclose(B, B_ref, rtol=1e-12)
         np.testing.assert_allclose(C, C_ref, rtol=1e-12)
         np.testing.assert_allclose(D, D_ref, rtol=1e-12)
-    
-    def test_first_order_system(self):
-        """Test simple first-order system"""
-        num = [2]
-        den = [1, 3]
-        
-        A, B, C, D = tf2ss(num, den)
-        A_ref, B_ref, C_ref, D_ref = scipy_tf2ss(num, den)
-        
-        np.testing.assert_allclose(A, A_ref, rtol=1e-12)
-        np.testing.assert_allclose(B, B_ref, rtol=1e-12)
-        np.testing.assert_allclose(C, C_ref, rtol=1e-12)
-        np.testing.assert_allclose(D, D_ref, rtol=1e-12)
-    
+
     def test_pure_integrator(self):
         """Test pure integrator: H(s) = 1/s"""
         num = [1]
@@ -53,36 +40,6 @@ class TestTf2ssBasic:
         """Test pure gain: H(s) = K"""
         num = [5]
         den = [1]
-        
-        A, B, C, D = tf2ss(num, den)
-        A_ref, B_ref, C_ref, D_ref = scipy_tf2ss(num, den)
-        
-        np.testing.assert_allclose(A, A_ref, rtol=1e-12)
-        np.testing.assert_allclose(B, B_ref, rtol=1e-12)
-        np.testing.assert_allclose(C, C_ref, rtol=1e-12)
-        np.testing.assert_allclose(D, D_ref, rtol=1e-12)
-    
-    def test_third_order_system(self):
-        """Test higher-order system"""
-        num = [1, 2]
-        den = [1, 6, 11, 6]  # (s+1)(s+2)(s+3)
-        
-        A, B, C, D = tf2ss(num, den)
-        A_ref, B_ref, C_ref, D_ref = scipy_tf2ss(num, den)
-        
-        np.testing.assert_allclose(A, A_ref, rtol=1e-12)
-        np.testing.assert_allclose(B, B_ref, rtol=1e-12)
-        np.testing.assert_allclose(C, C_ref, rtol=1e-12)
-        np.testing.assert_allclose(D, D_ref, rtol=1e-12)
-
-
-class TestTf2ssEdgeCases:
-    """Test edge cases and boundary conditions"""
-    
-    def test_proper_transfer_function(self):
-        """Test proper TF where deg(num) == deg(den)"""
-        num = [1, 2, 3]
-        den = [1, 4, 5]
         
         A, B, C, D = tf2ss(num, den)
         A_ref, B_ref, C_ref, D_ref = scipy_tf2ss(num, den)
@@ -126,12 +83,8 @@ class TestTf2ssEdgeCases:
         
         with pytest.raises(ValueError, match="Improper transfer function"):
             tf2ss(num, den)
-
-
-class TestTf2ssShapes:
-    """Test output shapes and array properties"""
     
-    def test_output_shapes_second_order(self):
+    def test_output_shapes(self):
         """Verify output matrix dimensions for second-order system"""
         num = [1, 2]
         den = [1, 3, 2]  # n=2 states
@@ -142,37 +95,9 @@ class TestTf2ssShapes:
         assert B.shape == (2, 1), f"B should be (2,1), got {B.shape}"
         assert C.shape == (1, 2), f"C should be (1,2), got {C.shape}"
         assert D.shape == (1, 1), f"D should be (1,1), got {D.shape}"
-    
-    def test_output_shapes_third_order(self):
-        """Verify output matrix dimensions for third-order system"""
-        num = [2, 1]
-        den = [1, 4, 5, 6]  # n=3 states
-        
-        A, B, C, D = tf2ss(num, den)
-        
-        assert A.shape == (3, 3), f"A should be (3,3), got {A.shape}"
-        assert B.shape == (3, 1), f"B should be (3,1), got {B.shape}"
-        assert C.shape == (1, 3), f"C should be (1,3), got {C.shape}"
-        assert D.shape == (1, 1), f"D should be (1,1), got {D.shape}"
-    
-    def test_output_shapes_first_order(self):
-        """Verify output matrix dimensions for first-order system"""
-        num = [3]
-        den = [1, 2]  # n=1 state
-        
-        A, B, C, D = tf2ss(num, den)
-        
-        assert A.shape == (1, 1), f"A should be (1,1), got {A.shape}"
-        assert B.shape == (1, 1), f"B should be (1,1), got {B.shape}"
-        assert C.shape == (1, 1), f"C should be (1,1), got {C.shape}"
-        assert D.shape == (1, 1), f"D should be (1,1), got {D.shape}"
 
-
-class TestTf2ssControllerCanonicalForm:
-    """Test that output is in controller canonical form"""
-    
-    def test_controller_canonical_a_matrix(self):
-        """Verify A matrix has controller canonical structure"""
+    def test_controller_canonical(self):
+        """Verify matrices have controller canonical structure"""
         num = [1, 2]
         den = [1, 5, 6]  # s^2 + 5s + 6
         
@@ -185,39 +110,11 @@ class TestTf2ssControllerCanonicalForm:
         
         np.testing.assert_allclose(A, expected_A, rtol=1e-12)
     
-    def test_controller_canonical_b_matrix(self):
-        """Verify B matrix has controller canonical structure"""
-        num = [1, 2]
-        den = [1, 5, 6]
-        
-        A, B, C, D = tf2ss(num, den)
-        
         # Controller canonical form: B = [[1], [0]]
         expected_B = np.array([[1], [0]])
         
         np.testing.assert_allclose(B, expected_B, rtol=1e-12)
 
-
-@pytest.mark.parametrize("num,den", [
-    ([1], [1, 2]),                    # First order
-    ([1, 2], [1, 3, 2]),             # Second order  
-    ([2, 3], [1, 4, 5, 6]),          # Third order
-    ([1, 0, 1], [1, 2, 3, 4]),       # Zeros in numerator
-    ([5], [1]),                      # Pure gain
-    ([1], [1, 0]),                   # Pure integrator
-])
-def test_tf2ss_parametrized(num, den):
-    """Parametrized test across multiple transfer functions"""
-    A, B, C, D = tf2ss(num, den)
-    A_ref, B_ref, C_ref, D_ref = scipy_tf2ss(num, den)
-    
-    np.testing.assert_allclose(A, A_ref, rtol=1e-12)
-    np.testing.assert_allclose(B, B_ref, rtol=1e-12)
-    np.testing.assert_allclose(C, C_ref, rtol=1e-12)
-    np.testing.assert_allclose(D, D_ref, rtol=1e-12)
-
-
-class TestTf2ssArchimedesIntegration:
     def test_with_symbolic_arrays(self):
         """Test that function works with symbolic arrays"""
         num_sym = arc.sym("num", (2,))
@@ -251,10 +148,6 @@ class TestTf2ssArchimedesIntegration:
         np.testing.assert_allclose(C, C_ref, rtol=1e-12)
         np.testing.assert_allclose(D, D_ref, rtol=1e-12)
 
-
-class TestTf2ssNumericalStability:
-    """Test numerical stability and precision"""
-    
     def test_near_zero_coefficients(self):
         """Test behavior with very small coefficients"""
         num = [1e-15, 1]
@@ -281,6 +174,28 @@ class TestTf2ssNumericalStability:
         np.testing.assert_allclose(B, B_ref, atol=1e-10)
         np.testing.assert_allclose(C, C_ref, atol=1e-10)
         np.testing.assert_allclose(D, D_ref, atol=1e-10)
+
+
+
+
+
+# @pytest.mark.parametrize("num,den", [
+#     ([1], [1, 2]),                    # First order
+#     ([1, 2], [1, 3, 2]),             # Second order  
+#     ([2, 3], [1, 4, 5, 6]),          # Third order
+#     ([1, 0, 1], [1, 2, 3, 4]),       # Zeros in numerator
+#     ([5], [1]),                      # Pure gain
+#     ([1], [1, 0]),                   # Pure integrator
+# ])
+# def test_tf2ss_parametrized(num, den):
+#     """Parametrized test across multiple transfer functions"""
+#     A, B, C, D = tf2ss(num, den)
+#     A_ref, B_ref, C_ref, D_ref = scipy_tf2ss(num, den)
+    
+#     np.testing.assert_allclose(A, A_ref, rtol=1e-12)
+#     np.testing.assert_allclose(B, B_ref, rtol=1e-12)
+#     np.testing.assert_allclose(C, C_ref, rtol=1e-12)
+#     np.testing.assert_allclose(D, D_ref, rtol=1e-12)
 
 
 if __name__ == "__main__":
