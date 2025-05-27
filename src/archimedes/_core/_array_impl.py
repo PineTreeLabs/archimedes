@@ -1120,7 +1120,13 @@ def ones_like(
 
 
 def eye(
-    n: int, dtype: DTypeLike = np.float64, kind: str = DEFAULT_SYM_NAME
+    N: int,
+    M: int | None = None,
+    k: int = 0,
+    dtype: DTypeLike = np.float64,
+    order: str = "C",
+    device: str = "cpu",
+    kind: str = DEFAULT_SYM_NAME,
 ) -> SymbolicArray:
     """
     Construct a symbolic identity matrix of size `n` with the given dtype.
@@ -1131,10 +1137,21 @@ def eye(
 
     Parameters
     ----------
-    n : int
+    N : int
         Size of the identity matrix.
+    M : int, optional
+        Number of columns in the identity matrix. If None (default), M is set to N,
+        creating a square matrix.
+    k : int, optional
+        Index of the diagonal. If None (default), the main diagonal is used.
     dtype : numpy.dtype, optional
         Data type of the array. Default is np.float64.
+    order : {"C", "F"}, optional
+        Memory layout order of the array. For compatibility with NumPy only - ignored
+        by this implementation.
+    device: str, optional
+        Device to create the array on. For compatibility with NumPy only - ignored
+        by this implementation.
     kind : {"SX", "MX"}, optional
         Kind of symbolic variable to create. Default is "MX".
 
@@ -1182,4 +1199,17 @@ def eye(
     ones : Create an array of ones
     zeros : Create an array of zeros
     """
-    return SymbolicArray(SYM_KINDS[kind].eye(n), dtype=dtype, shape=(n, n))
+    if M is None:
+        M = N
+
+    if k != 0:
+        raise NotImplementedError(
+            "Creating identity matrices with a non-zero diagonal (k != 0) "
+            "is not supported yet"
+        )
+
+    sz = max(N, M)
+    eye_mat = SymbolicArray(SYM_KINDS[kind].eye(sz), dtype=dtype, shape=(sz, sz))
+
+    eye_mat = eye_mat[:N, :M]  # Ensure it has shape (N, M)
+    return eye_mat

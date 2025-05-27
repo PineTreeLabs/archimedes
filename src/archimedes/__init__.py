@@ -1,4 +1,4 @@
-from . import error, theme, tree
+from . import error, theme, tree, signal
 from ._core import (
     array,
     callback,
@@ -31,6 +31,7 @@ __all__ = [
     "theme",
     "set_theme",
     "tree",
+    "signal",
     "struct",
     "callback",
     "codegen",
