@@ -130,8 +130,7 @@ class PEMObjective:
             x0 = self.x0
             params = decision_variables
         else:
-            x0 = decision_variables["x0"]
-            params = decision_variables["params"]
+            x0, params = decision_variables
 
         results = self.forward(x0, params)
         V = results["V"]

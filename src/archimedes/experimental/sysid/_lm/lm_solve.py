@@ -4,6 +4,59 @@ from typing import Dict, Tuple, Optional, Callable, Any, List, NamedTuple
 from archimedes import tree, compile
 
 
+class LMProgress:
+    """Handle progress reporting for LM optimization."""
+    
+    def __init__(self, nprint=0):
+        self.nprint = nprint
+        self.iteration = 0
+        self.prev_cost = None
+        self.header_printed = False
+        
+    def report(self, cost, grad_norm, step_norm, nfev):
+        """Report progress in SciPy-style format."""
+        if self.nprint <= 0:
+            return
+            
+        if self.iteration % self.nprint == 0:
+            if not self.header_printed:
+                self._print_header()
+                self.header_printed = True
+            
+            # Calculate cost reduction
+            if self.prev_cost is not None:
+                cost_reduction = self.prev_cost - cost
+            else:
+                cost_reduction = None
+            
+            self._print_iteration(self.iteration, nfev, cost, cost_reduction, 
+                                step_norm, grad_norm)
+        
+        self.prev_cost = cost
+        self.iteration += 1
+    
+    def _print_header(self):
+        print(f"{'Iteration':^10} {'Total nfev':^12} {'Cost':^15} "
+              f"{'Cost reduction':^15} {'Step norm':^12} {'Optimality':^12}")
+    
+    def _print_iteration(self, iter_num, nfev, cost, cost_reduction, 
+                        step_norm, grad_norm):
+        """Print a single iteration row."""
+        # Format numbers with appropriate precision
+        cost_str = f"{cost:.4e}"
+        grad_str = f"{grad_norm:.2e}"
+        
+        if cost_reduction is not None:
+            cost_red_str = f"{cost_reduction:.2e}"
+            step_str = f"{step_norm:.2e}" if step_norm is not None else ""
+        else:
+            cost_red_str = ""
+            step_str = ""
+        
+        print(f"{iter_num:^10} {nfev:^12} {cost_str:^15} "
+              f"{cost_red_str:^15} {step_str:^12} {grad_str:^12}")
+
+
 class LMResult(NamedTuple):
     """Result of Levenberg-Marquardt optimization.
 
@@ -179,6 +232,8 @@ def lm_solve(
     result : LMResult
         Optimization result with solution, convergence info, and history
     """
+    progress = LMProgress(nprint)  # Initialize logger
+
     # Constants
     MACHEP = np.finfo(float).eps  # Machine precision
 
@@ -223,10 +278,7 @@ def lm_solve(
 
     # Main iteration loop
     while nfev < maxfev:
-        # If requested, call function for printing
-        if nprint > 0 and iter % nprint == 0:
-            print(f"Iteration {iter}, Cost: {cost}, Grad norm: {g_norm}")
-
+        
         # Record iteration history before computing step
         history.append(
             {
@@ -301,6 +353,9 @@ def lm_solve(
                 cost, grad, hess = cost_new, grad_new, hess_new
                 g_norm = np.linalg.norm(grad, np.inf)
                 xnorm = np.linalg.norm(diag * x)
+
+                # Report progress
+                progress.report(cost, g_norm, pnorm, nfev)
 
                 # Record detailed step information in history
                 if len(history) > 0:
@@ -382,6 +437,9 @@ def lm_solve(
 
     success = info in (1, 2, 3, 4)  # Check if convergence criteria met
     message = messages.get(info, "Unknown error")
+
+    if nprint > 0 and info in messages:
+        print(messages[info])
 
     # Unravel and transform the final solution
     x = unravel(x)
