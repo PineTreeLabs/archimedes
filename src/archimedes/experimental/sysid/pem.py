@@ -17,6 +17,7 @@ class PEMObjective:
     obs: Callable = struct.field(static=True)
     ts: np.ndarray = struct.field(static=True)
     ys: np.ndarray = struct.field(static=True)
+    us: np.ndarray = struct.field(static=True)
     optimize_x0: bool = struct.field(static=True)
 
     @property
@@ -27,48 +28,57 @@ class PEMObjective:
             "ukf": ukf_step,
         }[self.kf_method]
 
-    def forward(self, x0: np.ndarray, args: tuple) -> tuple:
+    def forward(self, x0: np.ndarray, params: tuple) -> tuple:
+        ts = self.ts
+        us = self.us
+        ys = self.ys
+
         nx = self.Q.shape[0]
-        ny = self.R.shape[0]
+        nu = us.shape[0]
+        ny = ys.shape[0]
+
+        if ny != self.R.shape[0]:
+            raise ValueError(
+                f"Measurement noise covariance R must have shape ({ny}, {ny}), "
+                f"but got {self.R.shape}"
+            )
+
         if self.P0 is None:
             P0 = np.eye(nx)
         else:
             P0 = self.P0
 
-        ts = self.ts
-        ys = self.ys
-
-        args_flat, unravel_args = tree.ravel(args)
-        na = args_flat.size
+        params_flat, unravel_params = tree.ravel(params)
+        na = params_flat.size
 
         V = 0.0  # Cost function
         J = np.zeros((nx + na,), like=x0)  # Jacobian-like term: sum_{i=1}^N psi[i]
         H = np.zeros(
             (nx + na, nx + na), like=x0
         )  # Hessian-like term: sum_{i=1}^N psi[i].T @ psi[i]
-        init_carry, unravel_carry = tree.ravel((x0, P0, args, V, J, H))
+        init_carry, unravel_carry = tree.ravel((x0, P0, params, V, J, H))
 
         # Predicted measurement (used for sensitivity analysis)
-        def step(t, x, y, P, args_flat):
-            args = unravel_args(args_flat)
+        def step(t, x, u, y, P, params_flat):
+            params = unravel_params(params_flat)
             x, P, e = self.kf_step(
-                self.dyn, self.obs, t, x, y, P, self.Q, self.R, args=args
+                self.dyn, self.obs, t, x, y, P, self.Q, self.R, args=(u, params)
             )
             y_hat = y - e  # Recover predicted observation
             return y_hat
 
-        calc_psi = jac(step, argnums=(1, 4))  # dy_hat/d[x0, params]
         # Returns tuple of gradients: (∂y/∂x₀, ∂y/∂params)
+        calc_psi = jac(step, argnums=(1, 5))  # dy_hat/d[x0, params]
 
         @compile(kind="MX")
         def scan_fn(carry_flat, input):
-            t, y = input[0], input[1:]
-            x, P, args, V, J, H = unravel_carry(carry_flat)
-            args_flat = tree.ravel(args)[0]
-            psi_x0, psi_params = calc_psi(t, x, y, P, args_flat)
+            t, u, y = input[0], input[1:nu+1], input[nu+1:]
+            x, P, params, V, J, H = unravel_carry(carry_flat)
+            params_flat = tree.ravel(params)[0]
+            psi_x0, psi_params = calc_psi(t, x, u, y, P, params_flat)
             psi = np.concatenate([psi_x0, psi_params], axis=1)  # shape (ny, nx+na)
             x, P, e = self.kf_step(
-                self.dyn, self.obs, t, x, y, P, self.Q, self.R, args=args
+                self.dyn, self.obs, t, x, y, P, self.Q, self.R, args=(u, params)
             )
             output = np.concatenate([x, e], axis=0)
 
@@ -77,10 +87,10 @@ class PEMObjective:
             J -= psi.T @ e
             H += psi.T @ psi
 
-            carry, _ = tree.ravel((x, P, args, V, J, H))
+            carry, _ = tree.ravel((x, P, params, V, J, H))
             return carry, output
 
-        inputs = np.vstack((ts, ys)).T
+        inputs = np.vstack((ts, us, ys)).T
         carry, scan_output = scan(scan_fn, init_carry, xs=inputs)
         _, _, _, V, J, H = unravel_carry(carry)
         scan_output = scan_output.T
@@ -127,6 +137,7 @@ def make_pem(
     dyn,
     obs,
     ts,
+    us,
     ys,
     Q,
     R,
@@ -137,9 +148,10 @@ def make_pem(
     """Create a function to evaluate the residuals
 
     Args:
-        dyn: function of (t, x, *args) that computes the state transition function
-        obs: function of (t, x, *args) that computes the measurement function
+        dyn: function of (t, x, u, p) that computes the state transition function
+        obs: function of (t, x, u, p) that computes the measurement function
         ts: time points (nt,)
+        us: exogenous inputs (nu, nt)
         ys: measurements (ny, nt)
         Q: process noise covariance
         R: measurement noise covariance
@@ -160,5 +172,6 @@ def make_pem(
         obs=obs,
         ts=ts,
         ys=ys,
+        us=us,
         optimize_x0=optimize_x0,
     )

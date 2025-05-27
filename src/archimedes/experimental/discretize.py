@@ -41,15 +41,15 @@ def _rk4(f, h):
     # Take a single RK4 step
 
     def scan_fun(carry, i):
-        t0, x0, p = carry
+        t0, x0, u, p = carry
 
-        k1 = f(t0, x0, p)
-        k2 = f(t0 + h / 2, x0 + h * k1 / 2, p)
-        k3 = f(t0 + h / 2, x0 + h * k2 / 2, p)
-        k4 = f(t0 + h, x0 + h * k3, p)
+        k1 = f(t0, x0, u, p)
+        k2 = f(t0 + h / 2, x0 + h * k1 / 2, u, p)
+        k3 = f(t0 + h / 2, x0 + h * k2 / 2, u, p)
+        k4 = f(t0 + h, x0 + h * k3, u, p)
         x1 = x0 + h * (k1 + 2 * k2 + 2 * k3 + k4) / 6
 
-        new_carry = (t0 + h, x1, p)
+        new_carry = (t0 + h, x1, u, p)
         return new_carry, np.array([])
 
     return scan_fun
@@ -83,7 +83,7 @@ def _radau5(rhs, h, newton_solver="fast_newton"):
     sym_kind = rhs._kind  # TODO: Use a better way to get the kind
 
     # Define the residual function used in the Newton solver
-    def F(k, t, y, p):
+    def F(k, t, y, u, p):
         n = y.size
         k = np.reshape(k, (3, n))
         f = np.zeros_like(k)
@@ -93,26 +93,26 @@ def _radau5(rhs, h, newton_solver="fast_newton"):
 
         # TODO: Use scan here?
         for i in range(3):
-            f[i] = rhs(ts[i], ys[i], p)
+            f[i] = rhs(ts[i], ys[i], u, p)
 
         f, k = np.reshape(f, (3 * n,)), np.reshape(k, (3 * n,))
         return f - k
 
     F = FunctionCache(
-        F, kind=sym_kind, arg_names=["k", "t", "y", "p"], return_names=["r"]
+        F, kind=sym_kind, arg_names=["k", "t", "y", "u", "p"], return_names=["r"]
     )
     solve = implicit(F, solver=newton_solver)
 
     def scan_fun(carry, i):
-        t, x0, p = carry
+        t, x0, u, p = carry
         n = x0.size
         # Solve the nonlinear system using Newton's method
         k0 = np.hstack([x0, x0, x0])
-        k = solve(k0, t, x0, p)
+        k = solve(k0, t, x0, u, p)
         k = np.reshape(k, (3, n))
         t1 = t + h
         x1 = x0 + h * np.dot(b, k)
-        new_carry = (t1, x1, p)
+        new_carry = (t1, x1, u, p)
         return new_carry, np.array([])
 
     return scan_fun
@@ -133,8 +133,8 @@ def discretize(func, dt, method="rk4", n_steps=1, name=None, **options):
         "radau5": _radau5,
     }[method](func, h, **options)
 
-    def step(t0, x0, p):
-        carry = (t0, x0, p)
+    def step(t0, x0, u, p):
+        carry = (t0, x0, u, p)
 
         if n_steps == 1:
             # Slightly faster compilation if scan is not used
@@ -142,7 +142,7 @@ def discretize(func, dt, method="rk4", n_steps=1, name=None, **options):
         else:
             carry, _ = scan(scan_fun, carry, length=n_steps)
 
-        _, xf, _ = carry
+        _, xf, _, _ = carry
         return xf
 
-    return FunctionCache(step, name=name, arg_names=["t", "x", "p"])
+    return FunctionCache(step, name=name, arg_names=["t", "x", "u", "p"])
