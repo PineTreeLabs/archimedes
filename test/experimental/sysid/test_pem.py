@@ -12,12 +12,16 @@ np.random.seed(0)
 class TestPEMIntegration:
     """Integration tests for system identification using PEM + LM solver."""
 
-    def test_second_order_sysid(self, plot=False):
+    def test_second_order_system(self, plot=False):
         """Test parameter recovery on a second-order damped oscillator.
         
         System: ẍ + 2ζωₙẋ + ωₙ²x = ωₙ²u
-        State space: ẋ₁ = x₂, ẋ₂ = -ωₙ²x₁ - 2ζωₙx₂ + ωₙ²u
-        Parameters: ωₙ (natural frequency), ζ (damping ratio)
+        State space:
+            ẋ₁ = x₂
+            ẋ₂ = -ωₙ²x₁ - 2ζωₙx₂ + ωₙ²u
+        Parameters:
+            ωₙ (natural frequency)
+            ζ (damping ratio)
         """
         # True system parameters
         omega_n_true = 2.0  # rad/s
@@ -76,7 +80,7 @@ class TestPEMIntegration:
         params_guess = {"omega_n": 2.5, "zeta": 0.5}
 
         R = noise_std ** 2 * np.eye(ny)  # Measurement noise covariance
-        Q = 1e-4 * np.eye(nx)  # Process noise covariance
+        Q = noise_std ** 2 * np.eye(nx)  # Process noise covariance (scale with R)
         
         # Set up PEM problem
         dyn = discretize(second_order_ode, dt, method="rk4")
@@ -123,17 +127,19 @@ class TestPEMIntegration:
 
         if plot:
             import matplotlib.pyplot as plt
-            kf_result = pem_obj.forward(x0_true, params_guess)
-            fig, ax = plt.subplots(2, 1, figsize=(10, 8), sharex=True)
+            kf_result_init = pem_obj.forward(x0_true, params_guess)
+            kf_result_opt = pem_obj.forward(x0_true, result.x)
+            fig, ax = plt.subplots(2, 1, figsize=(7, 4), sharex=True)
             ax[0].plot(ts, ys[0], label="Measured Output (y₁)")
-            ax[0].plot(ts, xs_true[0], label="True Output (x₁)", linestyle='--')
-            ax[0].plot(ts, kf_result["x_hat"][0], label="KF Estimate (x₁)", linestyle=':')
-            ax[0].plot(ts, xs_pred[0], label="Predicted Output (x₁)", linestyle='-.')
+            ax[0].plot(ts, xs_true[0], label="True Output (x₁)", c='k', linestyle='--')
+            # ax[0].plot(ts, kf_result_init["x_hat"][0], label="KF Estimate (x₁)", linestyle=':')
+            ax[0].plot(ts, xs_pred[0], label="Final predictions", linestyle='-.')
             ax[0].legend()
             ax[0].grid()
             ax[0].set_ylabel("State prediction")
-            ax[1].plot(ts, kf_result["e"].T)
-            ax[1].set_ylabel("Estimation Error")
+            ax[1].plot(ts, kf_result_init["e"].T, label="Initial residuals")
+            ax[1].plot(ts, kf_result_opt["e"].T, label="Final residuals")
+            ax[1].set_ylabel("Kalman residuals")
             ax[1].grid()
             ax[-1].set_xlabel("Time (s)")
             plt.show()
@@ -157,16 +163,172 @@ class TestPEMIntegration:
         assert result.nit < 50, f"Too many iterations required: {result.nit}"
         assert result.fun < 1e-3, f"Final cost too high: {result.fun:.2e}"
 
-        # Compare objective values at different initial guesses
-        params_good = {"omega_n": 2.5, "zeta": 0.5}  # Works
-        params_bad = {"omega_n": 3.0, "zeta": 0.5}   # Fails
+    def test_van_der_pol_oscillator(self, plot=False):
+        """Test parameter recovery on Van der Pol oscillator (nonlinear system).
+        
+        System: ẍ - μ(1-x²)ẋ + x = 0
+        State space:
+            ẋ₁ = x₂  
+            ẋ₂ = μ(1-x₁²)x₂ - x₁
+        Parameters:
+            μ (nonlinearity parameter)
+        """
+        # True system parameters
+        mu_true = 0.5  # Moderate nonlinearity for good convergence
+        params_true = {"mu": mu_true}
+        
+        # Time vector (shorter simulation for limit cycle development)
+        t0, tf = 0.0, 15.0
+        dt = 0.05
+        ts = np.arange(t0, tf, dt)
 
-        print(f"Objective at good guess: {pem_obj(params_good)[0]:.2e}")
-        print(f"Objective at bad guess:  {pem_obj(params_bad)[0]:.2e}")
+        # Problem dimensions
+        nx = 2  # state dimension (x₁, x₂)
+        nu = 0  # no external input (autonomous system)
+        ny = 1  # output dimension (y = x₁)
+        
+        # No input signal (autonomous system)
+        us = np.zeros((1, len(ts)))  # dummy input
+        
+        # Initial conditions (start away from equilibrium to excite dynamics)
+        x0_true = np.array([2.0, 0.0])  # initial displacement
+    
+        # Generate true system response
+        def van_der_pol_ode(t, x, u, params):
+            """Van der Pol oscillator: ẍ - μ(1-x²)ẋ + x = 0"""
+            mu = params["mu"]
+            
+            x1, x2 = x[0], x[1]
+            # u is unused for autonomous system
+            
+            x1_t = x2
+            x2_t = mu * (1 - x1**2) * x2 - x1
+            
+            return np.hstack([x1_t, x2_t])
 
-        # Also check gradient magnitudes
-        print(f"Gradient norm at good guess: {np.linalg.norm(pem_obj(params_good)[1]):.2e}")
-        print(f"Gradient norm at bad guess:  {np.linalg.norm(pem_obj(params_bad)[1]):.2e}")
+        def obs(t, x, u, params):
+            return x[0]  # observe position only
+        
+        # Generate reference data
+        xs_true = arc.odeint(
+            van_der_pol_ode,
+            t_span=(t0, tf),
+            x0=x0_true,
+            args=(us[:, 0], params_true),
+            t_eval=ts,
+            rtol=1e-8,
+            atol=1e-10,
+        )
+        
+        # Add measurement noise
+        noise_std = 0.05
+        ys = xs_true[:1, :] + np.random.normal(0, noise_std, (ny, len(ts)))
+        
+        # Initial parameter guess (should be different from true value)
+        params_guess = {"mu": 1.0}  # Start with higher nonlinearity
+
+        R = noise_std ** 2 * np.eye(ny)  # Measurement noise covariance
+        Q = noise_std ** 2 * np.eye(nx)  # Process noise covariance (scale with R)
+
+        P0 = 1e-4 * np.eye(nx)  # Initial state covariance (small uncertainty)
+        
+        # Set up PEM problem
+        dyn = discretize(van_der_pol_ode, dt, method="rk4")
+        pem_obj = make_pem(
+            dyn=dyn,
+            obs=obs,
+            ts=ts,
+            us=us,
+            ys=ys,
+            Q=Q,
+            R=R,
+            P0=P0,
+            x0=x0_true,  # Assume initial conditions are known
+        )
+        
+        # Solve using LM
+        result = lm_solve(
+            pem_obj,
+            params_guess,
+            ftol=1e-8,
+            xtol=1e-8,
+            gtol=1e-8,
+            nprint=1,
+        )
+        
+        # Validate results
+        print(f"\nVan der Pol Oscillator ID Results:")
+        print(f"True parameter: μ={mu_true:.3f}")
+        print(f"Estimated parameter: μ={result.x['mu']:.3f}")
+        print(f"Success: {result.success}")
+        print(f"Iterations: {result.nit}")
+        print(f"Final cost: {result.fun:.2e}")
+
+        # Validate forward simulation accuracy
+        xs_pred = arc.odeint(
+            van_der_pol_ode,
+            t_span=(t0, tf),
+            x0=x0_true,
+            args=(us[:, 0], result.x),
+            t_eval=ts,
+            rtol=1e-8,
+            atol=1e-10,
+        )
+
+        if plot:
+            import matplotlib.pyplot as plt
+            kf_result_init = pem_obj.forward(x0_true, params_guess)
+            kf_result_opt = pem_obj.forward(x0_true, result.x)
+            
+            fig, ax = plt.subplots(3, 1, figsize=(8, 6), sharex=True)
+            
+            # State trajectory
+            ax[0].plot(ts, ys[0], label="Measured Output (x₁)", alpha=0.7)
+            ax[0].plot(ts, xs_true[0], label="True Output (x₁)", c='k', linestyle='--')
+            ax[0].plot(ts, kf_result_init["x_hat"][0], label="KF Estimate (x₁)", linestyle=':')
+            ax[0].plot(ts, xs_pred[0], label="Final predictions", linestyle='-.')
+            ax[0].legend()
+            ax[0].grid()
+            ax[0].set_ylabel("Position (x₁)")
+            ax[0].set_title("Van der Pol Oscillator - State Trajectories")
+            
+            # Kalman residuals
+            ax[1].plot(ts, kf_result_init["e"].T, label="Initial residuals", alpha=0.7)
+            ax[1].plot(ts, kf_result_opt["e"].T, label="Final residuals", alpha=0.7)
+            ax[1].set_ylabel("Kalman residuals")
+            ax[1].legend()
+            ax[1].grid()
+            
+            # Phase portrait
+            ax[2].plot(xs_true[0], xs_true[1], label="True phase portrait", c='k', linestyle='--')
+            ax[2].plot(xs_pred[0], xs_pred[1], label="Predicted phase portrait", linestyle='-.')
+            ax[2].set_xlabel("Position (x₁)")
+            ax[2].set_ylabel("Velocity (x₂)")
+            ax[2].legend()
+            ax[2].grid()
+            ax[2].set_title("Phase Portrait")
+            
+            plt.tight_layout()
+            plt.show()
+        
+        # Test assertions
+        assert result.success, f"Parameter estimation failed: {result.message}"
+        
+        # Check parameter recovery accuracy
+        # Note: Nonlinear systems are typically harder to identify than linear ones
+        mu_error = abs(result.x["mu"] - mu_true)
+        
+        assert mu_error < 0.05, f"Nonlinearity parameter error too large: {mu_error:.6f}"
+        
+        # Check simulation accuracy (allow larger error for nonlinear system)
+        simulation_error = np.sqrt(np.mean((xs_true - xs_pred)**2))
+        print(f"Forward simulation RMS error: {simulation_error:.2e}")
+        
+        assert simulation_error < 0.1, f"Forward simulation error too large: {simulation_error:.6f}"
+        
+        # Test convergence performance (allow more iterations for nonlinear system)
+        assert result.nit < 100, f"Too many iterations required: {result.nit}"
+        assert result.fun < 1e-2, f"Final cost too high: {result.fun:.2e}"
 
 
 if __name__ == "__main__":
@@ -174,10 +336,16 @@ if __name__ == "__main__":
     test_suite = TestPEMIntegration()
     
     print("=" * 60)
-    print("Running Second-Order System Identification Tests")
+    print("Running System Identification Tests")
     print("=" * 60)
     
-    test_suite.test_second_order_sysid(plot=True)
+    test_suite.test_second_order_system(plot=True)
+    
+    print("\n" + "=" * 60)
+    print("Running Van der Pol Oscillator Identification Test")
+    print("=" * 60)
+    
+    test_suite.test_van_der_pol_oscillator(plot=True)
     
     print("\n" + "=" * 60)
     print("All tests passed!")
