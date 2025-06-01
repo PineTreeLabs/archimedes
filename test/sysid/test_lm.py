@@ -3,7 +3,7 @@
 import numpy as np
 
 import archimedes as arc
-from archimedes.sysid import lm_solve
+from archimedes.sysid import lm_solve, LMStatus
 
 
 class TestLM:
@@ -239,7 +239,8 @@ class TestLM:
         assert result.success, (
             f"Optimization should succeed, got: {result.message}"
         )
-        assert result.status in [1, 2, 3, 4], (
+        assert result.status in [LMStatus.FTOL_REACHED, LMStatus.XTOL_REACHED, 
+                                LMStatus.BOTH_TOL_REACHED, LMStatus.GTOL_REACHED], (
             f"Should have valid convergence status, got {result.status}"
         )
 
@@ -252,7 +253,7 @@ class TestLM:
             gtol=1e-15,
             maxfev=5,
         )
-        assert result.status == 5, (
+        assert result.status == LMStatus.MAX_FEVAL, (
             f"Should hit max iterations, got status {result.status}: {result.message}"
         )
 
@@ -576,6 +577,165 @@ class TestLM:
                     print(f"  {key}: {value}")
                 else:
                     print(f"  {key}: {value:.6e}")
+
+    def test_ftol_convergence_info_1(self):
+        """Test convergence via ftol only (info = 1)."""
+        
+        def simple_func(x):
+            x = np.atleast_1d(x)
+            # Function that will have small predicted and actual reduction
+            V = 0.5 * x[0]**2 + 1e-10  # Add small constant to control reduction
+            g = np.array([x[0]], like=x)
+            H = np.array([[1.0]], like=x)
+            return V, g, H
+        
+        # Start close to optimum
+        x0 = np.array([1e-6])
+        
+        result = lm_solve(
+            simple_func,
+            x0,
+            ftol=1e-3,  # Relatively loose ftol
+            xtol=1e-15,  # Very tight xtol to avoid that convergence
+            gtol=1e-15,  # Very tight gtol to avoid that convergence
+            maxfev=50
+        )
+        
+        # Should converge due to ftol
+        assert result.status == LMStatus.FTOL_REACHED, f"Expected ftol convergence, got {result.status}: {result.message}"
+        assert result.success
+
+
+    def test_combined_convergence_info_3(self):
+        """Test combined ftol and xtol convergence (info = 3)."""
+        
+        def dual_convergence_func(x):
+            x = np.atleast_1d(x)
+            # Design function to satisfy both ftol and xtol simultaneously
+            V = 0.5 * x[0]**2 + 1e-12
+            g = np.array([x[0] + 1e-10], like=x)  # Small gradient
+            H = np.array([[1.0]], like=x)
+            return V, g, H
+        
+        x0 = np.array([1e-5])  # Start very close to optimum
+        result = lm_solve(
+            dual_convergence_func,
+            x0,
+            ftol=1e-4,  # Loose enough to trigger
+            xtol=5e2,  # Loose enough to trigger (this is relative to parameter norm)
+            gtol=1e-15,  # Very tight to avoid gradient convergence
+            maxfev=10,
+            nprint=1,
+        )
+        
+        # Should converge with combined criteria
+        assert result.status == LMStatus.BOTH_TOL_REACHED, f"Expected combined convergence, got {result.status}: {result.message}"
+        assert result.success
+
+    def test_maxfev_reached_in_inner_loop(self):
+        """Test maxfev reached during inner loop iterations."""
+        
+        def slow_converging_func(x):
+            x = np.atleast_1d(x)
+            V = 0.5 * x[0]**2
+            g = np.array([x[0]], like=x)
+            # Use ill-conditioned Hessian to slow convergence
+            H = np.array([[1e-8]], like=x)  # Very small eigenvalue
+            return V, g, H
+        
+        x0 = np.array([1.0])
+        
+        result = lm_solve(
+            slow_converging_func,
+            x0,
+            maxfev=3,  # Very small limit to hit during inner loop
+            ftol=1e-15,
+            xtol=1e-15, 
+            gtol=1e-15
+        )
+        
+        # Should fail due to max function evaluations
+        assert result.status == LMStatus.MAX_FEVAL, f"Expected max fev, got {result.status}: {result.message}"
+        assert not result.success
+        assert result.nfev >= 3  # Should have hit the limit
+
+
+    def test_progress_reporting_with_nprint(self):
+        """Test progress reporting functionality (nprint > 0)."""
+        
+        def simple_quadratic(x):
+            x = np.atleast_1d(x)
+            r = x - 2.0
+            V = 0.5 * np.sum(r**2)
+            g = r
+            H = np.eye(len(x), like=x)
+            return V, g, H
+        
+        # Capture printed output by redirecting stdout
+        import io
+        import sys
+        
+        captured_output = io.StringIO()
+        sys.stdout = captured_output
+        
+        try:
+            result = lm_solve(
+                simple_quadratic,
+                np.array([5.0]),
+                nprint=1,  # Print every iteration
+                maxfev=20
+            )
+            
+            # Restore stdout
+            sys.stdout = sys.__stdout__
+            output = captured_output.getvalue()
+            
+            # Check that headers and iteration info were printed
+            assert "Iteration" in output, "Should print iteration header"
+            assert "Cost" in output, "Should print cost header"
+            assert result.success, "Optimization should succeed"
+            
+        finally:
+            # Ensure stdout is restored even if test fails
+            sys.stdout = sys.__stdout__
+
+
+    def test_nprint_header_logic(self):
+        """Test the specific header printing logic in LMProgress."""
+        from archimedes.sysid._lm.lm_solve import LMProgress
+        import io
+        import sys
+        
+        # Test LMProgress class directly
+        captured_output = io.StringIO()
+        sys.stdout = captured_output
+        
+        try:
+            progress = LMProgress(nprint=2)  # Print every 2 iterations
+            
+            # First report (iteration 0) - should print header
+            progress.report(1.0, 0.1, 0.01, 5)
+            
+            # Second report (iteration 1) - should not print 
+            progress.report(0.5, 0.05, 0.005, 6)
+            
+            # Third report (iteration 2) - should print again
+            progress.report(0.25, 0.025, 0.0025, 7)
+            
+            sys.stdout = sys.__stdout__
+            output = captured_output.getvalue()
+            
+            # Should contain headers and specific iteration data
+            assert "Iteration" in output, "Should contain header"
+            assert "Cost" in output, "Should contain cost header"
+            
+            # Check that it printed for iterations 0 and 2
+            lines = output.strip().split('\n')
+            # Should have: header line + iteration 0 + iteration 2 = 3 lines minimum
+            assert len(lines) >= 3, f"Expected at least 3 lines of output, got {len(lines)}"
+            
+        finally:
+            sys.stdout = sys.__stdout__
 
 
 if __name__ == "__main__":

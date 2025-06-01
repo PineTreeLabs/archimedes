@@ -1,7 +1,39 @@
 import numpy as np
 from typing import Dict, Tuple, Optional, Callable, Any, List, NamedTuple
+from enum import IntEnum
 
 from archimedes import tree, compile
+
+
+class LMStatus(IntEnum):
+    """Status codes for Levenberg-Marquardt optimization results."""
+    
+    # Success codes (convergence achieved)
+    FTOL_REACHED = 1      # Function tolerance convergence
+    XTOL_REACHED = 2      # Parameter tolerance convergence  
+    BOTH_TOL_REACHED = 3  # Both ftol and xtol satisfied
+    GTOL_REACHED = 4      # Gradient tolerance convergence
+    
+    # Failure codes
+    MAX_FEVAL = 5         # Maximum function evaluations reached
+
+    @property
+    def message(self) -> str:
+        """Get descriptive message for this status code."""
+        messages = {
+            self.FTOL_REACHED: "Both actual and predicted relative reductions in the sum of squares are at most ftol",
+            self.XTOL_REACHED: "Relative error between two consecutive iterates is at most xtol", 
+            self.BOTH_TOL_REACHED: "Conditions for ftol and xtol both hold",
+            self.GTOL_REACHED: "The cosine of the angle between fvec and any column of the Jacobian is at most gtol in absolute value",
+            self.MAX_FEVAL: "Number of function evaluations has reached maxfev",
+        }
+        return messages.get(self, "Unknown status")
+    
+    @property 
+    def success(self) -> bool:
+        """Check if this status indicates successful convergence."""
+        return self in (self.FTOL_REACHED, self.XTOL_REACHED, 
+                       self.BOTH_TOL_REACHED, self.GTOL_REACHED)
 
 
 class LMProgress:
@@ -66,8 +98,8 @@ class LMResult(NamedTuple):
         Solution array
     success : bool
         Whether optimization succeeded
-    status : int
-        Integer status code
+    status : LMStatus
+        Status code indicating termination reason
     message : str
         Description of termination reason
     fun : float
@@ -88,7 +120,7 @@ class LMResult(NamedTuple):
 
     x: np.ndarray
     success: bool
-    status: int
+    status: LMStatus
     message: str
     fun: float
     jac: np.ndarray
@@ -259,7 +291,7 @@ def lm_solve(
     nfev = 0  # Number of function evaluations
     njev = 0  # Number of Jacobian evaluations
     iter = 0  # Iteration counter
-    info = 0  # Convergence info
+    status = None  # Will be set to LMStatus value
 
     # Always collect iteration history
     history = []
@@ -301,10 +333,11 @@ def lm_solve(
 
         # Check gradient convergence
         if g_norm <= gtol:
-            info = 4
+            status = LMStatus.GTOL_REACHED
             break
 
         # Inner loop - compute step and try it
+        inner_loop_exit = False
         while True:
             # Compute step using damped normal equations
             step = compute_step(hess, grad, diag, lambda_val)
@@ -371,73 +404,43 @@ def lm_solve(
                 iter += 1
                 break
 
-            # If lambda becomes too large, the step becomes too small
-            if lambda_val >= 1e10:
-                info = 7  # xtol is too small
-                break
-
-            # If maximum function evaluations reached
+            # If maximum function evaluations reached during inner loop
             if nfev >= maxfev:
-                info = 5
+                status = LMStatus.MAX_FEVAL
+                inner_loop_exit = True
                 break
 
         # Check if we exited inner loop due to max function evaluations
-        if info == 5:
+        if inner_loop_exit:
             break
 
         # Test convergence conditions
         # 1. Function value convergence (ftol)
         if abs(actred) <= ftol and prered <= ftol and 0.5 * ratio <= 1.0:
-            info = 1
+            status = LMStatus.FTOL_REACHED
 
         # 2. Parameter convergence (xtol)
-        # In our case, we use step size relative to parameter magnitude
+        # Check step size relative to parameter magnitude
         if pnorm <= xtol * xnorm:
-            info = 2
+            # Check if we also satisfied ftol for combined convergence
+            if (status == LMStatus.FTOL_REACHED):
+                status = LMStatus.BOTH_TOL_REACHED
+            else:
+                status = LMStatus.XTOL_REACHED
 
-        # 3. Both criteria met
-        if abs(actred) <= ftol and prered <= ftol and 0.5 * ratio <= 1.0 and info == 2:
-            info = 3
-
-        # 4. Gradient convergence already checked above
-
-        # 5. Check if ftol is too small (relative error in the sum of squares)
-        if abs(actred) <= MACHEP and prered <= MACHEP and 0.5 * ratio <= 1.0:
-            info = 6
-
-        # 6. Check if xtol is too small (relative error in the approximate solution)
-        if pnorm <= MACHEP * xnorm:
-            info = 7
-
-        # 7. Check if gtol is too small (orthogonality between fvec and its derivatives)
-        if g_norm <= MACHEP:
-            info = 8
-
-        if info != 0:
+        if status is not None:
             break
 
     # Final check for max function evaluations if we exited the main loop
-    if info == 0 and nfev >= maxfev:
-        info = 5
+    if status is None and nfev >= maxfev:
+        status = LMStatus.MAX_FEVAL
 
-    # Set final message based on info code
-    messages = {
-        0: "Improper input parameters",
-        1: "Both actual and predicted relative reductions in the sum of squares are at most ftol",
-        2: "Relative error between two consecutive iterates is at most xtol",
-        3: "Conditions for info = 1 and info = 2 both hold",
-        4: "The cosine of the angle between fvec and any column of the Jacobian is at most gtol in absolute value",
-        5: "Number of function evaluations has reached maxfev",
-        6: "ftol is too small: no further reduction in the sum of squares is possible",
-        7: "xtol is too small: no further improvement in the approximate solution is possible",
-        8: "gtol is too small: fvec is orthogonal to the columns of the Jacobian to machine precision",
-    }
+    # Default to max function evaluations if no other status was set
+    if status is None:
+        status = LMStatus.MAX_FEVAL
 
-    success = info in (1, 2, 3, 4)  # Check if convergence criteria met
-    message = messages.get(info, "Unknown error")
-
-    if nprint > 0 and info in messages:
-        print(messages[info])
+    if nprint > 0:
+        print(status.message)
 
     # Unravel the final solution
     x = unravel(x)
@@ -445,9 +448,9 @@ def lm_solve(
     # Create and return LMResult
     return LMResult(
         x=x,
-        success=success,
-        status=info,
-        message=message,
+        success=status.success,
+        status=status,
+        message=status.message,
         fun=cost,
         jac=grad,  # This is the gradient
         hess=hess,
