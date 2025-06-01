@@ -1,39 +1,35 @@
 from __future__ import annotations
-from typing import Callable
+from typing import TYPE_CHECKING, Callable
 
 import numpy as np
 
 from archimedes import compile, scan, tree, jac, struct
-from archimedes.experimental.state_estimation import ekf_step, ukf_step
+
+from ._lm import lm_solve
+
+if TYPE_CHECKING:
+    from archimedes.typing import PyTree
+    from archimedes.experimental.state_estimation import KalmanFilterBase
+    from .timeseries import Timeseries
+    from ._lm import LMResult
+
+
+__all__ = ["pem_solve"]
 
 
 @struct.pytree_node
 class PEMObjective:
-    Q: np.ndarray
-    R: np.ndarray
+    predictor: KalmanFilterBase
+    data: Timeseries
     P0: np.ndarray
-    kf_method: str = struct.field(static=True)
-    dyn: Callable = struct.field(static=True)
-    obs: Callable = struct.field(static=True)
-    ts: np.ndarray = struct.field(static=True)
-    ys: np.ndarray = struct.field(static=True)
-    us: np.ndarray = struct.field(static=True)
     x0: np.ndarray = struct.field(static=True, default=None)
 
-    @property
-    def kf_step(self) -> Callable:
-        """Return the Kalman filter step function based on the method"""
-        return {
-            "ekf": ekf_step,
-            "ukf": ukf_step,
-        }[self.kf_method]
-
     def forward(self, x0: np.ndarray, params: tuple) -> tuple:
-        ts = self.ts
-        us = self.us
-        ys = self.ys
+        ts = self.data.ts
+        us = self.data.us
+        ys = self.data.ys
 
-        nx = self.Q.shape[0]
+        nx = self.predictor.nx
         nu = us.shape[0]
         ny = ys.shape[0]
 
@@ -55,9 +51,7 @@ class PEMObjective:
         # Predicted measurement (used for sensitivity analysis)
         def step(t, x, u, y, P, params_flat):
             params = unravel_params(params_flat)
-            x, P, e = self.kf_step(
-                self.dyn, self.obs, t, x, y, P, self.Q, self.R, args=(u, params)
-            )
+            x, P, e = self.predictor(t, x, y, P, args=(u, params))
             y_hat = y - e  # Recover predicted observation
             return y_hat
 
@@ -71,9 +65,7 @@ class PEMObjective:
             params_flat = tree.ravel(params)[0]
             psi_x0, psi_params = calc_psi(t, x, u, y, P, params_flat)
             psi = np.concatenate([psi_x0, psi_params], axis=1)  # shape (ny, nx+na)
-            x, P, e = self.kf_step(
-                self.dyn, self.obs, t, x, y, P, self.Q, self.R, args=(u, params)
-            )
+            x, P, e = self.predictor(t, x, y, P, args=(u, params))
             output = np.concatenate([x, e], axis=0)
 
             # Accumulate cost function, Jacobian, and Hessian
@@ -133,44 +125,40 @@ class PEMObjective:
         return V, J, H
 
 
-def make_pem(
-    dyn,
-    obs,
-    ts,
-    us,
-    ys,
-    Q,
-    R,
-    x0=None,
-    P0=None,
-    kf_method="ekf",
-):
-    """Create a function to evaluate the residuals
+def pem_solve(
+    predictor: KalmanFilterBase,
+    data: Timeseries,
+    params_guess: PyTree,
+    x0: np.ndarray = None,
+    P0: np.ndarray = None,
+    method: str = "lm",
+    options: dict | None = None,
+) -> LMResult:
+    """Solve the prediction error minimization problem
 
     Args:
-        dyn: function of (t, x, u, p) that computes the state transition function
-        obs: function of (t, x, u, p) that computes the measurement function
-        ts: time points (nt,)
-        us: exogenous inputs (nu, nt)
-        ys: measurements (ny, nt)
-        Q: process noise covariance
-        R: measurement noise covariance
+        predictor: Kalman filter predictor
+        data: Timeseries object containing ts, us, ys
+        params_guess: initial guess for parameters
         x0: initial state (optional, defaults to None)
         P0: initial state covariance (optional, defaults to identity)
-        kf_method: "ekf" or "ukf" (optional, defaults to "ekf")
+        method: optimization method (default is "lm")
+        options: additional options for the optimizer (optional)
 
     Returns:
-        function of (x0, args) that computes the residuals
+        LMResult containing the optimized parameters and other information
     """
-    return PEMObjective(
-        Q=Q,
-        R=R,
+    if method not in {"lm"}:
+        raise ValueError(f"Unsupported method: {method}. Only 'lm' is supported.")
+
+    if options is None:
+        options = {}
+
+    objective = PEMObjective(
+        predictor=predictor,
+        data=data,
         P0=P0,
-        kf_method=kf_method,
-        dyn=dyn,
-        obs=obs,
-        ts=ts,
-        ys=ys,
-        us=us,
         x0=x0,
     )
+
+    return lm_solve(objective, params_guess, **options)

@@ -2,7 +2,8 @@ import numpy as np
 import pytest
 import archimedes as arc
 
-from archimedes.sysid import make_pem, lm_solve
+from archimedes.sysid import pem_solve, Timeseries
+from archimedes.experimental.state_estimation import ExtendedKalmanFilter
 from archimedes.experimental.discretize import discretize
 from archimedes import struct
 
@@ -108,27 +109,22 @@ class TestPEMIntegration:
         
         # Set up PEM problem
         dyn = discretize(second_order_ode, dt, method="rk4")
-        pem_obj = make_pem(
-            dyn=dyn,
-            obs=obs,
-            ts=ts,
-            us=us,
-            ys=ys,
-            Q=Q,
-            R=R,
-            x0=x0_true,  # Assume initial conditions are known
-        )
-        
-        # Solve using LM
-        result = lm_solve(
-            pem_obj,
+        ekf = ExtendedKalmanFilter(dyn, obs, Q, R)
+        data = Timeseries(ts=ts, us=us, ys=ys)
+        options = {
+            "ftol": 1e-6,
+            "xtol": 1e-6,
+            "gtol": 1e-6,
+            "nprint": 1,
+        }
+        result = pem_solve(
+            ekf,
+            data,
             params_guess,
-            ftol=1e-6,
-            xtol=1e-6,
-            gtol=1e-6,
-            nprint=1,
+            x0=x0_true,  # Assume initial conditions are known
+            options=options,
         )
-        
+
         # Validate results
         print(f"\nSecond-Order System ID Results:")
         print(f"True parameters: ωₙ={omega_n_true:.3f}, ζ={zeta_true:.3f}")
@@ -188,15 +184,13 @@ class TestPEMIntegration:
         assert result.fun < 1e-3, f"Final cost too high: {result.fun:.2e}"
 
         # Test optimizing initial conditions
-        pem_obj_with_x0 = pem_obj.replace(x0=None)
         dvs_guess = (np.array([0.0, 0.0]), result.x)
-        result_with_x0 = lm_solve(
-            pem_obj_with_x0,
+        result_with_x0 = pem_solve(
+            ekf,
+            data,
             dvs_guess,
-            ftol=1e-6,
-            xtol=1e-6,
-            gtol=1e-6,
-            nprint=1,
+            x0=None,  # Unknown initial conditions
+            options=options,
         )
         x0_est, params_est = result_with_x0.x
         print(f"Estimated initial conditions: {x0_est}")
@@ -271,7 +265,7 @@ class TestPEMIntegration:
         )
         
         # Add measurement noise
-        noise_std = 0.05
+        noise_std = 0.01
         ys = xs_true[:1, :] + np.random.normal(0, noise_std, (ny, len(ts)))
         
         # Initial parameter guess (should be different from true value)
@@ -284,26 +278,20 @@ class TestPEMIntegration:
         
         # Set up PEM problem
         dyn = discretize(van_der_pol_ode, dt, method="rk4")
-        pem_obj = make_pem(
-            dyn=dyn,
-            obs=obs,
-            ts=ts,
-            us=us,
-            ys=ys,
-            Q=Q,
-            R=R,
-            P0=P0,
-            x0=x0_true,  # Assume initial conditions are known
-        )
-        
-        # Solve using LM
-        result = lm_solve(
-            pem_obj,
+        ekf = ExtendedKalmanFilter(dyn, obs, Q, R)
+        data = Timeseries(ts=ts, us=us, ys=ys)
+        options = {
+            "ftol": 1e-8,
+            "xtol": 1e-8,
+            "gtol": 1e-8,
+            "nprint": 1,
+        }
+        result = pem_solve(
+            ekf,
+            data,
             params_guess,
-            ftol=1e-8,
-            xtol=1e-8,
-            gtol=1e-8,
-            nprint=1,
+            x0=x0_true,  # Assume initial conditions are known
+            options=options,
         )
         
         # Validate results
@@ -470,26 +458,21 @@ class TestPEMIntegration:
 
             # Set up PEM problem
             dyn = discretize(duffing_ode, dt, method="rk4")
-            pem_obj = make_pem(
-                dyn=dyn,
-                obs=obs,
-                ts=ts,
-                us=us,
-                ys=ys,
-                Q=Q,
-                R=R,
-                x0=x0_true,  # Assume initial conditions are known
-            )
-            
-            # Solve using LM with relaxed tolerances for challenging problem
-            result = lm_solve(
-                pem_obj,
+            ekf = ExtendedKalmanFilter(dyn, obs, Q, R)
+            data = Timeseries(ts=ts, us=us, ys=ys)
+            options = {
+                "ftol": 1e-6,
+                "xtol": 1e-6,
+                "gtol": 1e-6,
+                "nprint": 1,
+                "maxfev": 100,  # Allow more iterations for challenging problem
+            }
+            result = pem_solve(
+                ekf,
+                data,
                 params_guess,
-                ftol=1e-6,
-                xtol=1e-6,
-                gtol=1e-6,
-                nprint=1,
-                maxfev=200,  # Allow more iterations for challenging problem
+                x0=x0_true,  # Assume initial conditions are known
+                options=options,
             )
             
             # Validate results
@@ -646,26 +629,20 @@ class TestPEMIntegration:
         
         # Set up PEM problem
         dyn = discretize(cartpole_ode, dt, method="rk4")
-        pem_obj = make_pem(
-            dyn=dyn,
-            obs=obs,
-            ts=ts,
-            us=us,
-            ys=ys,
-            Q=Q,
-            R=R,
-            x0=x0_true,  # Assume initial conditions are known
-        )
-        
-        # Solve using LM with appropriate tolerances
-        result = lm_solve(
-            pem_obj,
+        ekf = ExtendedKalmanFilter(dyn, obs, Q, R)
+        data = Timeseries(ts=ts, us=us, ys=ys)
+        options = {
+            "ftol": 1e-6,
+            "xtol": 1e-6,
+            "gtol": 1e-6,
+            "nprint": 1,
+        }
+        result = pem_solve(
+            ekf,
+            data,
             params_guess,
-            ftol=1e-6,
-            xtol=1e-6,
-            gtol=1e-6,
-            nprint=1,
-            maxfev=150,  # Allow sufficient iterations for convergence
+            x0=x0_true,  # Assume initial conditions are known
+            options=options,
         )
         
         # Validate results

@@ -1,10 +1,11 @@
-from .pem import make_pem
+from .pem import pem_solve
 from .timeseries import Timeseries
-from ._lm import lm_solve, LMStatus
+from ._lm import lm_solve, LMStatus, LMResult
 
 __all__ = [
     "Timeseries",
-    "make_pem",
+    "pem_solve",
     "lm_solve",
     "LMStatus",
+    "LMResult",
 ]

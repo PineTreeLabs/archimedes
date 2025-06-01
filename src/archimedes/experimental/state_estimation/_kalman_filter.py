@@ -42,6 +42,14 @@ class KalmanFilterBase(metaclass=abc.ABCMeta):
         """
         pass
 
+    @property
+    def nx(self):
+        return self.Q.shape[0]
+
+    @property
+    def ny(self):
+        return self.R.shape[0]
+
 
 def ekf_correct(h, t, x, y, P, R, args=None):
     """Perform the "correct" step of the extended Kalman filter
