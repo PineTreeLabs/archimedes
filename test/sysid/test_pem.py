@@ -187,6 +187,32 @@ class TestPEMIntegration:
         assert result.nit < 50, f"Too many iterations required: {result.nit}"
         assert result.fun < 1e-3, f"Final cost too high: {result.fun:.2e}"
 
+        # Test optimizing initial conditions
+        pem_obj_with_x0 = pem_obj.replace(x0=None)
+        dvs_guess = (np.array([0.0, 0.0]), result.x)
+        result_with_x0 = lm_solve(
+            pem_obj_with_x0,
+            dvs_guess,
+            ftol=1e-6,
+            xtol=1e-6,
+            gtol=1e-6,
+            nprint=1,
+        )
+        x0_est, params_est = result_with_x0.x
+        print(f"Estimated initial conditions: {x0_est}")
+        print(f"Estimated parameters with x0: {params_est}")
+
+        assert result_with_x0.success, f"Parameter estimation with x0 failed: {result_with_x0.message}"
+
+        # Check parameter recovery accuracy (should be quite good for this clean problem)
+        omega_n_error = abs(params_est["omega_n"] - omega_n_true)
+        zeta_error = abs(params_est["zeta"] - zeta_true)
+        
+        assert omega_n_error < 0.01, f"Natural frequency error too large: {omega_n_error:.6f}"
+        assert zeta_error < 0.01, f"Damping ratio error too large: {zeta_error:.6f}"
+        
+        assert np.allclose(x0_est, x0_true, atol=1e-2), f"Initial condition error too large: {np.abs(x0_est - x0_true)}"
+
     def test_van_der_pol(self, plot=False):
         """Test parameter recovery on Van der Pol oscillator (nonlinear system).
         

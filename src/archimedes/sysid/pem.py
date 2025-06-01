@@ -37,12 +37,6 @@ class PEMObjective:
         nu = us.shape[0]
         ny = ys.shape[0]
 
-        if ny != self.R.shape[0]:
-            raise ValueError(
-                f"Measurement noise covariance R must have shape ({ny}, {ny}), "
-                f"but got {self.R.shape}"
-            )
-
         if self.P0 is None:
             P0 = np.eye(nx)
         else:
