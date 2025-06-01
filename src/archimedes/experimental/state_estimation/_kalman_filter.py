@@ -1,6 +1,46 @@
+from __future__ import annotations
+
+import abc
+from typing import Callable
+
 import numpy as np
 
-from archimedes import jac
+from archimedes import jac, struct
+
+
+__all__ = [
+    "KalmanFilterBase",
+    "ExtendedKalmanFilter",
+    "UnscentedKalmanFilter",
+    "ekf_step",
+    "ukf_step",
+]
+
+
+@struct.pytree_node
+class KalmanFilterBase(metaclass=abc.ABCMeta):
+    dyn: Callable = struct.field(static=True)
+    obs: Callable = struct.field(static=True)
+    Q: np.ndarray
+    R: np.ndarray
+
+    @abc.abstractmethod
+    def __call__(t, x, y, P, args=None):
+        """Perform one step of the filter
+
+        Args:
+            t: current time
+            x: state vector
+            y: measurement
+            P: state covariance
+            args: additional arguments to pass to f and h
+
+        Returns:
+            x: updated state vector
+            P: updated state covariance
+            e: innovation or measurement residual
+        """
+        pass
 
 
 def ekf_correct(h, t, x, y, P, R, args=None):
@@ -70,6 +110,13 @@ def ekf_step(f, h, t, x, y, P, Q, R, args=None):
     return x, P, e
 
 
+@struct.pytree_node
+class ExtendedKalmanFilter(KalmanFilterBase):
+
+    def __call__(self, t, x, y, P, args=None):
+        return ekf_step(self.dyn, self.obs, t, x, y, P, self.Q, self.R, args)
+
+
 def ukf_step(f, h, t, x, y, P, Q, R, *args):
     """Perform one step of the unscented Kalman filter
 
@@ -133,3 +180,10 @@ def ukf_step(f, h, t, x, y, P, Q, R, *args):
     P = P - K @ S_hat @ K.T  # Updated state covariance
 
     return x, P, e
+
+
+@struct.pytree_node
+class UnscentedKalmanFilter(KalmanFilterBase):
+
+    def __call__(self, t, x, y, P, args=None):
+        return ukf_step(self.dyn, self.obs, t, x, y, P, self.Q, self.R, args)
