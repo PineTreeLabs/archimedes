@@ -431,11 +431,6 @@ def lm_solve(
         if status is not None:
             break
 
-    # Final check for max function evaluations if we exited the main loop
-    if status is None and nfev >= maxfev:
-        status = LMStatus.MAX_FEVAL
-
-    # Default to max function evaluations if no other status was set
     if status is None:
         status = LMStatus.MAX_FEVAL
 
