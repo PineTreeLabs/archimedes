@@ -3,7 +3,7 @@
 import numpy as np
 
 import archimedes as arc
-from archimedes.experimental.sysid import lm_solve
+from archimedes.sysid import lm_solve
 
 
 class TestLM:
@@ -64,7 +64,7 @@ class TestLM:
 
     def test_compute_step_well_conditioned(self):
         """Test compute_step with a well-conditioned matrix."""
-        from archimedes.experimental.sysid._lm.lm_solve import compute_step
+        from archimedes.sysid._lm.lm_solve import compute_step
 
         # Simple 2x2 case with known solution
         hess = np.array([[4.0, 1.0], [1.0, 3.0]])  # SPD matrix
@@ -81,7 +81,7 @@ class TestLM:
 
     def test_compute_step_ill_conditioned(self):
         """Test compute_step with an ill-conditioned matrix."""
-        from archimedes.experimental.sysid._lm.lm_solve import compute_step
+        from archimedes.sysid._lm.lm_solve import compute_step
 
         # Ill-conditioned matrix (near-singular)
         hess = np.array([[1.0, 1.0], [1.0, 1.0001]])
@@ -97,7 +97,7 @@ class TestLM:
 
     def test_compute_step_singular(self):
         """Test compute_step with a singular matrix."""
-        from archimedes.experimental.sysid._lm.lm_solve import compute_step
+        from archimedes.sysid._lm.lm_solve import compute_step
 
         # Singular matrix
         hess = np.array([[1.0, 1.0], [1.0, 1.0]])
@@ -112,7 +112,7 @@ class TestLM:
 
     def test_compute_predicted_reduction(self):
         """Test predicted reduction calculation."""
-        from archimedes.experimental.sysid._lm.lm_solve import (
+        from archimedes.sysid._lm.lm_solve import (
             compute_predicted_reduction,
         )
 

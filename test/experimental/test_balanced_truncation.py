@@ -20,7 +20,7 @@
 import numpy as np
 from scipy import signal
 
-from archimedes.experimental.sysid import balanced_truncation
+from archimedes.experimental import balanced_truncation
 
 
 def test_balanced_truncation(plot=False):

@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 import archimedes as arc
 from archimedes._core import SymbolicArray
-from archimedes.signal import tf2ss
+from archimedes.experimental.signal import tf2ss
 
 from scipy.signal import tf2ss as scipy_tf2ss
 

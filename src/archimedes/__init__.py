@@ -1,4 +1,4 @@
-from . import error, theme, tree, signal
+from . import error, theme, tree
 from ._core import (
     array,
     callback,
@@ -25,14 +25,15 @@ from .optimize import implicit, minimize, nlp_solver, qpsol, root
 from .simulate import integrator, odeint
 from .theme import set_theme
 from .tree import struct
+from . import sysid
 
 __all__ = [
     "error",
     "theme",
     "set_theme",
     "tree",
-    "signal",
     "struct",
+    "sysid",
     "callback",
     "codegen",
     "array",

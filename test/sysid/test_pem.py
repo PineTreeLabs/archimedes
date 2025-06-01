@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 import archimedes as arc
 
-from archimedes.experimental.sysid import make_pem, lm_solve
+from archimedes.sysid import make_pem, lm_solve
 from archimedes.experimental.discretize import discretize
 from archimedes import struct
 
