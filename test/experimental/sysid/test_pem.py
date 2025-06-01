@@ -4,9 +4,33 @@ import archimedes as arc
 
 from archimedes.experimental.sysid import make_pem, lm_solve
 from archimedes.experimental.discretize import discretize
+from archimedes import struct
 
 
 np.random.seed(0)
+
+
+@struct.pytree_node
+class CartPole:
+    """CartPole model for testing system identification."""
+    m1: float = 1.0  # cart mass
+    m2: float = 0.3  # pole mass
+    L: float = 0.5   # pole length
+    g: float = 9.81  # gravity
+
+    def dynamics(self, t, q, u=None):
+        """CartPole dynamics: [x, θ, ẋ, θ̇]"""
+        x, θ, ẋ, θ̇ = q
+        sθ, cθ = np.sin(θ), np.cos(θ)
+        τ = 0.0 if u is None else np.atleast_1d(u)[0]
+        den = self.m1 + self.m2 * sθ**2
+        ẍ = (self.L * self.m2 * sθ * θ̇**2 + τ + self.m2 * self.g * cθ * sθ) / den
+        θ̈ = -(
+            self.L * self.m2 * cθ * sθ * θ̇**2
+            + τ * cθ
+            + (self.m1 + self.m2) * self.g * sθ
+        ) / (self.L * den)
+        return np.stack([ẋ, θ̇, ẍ, θ̈])
 
 
 class TestPEMIntegration:
@@ -405,7 +429,7 @@ class TestPEMIntegration:
             )
             
             # Add measurement noise
-            noise_std = 0.03  # Higher noise for challenging identification
+            noise_std = 0.03
             ys = xs_true[:1, :] + np.random.normal(0, noise_std, (ny, len(ts)))
             
             # Initial parameter guess (should be different from true values)
@@ -520,6 +544,190 @@ class TestPEMIntegration:
             assert result.nit < 200, f"Too many iterations required: {result.nit}"
             assert result.fun < 1e-1, f"Final cost too high: {result.fun:.2e}"
 
+    def test_cartpole(self, plot=False):
+        """Test parameter recovery on CartPole system (nonlinear underactuated system).
+        
+        System: CartPole with cart mass m1, pole mass m2, and pole length L
+        State: [x, θ, ẋ, θ̇] (cart position, pole angle, velocities)
+        Input: u (horizontal force on cart)
+        Parameters to identify:
+            m1 (cart mass)
+            m2 (pole mass) 
+            L (pole length)
+        Fixed parameter:
+            g (gravity - assumed known)
+        """
+        # True system parameters (to be identified)
+        m1_true = 1.0   # cart mass (kg)
+        m2_true = 0.3   # pole mass (kg)
+        L_true = 0.5    # pole length (m)
+        g_true = 9.81   # gravity (m/s²) - assumed known
+        
+        params_true = {"m2": m2_true, "L": L_true}
+        system = CartPole(**params_true, m1=m1_true, g=g_true)  # Create true system instance
+        
+        # Time vector (shorter simulation for challenging nonlinear system)
+        t0, tf = 0.0, 3.0
+        dt = 0.01  # Fine timestep for accurate simulation
+        ts = np.arange(t0, tf, dt)
+
+        # Problem dimensions
+        nx = 4  # state dimension [x, θ, ẋ, θ̇]
+        nu = 1  # input dimension (force on cart)
+        ny = 4  # output dimension
+        
+        # Input signal
+        us = np.zeros((nu, len(ts)))
+ 
+        # Initial conditions (start near inverted equilibrium)
+        x0_true = np.array([0.0, 0.1, 0.0, 0.0])  # Small initial pole angle
+    
+        # Generate true system response
+        def cartpole_ode(t, x, u, params):
+            return system.replace(**params).dynamics(t, x, u)
+
+        def obs(t, x, u, params):
+            return x
+        
+        def ode_rhs(t, x, params):
+            """ODE with interpolated input."""
+            u = np.interp(t, ts, us[0]).reshape((nu,))
+            return cartpole_ode(t, x, u, params)
+        
+        # Generate reference data
+        xs_true = arc.odeint(
+            ode_rhs,
+            t_span=(t0, tf),
+            x0=x0_true,
+            args=(params_true,),
+            t_eval=ts,
+            rtol=1e-8,
+            atol=1e-10,
+        )
+        
+        # Add measurement noise
+        noise_std = 0.01
+        ys = xs_true + np.random.normal(0, noise_std, (ny, len(ts)))
+        
+        # Initial parameter guess
+        params_guess = {
+            "m2": 0.5,
+            "L": 1.0,
+        }
+
+        R = noise_std ** 2 * np.eye(ny)  # Measurement noise covariance
+        Q = noise_std ** 2 * np.eye(nx)  # Process noise (smaller than measurement)
+        
+        # Set up PEM problem
+        dyn = discretize(cartpole_ode, dt, method="rk4")
+        pem_obj = make_pem(
+            dyn=dyn,
+            obs=obs,
+            ts=ts,
+            us=us,
+            ys=ys,
+            Q=Q,
+            R=R,
+            x0=x0_true,  # Assume initial conditions are known
+        )
+        
+        # Solve using LM with appropriate tolerances
+        result = lm_solve(
+            pem_obj,
+            params_guess,
+            ftol=1e-6,
+            xtol=1e-6,
+            gtol=1e-6,
+            nprint=1,
+            maxfev=150,  # Allow sufficient iterations for convergence
+        )
+        
+        # Validate results
+        print(f"\nCartPole System ID Results:")
+        print(f"True parameters: m1={m1_true:.3f}, m2={m2_true:.3f}, L={L_true:.3f}")
+        print(f"Estimated parameters: m2={result.x['m2']:.3f}, L={result.x['L']:.3f}")
+        print(f"Success: {result.success}")
+        print(f"Iterations: {result.nit}")
+        print(f"Final cost: {result.fun:.2e}")
+
+        # Validate forward simulation accuracy
+        xs_pred = arc.odeint(
+            ode_rhs,
+            t_span=(t0, tf),
+            x0=x0_true,
+            args=(result.x,),
+            t_eval=ts,
+            rtol=1e-8,
+            atol=1e-10,
+        )
+
+        if plot:
+            import matplotlib.pyplot as plt
+            kf_result_init = pem_obj.forward(x0_true, params_guess)
+            kf_result_opt = pem_obj.forward(x0_true, result.x)
+            
+            fig, ax = plt.subplots(4, 1, figsize=(10, 8), sharex=True)
+            
+            # Cart position
+            ax[0].plot(ts, ys[0], label="Measured Cart Position", alpha=0.7)
+            ax[0].plot(ts, xs_true[0], label="True Cart Position", c='k', linestyle='--')
+            ax[0].plot(ts, xs_pred[0], label="Predicted Cart Position", linestyle='-.')
+            ax[0].set_ylabel("Cart Position (m)")
+            ax[0].legend()
+            ax[0].grid()
+            ax[0].set_title("CartPole System Identification Results")
+            
+            # Pole angle
+            ax[1].plot(ts, ys[1], label="Measured Pole Angle", alpha=0.7)
+            ax[1].plot(ts, xs_true[1], label="True Pole Angle", c='k', linestyle='--')
+            ax[1].plot(ts, xs_pred[1], label="Predicted Pole Angle", linestyle='-.')
+            ax[1].set_ylabel("Pole Angle (rad)")
+            ax[1].legend()
+            ax[1].grid()
+            
+            # Control input
+            ax[2].plot(ts, us[0], label="Control Force", c='orange')
+            ax[2].set_ylabel("Force (N)")
+            ax[2].legend()
+            ax[2].grid()
+            
+            # Kalman residuals
+            ax[3].plot(ts, kf_result_init["e"][0], label="Initial residuals (x)", alpha=0.7)
+            ax[3].plot(ts, kf_result_opt["e"][0], label="Final residuals (x)", alpha=0.7)
+            ax[3].plot(ts, kf_result_init["e"][1], label="Initial residuals (θ)", alpha=0.7, linestyle=':')
+            ax[3].plot(ts, kf_result_opt["e"][1], label="Final residuals (θ)", alpha=0.7, linestyle=':')
+            ax[3].set_ylabel("Kalman Residuals")
+            ax[3].set_xlabel("Time (s)")
+            ax[3].legend()
+            ax[3].grid()
+            
+            plt.tight_layout()
+            plt.show()
+        
+        # Test assertions
+        assert result.success, f"Parameter estimation failed: {result.message}"
+        
+        # Check parameter recovery accuracy
+        # CartPole is challenging due to underactuation and nonlinearity
+        m2_error = abs(result.x["m2"] - m2_true) / m2_true  
+        L_error = abs(result.x["L"] - L_true) / L_true
+        
+        print(f"Relative parameter errors: m2={m2_error:.3f}, L={L_error:.3f}")
+        
+        # Allow reasonable tolerances for this challenging system
+        assert m2_error < 0.05, f"Pole mass error too large: {m2_error:.6f}"
+        assert L_error < 0.05, f"Pole length error too large: {L_error:.6f}"
+        
+        # Check simulation accuracy (focus on observed states)
+        obs_error = np.sqrt(np.mean((xs_true[:2] - xs_pred[:2])**2))
+        print(f"Observed states RMS error: {obs_error:.3e}")
+        
+        assert obs_error < 0.05, f"Simulation error too large: {obs_error:.6f}"
+        
+        # Test convergence performance  
+        assert result.nit < 20, f"Too many iterations required: {result.nit}"
+        assert result.fun < 1e-1, f"Final cost too high: {result.fun:.2e}"
+
 
 if __name__ == "__main__":
     # Run individual tests for debugging
@@ -535,13 +743,19 @@ if __name__ == "__main__":
     print("Running Van der Pol Oscillator Identification Test")
     print("=" * 60)
     
-    test_suite.test_van_der_pol_oscillator(plot=True)
+    test_suite.test_van_der_pol(plot=True)
 
     print("\n" + "=" * 60)
     print("Running Duffing Oscillator Identification Test")
     print("=" * 60)
     
     test_suite.test_duffing(plot=True)
+    
+    print("\n" + "=" * 60)
+    print("Running CartPole System Identification Test")
+    print("=" * 60)
+    
+    test_suite.test_cartpole(plot=True)
     
     print("\n" + "=" * 60)
     print("All tests passed!")
