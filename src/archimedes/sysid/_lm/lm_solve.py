@@ -187,14 +187,12 @@ def compute_predicted_reduction(grad, step, hess, current_objective=None):
 def lm_solve(
     func,
     x0,
-    jac=None,
     args=(),
     ftol=1e-8,
     xtol=1e-8,
     gtol=1e-8,
     maxfev=100,
     diag=None,
-    transform=None,
     lambda0=1e-3,
     nprint=0,
 ) -> LMResult:
@@ -244,7 +242,7 @@ def lm_solve(
     x = x0_flat.copy()  # Start with the flattened initial guess
     n = len(x)
 
-    # Wrap the original function to apply the transform
+    # Wrap the original function to apply the unravel
     _func = compile(func)
     def func(x_flat, *args):
         x = unravel(x_flat)
@@ -441,7 +439,7 @@ def lm_solve(
     if nprint > 0 and info in messages:
         print(messages[info])
 
-    # Unravel and transform the final solution
+    # Unravel the final solution
     x = unravel(x)
 
     # Create and return LMResult
