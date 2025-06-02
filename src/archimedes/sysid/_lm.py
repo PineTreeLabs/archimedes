@@ -1,8 +1,22 @@
 import numpy as np
-from typing import Dict, Tuple, Optional, Callable, Any, List, NamedTuple
+from typing import (
+    TYPE_CHECKING,
+    Dict,
+    Tuple,
+    Optional,
+    Callable,
+    Any,
+    List,
+    NamedTuple
+)
 from enum import IntEnum
 
+import osqp
+
 from archimedes import tree, compile
+
+if TYPE_CHECKING:
+    from archimedes.typing import PyTree
 
 __all__ = [
     "lm_solve",
@@ -137,7 +151,7 @@ class LMResult(NamedTuple):
     history: List[Dict[str, Any]]
 
 
-def _compute_step(hess, grad, diag, lambda_val, bounds):
+def _compute_step(hess, grad, diag, lambda_val, bounds=None, qp_solver=None):
     """
     Compute the Levenberg-Marquardt step by solving the damped normal equations.
 
@@ -153,6 +167,8 @@ def _compute_step(hess, grad, diag, lambda_val, bounds):
         Levenberg-Marquardt damping parameter
     bounds : tuple, optional
         Tuple of (lower_bounds, upper_bounds) for parameters.
+    qp_solver : osqp.OSQP, optional
+        OSQP solver instance for handling bounds. Must be provided if bounds are set.
 
     Returns
     -------
@@ -182,6 +198,19 @@ def _compute_step(hess, grad, diag, lambda_val, bounds):
         except np.linalg.LinAlgError:
             # Last resort: gradient descent direction with normalization
             step = -grad / (np.linalg.norm(grad) + 1e-8)
+
+    if bounds is not None:
+        if qp_solver is None:
+            raise ValueError("qp_solver must be provided if bounds are set.")
+        lb, ub = bounds
+        if np.any(lb > step) or np.any(ub < step):
+            # If bounds are violated, solve the QP with OSQP
+            qp_solver.update(P=hess_damped, q=grad)
+            qp_solver.warm_start(x=step)  # Use current step as warm start
+            qp_results = qp_solver.solve()
+            print("OSQP results:")
+            print(qp_results.info)
+            step = qp_results.x
 
     return step
 
@@ -307,6 +336,24 @@ def lm_solve(
     x = x0_flat.copy()  # Start with the flattened initial guess
     n = len(x)
 
+    if bounds is not None:
+        # Unpack bounds into lower and upper arrays
+        lower_bounds, upper_bounds = bounds
+        lb, _ = tree.ravel(lower_bounds)
+        ub, _ = tree.ravel(upper_bounds)
+        bounds_flat = (lb, ub)
+        qp_solver = osqp.OSQP()  # Initialize OSQP solver for QP
+        qp_solver.setup(
+            P=np.eye(n),  # Will be overridden later
+            q=np.ones(n),  # Will be overridden later
+            A=np.eye(n),  # Identity for linear constraints
+            l=lb,  # Lower bounds
+            u=ub,  # Upper bounds
+        )
+    else:
+        qp_solver = None
+        bounds_flat = None
+
     # Wrap the original function to apply the unravel
     _func = compile(func)
     def func(x_flat, *args):
@@ -373,7 +420,9 @@ def lm_solve(
         inner_loop_exit = False
         while True:
             # Compute step using damped normal equations
-            step = _compute_step(hess, grad, diag, lambda_val, bounds)
+            step = _compute_step(
+                hess, grad, diag, lambda_val, bounds_flat, qp_solver
+            )
 
             # Compute trial point
             x_new = x + step
