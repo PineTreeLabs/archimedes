@@ -1,6 +1,9 @@
 # ruff: noqa: N802, N803, N806, E741
 
+import pytest
+
 import numpy as np
+from scipy import sparse
 
 import archimedes as arc
 from archimedes.sysid import lm_solve, LMStatus
@@ -975,6 +978,35 @@ class TestLM:
             assert final_history['grad_proj_norm'] < 1e-6, (
                 f"Projected gradient norm should be small: {final_history['grad_proj_norm']}"
             )
+        
+        # Edge case: Test ValueError for bounds structure mismatch
+        bad_lower = np.array([0.0])  # Wrong size (1 instead of 2)
+        bad_upper = np.array([2.0, 1.0])  # Correct size
+        bad_bounds = (bad_lower, bad_upper)
+
+        with pytest.raises(
+            ValueError, match=r"Lower bounds must have the same structure .*"
+        ):
+            lm_solve(
+                constrained_quadratic,
+                x0,
+                bounds=bad_bounds,
+                maxfev=10
+            )
+        
+        bad_lower = np.array([0.0, 0.0])  # Correct size
+        bad_upper = np.array([2.0])  # Wrong size (1 instead of 2)
+        bad_bounds = (bad_lower, bad_upper)
+        
+        with pytest.raises(
+            ValueError, match=r"Upper bounds must have the same structure .*"
+        ):
+            lm_solve(
+                constrained_quadratic,
+                x0,
+                bounds=bad_bounds,
+                maxfev=10
+            )
 
     def test_box_constraints_rosenbrock(self):
         """Test box constraints with Rosenbrock function."""
@@ -1077,7 +1109,7 @@ class TestLM:
 
     def test_box_constraints_gradient_projection(self):
         """Test gradient projection logic with a simple example."""
-        from archimedes.sysid._lm import _project_gradient, _check_constrained_convergence
+        from archimedes.sysid._lm import _project_gradient, _check_constrained_convergence, _compute_step
         
         # Test case: At lower bound with outward gradient
         x = np.array([0.0, 2.5])  # First variable at lower bound
@@ -1105,6 +1137,129 @@ class TestLM:
         assert proj_norm == abs(grad[1]), "Projected norm should be second component only"
         assert active_info['n_active_lower'] == 1, "Should detect one active lower bound"
         assert active_info['total_active'] == 1, "Should have one total active constraint"
+        
+        # Edge case: Test ValueError when qp_solver is None but bounds are present
+        hess = np.eye(2)
+        diag = np.ones(2)
+        lambda_val = 0.1
+        
+        try:
+            _compute_step(hess, grad, diag, lambda_val, x, bounds, qp_solver=None)
+            assert False, "Should have raised ValueError for missing qp_solver"
+        except ValueError as e:
+            assert "qp_solver must be provided" in str(e), f"Unexpected error message: {e}"
+
+    def test_box_constraints_qp_edge_cases(self):
+        """Test QP solver edge cases: difficult solves and fallback handling."""
+        from archimedes.sysid._lm import _compute_step
+        import osqp
+        import io
+        import sys
+        
+        # Set up basic QP problem data
+        n = 2
+        hess = np.eye(n)
+        grad = np.array([1.0, 1.0])
+        diag = np.ones(n)
+        lambda_val = 0.1
+        x_current = np.array([0.0, 0.0])
+        
+        # Test case 1: QP with very tight constraints that might cause solver issues
+        # Use extremely small feasible region
+        epsilon = 1e-10  # Very tight bounds
+        bounds_tight = (np.array([-epsilon, -epsilon]), np.array([epsilon, epsilon]))
+        
+        # Set up OSQP solver with settings that might cause early termination
+        qp_solver = osqp.OSQP()
+        qp_solver.setup(
+            P=sparse.csc_matrix(np.ones((n, n))),
+            q=np.zeros(n),
+            A=sparse.csc_matrix(np.eye(n)),
+            l=np.array([-epsilon, -epsilon]),
+            u=np.array([epsilon, epsilon]),
+            verbose=False,
+            max_iter=1,    # Very few iterations to force early termination
+            eps_abs=1e-3,  # Loose tolerance
+            eps_rel=1e-3,
+        )
+        
+        # Capture printed output
+        captured_output = io.StringIO()
+        sys.stdout = captured_output
+        
+        try:
+            # This might trigger suboptimal solve due to tight constraints + few iterations
+            step = _compute_step(
+                hess, grad, diag, lambda_val, x_current, bounds_tight, qp_solver
+            )
+            
+            # Should return a valid step regardless of QP solver status
+            assert step is not None, "Step should not be None even with difficult QP"
+            assert not np.any(np.isnan(step)), "Step should not contain NaN"
+            assert not np.any(np.isinf(step)), "Step should not contain Inf"
+            assert len(step) == n, "Step should have correct dimension"
+            
+        finally:
+            sys.stdout = sys.__stdout__
+            
+        # Test case 2: Test fast path vs QP path decision logic
+        # This tests the bounds violation detection more directly
+        
+        # Case where unconstrained step doesn't violate bounds (should use fast path)
+        grad_small = np.array([0.01, 0.01])  # Small gradient
+        bounds_loose = (np.array([-10.0, -10.0]), np.array([10.0, 10.0]))
+        
+        qp_solver_test = osqp.OSQP()
+        qp_solver_test.setup(
+            P=sparse.csc_matrix(np.ones((n, n))),
+            q=np.zeros(n),
+            A=sparse.csc_matrix(np.eye(n)),
+            l=np.array([-10.0, -10.0]),
+            u=np.array([10.0, 10.0]),
+            verbose=False
+        )
+        
+        step_fast = _compute_step(
+            hess, grad_small, diag, lambda_val, x_current, bounds_loose, qp_solver_test
+        )
+        
+        # Case where unconstrained step would violate bounds (should use QP path)
+        grad_large = np.array([5.0, 5.0])  # Large gradient that will violate bounds
+        bounds_tight_valid = (np.array([-0.1, -0.1]), np.array([0.1, 0.1]))
+        
+        qp_solver_test.update(l=np.array([-0.1, -0.1]), u=np.array([0.1, 0.1]))
+        
+        step_qp = _compute_step(
+            hess, grad_large, diag, lambda_val, x_current, bounds_tight_valid, qp_solver_test
+        )
+        
+        # Both should return valid steps, but they should be different
+        assert not np.allclose(step_fast, step_qp, atol=1e-6), (
+            "Fast path and QP path should give different steps for this problem"
+        )
+        
+        # QP step should respect bounds after adding to x_current
+        x_trial_qp = x_current + step_qp
+        lb, ub = bounds_tight_valid
+        bounds_tolerance = 1e-6
+        assert np.all(x_trial_qp >= lb - bounds_tolerance), "QP step should respect lower bounds"
+        assert np.all(x_trial_qp <= ub + bounds_tolerance), "QP step should respect upper bounds"
+        
+        # Test case 3: Simulate QP solver failure by causing numerical issues
+        # Use pathological problem that might stress the QP solver
+        hess_ill = np.array([[1e-12, 0], [0, 1e12]])  # Very ill-conditioned
+        grad_mixed = np.array([1e6, 1e-6])  # Mixed scales
+        
+        # This combination might cause the QP solver to struggle
+        step_pathological = _compute_step(
+            hess_ill, grad_mixed, diag, lambda_val, x_current,
+            bounds_tight_valid, qp_solver_test
+        )
+        
+        # Should still return a valid step via fallback mechanisms
+        assert step_pathological is not None, "Step should not be None even with pathological QP"
+        assert not np.any(np.isnan(step_pathological)), "Step should not contain NaN"
+        assert len(step_pathological) == n, "Step should have correct dimension"
 
 
 if __name__ == "__main__":

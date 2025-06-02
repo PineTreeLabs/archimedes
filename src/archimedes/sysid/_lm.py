@@ -214,43 +214,35 @@ def _compute_step(hess, grad, diag, lambda_val, x, bounds=None, qp_solver=None):
     
     # Check if trial point violates bounds
     violates_bounds = np.any(x_trial < lb) or np.any(x_trial > ub)
-    
+
     if not violates_bounds:
         return step  # Fast path: no QP needed
-    
+
     # Step 3: Solve constrained QP
     if qp_solver is None:
         raise ValueError("qp_solver must be provided if bounds are set.")
+
+    # Update QP matrices: min 0.5*p^T*H_damped*p + grad^T*p
+    # subject to: lb <= x + p <= ub
+    # Rearranged: (lb - x) <= p <= (ub - x)
+    l_qp = lb - x  # Lower bounds for step
+    u_qp = ub - x  # Upper bounds for step
     
-    try:
-        # Update QP matrices: min 0.5*p^T*H_damped*p + grad^T*p
-        # subject to: lb <= x + p <= ub
-        # Rearranged: (lb - x) <= p <= (ub - x)
-        l_qp = lb - x  # Lower bounds for step
-        u_qp = ub - x  # Upper bounds for step
-        
-        # Update the QP problem
-        qp_solver.update(P=H_damped, q=grad, l=l_qp, u=u_qp)
-        
-        # Warm start with unconstrained solution (projected to bounds)
-        qp_solver.warm_start(x=np.clip(step, l_qp, u_qp))
-        
-        # Solve QP
-        qp_results = qp_solver.solve()
-        
-        if qp_results.info.status != 'solved':
-            print(f"OSQP warning: {qp_results.info.status}")
-            # Fallback: project unconstrained step to bounds
-            return np.clip(step, l_qp, u_qp)
-        
-        return qp_results.x
-        
-    except Exception as e:
-        print(f"QP solver failed: {e}. Using projected step.")
-        # Fallback: simple projection of unconstrained step
-        l_qp = lb - x
-        u_qp = ub - x
+    # Update the QP problem
+    qp_solver.update(P=H_damped, q=grad, l=l_qp, u=u_qp)
+    
+    # Warm start with unconstrained solution (projected to bounds)
+    qp_solver.warm_start(x=np.clip(step, l_qp, u_qp))
+    
+    # Solve QP
+    qp_results = qp_solver.solve()
+    
+    if qp_results.info.status != 'solved':
+        print(f"OSQP warning: {qp_results.info.status}")
+        # Fallback: project unconstrained step to bounds
         return np.clip(step, l_qp, u_qp)
+    
+    return qp_results.x
 
 
 def _compute_predicted_reduction(grad, step, hess, current_objective=None):
@@ -399,15 +391,19 @@ def _check_bounds(x, bounds):
     if bounds is None:
         return
     lower, upper = bounds
-    x_treedef = tree.structure(x)
-    lb_treedef = tree.structure(lower)
-    ub_treedef = tree.structure(upper)
-    if x_treedef != lb_treedef:
+    _, unravel_x = tree.ravel(x)
+    _, unravel_lb = tree.ravel(lower)
+    _, unravel_ub = tree.ravel(upper)
+    if unravel_x != unravel_lb:
+        x_treedef = tree.structure(x)
+        lb_treedef = tree.structure(lower)
         raise ValueError(
             f"Lower bounds must have the same structure as x0 but got {x_treedef}"
             f"for x0 and {lb_treedef} for lower bounds."
         )
-    if x_treedef != ub_treedef:
+    if unravel_x != unravel_ub:
+        x_treedef = tree.structure(x)
+        ub_treedef = tree.structure(upper)
         raise ValueError(
             f"Upper bounds must have the same structure as x0 but got {x_treedef}"
             f"for x0 and {ub_treedef} for upper bounds."

@@ -106,23 +106,20 @@ class TestPEMIntegration:
 
         R = noise_std ** 2 * np.eye(ny)  # Measurement noise covariance
         Q = noise_std ** 2 * np.eye(nx)  # Process noise covariance (scale with R)
+
+        # Initial state covariance (not necessary, just tests proper handling)
+        P0 = np.eye(nx)
         
         # Set up PEM problem
         dyn = discretize(second_order_ode, dt, method="rk4")
         ekf = ExtendedKalmanFilter(dyn, obs, Q, R)
         data = Timeseries(ts=ts, us=us, ys=ys)
-        options = {
-            "ftol": 1e-6,
-            "xtol": 1e-6,
-            "gtol": 1e-6,
-            "nprint": 1,
-        }
         result = pem_solve(
             ekf,
             data,
             params_guess,
             x0=x0_true,  # Assume initial conditions are known
-            options=options,
+            P0=P0,
         )
 
         # Validate results
@@ -190,7 +187,6 @@ class TestPEMIntegration:
             data,
             dvs_guess,
             x0=None,  # Unknown initial conditions
-            options=options,
         )
         x0_est, params_est = result_with_x0.x
         print(f"Estimated initial conditions: {x0_est}")
@@ -206,6 +202,16 @@ class TestPEMIntegration:
         assert zeta_error < 0.01, f"Damping ratio error too large: {zeta_error:.6f}"
         
         assert np.allclose(x0_est, x0_true, atol=1e-2), f"Initial condition error too large: {np.abs(x0_est - x0_true)}"
+
+        # Error handling
+        with pytest.raises(ValueError, match=r"Unsupported method.*"):
+            pem_solve(
+                ekf,
+                data,
+                params_guess,
+                x0=x0_true,
+                method="unsupported_method",
+            )
 
     def test_van_der_pol(self, plot=False):
         """Test parameter recovery on Van der Pol oscillator (nonlinear system).

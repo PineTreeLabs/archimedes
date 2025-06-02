@@ -13,6 +13,8 @@ if TYPE_CHECKING:
     from .timeseries import Timeseries
     from ._lm import LMResult
 
+    T = TypeVar("T", bound=PyTree)
+
 
 __all__ = ["pem_solve"]
 
@@ -128,8 +130,9 @@ class PEMObjective:
 def pem_solve(
     predictor: KalmanFilterBase,
     data: Timeseries,
-    params_guess: PyTree,
+    params_guess: T,
     x0: np.ndarray = None,
+    bounds: tuple[T, T] | None = None,
     P0: np.ndarray = None,
     method: str = "lm",
     options: dict | None = None,
@@ -141,6 +144,9 @@ def pem_solve(
         data: Timeseries object containing ts, us, ys
         params_guess: initial guess for parameters
         x0: initial state (optional, defaults to None)
+        bounds: tuple of lower and upper bounds for parameters (optional)
+            If provided, should be a tuple of two PyTrees with the same structure
+            as the parameters
         P0: initial state covariance (optional, defaults to identity)
         method: optimization method (default is "lm")
         options: additional options for the optimizer (optional)
@@ -161,4 +167,4 @@ def pem_solve(
         x0=x0,
     )
 
-    return lm_solve(objective, params_guess, **options)
+    return lm_solve(objective, params_guess, bounds=bounds, **options)
