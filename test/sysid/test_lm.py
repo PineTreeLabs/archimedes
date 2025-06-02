@@ -71,9 +71,10 @@ class TestLM:
         grad = np.array([2.0, 1.0])
         diag = np.array([1.0, 1.0])
         lambda_val = 0.1
+        x_current = np.array([0.0, 0.0])  # Current point
         bounds = None
 
-        step = _compute_step(hess, grad, diag, lambda_val, bounds)
+        step = _compute_step(hess, grad, diag, lambda_val, x_current, bounds)
 
         # Verify the step satisfies (H + λI)p = -g
         H_damped = hess + lambda_val * np.eye(2)
@@ -89,10 +90,11 @@ class TestLM:
         grad = np.array([1.0, 1.0])
         diag = np.array([1.0, 1.0])
         lambda_val = 0.01
+        x_current = np.array([0.0, 0.0])  # Current point
         bounds = None
 
         # Should not crash and should return reasonable step
-        step = _compute_step(hess, grad, diag, lambda_val, bounds)
+        step = _compute_step(hess, grad, diag, lambda_val, x_current, bounds)
         assert not np.any(np.isnan(step))
         assert not np.any(np.isinf(step))
         assert np.linalg.norm(step) < 100  # Reasonable magnitude
@@ -106,10 +108,11 @@ class TestLM:
         grad = np.array([1.0, 1.0])
         diag = np.array([1.0, 1.0])
         lambda_val = 0.0  # No damping to keep it singular
+        x_current = np.array([0.0, 0.0])  # Current point
         bounds = None
 
         # Should fall back gracefully
-        step = _compute_step(hess, grad, diag, lambda_val, bounds)
+        step = _compute_step(hess, grad, diag, lambda_val, x_current, bounds)
         assert not np.any(np.isnan(step))
         assert not np.any(np.isinf(step))
 
@@ -892,6 +895,216 @@ class TestLM:
             
         finally:
             sys.stdout = sys.__stdout__
+
+    def test_box_constraints_simple_quadratic(self):
+        """Test box constraints with a simple quadratic function."""
+        
+        def constrained_quadratic(x):
+            """
+            Minimize f(x,y) = (x-3)² + (y-2)²
+            Subject to: 0 ≤ x ≤ 2, 0 ≤ y ≤ 1
+            
+            Unconstrained optimum: (3, 2)
+            Constrained optimum: (2, 1) - both variables at upper bounds
+            """
+            x = np.atleast_1d(x)
+            
+            # Residuals: r1 = (x-3), r2 = (y-2)
+            r = np.array([x[0] - 3.0, x[1] - 2.0], like=x)
+            
+            # Compute Jacobian manually for this simple case
+            J = np.array([[1.0, 0.0],
+                          [0.0, 1.0]], like=x)
+            
+            # Objective: V = 0.5 * ||r||²
+            V = 0.5 * np.sum(r**2)
+            
+            # Gradient: g = J^T @ r
+            g = J.T @ r
+            
+            # Hessian: H = J^T @ J
+            H = J.T @ J
+            
+            return V, g, H
+        
+        # Test setup
+        x0 = np.array([0.5, 0.5])  # Start in interior
+        bounds = (
+            np.array([0.0, 0.0]),  # Lower bounds
+            np.array([2.0, 1.0])   # Upper bounds  
+        )
+        
+        # Solve constrained problem
+        result = lm_solve(
+            constrained_quadratic,
+            x0,
+            bounds=bounds,
+            ftol=1e-8,
+            xtol=1e-8,
+            gtol=1e-6,
+            maxfev=50
+        )
+        
+        # Test assertions
+        expected_solution = np.array([2.0, 1.0])
+        solution_error = np.linalg.norm(result.x - expected_solution)
+        
+        assert result.success, (
+            f"Constrained quadratic optimization should succeed, got: {result.message}"
+        )
+        
+        assert solution_error < 1e-4, (
+            f"Solution {result.x} not close enough to [2,1] (error: {solution_error:.6e})"
+        )
+        
+        # Check constraint satisfaction
+        lb, ub = bounds
+        tol = 1e-6  # Tolerance for bounds checking
+        bounds_satisfied = np.all(lb <= result.x + tol) and np.all(result.x - tol <= ub)
+        assert bounds_satisfied, (
+            f"Bounds violated: {result.x} not in [{lb}, {ub}]"
+        )
+        
+        # Check that constrained optimization info is recorded
+        if len(result.history) > 0 and 'grad_proj_norm' in result.history[-1]:
+            final_history = result.history[-1]
+            # Both variables should be at upper bounds
+            assert final_history['n_active_upper'] == 2, (
+                f"Expected 2 active upper bounds, got {final_history['n_active_upper']}"
+            )
+            assert final_history['grad_proj_norm'] < 1e-6, (
+                f"Projected gradient norm should be small: {final_history['grad_proj_norm']}"
+            )
+
+    def test_box_constraints_rosenbrock(self):
+        """Test box constraints with Rosenbrock function."""
+        
+        def rosenbrock_res(x):
+            return np.hstack([10.0 * (x[1] - x[0] ** 2), 1.0 - x[0]])
+
+        def rosenbrock_func(x):
+            # Residuals and Jacobian
+            r = rosenbrock_res(x)
+            J = arc.jac(rosenbrock_res)(x)
+
+            # Objective (half sum of squares)
+            V = 0.5 * np.sum(r**2)
+
+            # Gradient of objective: g = J.T @ r
+            g = J.T @ r
+
+            # Hessian approximation: H ≈ J.T @ J (Gauss-Newton)
+            H = J.T @ J
+
+            return V, g, H
+        
+        # Test Case 1: Bounds that force solution to boundary
+        # Unconstrained optimum is [1, 1], but we restrict x ≤ 0.8
+        x0 = np.array([0.0, 0.0])  # Start at origin
+        bounds = (
+            np.array([0.0, 0.0]),   # Lower bounds
+            np.array([0.8, 2.0])    # Upper bounds - restrict first variable
+        )
+        
+        result = lm_solve(
+            rosenbrock_func,
+            x0,
+            bounds=bounds,
+            ftol=1e-8,
+            xtol=1e-8,
+            gtol=1e-6,
+            maxfev=100
+        )
+        
+        # The constrained optimum should be at x[0] = 0.8, x[1] = 0.8² = 0.64
+        expected_solution = np.array([0.8, 0.64])
+        solution_error = np.linalg.norm(result.x - expected_solution)
+        
+        assert result.success, (
+            f"Constrained Rosenbrock optimization should succeed, got: {result.message}"
+        )
+        
+        assert solution_error < 1e-2, (
+            f"Solution {result.x} not close enough to [0.8, 0.64] (error: {solution_error:.6e})"
+        )
+        
+        # Check that first variable is at upper bound
+        assert abs(result.x[0] - 0.8) < 1e-6, (
+            f"First variable should be at upper bound 0.8, got {result.x[0]}"
+        )
+        
+        # Check constraint satisfaction
+        lb, ub = bounds
+        bounds_satisfied = np.all(lb <= result.x) and np.all(result.x <= ub)
+        assert bounds_satisfied, (
+            f"Bounds violated: {result.x} not in [{lb}, {ub}]"
+        )
+        
+        # Test Case 2: Bounds that don't affect the solution (interior optimum)
+        bounds_loose = (
+            np.array([0.0, 0.0]),   # Lower bounds
+            np.array([2.0, 2.0])    # Upper bounds - don't restrict
+        )
+        
+        result_loose = lm_solve(
+            rosenbrock_func,
+            x0,
+            bounds=bounds_loose,
+            ftol=1e-8,
+            xtol=1e-8,
+            gtol=1e-6,
+            maxfev=100
+        )
+        
+        # Should find the unconstrained optimum [1, 1]
+        expected_solution_loose = np.array([1.0, 1.0])
+        solution_error_loose = np.linalg.norm(result_loose.x - expected_solution_loose)
+        
+        assert result_loose.success, (
+            f"Loosely constrained Rosenbrock should succeed, got: {result_loose.message}"
+        )
+        
+        assert solution_error_loose < 1e-3, (
+            f"Loose bounds solution {result_loose.x} not close to [1,1] (error: {solution_error_loose:.6e})"
+        )
+        
+        # Verify that loose bounds don't activate constraints
+        if len(result_loose.history) > 0 and 'total_active' in result_loose.history[-1]:
+            final_active = result_loose.history[-1]['total_active']
+            assert final_active == 0, (
+                f"Loose bounds should have no active constraints, got {final_active}"
+            )
+
+    def test_box_constraints_gradient_projection(self):
+        """Test gradient projection logic with a simple example."""
+        from archimedes.sysid._lm import _project_gradient, _check_constrained_convergence
+        
+        # Test case: At lower bound with outward gradient
+        x = np.array([0.0, 2.5])  # First variable at lower bound
+        grad = np.array([0.5, -0.2])  # Positive gradient for bounded variable
+        bounds = (np.array([0.0, 0.0]), np.array([3.0, 3.0]))
+        
+        grad_proj, active_lower, active_upper = _project_gradient(grad, x, bounds)
+        
+        # First component should be projected to 0, second unchanged
+        assert grad_proj[0] == 0.0, (
+            f"First component should be projected to 0, got {grad_proj[0]}"
+        )
+        assert grad_proj[1] == grad[1], (
+            f"Second component should be unchanged, got {grad_proj[1]} vs {grad[1]}"
+        )
+        assert active_lower[0] == True, "First variable should be detected as active lower"
+        assert active_lower[1] == False, "Second variable should not be active"
+        
+        # Test convergence check
+        converged, proj_norm, active_info = _check_constrained_convergence(
+            grad, x, bounds, gtol=1e-1
+        )
+        
+        assert converged == False, "Should not converge with large projected gradient"
+        assert proj_norm == abs(grad[1]), "Projected norm should be second component only"
+        assert active_info['n_active_lower'] == 1, "Should detect one active lower bound"
+        assert active_info['total_active'] == 1, "Should have one total active constraint"
 
 
 if __name__ == "__main__":
