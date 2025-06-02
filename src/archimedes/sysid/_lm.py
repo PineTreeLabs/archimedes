@@ -4,6 +4,12 @@ from enum import IntEnum
 
 from archimedes import tree, compile
 
+__all__ = [
+    "lm_solve",
+    "LMStatus",
+    "LMResult",
+]
+
 
 class LMStatus(IntEnum):
     """Status codes for Levenberg-Marquardt optimization results."""
@@ -131,7 +137,7 @@ class LMResult(NamedTuple):
     history: List[Dict[str, Any]]
 
 
-def compute_step(hess, grad, diag, lambda_val):
+def _compute_step(hess, grad, diag, lambda_val, bounds):
     """
     Compute the Levenberg-Marquardt step by solving the damped normal equations.
 
@@ -145,6 +151,8 @@ def compute_step(hess, grad, diag, lambda_val):
         Scaling factors for the variables
     lambda_val : float
         Levenberg-Marquardt damping parameter
+    bounds : tuple, optional
+        Tuple of (lower_bounds, upper_bounds) for parameters.
 
     Returns
     -------
@@ -178,7 +186,7 @@ def compute_step(hess, grad, diag, lambda_val):
     return step
 
 
-def compute_predicted_reduction(grad, step, hess, current_objective=None):
+def _compute_predicted_reduction(grad, step, hess, current_objective=None):
     """
     Compute the predicted reduction in the objective function.
 
@@ -216,10 +224,30 @@ def compute_predicted_reduction(grad, step, hess, current_objective=None):
     return pred_red
 
 
+def _check_bounds(x, bounds):
+    if bounds is None:
+        return
+    lower, upper = bounds
+    x_treedef = tree.structure(x)
+    lb_treedef = tree.structure(lower)
+    ub_treedef = tree.structure(upper)
+    if x_treedef != lb_treedef:
+        raise ValueError(
+            f"Lower bounds must have the same structure as x0 but got {x_treedef}"
+            f"for x0 and {lb_treedef} for lower bounds."
+        )
+    if x_treedef != ub_treedef:
+        raise ValueError(
+            f"Upper bounds must have the same structure as x0 but got {x_treedef}"
+            f"for x0 and {ub_treedef} for upper bounds."
+        )
+
+
 def lm_solve(
     func,
     x0,
     args=(),
+    bounds=None,
     ftol=1e-8,
     xtol=1e-8,
     gtol=1e-8,
@@ -238,10 +266,13 @@ def lm_solve(
         - objective: scalar value (0.5 * sum of squared residuals)
         - gradient: gradient vector of the objective
         - hessian: Hessian matrix or approximation (e.g., J.T @ J)
-    x0 : ndarray, shape (n,)
+    x0 : PyTree
         Initial guess to the parameters
     args : tuple, optional
         Extra arguments passed to func
+    bounds : tuple, optional
+        Tuple of (lower_bounds, upper_bounds) for parameters.  Default is None
+        (unconstrained).  If provided, both must have the same PyTree structure as x0.
     ftol : float, optional
         Relative error desired in the sum of squares
     xtol : float, optional
@@ -253,7 +284,7 @@ def lm_solve(
     diag : ndarray, optional
         N-element array of scaling factors. If None, automatic scaling used.
     lambda0 : float, optional
-        Initial LM damping parameter
+        Initial LM damping parameter. Default is 1e-3.
     nprint : int, optional
         Print progress every nprint iterations
 
@@ -262,6 +293,8 @@ def lm_solve(
     result : LMResult
         Optimization result with solution, convergence info, and history
     """
+    _check_bounds(x0, bounds)  # Validate bounds structure
+
     progress = LMProgress(nprint)  # Initialize logger
 
     # Constants
@@ -340,7 +373,7 @@ def lm_solve(
         inner_loop_exit = False
         while True:
             # Compute step using damped normal equations
-            step = compute_step(hess, grad, diag, lambda_val)
+            step = _compute_step(hess, grad, diag, lambda_val, bounds)
 
             # Compute trial point
             x_new = x + step
@@ -358,7 +391,7 @@ def lm_solve(
                 actred = 1.0 - cost_new / cost
 
             # Compute predicted reduction using quadratic model
-            prered = compute_predicted_reduction(grad, step, hess, cost)
+            prered = _compute_predicted_reduction(grad, step, hess, cost)
 
             # Compute ratio of actual to predicted reduction
             ratio = 0.0

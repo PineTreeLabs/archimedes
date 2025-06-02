@@ -64,15 +64,16 @@ class TestLM:
 
     def test_compute_step_well_conditioned(self):
         """Test compute_step with a well-conditioned matrix."""
-        from archimedes.sysid._lm.lm_solve import compute_step
+        from archimedes.sysid._lm import _compute_step
 
         # Simple 2x2 case with known solution
         hess = np.array([[4.0, 1.0], [1.0, 3.0]])  # SPD matrix
         grad = np.array([2.0, 1.0])
         diag = np.array([1.0, 1.0])
         lambda_val = 0.1
+        bounds = None
 
-        step = compute_step(hess, grad, diag, lambda_val)
+        step = _compute_step(hess, grad, diag, lambda_val, bounds)
 
         # Verify the step satisfies (H + λI)p = -g
         H_damped = hess + lambda_val * np.eye(2)
@@ -81,39 +82,41 @@ class TestLM:
 
     def test_compute_step_ill_conditioned(self):
         """Test compute_step with an ill-conditioned matrix."""
-        from archimedes.sysid._lm.lm_solve import compute_step
+        from archimedes.sysid._lm import _compute_step
 
         # Ill-conditioned matrix (near-singular)
         hess = np.array([[1.0, 1.0], [1.0, 1.0001]])
         grad = np.array([1.0, 1.0])
         diag = np.array([1.0, 1.0])
         lambda_val = 0.01
+        bounds = None
 
         # Should not crash and should return reasonable step
-        step = compute_step(hess, grad, diag, lambda_val)
+        step = _compute_step(hess, grad, diag, lambda_val, bounds)
         assert not np.any(np.isnan(step))
         assert not np.any(np.isinf(step))
         assert np.linalg.norm(step) < 100  # Reasonable magnitude
 
     def test_compute_step_singular(self):
         """Test compute_step with a singular matrix."""
-        from archimedes.sysid._lm.lm_solve import compute_step
+        from archimedes.sysid._lm import _compute_step
 
         # Singular matrix
         hess = np.array([[1.0, 1.0], [1.0, 1.0]])
         grad = np.array([1.0, 1.0])
         diag = np.array([1.0, 1.0])
         lambda_val = 0.0  # No damping to keep it singular
+        bounds = None
 
         # Should fall back gracefully
-        step = compute_step(hess, grad, diag, lambda_val)
+        step = _compute_step(hess, grad, diag, lambda_val, bounds)
         assert not np.any(np.isnan(step))
         assert not np.any(np.isinf(step))
 
     def test_compute_predicted_reduction(self):
         """Test predicted reduction calculation."""
-        from archimedes.sysid._lm.lm_solve import (
-            compute_predicted_reduction,
+        from archimedes.sysid._lm import (
+            _compute_predicted_reduction,
         )
 
         # Simple test case
@@ -122,8 +125,8 @@ class TestLM:
         hess = np.array([[4.0, 0.0], [0.0, 2.0]])
         current_objective = 2.0
 
-        # Test without scaling (legacy behavior)
-        pred_red_unscaled = compute_predicted_reduction(grad, step, hess)
+        # Test without scaling
+        pred_red_unscaled = _compute_predicted_reduction(grad, step, hess)
 
         # Manual calculation: pred_red = -(g^T*p + 0.5*p^T*H*p)
         linear = np.dot(grad, step)  # 2*(-0.5) + 1*(-0.25) = -1.25
@@ -135,8 +138,8 @@ class TestLM:
         assert np.isclose(pred_red_unscaled, expected_unscaled)
         assert pred_red_unscaled > 0  # Should predict a reduction
 
-        # Test with scaling (new behavior)
-        pred_red_scaled = compute_predicted_reduction(
+        # Test with scaling
+        pred_red_scaled = _compute_predicted_reduction(
             grad, step, hess, current_objective
         )
         expected_scaled = (
@@ -855,7 +858,7 @@ class TestLM:
 
     def test_nprint_header_logic(self):
         """Test the specific header printing logic in LMProgress."""
-        from archimedes.sysid._lm.lm_solve import LMProgress
+        from archimedes.sysid._lm import LMProgress
         import io
         import sys
         
