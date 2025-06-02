@@ -1,4 +1,3 @@
-import numpy as np
 from typing import (
     TYPE_CHECKING,
     Dict,
@@ -11,6 +10,8 @@ from typing import (
 )
 from enum import IntEnum
 
+import numpy as np
+from scipy import sparse
 import osqp
 
 from archimedes import tree, compile
@@ -151,9 +152,11 @@ class LMResult(NamedTuple):
     history: List[Dict[str, Any]]
 
 
-def _compute_step(hess, grad, diag, lambda_val, bounds=None, qp_solver=None):
+def _compute_step(hess, grad, diag, lambda_val, x, bounds=None, qp_solver=None):
     """
     Compute the Levenberg-Marquardt step by solving the damped normal equations.
+    
+    Uses hybrid approach: first try unconstrained step, then QP if bounds violated.
 
     Parameters
     ----------
@@ -165,6 +168,8 @@ def _compute_step(hess, grad, diag, lambda_val, bounds=None, qp_solver=None):
         Scaling factors for the variables
     lambda_val : float
         Levenberg-Marquardt damping parameter
+    x : ndarray, shape (n,)
+        Current parameter values
     bounds : tuple, optional
         Tuple of (lower_bounds, upper_bounds) for parameters.
     qp_solver : osqp.OSQP, optional
@@ -181,7 +186,8 @@ def _compute_step(hess, grad, diag, lambda_val, bounds=None, qp_solver=None):
     for i in range(n):
         H_damped[i, i] += lambda_val * diag[i] ** 2
 
-    # Solve for the step
+    # Step 1: Compute unconstrained step
+    step = None
     try:
         # Use Cholesky decomposition for better numerical stability
         # This requires the matrix to be positive definite
@@ -198,21 +204,53 @@ def _compute_step(hess, grad, diag, lambda_val, bounds=None, qp_solver=None):
         except np.linalg.LinAlgError:
             # Last resort: gradient descent direction with normalization
             step = -grad / (np.linalg.norm(grad) + 1e-8)
-
-    if bounds is not None:
-        if qp_solver is None:
-            raise ValueError("qp_solver must be provided if bounds are set.")
-        lb, ub = bounds
-        if np.any(lb > step) or np.any(ub < step):
-            # If bounds are violated, solve the QP with OSQP
-            qp_solver.update(P=hess_damped, q=grad)
-            qp_solver.warm_start(x=step)  # Use current step as warm start
-            qp_results = qp_solver.solve()
-            print("OSQP results:")
-            print(qp_results.info)
-            step = qp_results.x
-
-    return step
+    
+    # Step 2: Check if bounds are satisfied
+    if bounds is None:
+        return step
+        
+    lb, ub = bounds
+    x_trial = x + step
+    
+    # Check if trial point violates bounds
+    violates_bounds = np.any(x_trial < lb) or np.any(x_trial > ub)
+    
+    if not violates_bounds:
+        return step  # Fast path: no QP needed
+    
+    # Step 3: Solve constrained QP
+    if qp_solver is None:
+        raise ValueError("qp_solver must be provided if bounds are set.")
+    
+    try:
+        # Update QP matrices: min 0.5*p^T*H_damped*p + grad^T*p
+        # subject to: lb <= x + p <= ub
+        # Rearranged: (lb - x) <= p <= (ub - x)
+        l_qp = lb - x  # Lower bounds for step
+        u_qp = ub - x  # Upper bounds for step
+        
+        # Update the QP problem
+        qp_solver.update(P=H_damped, q=grad, l=l_qp, u=u_qp)
+        
+        # Warm start with unconstrained solution (projected to bounds)
+        qp_solver.warm_start(x=np.clip(step, l_qp, u_qp))
+        
+        # Solve QP
+        qp_results = qp_solver.solve()
+        
+        if qp_results.info.status != 'solved':
+            print(f"OSQP warning: {qp_results.info.status}")
+            # Fallback: project unconstrained step to bounds
+            return np.clip(step, l_qp, u_qp)
+        
+        return qp_results.x
+        
+    except Exception as e:
+        print(f"QP solver failed: {e}. Using projected step.")
+        # Fallback: simple projection of unconstrained step
+        l_qp = lb - x
+        u_qp = ub - x
+        return np.clip(step, l_qp, u_qp)
 
 
 def _compute_predicted_reduction(grad, step, hess, current_objective=None):
@@ -251,6 +289,110 @@ def _compute_predicted_reduction(grad, step, hess, current_objective=None):
         pred_red = pred_red / (current_objective + epsilon)
 
     return pred_red
+
+
+def _project_gradient(grad, x, bounds, atol=1e-8):
+    """
+    Project gradient onto the tangent cone of box constraints.
+    
+    This computes the "projected gradient" which is the correct measure
+    for convergence in constrained optimization. At a constrained optimum,
+    the projected gradient should be zero, not the full gradient.
+    
+    Parameters
+    ----------
+    grad : ndarray, shape (n,)
+        Current gradient vector
+    x : ndarray, shape (n,)
+        Current parameter values
+    bounds : tuple of (lower, upper)
+        Box constraints where lower and upper are arrays of shape (n,)
+        Use -np.inf/np.inf for unbounded variables
+    atol : float, optional
+        Absolute tolerance for determining if a variable is at its bound
+        
+    Returns
+    -------
+    grad_proj : ndarray, shape (n,)
+        Projected gradient
+    active_lower : ndarray, shape (n,), dtype=bool
+        True where lower bounds are active
+    active_upper : ndarray, shape (n,), dtype=bool  
+        True where upper bounds are active
+        
+    Mathematical Notes
+    -----------------
+    For box constraints l ≤ x ≤ u, the projected gradient is:
+    
+    g_proj[i] = {
+        0       if x[i] = l[i] and g[i] > 0  (at lower bound, gradient points out)
+        0       if x[i] = u[i] and g[i] < 0  (at upper bound, gradient points out)  
+        g[i]    otherwise                    (interior or admissible direction)
+    }
+    
+    This captures the KKT optimality conditions:
+    - Interior variables: g_proj[i] = g[i] = 0 at optimum
+    - Boundary variables: g_proj[i] = 0 always (projected out)
+    """
+    lower, upper = bounds
+    
+    # Determine which constraints are active (within tolerance)
+    active_lower = (x <= lower + atol) & np.isfinite(lower)
+    active_upper = (x >= upper - atol) & np.isfinite(upper)
+    
+    # Start with full gradient
+    grad_proj = grad.copy()
+    
+    # Zero out gradient components that point "outward" from active constraints
+    # At lower bound: zero positive gradients (can't move further left)
+    grad_proj = np.where(active_lower & (grad > 0), 0.0, grad_proj)
+    
+    # At upper bound: zero negative gradients (can't move further right)  
+    grad_proj = np.where(active_upper & (grad < 0), 0.0, grad_proj)
+    
+    return grad_proj, active_lower, active_upper
+
+
+def _check_constrained_convergence(grad, x, bounds, gtol=1e-8, atol=1e-8):
+    """
+    Check convergence for box-constrained optimization using projected gradient.
+    
+    Parameters
+    ----------
+    grad : ndarray
+        Current gradient
+    x : ndarray  
+        Current parameters
+    bounds : tuple of (lower, upper)
+        Box constraints
+    gtol : float
+        Gradient tolerance for convergence
+    atol : float
+        Tolerance for determining active constraints
+        
+    Returns
+    -------
+    converged : bool
+        True if converged according to constrained optimality conditions
+    grad_proj_norm : float
+        Norm of projected gradient (should be small at optimum)
+    active_info : dict
+        Information about active constraints
+    """
+    grad_proj, active_lower, active_upper = _project_gradient(grad, x, bounds, atol)
+    
+    grad_proj_norm = np.linalg.norm(grad_proj, np.inf)
+    converged = grad_proj_norm <= gtol
+    
+    active_info = {
+        'n_active_lower': np.sum(active_lower),
+        'n_active_upper': np.sum(active_upper), 
+        'total_active': np.sum(active_lower | active_upper),
+        'grad_proj_norm': grad_proj_norm,
+        'full_grad_norm': np.linalg.norm(grad, np.inf)
+    }
+    
+    return converged, grad_proj_norm, active_info
 
 
 def _check_bounds(x, bounds):
@@ -342,13 +484,17 @@ def lm_solve(
         lb, _ = tree.ravel(lower_bounds)
         ub, _ = tree.ravel(upper_bounds)
         bounds_flat = (lb, ub)
-        qp_solver = osqp.OSQP()  # Initialize OSQP solver for QP
+        # Initialize OSQP solver for box-constrained QP
+        qp_solver = osqp.OSQP()
         qp_solver.setup(
-            P=np.eye(n),  # Will be overridden later
-            q=np.ones(n),  # Will be overridden later
-            A=np.eye(n),  # Identity for linear constraints
-            l=lb,  # Lower bounds
-            u=ub,  # Upper bounds
+            P=sparse.csc_matrix(np.ones((n, n))),  # Will be updated each iteration
+            q=np.zeros(n),  # Will be updated each iteration
+            A=sparse.csc_matrix(np.eye(n)),  # Identity matrix for box constraints
+            l=lb - x,  # Step lower bounds (will be updated)
+            u=ub - x,  # Step upper bounds (will be updated)
+            verbose=False,  # Suppress OSQP output
+            eps_abs=1e-8,  # Absolute tolerance
+            eps_rel=1e-8,  # Relative tolerance
         )
     else:
         qp_solver = None
@@ -390,15 +536,27 @@ def lm_solve(
     while nfev < maxfev:
         
         # Record iteration history before computing step
-        history.append(
-            {
-                "iter": iter,
-                "cost": float(cost),
-                "grad_norm": float(g_norm),
-                "lambda": float(lambda_val),
-                "x": x.copy(),  # Current parameter values
-            }
-        )
+        history_entry = {
+            "iter": iter,
+            "cost": float(cost),
+            "grad_norm": float(g_norm),
+            "lambda": float(lambda_val),
+            "x": x.copy(),  # Current parameter values
+        }
+        
+        # Add constrained optimization info if bounds are present
+        if bounds_flat is not None:
+            _, g_proj_norm, active_info = _check_constrained_convergence(
+                grad, x, bounds_flat, gtol
+            )
+            history_entry.update({
+                "grad_proj_norm": float(g_proj_norm),
+                "n_active_lower": int(active_info['n_active_lower']),
+                "n_active_upper": int(active_info['n_active_upper']),
+                "total_active": int(active_info['total_active']),
+            })
+        
+        history.append(history_entry)
 
         # Increment Jacobian evaluations counter
         njev += 1
@@ -411,17 +569,30 @@ def lm_solve(
         # Calculate scaled vector norm
         xnorm = np.linalg.norm(diag * x)
 
-        # Check gradient convergence
-        if g_norm <= gtol:
-            status = LMStatus.GTOL_REACHED
-            break
+        # Check gradient convergence (constrained vs unconstrained)
+        if bounds_flat is not None:
+            # Constrained optimization: use projected gradient
+            converged, g_proj_norm, active_info = _check_constrained_convergence(
+                grad, x, bounds_flat, gtol
+            )
+            if converged:
+                status = LMStatus.GTOL_REACHED
+                break
+            # Use projected gradient norm for progress reporting
+            effective_grad_norm = g_proj_norm
+        else:
+            # Unconstrained optimization: use standard gradient norm
+            if g_norm <= gtol:
+                status = LMStatus.GTOL_REACHED
+                break
+            effective_grad_norm = g_norm
 
         # Inner loop - compute step and try it
         inner_loop_exit = False
         while True:
             # Compute step using damped normal equations
             step = _compute_step(
-                hess, grad, diag, lambda_val, bounds_flat, qp_solver
+                hess, grad, diag, lambda_val, x, bounds_flat, qp_solver
             )
 
             # Compute trial point
@@ -466,9 +637,18 @@ def lm_solve(
                 cost, grad, hess = cost_new, grad_new, hess_new
                 g_norm = np.linalg.norm(grad, np.inf)
                 xnorm = np.linalg.norm(diag * x)
+                
+                # Update effective gradient norm for progress reporting
+                if bounds_flat is not None:
+                    _, g_proj_norm, _ = _check_constrained_convergence(
+                        grad, x, bounds_flat, gtol
+                    )
+                    effective_grad_norm = g_proj_norm
+                else:
+                    effective_grad_norm = g_norm
 
-                # Report progress
-                progress.report(cost, g_norm, pnorm, nfev)
+                # Report progress (use appropriate gradient norm)
+                progress.report(cost, effective_grad_norm, pnorm, nfev)
 
                 # Record detailed step information in history
                 if len(history) > 0:
