@@ -4,8 +4,10 @@ import abc
 from typing import Callable
 
 import numpy as np
+from scipy.linalg import cholesky  # For Cholesky decomposition
+import casadi as cs
 
-from archimedes import jac, struct
+from archimedes import jac, struct, compile
 
 
 __all__ = [
@@ -15,6 +17,17 @@ __all__ = [
     "ekf_step",
     "ukf_step",
 ]
+
+
+# NOTE: Currently unused, but necessary for MLE calculations
+@compile(kind="SX")
+def _spd_logdet(A):
+    """slogdet for SPD matrices using Cholesky decomposition"""
+    L = np.linalg.cholesky(A)  # A = L @ L.T
+
+    # det(A) = det(L)^2 = (product of diagonal elements of L)^2
+    # log(det(A)) = 2 * sum(log(diagonal elements of L))
+    return 2.0 * sum(np.log(L[i, i]) for i in range(A.shape[0]))
 
 
 @struct.pytree_node
@@ -125,7 +138,32 @@ class ExtendedKalmanFilter(KalmanFilterBase):
         return ekf_step(self.dyn, self.obs, t, x, y, P, self.Q, self.R, args)
 
 
-def ukf_step(f, h, t, x, y, P, Q, R, *args):
+def _julier_sigma_points(x_center, P_cov, kappa):
+    """Generate Julier sigma points exactly as in filterpy"""
+    n = len(x_center)
+
+    # Cholesky decomposition - scipy returns upper triangular
+    U = cholesky((n + kappa) * P_cov)
+    
+    sigmas = np.zeros((2*n + 1, n))
+    sigmas[0] = x_center
+    
+    for k in range(n):
+        # Note: U[k] accesses the k-th row of the upper triangular matrix
+        sigmas[k + 1] = x_center + U[k]      # x + U[k]
+        sigmas[n + k + 1] = x_center - U[k]  # x - U[k]
+        
+    return sigmas
+
+def _julier_weights(n, kappa):
+    """Compute Julier weights exactly as in filterpy"""
+    Wm = np.full(2*n + 1, 0.5 / (n + kappa))
+    Wm[0] = kappa / (n + kappa)
+    Wc = Wm.copy()  # For Julier, Wm and Wc are the same
+    return Wm, Wc
+    
+
+def ukf_step(f, h, t, x, y, P, Q, R, args=None, kappa=0.0):
     """Perform one step of the unscented Kalman filter
 
     Args:
@@ -138,56 +176,83 @@ def ukf_step(f, h, t, x, y, P, Q, R, *args):
         Q: process noise covariance
         R: measurement noise covariance
         args: additional arguments to pass to f and h
+        kappa: secondary scaling parameter (typically 0 or 3-n)
 
     Returns:
         x: updated state vector
         P: updated state covariance
         e: innovation or measurement residual
     """
-    A = np.linalg.cholesky(P)
+    if args is None:
+        args = ()
 
-    # Construct sigma points
-    L = len(x)
-    n = 2 * L + 1
-    s = [x]
+    n = len(x)
 
-    for j in range(L):
-        s.append(x + np.sqrt(L) * A[:, j])
+    # Generate weights
+    Wm, Wc = _julier_weights(n, kappa)
 
-    for j in range(L):
-        s.append(x - np.sqrt(L) * A[:, j])
+    # Generate initial sigma points
+    sigmas = _julier_sigma_points(x, P, kappa)
 
-    w_a = np.ones(n) / n  # Weights for means
-    w_c = w_a  # Weights for covariance
+    # PREDICT STEP - propagate sigma points through dynamics
+    sigmas_f = np.zeros((2*n + 1, n))
+    for i in range(2*n + 1):
+        sigmas_f[i] = f(t, sigmas[i], *args)
 
-    # Predict step
-    x_pred = []
-    for i in range(n):
-        x_pred.append(f(t, s[i], *args))
+    # Predicted mean (unscented transform)
+    x_pred = np.zeros(n)
+    for i in range(2*n + 1):
+        x_pred += Wm[i] * sigmas_f[i]
+    
+    # Predicted covariance
+    P_pred = Q.copy()
+    for i in range(2*n + 1):
+        diff = sigmas_f[i] - x_pred
+        P_pred += Wc[i] * np.outer(diff, diff)
 
-    x_hat = sum([w_a[i] * x_pred[i] for i in range(n)])
-    P = Q + sum(
-        [w_c[i] * np.outer(x_pred[i] - x_hat, x_pred[i] - x_hat) for i in range(n)]
-    )
+    # Regenerate sigma points around predicted state (critical for accuracy)
+    sigmas_pred = _julier_sigma_points(x_pred, P_pred, kappa)
 
-    # Update step
-    y_pred = [h(t, s[i], *args) for i in range(n)]
-    y_hat = sum(
-        [w_a[i] * y_pred[i] for i in range(n)]
-    )  # Empirical mean of measurements
-    S_hat = R + sum(
-        [w_c[i] * np.outer(y_pred[i] - y_hat, y_pred[i] - y_hat) for i in range(n)]
-    )  # Empirical covariance
-    Cxz = sum(
-        [w_c[i] * np.outer(x_pred[i] - x_hat, y_pred[i] - y_hat) for i in range(n)]
-    )  # Cross-covariance
+    # UPDATE STEP - propagate predicted sigma points through measurement function
+    dim_z = len(y)
+    sigmas_h = np.zeros((2*n + 1, dim_z))
+    for i in range(2*n + 1):
+        sigmas_h[i] = h(t, sigmas_pred[i], *args)
+    
+    # Predicted measurement mean
+    y_pred = np.zeros(dim_z)
+    for i in range(2*n + 1):
+        y_pred += Wm[i] * sigmas_h[i]
+    
+    # Innovation covariance
+    S = R.copy()
+    for i in range(2*n + 1):
+        diff_y = sigmas_h[i] - y_pred
+        S += Wc[i] * np.outer(diff_y, diff_y)
+    
+    # Cross-covariance
+    Pxz = np.zeros((n, dim_z))
+    for i in range(2*n + 1):
+        diff_x = sigmas_pred[i] - x_pred
+        diff_y = sigmas_h[i] - y_pred
+        Pxz += Wc[i] * np.outer(diff_x, diff_y)
 
-    K = Cxz @ np.linalg.inv(S_hat)  # Kalman gain
-    e = y - y_hat  # Innovation or measurement residual
-    x = x_hat + K @ e  # Updated state estimate
-    P = P - K @ S_hat @ K.T  # Updated state covariance
+    # Kalman gain
+    try:
+        K = Pxz @ np.linalg.inv(S)
+    except np.linalg.LinAlgError:
+        K = Pxz @ np.linalg.pinv(S)
+    
+    # Innovation
+    e = y - y_pred
+    
+    # Updated state estimate
+    x_new = x_pred + K @ e
+    
+    # Updated covariance
+    P_new = P_pred - K @ S @ K.T
 
-    return x, P, e
+    return x_new, P_new, e
 
 
 @struct.pytree_node

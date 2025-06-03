@@ -25,7 +25,7 @@ from .optimize import implicit, minimize, nlp_solver, qpsol, root
 from .simulate import integrator, odeint
 from .theme import set_theme
 from .tree import struct
-from . import sysid
+from . import sysid, state_estimation
 
 __all__ = [
     "error",
@@ -34,6 +34,7 @@ __all__ = [
     "tree",
     "struct",
     "sysid",
+    "state_estimation",
     "callback",
     "codegen",
     "array",

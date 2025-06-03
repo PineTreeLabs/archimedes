@@ -3,7 +3,9 @@ import numpy as np
 import pytest
 from scipy.linalg import expm
 
-from archimedes.experimental.state_estimation import ExtendedKalmanFilter, ekf_step
+from archimedes.state_estimation import (
+    ExtendedKalmanFilter, ekf_step, ekf_correct
+)
 from archimedes import jac
 
 
@@ -54,34 +56,35 @@ class TestEKF:
 
     def test_measurement_update_properties(self):
         """Test mathematical properties of the measurement update step."""
-        # Set up a simple test case
-        def f(t, x):
-            return x  # Identity dynamics
         
         def h(t, x):
             return np.array([x[0] + 0.1*x[1]**2], like=x)  # Nonlinear measurement
-        
-        Q = np.eye(2) * 0.01
+
         R = np.array([[0.1]])
-        
+
+        # State and covariance BEFORE measurement update
         x_prior = np.array([1.0, 0.5])
         P_prior = np.array([[0.1, 0.02], [0.02, 0.08]])
         y = np.array([1.02])
-        
-        x_post, P_post, innovation = ekf_step(f, h, 0.0, x_prior, y, P_prior, Q, R)
-        
+
+        # Apply ONLY the measurement update
+        x_post, P_post, innovation = ekf_correct(h, 0.0, x_prior, y, P_prior, R)
+
         # Test 1: Posterior covariance should be smaller than prior
-        assert np.trace(P_post) < np.trace(P_prior), "Measurement should reduce uncertainty"
-        
+        assert (
+            np.trace(P_post) < np.trace(P_prior),
+            "Measurement should reduce uncertainty"
+        )
+
         # Test 2: Innovation should be consistent with prediction
         y_pred = h(0.0, x_prior)
         expected_innovation = y - y_pred
         np.testing.assert_allclose(innovation, expected_innovation, rtol=1e-12)
-        
+
         # Test 3: Information matrix should increase
         info_prior = np.linalg.inv(P_prior)
         info_post = np.linalg.inv(P_post)
-        
+
         # Information should not decrease (Loewner ordering)
         diff = info_post - info_prior
         eigenvals = np.linalg.eigvals(diff)

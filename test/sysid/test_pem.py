@@ -3,7 +3,7 @@ import pytest
 import archimedes as arc
 
 from archimedes.sysid import pem_solve, Timeseries
-from archimedes.experimental.state_estimation import ExtendedKalmanFilter
+from archimedes.state_estimation import ExtendedKalmanFilter
 from archimedes.experimental.discretize import discretize
 from archimedes import struct
 

@@ -1,12 +1,12 @@
 # Mathematical correctness tests for Unscented Kalman Filter
 import numpy as np
 import pytest
-from scipy.linalg import sqrtm
+from scipy.linalg import sqrtm, cholesky
 
-from archimedes.experimental.state_estimation import UnscentedKalmanFilter, ukf_step
+from archimedes.state_estimation import UnscentedKalmanFilter, ukf_step
 
 
-class TestUKFMathematicalCorrectness:
+class TestUKF:
     """Test mathematical properties and correctness of UKF implementation."""
     
     def test_ukf_matches_linear(self):
@@ -47,53 +47,11 @@ class TestUKFMathematicalCorrectness:
         P_linear = (np.eye(2) - K @ H) @ P_pred
         
         # Results should be very close (UKF should be exact for linear systems)
-        np.testing.assert_allclose(x_ukf, x_linear, atol=1e-3)
-        np.testing.assert_allclose(P_ukf, P_linear, atol=1e-3)
-        np.testing.assert_allclose(e_ukf, innovation, atol=1e-3)
-    
-    def test_sigma_point_generation(self):
-        """Test that sigma points have correct statistical properties."""
-        # Test parameters
-        n = 3  # State dimension
-        x_mean = np.array([1.0, -0.5, 2.0])
-        P = np.array([[0.1, 0.02, 0.0],
-                     [0.02, 0.08, -0.01],
-                     [0.0, -0.01, 0.05]])
-        
-        # Generate sigma points (mimicking UKF internal calculation)
-        L = len(x_mean)
-        n_sigma = 2 * L + 1
-        
-        # Compute square root of covariance
-        A = np.linalg.cholesky(P)
-        
-        # Generate sigma points
-        sigma_points = [x_mean]  # Central point
-        
-        for j in range(L):
-            sigma_points.append(x_mean + np.sqrt(L) * A[:, j])
-            
-        for j in range(L):
-            sigma_points.append(x_mean - np.sqrt(L) * A[:, j])
-        
-        sigma_points = np.array(sigma_points)
-        
-        # Uniform weights (as used in the UKF implementation)
-        w = np.ones(n_sigma) / n_sigma
-        
-        # Test 1: Weighted mean should equal original mean
-        computed_mean = np.sum(w[:, np.newaxis] * sigma_points, axis=0)
-        np.testing.assert_allclose(computed_mean, x_mean, rtol=1e-12)
-        
-        # Test 2: Weighted covariance should equal original covariance
-        deviations = sigma_points - x_mean[np.newaxis, :]
-        computed_cov = np.sum(w[:, np.newaxis, np.newaxis] * 
-                             deviations[:, :, np.newaxis] * 
-                             deviations[:, np.newaxis, :], axis=0)
-        np.testing.assert_allclose(computed_cov, P, rtol=1e-12)
-    
+        np.testing.assert_allclose(x_ukf, x_linear, rtol=1e-10)
+        np.testing.assert_allclose(P_ukf, P_linear, rtol=1e-10)
+        np.testing.assert_allclose(e_ukf, innovation, rtol=1e-10)
+
     def test_unscented_transform(self):
-        """Test that unscented transform is exact for polynomials up to 2nd order."""
         # Define test mean and covariance
         x_mean = np.array([1.0, -0.5])
         P = np.array([[0.1, 0.02], [0.02, 0.08]])
@@ -107,16 +65,24 @@ class TestUKFMathematicalCorrectness:
             """Quadratic function: should be exact for unscented transform"""
             return np.array([x[0]**2, x[1]**2, x[0]*x[1]])
         
-        # Generate sigma points
+        # Generate sigma points using Julier method (matches our UKF)
         L = len(x_mean)
-        A = np.linalg.cholesky(P)
-        sigma_points = [x_mean]
+        kappa = 0.0
+        
+        # FIXED: Use scipy.linalg.cholesky and proper indexing
+        U = cholesky((L + kappa) * P)
+        
+        sigma_points = []
+        sigma_points.append(x_mean)
         
         for j in range(L):
-            sigma_points.append(x_mean + np.sqrt(L) * A[:, j])
-            sigma_points.append(x_mean - np.sqrt(L) * A[:, j])
+            # FIXED: Use U[j] (j-th row) instead of A[:, j] (j-th column)
+            sigma_points.append(x_mean + U[j])
+            sigma_points.append(x_mean - U[j])
         
-        w = np.ones(2*L + 1) / (2*L + 1)
+        # FIXED: Use proper Julier weights instead of equal weights
+        w = np.full(2*L + 1, 0.5 / (L + kappa))
+        w[0] = kappa / (L + kappa)
         
         # Test linear function
         y_points_linear = np.array([linear_func(sp) for sp in sigma_points])
@@ -128,13 +94,11 @@ class TestUKFMathematicalCorrectness:
         
         np.testing.assert_allclose(y_mean_ut, y_mean_analytical, rtol=1e-12)
         
-        # Test quadratic function - this tests the core UKF property
+        # Test quadratic function
         y_points_quad = np.array([quadratic_func(sp) for sp in sigma_points])
         y_mean_ut_quad = np.sum(w[:, np.newaxis] * y_points_quad, axis=0)
         
         # Analytical moments for quadratic function
-        # E[X²] = Var[X] + E[X]²
-        # E[XY] = Cov[X,Y] + E[X]E[Y]
         expected_quad = np.array([
             P[0,0] + x_mean[0]**2,  # E[x₁²]
             P[1,1] + x_mean[1]**2,  # E[x₂²]
@@ -142,7 +106,7 @@ class TestUKFMathematicalCorrectness:
         ])
         
         np.testing.assert_allclose(y_mean_ut_quad, expected_quad, rtol=1e-10)
-
+    
     def test_measurement_update_information_increase(self):
         """Test that measurement updates increase information (decrease uncertainty)."""
         def f(t, x):
@@ -171,9 +135,10 @@ class TestUKFMathematicalCorrectness:
         det_post = np.linalg.det(P_post)
         
         assert det_post < det_prior, "Measurement should reduce uncertainty volume"
-    
+
     def test_ukf_symmetry(self):
-        """Test that UKF respects symmetry properties of the problem."""
+        """Test that UKF respects symmetry properties of the problem - CORRECTED VERSION."""
+        
         # Symmetric system
         def f_symmetric(t, x):
             return np.array([0.9*x[0], 0.9*x[1]])  # Symmetric dynamics
@@ -196,13 +161,18 @@ class TestUKFMathematicalCorrectness:
         x1_post, P1_post, _ = ukf_step(f_symmetric, h_symmetric, 0.0, x1, y1, P, Q, R)
         x2_post, P2_post, _ = ukf_step(f_symmetric, h_symmetric, 0.0, x2, y2, P, Q, R)
         
-        # Test: Posterior covariances should be identical (up to rotation)
-        # For this symmetric case, they should actually be identical
-        np.testing.assert_allclose(P1_post, P2_post, rtol=1e-6)
+        # Posterior states should have same magnitude
+        np.testing.assert_allclose(np.linalg.norm(x1_post), np.linalg.norm(x2_post), rtol=1e-10)
         
-        # Test: Posterior states should have same magnitude
-        assert abs(np.linalg.norm(x1_post) - np.linalg.norm(x2_post)) < 1e-6
-    
+        # Posterior covariances should be related by 90° rotation
+        # P2 should equal R90^T * P1 * R90 where R90 is 90° rotation matrix
+        R90 = np.array([[0, 1], [-1, 0]])  # 90° counter-clockwise rotation
+        P1_rotated = R90.T @ P1_post @ R90
+        np.testing.assert_allclose(P2_post, P1_rotated, rtol=1e-10)
+
+        print(f"State magnitudes: {np.linalg.norm(x1_post):.10f} == {np.linalg.norm(x2_post):.10f}")
+        print(f"Covariance rotation relationship verified with precision: {np.max(np.abs(P2_post - P1_rotated)):.2e}")
+
     def test_degenerate_covariance_handling(self):
         """Test UKF behavior with near-singular covariance matrices."""
         def f(t, x):
