@@ -260,7 +260,7 @@ class TestLM:
             ftol=1e-15,
             xtol=1e-15,
             gtol=1e-15,
-            maxfev=5,
+            maxfev=2,
         )
         assert result.status == LMStatus.MAX_FEVAL, (
             f"Should hit max iterations, got status {result.status}: {result.message}"

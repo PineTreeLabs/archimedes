@@ -157,8 +157,18 @@ def pem_solve(
     if method not in {"lm"}:
         raise ValueError(f"Unsupported method: {method}. Only 'lm' is supported.")
 
+    # Set sensible defaults for system identification problems
     if options is None:
         options = {}
+
+    # Apply defaults for any missing options
+    default_options = {
+        "ftol": 1e-4,
+        "xtol": 1e-6, 
+        "gtol": 1e-6,
+        "maxfev": 200
+    }
+    options = {**default_options, **options}
 
     objective = PEMObjective(
         predictor=predictor,

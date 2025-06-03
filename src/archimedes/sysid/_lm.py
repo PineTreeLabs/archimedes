@@ -415,9 +415,9 @@ def lm_solve(
     x0,
     args=(),
     bounds=None,
-    ftol=1e-8,
-    xtol=1e-8,
-    gtol=1e-8,
+    ftol=1e-6,
+    xtol=1e-6,
+    gtol=1e-6,
     maxfev=100,
     diag=None,
     lambda0=1e-3,
@@ -466,6 +466,7 @@ def lm_solve(
 
     # Constants
     MACHEP = np.finfo(float).eps  # Machine precision
+    SQRT_MACHEP = np.sqrt(MACHEP)  # Square root of machine precision
 
     # By default, just flatten/unflatten the PyTree
     x0_flat, unravel = tree.ravel(x0)
@@ -530,7 +531,7 @@ def lm_solve(
 
     # Main iteration loop
     while nfev < maxfev:
-        
+
         # Record iteration history before computing step
         history_entry = {
             "iter": iter,
@@ -615,16 +616,12 @@ def lm_solve(
                 ratio = actred / prered
 
             # Update lambda based on ratio (Trust region update)
-            # Use more conservative updates similar to MINPACK
+            # Use more conservative updates to prevent runaway growth
             if ratio < 0.25:  # Poor agreement: increase damping
-                lambda_val = lambda_val * 4.0
+                lambda_val = lambda_val * 2.0
             elif ratio > 0.75:  # Good agreement: decrease damping
-                lambda_val = lambda_val * 0.5
+                lambda_val = lambda_val / 2.0
             # For 0.25 <= ratio <= 0.75, keep lambda unchanged
-
-            # Ensure lambda stays reasonably bounded
-            lambda_val = max(lambda_val, 1e-12)
-            lambda_val = min(lambda_val, 1e12)
 
             # Test for successful iteration
             if ratio >= 1.0e-4:  # Step provides sufficient decrease
@@ -645,6 +642,12 @@ def lm_solve(
 
                 # Report progress (use appropriate gradient norm)
                 progress.report(cost, effective_grad_norm, pnorm, nfev)
+                
+                # Machine precision check: if step norm is tiny relative to parameter norm,
+                # we're likely at numerical precision limits and should terminate
+                if pnorm <= SQRT_MACHEP * max(xnorm, 1.0):
+                    status = LMStatus.XTOL_REACHED
+                    break
 
                 # Record detailed step information in history
                 if len(history) > 0:
