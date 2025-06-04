@@ -178,38 +178,38 @@ class TestPEMIntegration:
         assert result.nit < 50, f"Too many iterations required: {result.nit}"
         assert result.fun < 1e-3, f"Final cost too high: {result.fun:.2e}"
 
-        # # Test optimizing initial conditions
-        # dvs_guess = (np.array([0.0, 0.0]), result.x)
-        # result_with_x0 = pem_solve(
-        #     ekf,
-        #     data,
-        #     dvs_guess,
-        #     x0=None,  # Unknown initial conditions
-        # )
-        # x0_est, params_est = result_with_x0.x
-        # print(f"Estimated initial conditions: {x0_est}")
-        # print(f"Estimated parameters with x0: {params_est}")
+        # Test optimizing initial conditions
+        dvs_guess = (np.array([0.0, 0.0]), result.x)
+        result_with_x0 = pem_solve(
+            ekf,
+            data,
+            dvs_guess,
+            x0=None,  # Unknown initial conditions
+        )
+        x0_est, params_est = result_with_x0.x
+        print(f"Estimated initial conditions: {x0_est}")
+        print(f"Estimated parameters with x0: {params_est}")
 
-        # assert result_with_x0.success, f"Parameter estimation with x0 failed: {result_with_x0.message}"
+        assert result_with_x0.success, f"Parameter estimation with x0 failed: {result_with_x0.message}"
 
-        # # Check parameter recovery accuracy (should be quite good for this clean problem)
-        # omega_n_error = abs(params_est["omega_n"] - omega_n_true)
-        # zeta_error = abs(params_est["zeta"] - zeta_true)
+        # Check parameter recovery accuracy (should be quite good for this clean problem)
+        omega_n_error = abs(params_est["omega_n"] - omega_n_true)
+        zeta_error = abs(params_est["zeta"] - zeta_true)
         
-        # assert omega_n_error < 0.01, f"Natural frequency error too large: {omega_n_error:.6f}"
-        # assert zeta_error < 0.01, f"Damping ratio error too large: {zeta_error:.6f}"
+        assert omega_n_error < 0.01, f"Natural frequency error too large: {omega_n_error:.6f}"
+        assert zeta_error < 0.01, f"Damping ratio error too large: {zeta_error:.6f}"
         
-        # assert np.allclose(x0_est, x0_true, atol=1e-2), f"Initial condition error too large: {np.abs(x0_est - x0_true)}"
+        assert np.allclose(x0_est, x0_true, atol=1e-2), f"Initial condition error too large: {np.abs(x0_est - x0_true)}"
 
-        # # Error handling
-        # with pytest.raises(ValueError, match=r"Unsupported method.*"):
-        #     pem_solve(
-        #         ekf,
-        #         data,
-        #         params_guess,
-        #         x0=x0_true,
-        #         method="unsupported_method",
-        #     )
+        # Error handling
+        with pytest.raises(ValueError, match=r"Unsupported method.*"):
+            pem_solve(
+                ekf,
+                data,
+                params_guess,
+                x0=x0_true,
+                method="unsupported_method",
+            )
 
     def test_van_der_pol(self, plot=False):
         """Test parameter recovery on Van der Pol oscillator (nonlinear system).

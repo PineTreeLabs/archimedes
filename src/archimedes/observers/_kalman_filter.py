@@ -19,15 +19,15 @@ __all__ = [
 ]
 
 
-# NOTE: Currently unused, but necessary for MLE calculations
-@compile(kind="SX")
-def _spd_logdet(A):
-    """slogdet for SPD matrices using Cholesky decomposition"""
-    L = np.linalg.cholesky(A)  # A = L @ L.T
+# # NOTE: Currently unused, but necessary for MLE calculations
+# @compile(kind="SX")
+# def _spd_logdet(A):
+#     """slogdet for SPD matrices using Cholesky decomposition"""
+#     L = np.linalg.cholesky(A)  # A = L @ L.T
 
-    # det(A) = det(L)^2 = (product of diagonal elements of L)^2
-    # log(det(A)) = 2 * sum(log(diagonal elements of L))
-    return 2.0 * sum(np.log(L[i, i]) for i in range(A.shape[0]))
+#     # det(A) = det(L)^2 = (product of diagonal elements of L)^2
+#     # log(det(A)) = 2 * sum(log(diagonal elements of L))
+#     return 2.0 * sum(np.log(L[i, i]) for i in range(A.shape[0]))
 
 
 @struct.pytree_node
@@ -38,8 +38,8 @@ class KalmanFilterBase(metaclass=abc.ABCMeta):
     R: np.ndarray
 
     @abc.abstractmethod
-    def __call__(t, x, y, P, args=None):
-        """Perform one step of the filter
+    def step(t, x, y, P, args=None):
+        """Perform one step of the filter, combining prediction and update steps.
 
         Args:
             t: current time
@@ -134,7 +134,7 @@ def ekf_step(f, h, t, x, y, P, Q, R, args=None):
 @struct.pytree_node
 class ExtendedKalmanFilter(KalmanFilterBase):
 
-    def __call__(self, t, x, y, P, args=None):
+    def step(self, t, x, y, P, args=None):
         return ekf_step(self.dyn, self.obs, t, x, y, P, self.Q, self.R, args)
 
 
@@ -238,10 +238,7 @@ def ukf_step(f, h, t, x, y, P, Q, R, args=None, kappa=0.0):
         Pxz += Wc[i] * np.outer(diff_x, diff_y)
 
     # Kalman gain
-    try:
-        K = Pxz @ np.linalg.inv(S)
-    except np.linalg.LinAlgError:
-        K = Pxz @ np.linalg.pinv(S)
+    K = Pxz @ np.linalg.inv(S)
     
     # Innovation
     e = y - y_pred
@@ -258,5 +255,5 @@ def ukf_step(f, h, t, x, y, P, Q, R, args=None, kappa=0.0):
 @struct.pytree_node
 class UnscentedKalmanFilter(KalmanFilterBase):
 
-    def __call__(self, t, x, y, P, args=None):
+    def step(self, t, x, y, P, args=None):
         return ukf_step(self.dyn, self.obs, t, x, y, P, self.Q, self.R, args)

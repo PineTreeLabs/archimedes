@@ -53,7 +53,7 @@ class PEMObjective:
         # Predicted measurement (used for sensitivity analysis)
         def step(t, x, u, y, P, params_flat):
             params = unravel_params(params_flat)
-            x, P, e = self.predictor(t, x, y, P, args=(u, params))
+            x, P, e = self.predictor.step(t, x, y, P, args=(u, params))
             y_hat = y - e  # Recover predicted observation
             return y_hat
 
@@ -67,7 +67,7 @@ class PEMObjective:
             params_flat = tree.ravel(params)[0]
             psi_x0, psi_params = calc_psi(t, x, u, y, P, params_flat)
             psi = np.concatenate([psi_x0, psi_params], axis=1)  # shape (ny, nx+na)
-            x, P, e = self.predictor(t, x, y, P, args=(u, params))
+            x, P, e = self.predictor.step(t, x, y, P, args=(u, params))
             output = np.concatenate([x, e], axis=0)
 
             # Accumulate cost function, Jacobian, and Hessian
