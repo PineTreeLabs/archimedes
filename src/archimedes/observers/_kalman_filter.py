@@ -529,8 +529,8 @@ class UnscentedKalmanFilter(KalmanFilterBase):
 
     References
     ----------
-    .. [1] Julier, S.J. and Uhlmann, J.K. "New extension of the Kalman filter
-           to nonlinear systems." Proc. SPIE 3068, 1997.
+    .. [1] Julier, S.J. and Uhlmann, J.K. "The scaled unscented transformation."
+           American Control Converence, 2002.
     .. [2] Wan, E.A. and Van der Merwe, R. "The unscented Kalman filter for
            nonlinear estimation." Proc. IEEE Adaptive Systems, 2000.
     .. [3] Van der Merwe, R. "Sigma-Point Kalman Filters for Probabilistic
@@ -539,6 +539,79 @@ class UnscentedKalmanFilter(KalmanFilterBase):
     kappa: float = 0.0
 
     def step(self, t, x, y, P, args=None):
+        """Perform one complete UKF step using the unscented transform.
+
+        This method implements the full Unscented Kalman Filter algorithm,
+        performing both the prediction step (using sigma points propagated
+        through the dynamics model) and the update step (incorporating the
+        measurement through the unscented transform) in sequence.
+
+        The UKF uses sigma points to capture the mean and covariance of the
+        state distribution to higher-order accuracy without requiring Jacobian
+        computations. This makes it particularly suitable for highly nonlinear
+        systems where the EKF's linearization may be inadequate.
+
+        Parameters
+        ----------
+        t : float
+            Current time step.
+        x : array_like
+            Previous state estimate of shape ``(nx,)``.
+        y : array_like
+            Current measurement vector of shape ``(ny,)``.
+        P : array_like
+            Previous state covariance matrix of shape ``(nx, nx)``.
+        args : tuple, optional
+            Additional arguments to pass to both dynamics and observation
+            functions. Default is None.
+
+        Returns
+        -------
+        x_new : ndarray
+            Updated state estimate of shape ``(nx,)``.
+        P_new : ndarray
+            Updated state covariance matrix of shape ``(nx, nx)``.
+        innovation : ndarray
+            Measurement residual of shape ``(ny,)``, computed as the
+            difference between the actual measurement and the predicted
+            measurement from the unscented transform.
+
+        Notes
+        -----
+        The method performs the following sequence:
+
+        1. **Sigma Point Generation**: Create 2n+1 sigma points using the
+           Julier symmetric scheme to capture the current state distribution.
+
+        2. **Prediction Step**:
+           - Propagate sigma points through dynamics function
+           - Compute predicted state mean using weighted sigma points
+           - Compute predicted covariance using weighted outer products
+           - Regenerate sigma points around predicted state (critical for accuracy)
+
+        3. **Update Step**:
+           - Propagate predicted sigma points through observation function
+           - Compute predicted measurement mean using weighted sigma points
+           - Compute innovation covariance and cross-covariance matrices
+           - Apply Kalman update equations using computed statistics
+
+        The regeneration of sigma points around the predicted state in step 2
+        is crucial for maintaining the accuracy of the unscented transform,
+        especially for highly nonlinear dynamics.
+
+        The weights are computed using the Julier scheme where mean weights
+        ``Wm`` and covariance weights ``Wc`` are identical, providing symmetric
+        treatment of positive and negative perturbations.
+
+        Examples
+        --------
+        >>> # Complete UKF filtering step for nonlinear system
+        >>> x_k, P_k, innov = ukf.step(t_k, x_prev, y_k, P_prev)
+        >>>
+        >>> # With additional function arguments
+        >>> extra_params = (param1, param2)
+        >>> x_k, P_k, innov = ukf.step(t_k, x_prev, y_k, P_prev, args=extra_params)
+        """
         f = self.dyn
         h = self.obs
         Q = self.Q
