@@ -6,7 +6,6 @@ from ._kalman_filter import (
     ukf_step,
     UnscentedKalmanFilter,
 )
-from ._continuous_filters import ContinuousEKF
 
 __all__ = [
     "KalmanFilterBase",
@@ -15,5 +14,4 @@ __all__ = [
     "ExtendedKalmanFilter",
     "ukf_step",
     "UnscentedKalmanFilter",
-    "ContinuousEKF",
 ]
