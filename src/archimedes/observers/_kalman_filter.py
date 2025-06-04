@@ -430,6 +430,112 @@ def _julier_weights(n, kappa):
 
 @struct.pytree_node
 class UnscentedKalmanFilter(KalmanFilterBase):
+    """Unscented Kalman Filter for highly nonlinear state estimation.
+
+    The Unscented Kalman Filter (UKF) uses the unscented transform to handle
+    nonlinear dynamics and observation models. Instead of linearizing like the
+    EKF, it propagates a carefully chosen set of sample points (sigma points)
+    through the nonlinear transformations to capture the mean and covariance
+    to higher-order accuracy.
+
+    The UKF provides several advantages over the Extended Kalman Filter:
+    
+    - **Higher accuracy**: Captures mean and covariance to 2nd order for any
+      nonlinearity (3rd order for Gaussian distributions)
+    - **No Jacobian computation**: Uses sigma points instead of derivatives
+    - **Better stability**: Less prone to divergence with strong nonlinearities
+    - **Symmetric treatment**: Handles positive and negative perturbations equally
+
+    The filter uses the Julier sigma point generation scheme with symmetric
+    scaling, providing 2n+1 sigma points for an n-dimensional state.
+
+    Parameters
+    ----------
+    Inherits all parameters from :class:`KalmanFilterBase`.
+    
+    kappa : float, default=0.0
+        Sigma point scaling parameter. Controls the spread of sigma points
+        around the mean. Typical values:
+        
+        - ``kappa = 0`` (default): Minimal spread, good for most applications
+        - ``kappa = 3 - n``: Traditional choice for Gaussian distributions
+        - ``kappa > 0``: Larger spread, may help with highly nonlinear systems
+        
+        where ``n`` is the state dimension.
+
+    Notes
+    -----
+    The UKF is most suitable for systems where:
+    
+    - Nonlinearities are moderate to strong
+    - Higher accuracy is needed than EKF can provide
+    - The computational cost (≈ 3x EKF) is acceptable
+    - Robustness to modeling errors is important
+    
+    For mildly nonlinear systems where computational efficiency is critical,
+    :class:`ExtendedKalmanFilter` may be more appropriate.
+
+    The UKF algorithm consists of:
+    
+    1. **Sigma point generation**: Create 2n+1 points capturing mean/covariance
+    2. **Prediction**: Propagate points through dynamics, compute statistics  
+    3. **Update**: Propagate points through observation model, apply correction
+
+    The implementation uses the Julier symmetric sigma point scheme with equal
+    weights for covariance calculations, providing excellent numerical properties.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> from archimedes.observers import UnscentedKalmanFilter
+    >>>
+    >>> # Define highly nonlinear dynamics (attitude dynamics)
+    >>> def f(t, x):
+    ...     dt = 0.1
+    ...     q0, q1, q2, q3, wx, wy, wz = x
+    ...     # Quaternion kinematics (highly nonlinear)
+    ...     dq = 0.5 * dt * np.hstack([
+    ...         -wx*q1 - wy*q2 - wz*q3,
+    ...         wx*q0 + wz*q2 - wy*q3,
+    ...         wy*q0 - wz*q1 + wx*q3,
+    ...         wz*q0 + wy*q1 - wx*q2
+    ...     ])
+    ...     return np.hstack([x[:4] + dq, x[4:]])  # Constant angular velocity
+    >>>
+    >>> # Nonlinear observation (magnetic field measurement)
+    >>> def h(t, x):
+    ...     q0, q1, q2, q3 = x[:4]
+    ...     # Rotate reference vector by quaternion (highly nonlinear)
+    ...     R11 = q0**2 + q1**2 - q2**2 - q3**2
+    ...     R21 = 2*(q1*q2 + q0*q3)
+    ...     R31 = 2*(q1*q3 - q0*q2)
+    ...     return np.hstack([R11, R21, R31])  # Simplified magnetic field
+    >>>
+    >>> # Create UKF with appropriate scaling
+    >>> Q = np.eye(7) * 0.01  # Process noise
+    >>> R = np.eye(3) * 0.1   # Measurement noise  
+    >>> ukf = UnscentedKalmanFilter(dyn=f, obs=h, Q=Q, R=R, kappa=0.0)
+    >>>
+    >>> # Filtering step
+    >>> x = np.array([1, 0, 0, 0, 0.1, 0.1, 0.1])  # Initial quaternion + rates
+    >>> P = np.eye(7) * 0.1                         # Initial covariance
+    >>> y = np.array([0.95, 0.2, 0.15])            # Magnetic field measurement
+    >>> x_new, P_new, innov = ukf.step(0.0, x, y, P)
+
+    See Also
+    --------
+    KalmanFilterBase : Abstract base class for all Kalman filters
+    ExtendedKalmanFilter : More efficient alternative for mildly nonlinear systems
+
+    References
+    ----------
+    .. [1] Julier, S.J. and Uhlmann, J.K. "New extension of the Kalman filter
+           to nonlinear systems." Proc. SPIE 3068, 1997.
+    .. [2] Wan, E.A. and Van der Merwe, R. "The unscented Kalman filter for
+           nonlinear estimation." Proc. IEEE Adaptive Systems, 2000.
+    .. [3] Van der Merwe, R. "Sigma-Point Kalman Filters for Probabilistic
+           Inference in Dynamic State-Space Models." PhD thesis, 2004.
+    """
     kappa: float = 0.0
 
     def step(self, t, x, y, P, args=None):
