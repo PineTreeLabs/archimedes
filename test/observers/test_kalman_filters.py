@@ -5,10 +5,7 @@ from scipy.linalg import expm, cholesky
 
 from archimedes.observers import (
     ExtendedKalmanFilter,
-    ekf_step,
-    ekf_correct,
     UnscentedKalmanFilter,
-    ukf_step,
 )
 from archimedes import jac
 
@@ -73,11 +70,8 @@ def test_linear_consistency(filter_name):
 
 @pytest.mark.parametrize("filter_name", ["ekf", "ukf"])
 def test_symmetry(filter_name):
-    """Test that KF respects symmetry properties of the problem."""
-    kf_step = {
-        "ekf": ekf_step,
-        "ukf": ukf_step,
-    }[filter_name]
+    """Test that the filter respects symmetry properties of the problem."""
+    KalmanFilter = get_kf(filter_name)
     
     # Symmetric system
     def f_symmetric(t, x):
@@ -88,6 +82,13 @@ def test_symmetry(filter_name):
     
     Q = np.eye(2) * 0.01
     R = np.array([[0.1]])
+
+    kf = KalmanFilter(
+        dyn=f_symmetric,
+        obs=h_symmetric,
+        Q=Q,
+        R=R,
+    )
     
     # Symmetric initial conditions
     x1 = np.array([1.0, 0.0])
@@ -98,8 +99,8 @@ def test_symmetry(filter_name):
     y2 = np.array([1.0])
     
     # UKF steps
-    x1_post, P1_post, _ = kf_step(f_symmetric, h_symmetric, 0.0, x1, y1, P, Q, R)
-    x2_post, P2_post, _ = kf_step(f_symmetric, h_symmetric, 0.0, x2, y2, P, Q, R)
+    x1_post, P1_post, _ = kf.step(0.0, x1, y1, P)
+    x2_post, P2_post, _ = kf.step(0.0, x2, y2, P)
     
     # Posterior states should have same magnitude
     np.testing.assert_allclose(np.linalg.norm(x1_post), np.linalg.norm(x2_post), rtol=1e-10)
@@ -145,13 +146,15 @@ class TestEKF:
 
         R = np.array([[0.1]])
 
+        ekf = ExtendedKalmanFilter(None, h, None, R)
+
         # State and covariance BEFORE measurement update
         x_prior = np.array([1.0, 0.5])
         P_prior = np.array([[0.1, 0.02], [0.02, 0.08]])
         y = np.array([1.02])
 
         # Apply ONLY the measurement update
-        x_post, P_post, innovation = ekf_correct(h, 0.0, x_prior, y, P_prior, R)
+        x_post, P_post, innovation = ekf.correct(0.0, x_prior, y, P_prior)
 
         # Test 1: Posterior covariance should be smaller than prior
         assert (
@@ -243,12 +246,14 @@ class TestUKF:
         
         Q = np.eye(2) * 0.001  # Small process noise
         R = np.eye(2) * 0.1
+
+        ukf = UnscentedKalmanFilter(f, h, Q, R)
         
         x_prior = np.array([1.0, 0.5])
         P_prior = np.array([[0.2, 0.05], [0.05, 0.15]])
         y = np.array([1.02, 0.48])
         
-        x_post, P_post, _ = ukf_step(f, h, 0.0, x_prior, y, P_prior, Q, R)
+        x_post, P_post, _ = ukf.step(0.0, x_prior, y, P_prior)
         
         # Test: Posterior uncertainty should be smaller
         trace_prior = np.trace(P_prior + Q)  # Include process noise
@@ -272,6 +277,8 @@ class TestUKF:
         
         Q = np.eye(2) * 1e-6  # Very small process noise
         R = np.array([[0.01]])
+
+        ukf = UnscentedKalmanFilter(f, h, Q, R)
         
         # Start with well-conditioned covariance
         x = np.array([1.0, 1.0])
@@ -281,7 +288,7 @@ class TestUKF:
         # This should make P become nearly singular in unobserved direction
         for i in range(50):
             y = np.array([1.0 + 0.01*np.random.randn()])
-            x, P, _ = ukf_step(f, h, i*0.1, x, y, P, Q, R)
+            x, P, _ = ukf.step(i*0.1, x, y, P)
             
             # Should not crash even if P becomes ill-conditioned
             assert np.all(np.isfinite(x)), f"State became non-finite at step {i}"

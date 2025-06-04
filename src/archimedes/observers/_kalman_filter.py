@@ -14,8 +14,6 @@ __all__ = [
     "KalmanFilterBase",
     "ExtendedKalmanFilter",
     "UnscentedKalmanFilter",
-    "ekf_step",
-    "ukf_step",
 ]
 
 
@@ -53,7 +51,23 @@ class KalmanFilterBase(metaclass=abc.ABCMeta):
             P: updated state covariance
             e: innovation or measurement residual
         """
-        pass
+
+    @abc.abstractmethod
+    def correct(t, x, y, P, args=None):
+        """Perform the "correct" step of the filter.
+
+        Args:
+            t: current time
+            x: state vector (typically the prediction from the forward model)
+            y: measurement
+            P: state covariance (typically the prediction from the forward model)
+            args: additional arguments to pass to f and h
+
+        Returns:
+            x: updated state vector
+            P: updated state covariance
+            e: innovation or measurement residual
+        """
 
     @property
     def nx(self):
@@ -64,78 +78,47 @@ class KalmanFilterBase(metaclass=abc.ABCMeta):
         return self.R.shape[0]
 
 
-def ekf_correct(h, t, x, y, P, R, args=None):
-    """Perform the "correct" step of the extended Kalman filter
-
-    Args:
-        h: function of (t, x, *args) that computes the measurement function
-        t: current time
-        x: state vector (typically the prediction from the forward model)
-        y: measurement
-        P: state covariance (typically the prediction from the forward model)
-        R: measurement noise covariance
-        args: additional arguments to pass to f and h
-
-    Returns:
-        x: updated state vector
-        P: updated state covariance
-        e: innovation or measurement residual
-    """
-
-    if args is None:
-        args = ()
-
-    H = jac(h, argnums=1)(t, x, *args)
-    H = np.atleast_2d(H)  # Ensure H is a 2D array
-
-    e = y - h(t, x, *args)  # Innovation or measurement residual
-    S = H @ P @ H.T + R  # Innovation covariance
-    K = P @ H.T @ np.linalg.inv(S)  # Kalman gain
-    x = x + K @ e  # Updated state estimate
-    P = (np.eye(len(x)) - K @ H) @ P  # Updated state covariance
-
-    return x, P, e
-
-
-def ekf_step(f, h, t, x, y, P, Q, R, args=None):
-    """Perform one step of the extended Kalman filter
-
-    Args:
-        f: function of (t, x, *args) that computes the state transition function
-        h: function of (t, x, *args) that computes the measurement function
-        t: current time
-        x: state vector
-        y: measurement
-        P: state covariance
-        Q: process noise covariance
-        R: measurement noise covariance
-        args: additional arguments to pass to f and h
-
-    Returns:
-        x: updated state vector
-        P: updated state covariance
-        e: innovation or measurement residual
-    """
-    if args is None:
-        args = ()
-
-    F = jac(f, argnums=1)(t, x, *args)
-
-    # Predict step
-    x = f(t, x, *args)
-    P = F @ P @ F.T + Q
-
-    # Update step
-    x, P, e = ekf_correct(h, t, x, y, P, R, args)
-
-    return x, P, e
-
-
 @struct.pytree_node
 class ExtendedKalmanFilter(KalmanFilterBase):
 
+    def correct(self, t, x, y, P, args=None):
+        h = self.obs
+        R = self.R
+
+        if args is None:
+            args = ()
+
+        H = jac(h, argnums=1)(t, x, *args)
+        H = np.atleast_2d(H)  # Ensure H is a 2D array
+
+        e = y - h(t, x, *args)  # Innovation or measurement residual
+        S = H @ P @ H.T + R  # Innovation covariance
+        K = P @ H.T @ np.linalg.inv(S)  # Kalman gain
+        x = x + K @ e  # Updated state estimate
+        P = (np.eye(len(x)) - K @ H) @ P  # Updated state covariance
+
+        return x, P, e
+
+
     def step(self, t, x, y, P, args=None):
-        return ekf_step(self.dyn, self.obs, t, x, y, P, self.Q, self.R, args)
+        f = self.dyn
+        h = self.obs
+        Q = self.Q
+        R = self.R
+
+        if args is None:
+            args = ()
+
+        F = jac(f, argnums=1)(t, x, *args)
+
+        # Predict step
+        x = f(t, x, *args)
+        P = F @ P @ F.T + Q
+
+        # Update step
+        x, P, e = self.correct(t, x, y, P, args)
+
+        return x, P, e
 
 
 def _julier_sigma_points(x_center, P_cov, kappa):
@@ -161,99 +144,88 @@ def _julier_weights(n, kappa):
     Wm[0] = kappa / (n + kappa)
     Wc = Wm.copy()  # For Julier, Wm and Wc are the same
     return Wm, Wc
-    
-
-def ukf_step(f, h, t, x, y, P, Q, R, args=None, kappa=0.0):
-    """Perform one step of the unscented Kalman filter
-
-    Args:
-        f: function of (t, x, *args) that computes the state transition function
-        h: function of (t, x, *args) that computes the measurement function
-        t: current time
-        x: state vector
-        y: measurement
-        P: state covariance
-        Q: process noise covariance
-        R: measurement noise covariance
-        args: additional arguments to pass to f and h
-        kappa: secondary scaling parameter (typically 0 or 3-n)
-
-    Returns:
-        x: updated state vector
-        P: updated state covariance
-        e: innovation or measurement residual
-    """
-    if args is None:
-        args = ()
-
-    n = len(x)
-
-    # Generate weights
-    Wm, Wc = _julier_weights(n, kappa)
-
-    # Generate initial sigma points
-    sigmas = _julier_sigma_points(x, P, kappa)
-
-    # PREDICT STEP - propagate sigma points through dynamics
-    sigmas_f = np.zeros((2*n + 1, n))
-    for i in range(2*n + 1):
-        sigmas_f[i] = f(t, sigmas[i], *args)
-
-    # Predicted mean (unscented transform)
-    x_pred = np.zeros(n)
-    for i in range(2*n + 1):
-        x_pred += Wm[i] * sigmas_f[i]
-    
-    # Predicted covariance
-    P_pred = Q.copy()
-    for i in range(2*n + 1):
-        diff = sigmas_f[i] - x_pred
-        P_pred += Wc[i] * np.outer(diff, diff)
-
-    # Regenerate sigma points around predicted state (critical for accuracy)
-    sigmas_pred = _julier_sigma_points(x_pred, P_pred, kappa)
-
-    # UPDATE STEP - propagate predicted sigma points through measurement function
-    dim_z = len(y)
-    sigmas_h = np.zeros((2*n + 1, dim_z))
-    for i in range(2*n + 1):
-        sigmas_h[i] = h(t, sigmas_pred[i], *args)
-    
-    # Predicted measurement mean
-    y_pred = np.zeros(dim_z)
-    for i in range(2*n + 1):
-        y_pred += Wm[i] * sigmas_h[i]
-    
-    # Innovation covariance
-    S = R.copy()
-    for i in range(2*n + 1):
-        diff_y = sigmas_h[i] - y_pred
-        S += Wc[i] * np.outer(diff_y, diff_y)
-    
-    # Cross-covariance
-    Pxz = np.zeros((n, dim_z))
-    for i in range(2*n + 1):
-        diff_x = sigmas_pred[i] - x_pred
-        diff_y = sigmas_h[i] - y_pred
-        Pxz += Wc[i] * np.outer(diff_x, diff_y)
-
-    # Kalman gain
-    K = Pxz @ np.linalg.inv(S)
-    
-    # Innovation
-    e = y - y_pred
-    
-    # Updated state estimate
-    x_new = x_pred + K @ e
-    
-    # Updated covariance
-    P_new = P_pred - K @ S @ K.T
-
-    return x_new, P_new, e
 
 
 @struct.pytree_node
 class UnscentedKalmanFilter(KalmanFilterBase):
+    kappa: float = 0.0
+
+    def correct(self, t, x, y, P, args=None):
+        raise NotImplementedError(
+            "UnscentedKalmanFilter does not yet have a separate correct method."
+        )
 
     def step(self, t, x, y, P, args=None):
-        return ukf_step(self.dyn, self.obs, t, x, y, P, self.Q, self.R, args)
+        f = self.dyn
+        h = self.obs
+        Q = self.Q
+        R = self.R
+        kappa = self.kappa
+        
+        if args is None:
+            args = ()
+
+        n = len(x)
+
+        # Generate weights
+        Wm, Wc = _julier_weights(n, kappa)
+
+        # Generate initial sigma points
+        sigmas = _julier_sigma_points(x, P, kappa)
+
+        # PREDICT STEP - propagate sigma points through dynamics
+        sigmas_f = np.zeros((2*n + 1, n))
+        for i in range(2*n + 1):
+            sigmas_f[i] = f(t, sigmas[i], *args)
+
+        # Predicted mean (unscented transform)
+        x_pred = np.zeros(n)
+        for i in range(2*n + 1):
+            x_pred += Wm[i] * sigmas_f[i]
+        
+        # Predicted covariance
+        P_pred = Q.copy()
+        for i in range(2*n + 1):
+            diff = sigmas_f[i] - x_pred
+            P_pred += Wc[i] * np.outer(diff, diff)
+
+        # Regenerate sigma points around predicted state (critical for accuracy)
+        sigmas_pred = _julier_sigma_points(x_pred, P_pred, kappa)
+
+        # UPDATE STEP - propagate predicted sigma points through measurement function
+        dim_z = len(y)
+        sigmas_h = np.zeros((2*n + 1, dim_z))
+        for i in range(2*n + 1):
+            sigmas_h[i] = h(t, sigmas_pred[i], *args)
+        
+        # Predicted measurement mean
+        y_pred = np.zeros(dim_z)
+        for i in range(2*n + 1):
+            y_pred += Wm[i] * sigmas_h[i]
+        
+        # Innovation covariance
+        S = R.copy()
+        for i in range(2*n + 1):
+            diff_y = sigmas_h[i] - y_pred
+            S += Wc[i] * np.outer(diff_y, diff_y)
+        
+        # Cross-covariance
+        Pxz = np.zeros((n, dim_z))
+        for i in range(2*n + 1):
+            diff_x = sigmas_pred[i] - x_pred
+            diff_y = sigmas_h[i] - y_pred
+            Pxz += Wc[i] * np.outer(diff_x, diff_y)
+
+        # Kalman gain
+        K = Pxz @ np.linalg.inv(S)
+        
+        # Innovation
+        e = y - y_pred
+        
+        # Updated state estimate
+        x_new = x_pred + K @ e
+        
+        # Updated covariance
+        P_new = P_pred - K @ S @ K.T
+
+        return x_new, P_new, e
