@@ -3,7 +3,7 @@ import numpy as np
 import pytest
 from scipy.linalg import sqrtm, cholesky
 
-from archimedes.state_estimation import UnscentedKalmanFilter, ukf_step
+from archimedes.observers import UnscentedKalmanFilter, ukf_step
 
 
 class TestUKF:

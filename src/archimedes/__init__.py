@@ -21,23 +21,25 @@ from ._core import (
     zeros,
     zeros_like,
 )
+from .discretize import discretize
 from .optimize import implicit, minimize, nlp_solver, qpsol, root
 from .simulate import integrator, odeint
 from .theme import set_theme
 from .tree import struct
-from . import sysid, state_estimation
+from . import observers, sysid
 
 __all__ = [
     "error",
     "theme",
     "set_theme",
+    "observers",
     "tree",
     "struct",
     "sysid",
-    "state_estimation",
+    "array",
     "callback",
     "codegen",
-    "array",
+    "discretize",
     "sym",
     "sym_like",
     "zeros",

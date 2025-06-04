@@ -1,6 +1,6 @@
 import numpy as np
 
-from archimedes.experimental.discretize import discretize
+from archimedes import discretize
 
 
 class TestRK4:

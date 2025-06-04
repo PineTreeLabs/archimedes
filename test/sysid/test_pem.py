@@ -3,9 +3,8 @@ import pytest
 import archimedes as arc
 
 from archimedes.sysid import pem_solve, Timeseries
-from archimedes.state_estimation import ExtendedKalmanFilter
-from archimedes.experimental.discretize import discretize
-from archimedes import struct
+from archimedes.observers import ExtendedKalmanFilter
+from archimedes import struct, discretize
 
 
 np.random.seed(0)
@@ -745,34 +744,36 @@ if __name__ == "__main__":
     print("Running System Identification Tests")
     print("=" * 60)
 
-    # for i in range(10):
-    #     print(f"Iteration {i+1}")
+    for i in range(10):
+        print(f"Iteration {i+1}")
+        np.random.seed(i)
 
-    #     print(f"\nRunning Second-Order System Test)")
-    #     np.random.seed(i)  # Set random seed for reproducibility
 
-    #     test_suite.test_second_order_system(plot=False)
+        print("\n" + "=" * 60)
+        print("Running Second Order System Identification Test")
+        print("=" * 60)
+        test_suite.test_second_order_system(plot=False)
     
     
-    test_suite.test_second_order_system(plot=True)
+    # test_suite.test_second_order_system(plot=True)
     
-    print("\n" + "=" * 60)
-    print("Running Van der Pol Oscillator Identification Test")
-    print("=" * 60)
+    # print("\n" + "=" * 60)
+    # print("Running Van der Pol Oscillator Identification Test")
+    # print("=" * 60)
     
-    test_suite.test_van_der_pol(plot=True)
+    # test_suite.test_van_der_pol(plot=True)
 
-    print("\n" + "=" * 60)
-    print("Running Duffing Oscillator Identification Test")
-    print("=" * 60)
+    # print("\n" + "=" * 60)
+    # print("Running Duffing Oscillator Identification Test")
+    # print("=" * 60)
     
-    test_suite.test_duffing(plot=True)
+    # test_suite.test_duffing(plot=True)
     
-    print("\n" + "=" * 60)
-    print("Running CartPole System Identification Test")
-    print("=" * 60)
+    # print("\n" + "=" * 60)
+    # print("Running CartPole System Identification Test")
+    # print("=" * 60)
     
-    test_suite.test_cartpole(plot=True)
+    # test_suite.test_cartpole(plot=True)
     
     print("\n" + "=" * 60)
     print("All tests passed!")

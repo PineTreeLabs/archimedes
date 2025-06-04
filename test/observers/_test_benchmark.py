@@ -5,7 +5,7 @@ from scipy.stats import chi2
 
 import archimedes as arc
 from archimedes.experimental import discretize
-from archimedes.experimental.state_estimation import (
+from archimedes.observers import (
     ExtendedKalmanFilter, UnscentedKalmanFilter, 
     ekf_step, ukf_step
 )

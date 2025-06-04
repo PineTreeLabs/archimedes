@@ -3,7 +3,7 @@ import numpy as np
 import pytest
 from scipy.linalg import expm
 
-from archimedes.state_estimation import (
+from archimedes.observers import (
     ExtendedKalmanFilter, ekf_step, ekf_correct
 )
 from archimedes import jac
