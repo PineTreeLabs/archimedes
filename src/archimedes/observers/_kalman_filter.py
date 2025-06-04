@@ -33,9 +33,7 @@ class KalmanFilterBase(metaclass=abc.ABCMeta):
     """Abstract base class for Kalman filter implementations.
 
     This class defines the common interface for Kalman filters used in system
-    identification and state estimation. It uses the PyTree structure for
-    efficient automatic differentiation and supports arbitrary dynamics and
-    observation functions.
+    identification and state estimation.
 
     All Kalman filter implementations follow the discrete-time state-space model:
 
@@ -175,21 +173,147 @@ class KalmanFilterBase(metaclass=abc.ABCMeta):
 
 @struct.pytree_node
 class ExtendedKalmanFilter(KalmanFilterBase):
+    """Extended Kalman Filter for nonlinear state estimation.
+
+    The Extended Kalman Filter (EKF) handles nonlinear dynamics and observation
+    models by linearizing them around the current state estimate using Jacobian
+    matrices. This makes it computationally efficient while providing reasonable
+    performance for mildly nonlinear systems.
+
+    The EKF uses first-order Taylor series approximations:
+
+    .. code-block:: text
+
+        F[k] ≈ ∂f/∂x |_{x[k|k-1]}    (dynamics Jacobian)
+        H[k] ≈ ∂h/∂x |_{x[k|k-1]}    (observation Jacobian)
+
+    These Jacobians are computed automatically using the ``archimedes.jac``
+    function, enabling seamless integration with the automatic differentiation
+    framework.
+
+    Parameters
+    ----------
+    Inherits all parameters from :class:`KalmanFilterBase`.
+
+    Notes
+    -----
+    The EKF is most suitable for systems where:
+    
+    - Nonlinearities are mild (locally approximately linear)
+    - Computational efficiency is important  
+    - The system dynamics and observations are smooth and differentiable
+    
+    For highly nonlinear systems, consider using :class:`UnscentedKalmanFilter`
+    which can better capture nonlinear transformations of uncertainty.
+
+    The EKF algorithm consists of two steps:
+    
+    1. **Prediction**: Propagate state and covariance using linearized dynamics
+    2. **Update**: Incorporate measurements using linearized observation model
+
+    The linearization can introduce bias in the state estimates and may cause
+    filter divergence if the nonlinearities are too strong or if the initial
+    estimate is far from the true state.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> from archimedes.observers import ExtendedKalmanFilter
+    >>>
+    >>> # Define nonlinear dynamics (simple pendulum)
+    >>> def f(t, x):
+    ...     dt = 0.1
+    ...     return np.hstack([
+    ...         x[0] + dt * x[1],                # position
+    ...         x[1] - dt * 9.81 * np.sin(x[0])  # velocity
+    ...     ])
+    >>>
+    >>> # Define observations
+    >>> def h(t, x):
+    ...     return x[0]
+    >>>
+    >>> # Create EKF
+    >>> Q = np.eye(2) * 0.01
+    >>> R = np.array([[0.1]])
+    >>> ekf = ExtendedKalmanFilter(dyn=f, obs=h, Q=Q, R=R)
+    >>>
+    >>> # Filtering step
+    >>> x = np.array([0.1, 0.0])  # Initial state
+    >>> P = np.eye(2) * 0.1       # Initial covariance  
+    >>> y = np.array([0.12])      # Measurement
+    >>> x_new, P_new, innov = ekf.step(0.0, x, y, P)
+
+    See Also
+    --------
+    KalmanFilterBase : Abstract base class for all Kalman filters
+    UnscentedKalmanFilter : Alternative for highly nonlinear systems
+
+    References
+    ----------
+    .. [1] "Extended Kalman filter", Wikipedia.
+           https://en.wikipedia.org/wiki/Extended_Kalman_filter
+    .. [2] Gelb, A. "Applied Optimal Estimation." MIT Press, 1974.
+    """
 
     def correct(self, t, x, y, P, args=None):
-        """Perform the "correct" step of the extended Kalman filter.
+        """Perform the measurement update (correction) step of the EKF.
 
-        Args:
-            t: current time
-            x: state vector (typically the prediction from the forward model)
-            y: measurement
-            P: state covariance (typically the prediction from the forward model)
-            args: additional arguments to pass to f and h
+        This method applies the measurement update equations to incorporate
+        new observations into the state estimate. It computes the observation
+        Jacobian automatically and updates both the state estimate and its
+        covariance matrix.
 
-        Returns:
-            x: updated state vector
-            P: updated state covariance
-            e: innovation or measurement residual
+        Parameters
+        ----------
+        t : float
+            Current time step.
+        x : array_like
+            Prior state estimate of shape ``(nx,)``, typically from the
+            prediction step.
+        y : array_like
+            Measurement vector of shape ``(ny,)``.
+        P : array_like
+            Prior state covariance matrix of shape ``(nx, nx)``, typically
+            from the prediction step.
+        args : tuple, optional
+            Additional arguments to pass to the observation function.
+            Default is None.
+
+        Returns
+        -------
+        x_post : ndarray
+            Posterior (updated) state estimate of shape ``(nx,)``.
+        P_post : ndarray
+            Posterior (updated) state covariance matrix of shape ``(nx, nx)``.
+        innovation : ndarray
+            Measurement residual of shape ``(ny,)``, computed as the
+            difference between the actual measurement and the predicted
+            measurement from the prior state estimate.
+
+        Notes
+        -----
+        This method can be used independently of the prediction step, allowing
+        for custom prediction schemes or processing multiple measurements at
+        the same time step.
+
+        The method computes the observation Jacobian ``H = ∂h/∂x`` using
+        automatic differentiation, then applies the standard Kalman update
+        equations:
+
+        .. code-block:: text
+
+            innovation = y - h(x_prior)
+            S = H @ P_prior @ H.T + R  
+            K = P_prior @ H.T @ S^(-1)
+            x_post = x_prior + K @ innovation
+            P_post = (I - K @ H) @ P_prior
+
+        Examples
+        --------
+        >>> # Apply correction with custom prediction
+        >>> x_pred = custom_prediction_step(x_prev)
+        >>> P_pred = custom_covariance_prediction(P_prev)  
+        >>> x_new, P_new, innov = ekf.correct(t, x_pred, y, P_pred)
         """
         h = self.obs
         R = self.R
@@ -210,6 +334,55 @@ class ExtendedKalmanFilter(KalmanFilterBase):
 
 
     def step(self, t, x, y, P, args=None):
+        """Perform one complete EKF step (prediction + update).
+
+        This method implements the full Extended Kalman Filter algorithm,
+        performing both the prediction step (using the dynamics model) and
+        the update step (incorporating the measurement) in sequence.
+
+        Parameters
+        ----------
+        t : float
+            Current time step.
+        x : array_like
+            Previous state estimate of shape ``(nx,)``.
+        y : array_like
+            Current measurement vector of shape ``(ny,)``.
+        P : array_like
+            Previous state covariance matrix of shape ``(nx, nx)``.
+        args : tuple, optional
+            Additional arguments to pass to both dynamics and observation
+            functions. Default is None.
+
+        Returns
+        -------
+        x_new : ndarray
+            Updated state estimate of shape ``(nx,)``.
+        P_new : ndarray
+            Updated state covariance matrix of shape ``(nx, nx)``.
+        innovation : ndarray
+            Measurement residual of shape ``(ny,)``.
+
+        Notes
+        -----
+        The method performs the following sequence:
+
+        1. **Prediction Step**: 
+           - Compute dynamics Jacobian ``F = ∂f/∂x``
+           - Propagate state: ``x_pred = f(t, x)``
+           - Propagate covariance: ``P_pred = F @ P @ F.T + Q``
+
+        2. **Update Step**:
+           - Apply measurement correction using :meth:`correct`
+
+        The automatic differentiation ensures that Jacobians are computed
+        accurately and efficiently, even for complex nonlinear functions.
+
+        Examples
+        --------
+        >>> # Complete filtering step
+        >>> x_k, P_k, innov = ekf.step(t_k, x_prev, y_k, P_prev)
+        """
         f = self.dyn
         h = self.obs
         Q = self.Q
@@ -231,7 +404,7 @@ class ExtendedKalmanFilter(KalmanFilterBase):
 
 
 def _julier_sigma_points(x_center, P_cov, kappa):
-    """Generate Julier sigma points exactly as in filterpy"""
+    """Generate Julier sigma points"""
     n = len(x_center)
 
     # Cholesky decomposition - scipy returns upper triangular
@@ -248,7 +421,7 @@ def _julier_sigma_points(x_center, P_cov, kappa):
     return sigmas
 
 def _julier_weights(n, kappa):
-    """Compute Julier weights exactly as in filterpy"""
+    """Compute Julier weights"""
     Wm = np.full(2*n + 1, 0.5 / (n + kappa))
     Wm[0] = kappa / (n + kappa)
     Wc = Wm.copy()  # For Julier, Wm and Wc are the same
