@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 import archimedes as arc
 
-from archimedes.sysid import pem_solve, Timeseries
+from archimedes.sysid import pem, Timeseries
 from archimedes.observers import ExtendedKalmanFilter
 from archimedes import struct, discretize
 
@@ -113,7 +113,7 @@ class TestPEMIntegration:
         dyn = discretize(second_order_ode, dt, method="rk4")
         ekf = ExtendedKalmanFilter(dyn, obs, Q, R)
         data = Timeseries(ts=ts, us=us, ys=ys)
-        result = pem_solve(
+        result = pem(
             ekf,
             data,
             params_guess,
@@ -180,7 +180,7 @@ class TestPEMIntegration:
 
         # Test optimizing initial conditions
         dvs_guess = (np.array([0.0, 0.0]), result.x)
-        result_with_x0 = pem_solve(
+        result_with_x0 = pem(
             ekf,
             data,
             dvs_guess,
@@ -203,7 +203,7 @@ class TestPEMIntegration:
 
         # Error handling
         with pytest.raises(ValueError, match=r"Unsupported method.*"):
-            pem_solve(
+            pem(
                 ekf,
                 data,
                 params_guess,
@@ -290,7 +290,7 @@ class TestPEMIntegration:
             "gtol": 1e-8,
             "nprint": 1,
         }
-        result = pem_solve(
+        result = pem(
             ekf,
             data,
             params_guess,
@@ -471,7 +471,7 @@ class TestPEMIntegration:
                 "nprint": 1,
                 "maxfev": 100,  # Allow more iterations for challenging problem
             }
-            result = pem_solve(
+            result = pem(
                 ekf,
                 data,
                 params_guess,
@@ -641,7 +641,7 @@ class TestPEMIntegration:
             "gtol": 1e-6,
             "nprint": 1,
         }
-        result = pem_solve(
+        result = pem(
             ekf,
             data,
             params_guess,

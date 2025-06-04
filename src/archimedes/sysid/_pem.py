@@ -16,7 +16,7 @@ if TYPE_CHECKING:
     T = TypeVar("T", bound=PyTree)
 
 
-__all__ = ["pem_solve"]
+__all__ = ["pem"]
 
 
 @struct.pytree_node
@@ -127,7 +127,7 @@ class PEMObjective:
         return V, J, H
 
 
-def pem_solve(
+def pem(
     predictor: KalmanFilterBase,
     data: Timeseries,
     params_guess: T,
