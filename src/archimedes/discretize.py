@@ -77,9 +77,6 @@ def _radau5(rhs, h, newton_solver="fast_newton"):
         ]
     )
 
-    if not isinstance(rhs, FunctionCache):
-        rhs = FunctionCache(rhs)
-
     sym_kind = rhs._kind  # TODO: Use a better way to get the kind
 
     # Define the residual function used in the Newton solver

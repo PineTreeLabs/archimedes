@@ -1,15 +1,18 @@
+import pytest
+
 import numpy as np
 
 from archimedes import discretize
 
 
 class TestRK4:
-    def test_rk4(self, plot=False):
+    @pytest.mark.parametrize("n_steps", [1, 2])
+    def test_rk4(self, n_steps, plot=False):
         def f(t, x, u, p):
             return np.stack([x[1], -x[0]])
 
         h = 1e-2
-        step = discretize(f, h, method="rk4")
+        step = discretize(f, h, method="rk4", n_steps=n_steps)
 
         x0 = np.array([1, 0])
         t0 = 0
@@ -32,12 +35,13 @@ class TestRK4:
 
 
 class TestRadau5:
-    def test_radau5(self, plot=False):
+    @pytest.mark.parametrize("n_steps", [1, 2])
+    def test_radau5(self, n_steps, plot=False):
         def f(t, x, u, p):
             return np.stack([x[1], -x[0]])
 
         h = 1e-1
-        step = discretize(f, h, method="radau5")
+        step = discretize(f, h, method="radau5", n_steps=n_steps)
 
         x0 = np.array([1, 0])
         t0 = 0
