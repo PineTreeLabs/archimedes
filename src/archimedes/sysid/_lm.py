@@ -1,3 +1,4 @@
+from __future__ import annotations
 from typing import (
     TYPE_CHECKING,
     Dict,
@@ -18,6 +19,8 @@ from archimedes import tree, compile
 
 if TYPE_CHECKING:
     from archimedes.typing import PyTree
+
+    T = TypeVar("T", bound=PyTree)
 
 __all__ = [
     "lm_solve",
@@ -411,54 +414,160 @@ def _check_bounds(x, bounds):
 
 
 def lm_solve(
-    func,
-    x0,
-    args=(),
-    bounds=None,
-    ftol=1e-6,
-    xtol=1e-6,
-    gtol=1e-6,
-    maxfev=100,
-    diag=None,
-    lambda0=1e-3,
-    nprint=0,
+    func: Callable,
+    x0: T,
+    args: Tuple[Any, ...] = (),
+    bounds: Tuple[T, T] | None = None,
+    ftol: float = 1e-6,
+    xtol: float = 1e-6,
+    gtol: float = 1e-6,
+    maxfev: int = 100,
+    diag: T | None = None,
+    lambda0: float = 1e-3,
+    nprint: int = 0,
 ) -> LMResult:
-    """
-    Solve nonlinear least squares problems using Levenberg-Marquardt.
+    """Solve nonlinear least squares using modified Levenberg-Marquardt algorithm.
+
+    Solves optimization problems of the form:
+
+    .. code-block:: text
+
+        minimize    0.5 * ||r(x)||²
+        subject to  lb <= x <= ub
+
+    where ``r(x)`` are residuals computed by the objective function.
+
+    This implementation uses a direct Hessian approximation approach rather
+    than the traditional Jacobian-based formulation, enabling integration
+    with efficient special-purpose custom Hessian approximations.
+    It provides superior performance and robustness compared to general-purpose
+    optimizers, particularly for system identification applications.
 
     Parameters
     ----------
     func : callable
-        Function with signature func(params) -> (objective, gradient, hessian)
-        - objective: scalar value (0.5 * sum of squared residuals)
-        - gradient: gradient vector of the objective
-        - hessian: Hessian matrix or approximation (e.g., J.T @ J)
+        Objective function with signature ``func(x, *args) -> (V, g, H)`` where:
+        
+        - ``V`` : float - Objective value (0.5 * sum of squared residuals)
+        - ``g`` : ndarray - Gradient vector of shape ``(n,)``
+        - ``H`` : ndarray - Hessian matrix or approximation of shape ``(n, n)``
+        
+        Unlike traditional least-squares formulations that work with residual
+        vectors, this interface expects the objective, gradient, and Hessian
+        directly, enabling applications like system identification with specialized
+        Hessian approximations.
     x0 : PyTree
-        Initial guess to the parameters
+        Initial parameter guess. Can be a flat array or a PyTree structure which
+        will be preserved in the solution.
     args : tuple, optional
-        Extra arguments passed to func
-    bounds : tuple, optional
-        Tuple of (lower_bounds, upper_bounds) for parameters.  Default is None
-        (unconstrained).  If provided, both must have the same PyTree structure as x0.
-    ftol : float, optional
-        Relative error desired in the sum of squares
-    xtol : float, optional
-        Relative error desired in the approximate solution
-    gtol : float, optional
-        Orthogonality desired between function vector and Jacobian columns
-    maxfev : int, optional
-        Maximum number of function evaluations
-    diag : ndarray, optional
-        N-element array of scaling factors. If None, automatic scaling used.
-    lambda0 : float, optional
-        Initial LM damping parameter. Default is 1e-3.
-    nprint : int, optional
-        Print progress every nprint iterations
+        Extra arguments passed to the objective function.
+    bounds : tuple of (PyTree, PyTree), optional
+        Box constraints specified as ``(lower_bounds, upper_bounds)``.
+        Each bound array must have the same PyTree structure as ``x0``. Use
+        ``-np.inf`` and ``np.inf`` for unbounded variables. Enables physical
+        constraints like mass > 0, damping > 0, etc.
+    ftol : float, default=1e-6
+        Tolerance for relative reduction in objective function.
+        Convergence occurs when both actual and predicted reductions
+        are smaller than this value.
+    xtol : float, default=1e-6
+        Tolerance for relative change in parameters. Convergence occurs
+        when the relative step size is smaller than this value.
+    gtol : float, default=1e-6
+        Tolerance for gradient norm. Convergence occurs when the infinity
+        norm of the gradient (or projected gradient for constrained problems)
+        falls below this threshold.
+    maxfev : int, default=100
+        Maximum number of function evaluations.
+    diag : PyTree, optional
+        Diagonal scaling factors for variables, in the form of a PyTree matching
+        the structure of ``x0``. If None, automatic scaling is used based on the
+        Hessian diagonal. Custom scaling can improve convergence for ill-conditioned
+        problems.
+    lambda0 : float, default=1e-3
+        Initial Levenberg-Marquardt damping parameter. Larger values
+        bias toward gradient descent, smaller values toward Gauss-Newton.
+    nprint : int, default=0
+        Print progress every ``nprint`` iterations. Set to 0 to disable
+        progress output.
 
     Returns
     -------
     result : LMResult
-        Optimization result with solution, convergence info, and history
+        Optimization result containing:
+        
+        - ``x`` : Solution parameters with same structure as ``x0``
+        - ``success`` : Whether optimization succeeded
+        - ``status`` : Termination status (:class:`LMStatus`)
+        - ``message`` : Descriptive termination message
+        - ``fun`` : Final objective value
+        - ``jac`` : Final gradient vector
+        - ``hess`` : Final Hessian matrix
+        - ``nfev`` : Number of function evaluations
+        - ``nit`` : Number of iterations
+        - ``history`` : Detailed iteration history
+
+    Notes
+    -----
+    The algorithm implements the damped normal equations approach:
+
+    .. code-block:: text
+
+        (H + λI)p = -g
+
+    where ``H`` is the Hessian approximation, ``λ`` is the damping parameter,
+    and ``p`` is the step direction. The damping parameter is adapted based
+    on the ratio of actual to predicted reduction.
+
+    For box-constrained problems, the algorithm uses projected gradients for
+    convergence testing and OSQP for constrained step computation when bounds
+    are violated.  When the damped normal equations yield a step that would violate
+    the bounds, the algorithm switches to solving the quadratic program:
+
+    .. code-block:: text
+        minimize    0.5 * p^T * (H + λI) * p + g^T * p
+        subject to  lb <= x + p <= ub
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> from archimedes.sysid import lm_solve
+    >>> import archimedes as arc
+    >>>
+    >>> # Rosenbrock function as least-squares problem
+    >>> def rosenbrock_func(x):
+    ...     # Residuals: r1 = 10*(x[1] - x[0]²), r2 = (1 - x[0])
+    ...     def residuals(x):
+    ...         return np.hstack([10*(x[1] - x[0]**2), 1 - x[0]])
+    ...     
+    ...     r = residuals(x)
+    ...     J = arc.jac(residuals)(x)
+    ...     
+    ...     V = 0.5 * np.sum(r**2)  # Objective
+    ...     g = J.T @ r             # Gradient
+    ...     H = J.T @ J             # Gauss-Newton Hessian
+    ...     
+    ...     return V, g, H
+    >>>
+    >>> # Solve unconstrained problem
+    >>> result = lm_solve(rosenbrock_func, x0=np.array([-1.2, 1.0]))
+    >>> print(f"Solution: {result.x}")
+    Solution: [0.99999941 0.99999881
+    >>> print(f"Converged: {result.success} ({result.message})")
+    Converged: True (The cosine of the angle between fvec and any column...)
+    >>>
+    >>> # Solve with box constraints (physical parameter limits)
+    >>> bounds = (np.array([0.0, 0.0]), np.array([0.8, 2.0]))
+    >>> result = lm_solve(rosenbrock_func, x0=np.array([0.5, 0.5]), bounds=bounds)
+    >>> print(f"Constrained solution: {result.x}")
+    Constrained solution: [0.79999998 0.6391025 ]
+
+    See Also
+    --------
+    pem : Parameter estimation using prediction error minimization
+    LMResult : Detailed description of optimization results
+    LMStatus : Convergence status codes and meanings
+    scipy.optimize.least_squares : SciPy's least-squares solver
     """
     _check_bounds(x0, bounds)  # Validate bounds structure
 
@@ -508,7 +617,7 @@ def lm_solve(
     if diag is None:
         diag = np.ones(n)
     else:
-        diag = np.asarray(diag)
+        diag, _ = tree.ravel(diag)
 
     # Initialize counters and status variables
     nfev = 0  # Number of function evaluations
