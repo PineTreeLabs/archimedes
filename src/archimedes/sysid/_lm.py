@@ -10,6 +10,7 @@ from typing import (
     NamedTuple
 )
 from enum import IntEnum
+import logging
 
 import numpy as np
 from scipy import sparse
@@ -21,6 +22,9 @@ if TYPE_CHECKING:
     from archimedes.typing import PyTree
 
     T = TypeVar("T", bound=PyTree)
+
+# Set up logger for this module
+logger = logging.getLogger("levenberg_marquardt")
 
 __all__ = [
     "lm_solve",
@@ -114,38 +118,36 @@ class LMStatus(IntEnum):
 
 class LMProgress:
     """Handle progress reporting for LM optimization."""
-    
-    def __init__(self, nprint=0):
-        self.nprint = nprint
+
+    def __init__(self, logger):
+        self.logger = logger
         self.iteration = 0
         self.prev_cost = None
         self.header_printed = False
-        
+
     def report(self, cost, grad_norm, step_norm, nfev):
         """Report progress in SciPy-style format."""
-        if self.nprint <= 0:
-            return
-            
-        if self.iteration % self.nprint == 0:
-            if not self.header_printed:
-                self._print_header()
-                self.header_printed = True
-            
-            # Calculate cost reduction
-            if self.prev_cost is not None:
-                cost_reduction = self.prev_cost - cost
-            else:
-                cost_reduction = None
-            
-            self._print_iteration(self.iteration, nfev, cost, cost_reduction, 
-                                step_norm, grad_norm)
+        if not self.header_printed:
+            self._print_header()
+            self.header_printed = True
+        
+        # Calculate cost reduction
+        if self.prev_cost is not None:
+            cost_reduction = self.prev_cost - cost
+        else:
+            cost_reduction = None
+        
+        self._print_iteration(self.iteration, nfev, cost, cost_reduction, 
+                            step_norm, grad_norm)
         
         self.prev_cost = cost
         self.iteration += 1
     
     def _print_header(self):
-        print(f"{'Iteration':^10} {'Total nfev':^12} {'Cost':^15} "
-              f"{'Cost reduction':^15} {'Step norm':^12} {'Optimality':^12}")
+        self.logger.info(
+            f"{'Iteration':^10} {'Total nfev':^12} {'Cost':^15} "
+            f"{'Cost reduction':^15} {'Step norm':^12} {'Optimality':^12}"
+        )
     
     def _print_iteration(self, iter_num, nfev, cost, cost_reduction, 
                         step_norm, grad_norm):
@@ -161,8 +163,10 @@ class LMProgress:
             cost_red_str = ""
             step_str = ""
         
-        print(f"{iter_num:^10} {nfev:^12} {cost_str:^15} "
-              f"{cost_red_str:^15} {step_str:^12} {grad_str:^12}")
+        self.logger.info(
+            f"{iter_num:^10} {nfev:^12} {cost_str:^15} "
+            f"{cost_red_str:^15} {step_str:^12} {grad_str:^12}"
+        )
 
 
 class LMResult(NamedTuple):
@@ -323,7 +327,7 @@ def _compute_step(hess, grad, diag, lambda_val, x, bounds=None, qp_solver=None):
     qp_results = qp_solver.solve()
     
     if qp_results.info.status != 'solved':
-        print(f"OSQP warning: {qp_results.info.status}")
+        logger.warning(f"OSQP solver status: {qp_results.info.status}")
         # Fallback: project unconstrained step to bounds
         return np.clip(step, l_qp, u_qp)
     
@@ -506,7 +510,7 @@ def lm_solve(
     maxfev: int = 100,
     diag: T | None = None,
     lambda0: float = 1e-3,
-    nprint: int = 0,
+    log_level: int | None = None,
 ) -> LMResult:
     """Solve nonlinear least squares using modified Levenberg-Marquardt algorithm.
 
@@ -569,7 +573,7 @@ def lm_solve(
     lambda0 : float, default=1e-3
         Initial Levenberg-Marquardt damping parameter. Larger values
         bias toward gradient descent, smaller values toward Gauss-Newton.
-    nprint : int, default=0
+    log_level : int, default=0
         Print progress every ``nprint`` iterations. Set to 0 to disable
         progress output.
 
@@ -651,9 +655,13 @@ def lm_solve(
     LMStatus : Convergence status codes and meanings
     scipy.optimize.least_squares : SciPy's least-squares solver
     """
+    if log_level is None:
+        log_level = logging.WARNING
+    logger.setLevel(log_level)
+
     _check_bounds(x0, bounds)  # Validate bounds structure
 
-    progress = LMProgress(nprint)  # Initialize logger
+    progress = LMProgress(logger)  # Initialize logger
 
     # Constants
     MACHEP = np.finfo(float).eps  # Machine precision
@@ -886,8 +894,7 @@ def lm_solve(
     if status is None:
         status = LMStatus.MAX_FEVAL
 
-    if nprint > 0:
-        print(status.message)
+    logger.info(status.message)
 
     # Unravel the final solution
     x = unravel(x)

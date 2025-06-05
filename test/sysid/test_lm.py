@@ -773,7 +773,7 @@ class TestLM:
             xtol=1e3,  # Loose enough to trigger (this is relative to parameter norm)
             gtol=1e-15,  # Very tight to avoid gradient convergence
             maxfev=10,
-            nprint=1,
+            log_level=20,
         )
         
         # Should converge with combined criteria
@@ -788,7 +788,7 @@ class TestLM:
             xtol=1e4,  # Loose enough to trigger (this is relative to parameter norm)
             gtol=1e-15,  # Very tight to avoid gradient convergence
             maxfev=10,
-            nprint=1,
+            log_level=20,
         )
 
         assert result.status == LMStatus.XTOL_REACHED, f"Expected xtol convergence, got {result.status}: {result.message}"
@@ -822,7 +822,7 @@ class TestLM:
         assert result.nfev >= 3  # Should have hit the limit
 
 
-    def test_progress_reporting_with_nprint(self):
+    def test_progress_reporting_with_nprint(self, caplog):
         """Test progress reporting functionality (nprint > 0)."""
         
         def simple_quadratic(x):
@@ -836,56 +836,42 @@ class TestLM:
         # Capture printed output by redirecting stdout
         import io
         import sys
+        import logging
         
-        captured_output = io.StringIO()
-        sys.stdout = captured_output
-        
-        try:
+        with caplog.at_level(logging.INFO):
             result = lm_solve(
                 simple_quadratic,
                 np.array([5.0]),
-                nprint=1,  # Print every iteration
+                log_level=logging.INFO,
                 maxfev=20
             )
-            
-            # Restore stdout
-            sys.stdout = sys.__stdout__
 
-            output = captured_output.getvalue()
+            output = caplog.text
             
             # Check that headers and iteration info were printed
             assert "Iteration" in output, "Should print iteration header"
             assert "Cost" in output, "Should print cost header"
             assert result.success, "Optimization should succeed"
 
-        finally:
-            # Ensure stdout is restored even if test fails
-            sys.stdout = sys.__stdout__
-
-    def test_nprint_header_logic(self):
+    def test_header_logic(self, caplog):
         """Test the specific header printing logic in LMProgress."""
         from archimedes.sysid._lm import LMProgress
         import io
         import sys
+        import logging
+
+        logger = logging.getLogger("test_header_logic")
         
         # Test LMProgress class directly
-        captured_output = io.StringIO()
-        sys.stdout = captured_output
-        
-        try:
-            progress = LMProgress(nprint=2)  # Print every 2 iterations
+        with caplog.at_level(logging.INFO):
+            progress = LMProgress(logger)
             
             # First report (iteration 0) - should print header
             progress.report(1.0, 0.1, 0.01, 5)
-            
-            # Second report (iteration 1) - should not print 
-            progress.report(0.5, 0.05, 0.005, 6)
-            
-            # Third report (iteration 2) - should print again
+    
+            # Second report (iteration 1) - should print again
             progress.report(0.25, 0.025, 0.0025, 7)
-            
-            sys.stdout = sys.__stdout__
-            output = captured_output.getvalue()
+            output = caplog.text
             
             # Should contain headers and specific iteration data
             assert "Iteration" in output, "Should contain header"
@@ -895,9 +881,6 @@ class TestLM:
             lines = output.strip().split('\n')
             # Should have: header line + iteration 0 + iteration 2 = 3 lines minimum
             assert len(lines) >= 3, f"Expected at least 3 lines of output, got {len(lines)}"
-            
-        finally:
-            sys.stdout = sys.__stdout__
 
     def test_box_constraints_simple_quadratic(self):
         """Test box constraints with a simple quadratic function."""
