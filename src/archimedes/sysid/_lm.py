@@ -30,7 +30,59 @@ __all__ = [
 
 
 class LMStatus(IntEnum):
-    """Status codes for Levenberg-Marquardt optimization results."""
+    """Status codes for Levenberg-Marquardt optimization results.
+    
+    These codes follow the MINPACK convention and provide detailed information
+    about the termination condition of the optimization algorithm. Understanding
+    these codes is essential for interpreting optimization results and diagnosing
+    potential issues.
+    
+    Attributes
+    ----------
+    FTOL_REACHED : int = 1
+        Both actual and predicted relative reductions in the objective function
+        are at most ``ftol``. This indicates convergence based on minimal
+        improvement in the objective function.
+        
+    XTOL_REACHED : int = 2
+        Relative error between two consecutive parameter iterates is at most
+        ``xtol``. This indicates convergence based on minimal change in the
+        parameters.
+        
+    BOTH_TOL_REACHED : int = 3
+        Both ``ftol`` and ``xtol`` conditions are satisfied simultaneously.
+        This represents the strongest convergence criterion.
+        
+    GTOL_REACHED : int = 4
+        The cosine of the angle between the gradient and any column of the
+        Jacobian is at most ``gtol`` in absolute value. For constrained
+        problems, this applies to the projected gradient. This indicates
+        convergence to a critical point.
+        
+    MAX_FEVAL : int = 5
+        Maximum number of function evaluations (``maxfev``) has been reached
+        without achieving convergence. This typically indicates that either
+        more iterations are needed, the tolerances are too tight, or the
+        problem is ill-conditioned.
+    
+    Notes
+    -----
+    **Success vs. Failure**:
+        Status codes 1-4 indicate successful convergence, while code 5 indicates
+        failure to converge within the iteration limit. Use the ``success``
+        property to check for overall success.
+        
+    **Interpretation Guide**:
+        - **FTOL_REACHED**: Good for most applications, indicates objective
+          function has stopped improving significantly
+        - **XTOL_REACHED**: May indicate convergence to a local minimum or
+          numerical precision limits
+        - **BOTH_TOL_REACHED**: Strongest convergence guarantee
+        - **GTOL_REACHED**: Gradient-based convergence, good indicator of
+          optimality conditions
+        - **MAX_FEVAL**: Check if more iterations are needed or if the problem
+          requires reformulation
+    """
     
     # Success codes (convergence achieved)
     FTOL_REACHED = 1      # Function tolerance convergence
@@ -116,30 +168,60 @@ class LMProgress:
 class LMResult(NamedTuple):
     """Result of Levenberg-Marquardt optimization.
 
+    This class provides detailed information about the optimization process
+    and results, following SciPy conventions while adding specialized fields
+    for system identification applications.
+
     Attributes
     ----------
-    x : ndarray
-        Solution array
+    x : ndarray or PyTree
+        Solution parameters with the same structure as the initial guess.
+        For system identification, this preserves the nested parameter
+        organization (e.g., ``{"mass": 1.0, "damping": {"c1": 0.1}}``).
     success : bool
-        Whether optimization succeeded
+        Whether optimization terminated successfully. True for status codes
+        1-4 (converged), False for status code 5 (max iterations reached).
     status : LMStatus
-        Status code indicating termination reason
+        Detailed termination status code indicating the specific convergence
+        criterion that was satisfied or reason for termination.
     message : str
-        Description of termination reason
+        Human-readable description of the termination reason corresponding
+        to the status code.
     fun : float
-        Final objective function value
+        Final objective function value. For least-squares problems, this
+        is 0.5 times the sum of squared residuals.
     jac : ndarray
-        Final gradient vector
+        Final gradient vector of shape ``(n,)``. For constrained problems,
+        this is the full gradient (not projected).
     hess : ndarray
-        Final Hessian matrix
+        Final Hessian matrix or approximation of shape ``(n, n)``. This
+        can be used for uncertainty quantification and further analysis.
     nfev : int
-        Number of function evaluations
+        Number of objective function evaluations performed during optimization.
+        Each evaluation computes the objective value, gradient, and Hessian.
     njev : int
-        Number of Jacobian evaluations
+        Number of Jacobian evaluations. For this implementation, this equals
+        ``nfev`` since gradient and Hessian are computed simultaneously.
     nit : int
-        Number of iterations
+        Number of algorithm iterations. Each iteration may involve multiple
+        function evaluations due to the trust region approach.
     history : List[Dict[str, Any]]
-        Iteration history with convergence details
+        Detailed iteration history containing convergence diagnostics:
+        
+        - ``iter`` : Iteration number
+        - ``cost`` : Objective function value
+        - ``grad_norm`` : Gradient norm (or projected gradient for constrained)
+        - ``lambda`` : Levenberg-Marquardt damping parameter
+        - ``x`` : Parameter values at this iteration
+        - ``step_norm`` : Step size (when step is accepted)
+        - ``actred`` : Actual reduction in objective
+        - ``prered`` : Predicted reduction from quadratic model
+        - ``ratio`` : Ratio of actual to predicted reduction
+
+    See Also
+    --------
+    lm_solve : Function that returns this result type
+    LMStatus : Detailed description of status codes
     """
 
     x: np.ndarray
