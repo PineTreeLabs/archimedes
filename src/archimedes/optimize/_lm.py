@@ -14,6 +14,7 @@ import logging
 
 import numpy as np
 from scipy import sparse
+from scipy.optimize import OptimizeResult
 import osqp
 
 import archimedes as arc
@@ -170,7 +171,7 @@ class LMProgress:
         )
 
 
-class LMResult(NamedTuple):
+class LMResult(OptimizeResult):
     """Result of Levenberg-Marquardt optimization.
 
     This class provides detailed information about the optimization process
@@ -229,17 +230,17 @@ class LMResult(NamedTuple):
     LMStatus : Detailed description of status codes
     """
 
-    x: np.ndarray
-    success: bool
-    status: LMStatus
-    message: str
-    fun: float
-    jac: np.ndarray
-    hess: np.ndarray
-    nfev: int
-    njev: int
-    nit: int
-    history: List[Dict[str, Any]]
+    # x: np.ndarray
+    # success: bool
+    # status: LMStatus
+    # message: str
+    # fun: float
+    # jac: np.ndarray
+    # hess: np.ndarray
+    # nfev: int
+    # njev: int
+    # nit: int
+    # history: List[Dict[str, Any]]
 
 
 def _compute_step(hess, grad, diag, lambda_val, x, bounds=None, qp_solver=None):
@@ -514,7 +515,7 @@ def lm_solve(
     diag: T | None = None,
     lambda0: float = 1e-3,
     log_level: int | None = None,
-) -> LMResult:
+) -> OptimizeResult:
     """Solve nonlinear least squares using modified Levenberg-Marquardt algorithm.
 
     Solves optimization problems of the form:
@@ -574,7 +575,7 @@ def lm_solve(
 
     Returns
     -------
-    result : LMResult
+    result : OptimizeResult
         Optimization result containing:
         
         - ``x`` : Solution parameters with same structure as ``x0``
@@ -636,7 +637,6 @@ def lm_solve(
     See Also
     --------
     pem : Parameter estimation using prediction error minimization
-    LMResult : Detailed description of optimization results
     LMStatus : Convergence status codes and meanings
     scipy.optimize.least_squares : SciPy's least-squares solver
     """
@@ -903,7 +903,7 @@ def lm_solve(
     # Unravel the final solution
     x = unravel(x)
 
-    # Create and return LMResult
+    # Create and return result
     return LMResult(
         x=x,
         success=status.success,

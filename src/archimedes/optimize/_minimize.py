@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING, Any, Callable, Sequence, TypeVar, cast
 
 import casadi as cs
 import numpy as np
+from scipy.optimize import OptimizeResult, minimize as scipy_minimize
 
 from archimedes import tree
 from archimedes._core import (
@@ -335,7 +336,7 @@ def minimize(
     constr_bounds: ArrayLike | None = None,
     method: str = "ipopt",
     **options,
-) -> T:
+) -> OptimizeResult:
     """
     Minimize a scalar function with optional constraints.
 
@@ -545,4 +546,6 @@ def minimize(
     # Add the varargs
     arg_names = [name for name in solver.arg_names if name not in solver_args]
     solver_args = {**solver_args, **dict(zip(arg_names, args))}
-    return solver(**solver_args)
+
+    x = solver(**solver_args)
+    return OptimizeResult(x=x, success=True, message="Optimization terminated successfully.")

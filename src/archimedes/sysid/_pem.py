@@ -227,17 +227,14 @@ def _pem_solve_ipopt(
     def func(params_flat):
         return pem_obj(unravel(params_flat))
 
-    params_opt_flat = arc.minimize(
+    result = arc.minimize(
         func,
         params_guess_flat,
         bounds=bounds,
         **options,
     )
 
-    result = OptimizeResult()
-    result.x = unravel(params_opt_flat)
-    result.success = True  # Assume success for now
-    result.message = "Optimization completed successfully."
+    result.x = unravel(result.x)
     result.nit = -1  # Placeholder for number of iterations
     result.fun = pem_obj(result.x)
 
