@@ -6,13 +6,18 @@ import numpy as np
 from scipy import sparse
 
 import archimedes as arc
-from archimedes.optimize import lm_solve, LMStatus
+from archimedes.optimize import least_squares, lm_solve, LMStatus
 
 
-class TestLM:
+METHODS = ["lm", "hess-lm"]
+BOUNDED_METHODS = ["trf", "hess-lm"]
+
+
+class TestLeastSquares:
     """Test suite for the Levenberg-Marquardt algorithm implementation."""
 
-    def test_rosenbrock(self):
+    @pytest.mark.parametrize("method", METHODS)
+    def test_rosenbrock(self, method):
         """Test optimization of the Rosenbrock function."""
 
         # Define Rosenbrock function as a least-squares problem
@@ -26,7 +31,8 @@ class TestLM:
         x0 = np.array([-1.2, 1.0])
 
         # Run optimization
-        result = lm_solve(rosenbrock_func, x0, maxfev=100)
+        options = {"maxfev": 100}
+        result = least_squares(rosenbrock_func, x0, options=options)
 
         # Check result - the solution should be close to [1.0, 1.0]
         print(f"Optimization result: {result.x}")
@@ -49,6 +55,418 @@ class TestLM:
             f"Final objective {result.fun} not close to zero"
         )
 
+    def test_powell_singular(self):
+        """Test optimization of Powell's singular function."""
+
+        def powell_func(x):
+            """
+            Powell's singular function:
+            f(x) = (x1 + 10*x2)² + 5*(x3 - x4)² + (x2 - 2*x3)⁴ + 10*(x1 - x4)⁴
+
+            Formulated as least squares with residuals:
+            r1 = x1 + 10*x2
+            r2 = √5*(x3 - x4)
+            r3 = (x2 - 2*x3)²
+            r4 = √10*(x1 - x4)²
+
+            Standard starting point: [3, -1, 0, 1]
+            Known solution: [0, 0, 0, 0] with f(x*) = 0
+            """
+
+            # Residuals
+            r1 = x[0] + 10.0 * x[1]
+            r2 = np.sqrt(5.0) * (x[2] - x[3])
+            r3 = (x[1] - 2.0 * x[2]) ** 2
+            r4 = np.sqrt(10.0) * (x[0] - x[3]) ** 2
+
+            return np.hstack([r1, r2, r3, r4])
+
+        # Standard starting point for Powell's function
+        x0 = np.array([3.0, -1.0, 0.0, 1.0])
+
+        # Run optimization with generous limits since this is a harder problem
+        options = {
+            "maxfev": 1000,
+            "ftol": 1e-12,
+            "xtol": 1e-12,
+            "gtol": 1e-8,
+        }
+        result = least_squares(powell_func, x0, options=options)
+
+        # Test assertions
+        expected_solution = np.array([0.0, 0.0, 0.0, 0.0])
+        solution_error = np.linalg.norm(result.x - expected_solution)
+
+        # Check result - the solution should be close to [0.0, 0.0, 0.0, 0.0]
+        print(f"Optimization result: {result.x}")
+        print(f"Final objective: {result.fun}")
+        print(f"Success: {result.success}")
+        print(f"Message: {result.message}")
+        print(f"Iterations: {result.nit}")
+        print(f"Function evaluations: {result.nfev}")
+
+        assert result.success, (
+            f"Powell optimization should succeed, got: {result.message}"
+        )
+
+        # Powell's function is notoriously challenging due to singular Jacobian
+        # at solution: ~1e-3 is actually quite good for this problem
+        assert solution_error < 5e-3, (
+            f"Solution {result.x} not close enough to [0,0,0,0] (error: "
+            f"{solution_error:.6e})"
+        )
+
+        assert result.fun < 1e-6, (
+            f"Final objective {result.fun:.6e} should be close to zero"
+        )
+
+    def test_wood_function(self):
+        """Test optimization of Wood's function."""
+
+        def wood_func(x):
+            """
+            Wood's function (4D optimization test problem):
+            f(x) = 100(x2-x1²)² + (1-x1)² + 90(x4-x3²)² + (1-x3)² + 10.1((x2-1)²
+                   + (x4-1)²) + 19.8(x2-1)(x4-1)
+
+            Formulated as pure least squares residuals:
+            f(x) = 0.5 * ||r||²
+
+            Standard starting point: [-3, -1, -3, -1]
+            Known solution: [1, 1, 1, 1] with f(x*) = 0
+            """
+            return np.hstack([
+                10.0 * np.sqrt(2.0) * (x[1] - x[0]**2),    # √200 * (x2 - x1²)
+                np.sqrt(2.0) * (1.0 - x[0]),               # √2 * (1 - x1) 
+                6.0 * np.sqrt(5.0) * (x[3] - x[2]**2),     # √180 * (x4 - x3²)
+                np.sqrt(2.0) * (1.0 - x[2]),               # √2 * (1 - x3)
+                np.sqrt(0.4) * (x[1] - 1.0),               # √0.4 * (x2 - 1)
+                np.sqrt(0.4) * (x[3] - 1.0),               # √0.4 * (x4 - 1)
+                np.sqrt(19.8) * (x[1] + x[3] - 2.0)        # √19.8 * (x2 + x4 - 2)
+            ])
+
+        # Standard starting point for Wood's function
+        x0 = np.array([-3.0, -1.0, -3.0, -1.0])
+
+        # Run optimization with reasonable limits
+        options = {
+            "maxfev": 1000,
+            "ftol": 1e-10,
+            "xtol": 1e-10,
+            "gtol": 1e-8,
+        }
+        result = least_squares(wood_func, x0, options=options)
+
+        # Print results for diagnostic purposes
+        print("\nWood's Function Results (Standard Starting Point):")
+        print(f"Initial point: {x0}")
+        print(f"Final solution: {result.x}")
+        print(f"Final objective: {result.fun:.2e}")
+        print(f"Success: {result.success}")
+        print(f"Status: {result.status} - {result.message}")
+        print(f"Iterations: {result.nit}")
+        print(f"Function evaluations: {result.nfev}")
+        print(f"Final gradient norm: {result.history[-1]['grad_norm']:.6e}")
+
+        # Test assertions - Modified to account for local vs global minima
+        expected_solution = np.array([1.0, 1.0, 1.0, 1.0])
+        solution_error = np.linalg.norm(result.x - expected_solution)
+
+        # Basic convergence assertion
+        assert result.success, (
+            f"Wood optimization should succeed, got: {result.message}"
+        )
+        # The algorithm should find the global minimum when started near it
+        assert solution_error < 1e-3, (
+            f"Solution {result_global.x} not close enough to "
+            f"[1,1,1,1] (error: {solution_error:.6e})"
+        )
+        assert result.fun < 1e-6, (
+            f"Final objective from global start {result.fun:.6e} should be "
+            "close to zero"
+        )
+
+        # For the standard start, we expect to find a local minimum (critical point)
+        # The key test is that we found a critical point (small gradient), not
+        # necessarily the global minimum
+        final_grad_norm = result.history[-1]["grad_norm"]
+        assert final_grad_norm < 1e-4, (
+            f"Should converge to critical point (grad norm: {final_grad_norm:.6e})"
+        )
+
+        print("\nTest Results:")
+        print(
+            f"✓ Standard start found global minimum (error: "
+            f"{solution_error:.2e})"
+        )
+        print(
+            f"✓ Standard start found critical point (grad norm: {final_grad_norm:.2e})"
+        )
+
+    def test_beale_function(self):
+        """Test optimization of Beale's function."""
+
+        def beale_func(x):
+            """
+            Beale's function (2D optimization test problem):
+            f(x,y) = (1.5 - x + xy)² + (2.25 - x + xy²)² + (2.625 - x + xy³)²
+
+            Formulated as least squares with residuals:
+            r1 = 1.5 - x + xy
+            r2 = 2.25 - x + xy²
+            r3 = 2.625 - x + xy³
+
+            Standard starting point: [1, 1]
+            Known solution: [3, 0.5] with f(x*) = 0
+            """
+
+            # Extract variables for clarity
+            x_var, y_var = x[0], x[1]
+
+            # Residuals
+            r1 = 1.5 - x_var + x_var * y_var
+            r2 = 2.25 - x_var + x_var * y_var**2
+            r3 = 2.625 - x_var + x_var * y_var**3
+
+            return np.hstack([r1, r2, r3])
+
+        # Standard starting point for Beale's function
+        x0 = np.array([1.0, 1.0])
+
+        # Run optimization with reasonable limits
+        options = {
+            "maxfev": 1000,
+            "ftol": 1e-10,
+            "xtol": 1e-10,
+            "gtol": 1e-8,
+        }
+        result = least_squares(beale_func, x0, options=options)
+
+        # Print results for diagnostic purposes
+        print("\nBeale's Function Results:")
+        print(f"Initial point: {x0}")
+        print(f"Final solution: {result.x}")
+        print(f"Final objective: {result.fun:.2e}")
+        print(f"Success: {result.success}")
+        print(f"Status: {result.status} - {result.message}")
+        print(f"Iterations: {result.nit}")
+        print(f"Function evaluations: {result.nfev}")
+
+        # Test assertions
+        expected_solution = np.array([3.0, 0.5])
+        solution_error = np.linalg.norm(result.x - expected_solution)
+
+        assert result.success, (
+            f"Beale optimization should succeed, got: {result.message}"
+        )
+
+        # Beale's function should converge to the known solution
+        assert solution_error < 1e-3, (
+            f"Solution {result.x} not close enough to [3,0.5] (error: "
+            f"{solution_error:.6e})"
+        )
+
+        assert result.fun < 1e-6, (
+            f"Final objective {result.fun:.6e} should be close to zero"
+        )
+
+        # Additional validation: verify original function value
+        x_final, y_final = result.x
+        original_beale = (
+            (1.5 - x_final + x_final * y_final) ** 2
+            + (2.25 - x_final + x_final * y_final**2) ** 2
+            + (2.625 - x_final + x_final * y_final**3) ** 2
+        )
+
+        print(f"Original Beale function value: {original_beale:.6e}")
+        assert original_beale < 1e-6, (
+            f"Original Beale function value should be close to zero: "
+            f"{original_beale:.6e}"
+        )
+
+
+    def test_box_constraints_simple_quadratic(self):
+        """Test box constraints with a simple quadratic function."""
+        
+        def constrained_quadratic(x):
+            """
+            Minimize f(x,y) = (x-3)² + (y-2)²
+            Subject to: 0 ≤ x ≤ 2, 0 ≤ y ≤ 1
+            
+            Unconstrained optimum: (3, 2)
+            Constrained optimum: (2, 1) - both variables at upper bounds
+            """
+            x = np.atleast_1d(x)
+            
+            # Residuals: r1 = (x-3), r2 = (y-2)
+            r = np.array([x[0] - 3.0, x[1] - 2.0], like=x)
+    
+            return r
+        
+        # Test setup
+        x0 = np.array([0.5, 0.5])  # Start in interior
+        bounds = (
+            np.array([0.0, 0.0]),  # Lower bounds
+            np.array([2.0, 1.0])   # Upper bounds  
+        )
+        
+        # Solve constrained problem
+        options = {
+            "ftol": 1e-8,
+            "xtol": 1e-8,
+            "gtol": 1e-6,
+            "maxfev": 50
+        }
+        result = least_squares(
+            constrained_quadratic,
+            x0,
+            bounds=bounds,
+            options=options,
+        )
+        
+        # Test assertions
+        expected_solution = np.array([2.0, 1.0])
+        solution_error = np.linalg.norm(result.x - expected_solution)
+        
+        assert result.success, (
+            f"Constrained quadratic optimization should succeed, got: {result.message}"
+        )
+        
+        assert solution_error < 1e-4, (
+            f"Solution {result.x} not close enough to [2,1] (error: {solution_error:.6e})"
+        )
+        
+        # Check constraint satisfaction
+        lb, ub = bounds
+        tol = 1e-6  # Tolerance for bounds checking
+        bounds_satisfied = np.all(lb <= result.x + tol) and np.all(result.x - tol <= ub)
+        assert bounds_satisfied, (
+            f"Bounds violated: {result.x} not in [{lb}, {ub}]"
+        )
+        
+        # Check that constrained optimization info is recorded
+        if len(result.history) > 0 and 'grad_proj_norm' in result.history[-1]:
+            final_history = result.history[-1]
+            # Both variables should be at upper bounds
+            assert final_history['n_active_upper'] == 2, (
+                f"Expected 2 active upper bounds, got {final_history['n_active_upper']}"
+            )
+            assert final_history['grad_proj_norm'] < 1e-6, (
+                f"Projected gradient norm should be small: {final_history['grad_proj_norm']}"
+            )
+        
+        # Edge case: Test ValueError for bounds structure mismatch
+        bad_lower = np.array([0.0])  # Wrong size (1 instead of 2)
+        bad_upper = np.array([2.0, 1.0])  # Correct size
+        bad_bounds = (bad_lower, bad_upper)
+
+        with pytest.raises(
+            ValueError, match=r"Lower bounds must have the same structure .*"
+        ):
+            least_squares(
+                constrained_quadratic,
+                x0,
+                bounds=bad_bounds,
+            )
+        
+        bad_lower = np.array([0.0, 0.0])  # Correct size
+        bad_upper = np.array([2.0])  # Wrong size (1 instead of 2)
+        bad_bounds = (bad_lower, bad_upper)
+        
+        with pytest.raises(
+            ValueError, match=r"Upper bounds must have the same structure .*"
+        ):
+            least_squares(
+                constrained_quadratic,
+                x0,
+                bounds=bad_bounds,
+            )
+
+    def test_box_constraints_rosenbrock(self):
+        """Test box constraints with Rosenbrock function."""
+        
+        def rosenbrock_func(x):
+            return np.hstack([10.0 * (x[1] - x[0] ** 2), 1.0 - x[0]])
+        
+        # Test Case 1: Bounds that force solution to boundary
+        # Unconstrained optimum is [1, 1], but we restrict x ≤ 0.8
+        x0 = np.array([0.0, 0.0])  # Start at origin
+        bounds = (
+            np.array([0.0, 0.0]),   # Lower bounds
+            np.array([0.8, 2.0])    # Upper bounds - restrict first variable
+        )
+        
+        options = {
+            "ftol": 1e-8,
+            "xtol": 1e-8,
+            "gtol": 1e-6,
+            "maxfev": 100
+        }
+        result = least_squares(
+            rosenbrock_func,
+            x0,
+            bounds=bounds,
+            options=options,
+        )
+        
+        # The constrained optimum should be at x[0] = 0.8, x[1] = 0.8² = 0.64
+        expected_solution = np.array([0.8, 0.64])
+        solution_error = np.linalg.norm(result.x - expected_solution)
+        
+        assert result.success, (
+            f"Constrained Rosenbrock optimization should succeed, got: {result.message}"
+        )
+        
+        assert solution_error < 1e-2, (
+            f"Solution {result.x} not close enough to [0.8, 0.64] (error: {solution_error:.6e})"
+        )
+        
+        # Check that first variable is at upper bound
+        assert abs(result.x[0] - 0.8) < 1e-6, (
+            f"First variable should be at upper bound 0.8, got {result.x[0]}"
+        )
+        
+        # Check constraint satisfaction
+        lb, ub = bounds
+        bounds_satisfied = np.all(lb <= result.x) and np.all(result.x <= ub)
+        assert bounds_satisfied, (
+            f"Bounds violated: {result.x} not in [{lb}, {ub}]"
+        )
+        
+        # Test Case 2: Bounds that don't affect the solution (interior optimum)
+        bounds_loose = (
+            np.array([0.0, 0.0]),   # Lower bounds
+            np.array([2.0, 2.0])    # Upper bounds - don't restrict
+        )
+        
+        result_loose = least_squares(
+            rosenbrock_func,
+            x0,
+            bounds=bounds_loose,
+            options=options,
+        )
+        
+        # Should find the unconstrained optimum [1, 1]
+        expected_solution_loose = np.array([1.0, 1.0])
+        solution_error_loose = np.linalg.norm(result_loose.x - expected_solution_loose)
+        
+        assert result_loose.success, (
+            f"Loosely constrained Rosenbrock should succeed, got: {result_loose.message}"
+        )
+        
+        assert solution_error_loose < 1e-3, (
+            f"Loose bounds solution {result_loose.x} not close to [1,1] (error: {solution_error_loose:.6e})"
+        )
+        
+        # Verify that loose bounds don't activate constraints
+        if len(result_loose.history) > 0 and 'total_active' in result_loose.history[-1]:
+            final_active = result_loose.history[-1]['total_active']
+            assert final_active == 0, (
+                f"Loose bounds should have no active constraints, got {final_active}"
+            )
+
+
+class TestLM:
     def test_compute_step_well_conditioned(self):
         """Test compute_step with a well-conditioned matrix."""
         from archimedes.optimize._lm import _compute_step
@@ -139,65 +557,6 @@ class TestLM:
         assert np.isclose(pred_red_scaled, expected_scaled)
         assert pred_red_scaled > 0  # Should still predict a reduction
 
-    def test_powell_singular(self):
-        """Test optimization of Powell's singular function."""
-
-        def powell_func(x):
-            """
-            Powell's singular function:
-            f(x) = (x1 + 10*x2)² + 5*(x3 - x4)² + (x2 - 2*x3)⁴ + 10*(x1 - x4)⁴
-
-            Formulated as least squares with residuals:
-            r1 = x1 + 10*x2
-            r2 = √5*(x3 - x4)
-            r3 = (x2 - 2*x3)²
-            r4 = √10*(x1 - x4)²
-
-            Standard starting point: [3, -1, 0, 1]
-            Known solution: [0, 0, 0, 0] with f(x*) = 0
-            """
-
-            # Residuals
-            r1 = x[0] + 10.0 * x[1]
-            r2 = np.sqrt(5.0) * (x[2] - x[3])
-            r3 = (x[1] - 2.0 * x[2]) ** 2
-            r4 = np.sqrt(10.0) * (x[0] - x[3]) ** 2
-
-            return np.hstack([r1, r2, r3, r4])
-
-        # Standard starting point for Powell's function
-        x0 = np.array([3.0, -1.0, 0.0, 1.0])
-
-        # Run optimization with generous limits since this is a harder problem
-        result = lm_solve(powell_func, x0, maxfev=1000, ftol=1e-12, xtol=1e-12, gtol=1e-8)
-
-        # Test assertions
-        expected_solution = np.array([0.0, 0.0, 0.0, 0.0])
-        solution_error = np.linalg.norm(result.x - expected_solution)
-
-        # Check result - the solution should be close to [0.0, 0.0, 0.0, 0.0]
-        print(f"Optimization result: {result.x}")
-        print(f"Final objective: {result.fun}")
-        print(f"Success: {result.success}")
-        print(f"Message: {result.message}")
-        print(f"Iterations: {result.nit}")
-        print(f"Function evaluations: {result.nfev}")
-
-        assert result.success, (
-            f"Powell optimization should succeed, got: {result.message}"
-        )
-
-        # Powell's function is notoriously challenging due to singular Jacobian
-        # at solution: ~1e-3 is actually quite good for this problem
-        assert solution_error < 5e-3, (
-            f"Solution {result.x} not close enough to [0,0,0,0] (error: "
-            f"{solution_error:.6e})"
-        )
-
-        assert result.fun < 1e-6, (
-            f"Final objective {result.fun:.6e} should be close to zero"
-        )
-
     def test_convergence_criteria(self):
         """Test that different convergence criteria can be triggered."""
 
@@ -252,7 +611,6 @@ class TestLM:
         assert result.success, (
             f"Should converge with loose tolerances, got: {result.message}"
         )
-
 
     def test_diagonal_scaling(self):
         """Test custom diagonal scaling vs automatic scaling."""
@@ -391,158 +749,6 @@ class TestLM:
                    abs(result_auto.fun - result_scaled.fun) > 1e-15), (
                 "Custom and automatic scaling should behave differently"
             )
-
-    def test_wood_function(self):
-        """Test optimization of Wood's function."""
-
-        def wood_func(x):
-            """
-            Wood's function (4D optimization test problem):
-            f(x) = 100(x2-x1²)² + (1-x1)² + 90(x4-x3²)² + (1-x3)² + 10.1((x2-1)²
-                   + (x4-1)²) + 19.8(x2-1)(x4-1)
-
-            Formulated as pure least squares residuals:
-            f(x) = 0.5 * ||r||²
-
-            Standard starting point: [-3, -1, -3, -1]
-            Known solution: [1, 1, 1, 1] with f(x*) = 0
-            """
-            return np.hstack([
-                10.0 * np.sqrt(2.0) * (x[1] - x[0]**2),    # √200 * (x2 - x1²)
-                np.sqrt(2.0) * (1.0 - x[0]),               # √2 * (1 - x1) 
-                6.0 * np.sqrt(5.0) * (x[3] - x[2]**2),     # √180 * (x4 - x3²)
-                np.sqrt(2.0) * (1.0 - x[2]),               # √2 * (1 - x3)
-                np.sqrt(0.4) * (x[1] - 1.0),               # √0.4 * (x2 - 1)
-                np.sqrt(0.4) * (x[3] - 1.0),               # √0.4 * (x4 - 1)
-                np.sqrt(19.8) * (x[1] + x[3] - 2.0)        # √19.8 * (x2 + x4 - 2)
-            ])
-
-        # Standard starting point for Wood's function
-        x0 = np.array([-3.0, -1.0, -3.0, -1.0])
-
-        # Run optimization with reasonable limits
-        result = lm_solve(wood_func, x0, maxfev=1000, ftol=1e-10, xtol=1e-10, gtol=1e-8)
-
-        # Print results for diagnostic purposes
-        print("\nWood's Function Results (Standard Starting Point):")
-        print(f"Initial point: {x0}")
-        print(f"Final solution: {result.x}")
-        print(f"Final objective: {result.fun:.2e}")
-        print(f"Success: {result.success}")
-        print(f"Status: {result.status} - {result.message}")
-        print(f"Iterations: {result.nit}")
-        print(f"Function evaluations: {result.nfev}")
-        print(f"Final gradient norm: {result.history[-1]['grad_norm']:.6e}")
-
-        # Test assertions - Modified to account for local vs global minima
-        expected_solution = np.array([1.0, 1.0, 1.0, 1.0])
-        solution_error = np.linalg.norm(result.x - expected_solution)
-
-        # Basic convergence assertion
-        assert result.success, (
-            f"Wood optimization should succeed, got: {result.message}"
-        )
-        # The algorithm should find the global minimum when started near it
-        assert solution_error < 1e-3, (
-            f"Solution {result_global.x} not close enough to "
-            f"[1,1,1,1] (error: {solution_error:.6e})"
-        )
-        assert result.fun < 1e-6, (
-            f"Final objective from global start {result.fun:.6e} should be "
-            "close to zero"
-        )
-
-        # For the standard start, we expect to find a local minimum (critical point)
-        # The key test is that we found a critical point (small gradient), not
-        # necessarily the global minimum
-        final_grad_norm = result.history[-1]["grad_norm"]
-        assert final_grad_norm < 1e-4, (
-            f"Should converge to critical point (grad norm: {final_grad_norm:.6e})"
-        )
-
-        print("\nTest Results:")
-        print(
-            f"✓ Standard start found global minimum (error: "
-            f"{solution_error:.2e})"
-        )
-        print(
-            f"✓ Standard start found critical point (grad norm: {final_grad_norm:.2e})"
-        )
-
-    def test_beale_function(self):
-        """Test optimization of Beale's function."""
-
-        def beale_func(x):
-            """
-            Beale's function (2D optimization test problem):
-            f(x,y) = (1.5 - x + xy)² + (2.25 - x + xy²)² + (2.625 - x + xy³)²
-
-            Formulated as least squares with residuals:
-            r1 = 1.5 - x + xy
-            r2 = 2.25 - x + xy²
-            r3 = 2.625 - x + xy³
-
-            Standard starting point: [1, 1]
-            Known solution: [3, 0.5] with f(x*) = 0
-            """
-
-            # Extract variables for clarity
-            x_var, y_var = x[0], x[1]
-
-            # Residuals
-            r1 = 1.5 - x_var + x_var * y_var
-            r2 = 2.25 - x_var + x_var * y_var**2
-            r3 = 2.625 - x_var + x_var * y_var**3
-
-            return np.hstack([r1, r2, r3])
-
-        # Standard starting point for Beale's function
-        x0 = np.array([1.0, 1.0])
-
-        # Run optimization with reasonable limits
-        result = lm_solve(beale_func, x0, maxfev=1000, ftol=1e-10, xtol=1e-10, gtol=1e-8)
-
-        # Print results for diagnostic purposes
-        print("\nBeale's Function Results:")
-        print(f"Initial point: {x0}")
-        print(f"Final solution: {result.x}")
-        print(f"Final objective: {result.fun:.2e}")
-        print(f"Success: {result.success}")
-        print(f"Status: {result.status} - {result.message}")
-        print(f"Iterations: {result.nit}")
-        print(f"Function evaluations: {result.nfev}")
-
-        # Test assertions
-        expected_solution = np.array([3.0, 0.5])
-        solution_error = np.linalg.norm(result.x - expected_solution)
-
-        assert result.success, (
-            f"Beale optimization should succeed, got: {result.message}"
-        )
-
-        # Beale's function should converge to the known solution
-        assert solution_error < 1e-3, (
-            f"Solution {result.x} not close enough to [3,0.5] (error: "
-            f"{solution_error:.6e})"
-        )
-
-        assert result.fun < 1e-6, (
-            f"Final objective {result.fun:.6e} should be close to zero"
-        )
-
-        # Additional validation: verify original function value
-        x_final, y_final = result.x
-        original_beale = (
-            (1.5 - x_final + x_final * y_final) ** 2
-            + (2.25 - x_final + x_final * y_final**2) ** 2
-            + (2.625 - x_final + x_final * y_final**3) ** 2
-        )
-
-        print(f"Original Beale function value: {original_beale:.6e}")
-        assert original_beale < 1e-6, (
-            f"Original Beale function value should be close to zero: "
-            f"{original_beale:.6e}"
-        )
 
     def test_iteration_history(self):
         """Test iteration history collection functionality."""
@@ -772,185 +978,6 @@ class TestLM:
             # Should have: header line + iteration 0 + iteration 2 = 3 lines minimum
             assert len(lines) >= 3, f"Expected at least 3 lines of output, got {len(lines)}"
 
-    def test_box_constraints_simple_quadratic(self):
-        """Test box constraints with a simple quadratic function."""
-        
-        def constrained_quadratic(x):
-            """
-            Minimize f(x,y) = (x-3)² + (y-2)²
-            Subject to: 0 ≤ x ≤ 2, 0 ≤ y ≤ 1
-            
-            Unconstrained optimum: (3, 2)
-            Constrained optimum: (2, 1) - both variables at upper bounds
-            """
-            x = np.atleast_1d(x)
-            
-            # Residuals: r1 = (x-3), r2 = (y-2)
-            r = np.array([x[0] - 3.0, x[1] - 2.0], like=x)
-    
-            return r
-        
-        # Test setup
-        x0 = np.array([0.5, 0.5])  # Start in interior
-        bounds = (
-            np.array([0.0, 0.0]),  # Lower bounds
-            np.array([2.0, 1.0])   # Upper bounds  
-        )
-        
-        # Solve constrained problem
-        result = lm_solve(
-            constrained_quadratic,
-            x0,
-            bounds=bounds,
-            ftol=1e-8,
-            xtol=1e-8,
-            gtol=1e-6,
-            maxfev=50
-        )
-        
-        # Test assertions
-        expected_solution = np.array([2.0, 1.0])
-        solution_error = np.linalg.norm(result.x - expected_solution)
-        
-        assert result.success, (
-            f"Constrained quadratic optimization should succeed, got: {result.message}"
-        )
-        
-        assert solution_error < 1e-4, (
-            f"Solution {result.x} not close enough to [2,1] (error: {solution_error:.6e})"
-        )
-        
-        # Check constraint satisfaction
-        lb, ub = bounds
-        tol = 1e-6  # Tolerance for bounds checking
-        bounds_satisfied = np.all(lb <= result.x + tol) and np.all(result.x - tol <= ub)
-        assert bounds_satisfied, (
-            f"Bounds violated: {result.x} not in [{lb}, {ub}]"
-        )
-        
-        # Check that constrained optimization info is recorded
-        if len(result.history) > 0 and 'grad_proj_norm' in result.history[-1]:
-            final_history = result.history[-1]
-            # Both variables should be at upper bounds
-            assert final_history['n_active_upper'] == 2, (
-                f"Expected 2 active upper bounds, got {final_history['n_active_upper']}"
-            )
-            assert final_history['grad_proj_norm'] < 1e-6, (
-                f"Projected gradient norm should be small: {final_history['grad_proj_norm']}"
-            )
-        
-        # Edge case: Test ValueError for bounds structure mismatch
-        bad_lower = np.array([0.0])  # Wrong size (1 instead of 2)
-        bad_upper = np.array([2.0, 1.0])  # Correct size
-        bad_bounds = (bad_lower, bad_upper)
-
-        with pytest.raises(
-            ValueError, match=r"Lower bounds must have the same structure .*"
-        ):
-            lm_solve(
-                constrained_quadratic,
-                x0,
-                bounds=bad_bounds,
-                maxfev=10
-            )
-        
-        bad_lower = np.array([0.0, 0.0])  # Correct size
-        bad_upper = np.array([2.0])  # Wrong size (1 instead of 2)
-        bad_bounds = (bad_lower, bad_upper)
-        
-        with pytest.raises(
-            ValueError, match=r"Upper bounds must have the same structure .*"
-        ):
-            lm_solve(
-                constrained_quadratic,
-                x0,
-                bounds=bad_bounds,
-                maxfev=10
-            )
-
-    def test_box_constraints_rosenbrock(self):
-        """Test box constraints with Rosenbrock function."""
-        
-        def rosenbrock_func(x):
-            return np.hstack([10.0 * (x[1] - x[0] ** 2), 1.0 - x[0]])
-        
-        # Test Case 1: Bounds that force solution to boundary
-        # Unconstrained optimum is [1, 1], but we restrict x ≤ 0.8
-        x0 = np.array([0.0, 0.0])  # Start at origin
-        bounds = (
-            np.array([0.0, 0.0]),   # Lower bounds
-            np.array([0.8, 2.0])    # Upper bounds - restrict first variable
-        )
-        
-        result = lm_solve(
-            rosenbrock_func,
-            x0,
-            bounds=bounds,
-            ftol=1e-8,
-            xtol=1e-8,
-            gtol=1e-6,
-            maxfev=100
-        )
-        
-        # The constrained optimum should be at x[0] = 0.8, x[1] = 0.8² = 0.64
-        expected_solution = np.array([0.8, 0.64])
-        solution_error = np.linalg.norm(result.x - expected_solution)
-        
-        assert result.success, (
-            f"Constrained Rosenbrock optimization should succeed, got: {result.message}"
-        )
-        
-        assert solution_error < 1e-2, (
-            f"Solution {result.x} not close enough to [0.8, 0.64] (error: {solution_error:.6e})"
-        )
-        
-        # Check that first variable is at upper bound
-        assert abs(result.x[0] - 0.8) < 1e-6, (
-            f"First variable should be at upper bound 0.8, got {result.x[0]}"
-        )
-        
-        # Check constraint satisfaction
-        lb, ub = bounds
-        bounds_satisfied = np.all(lb <= result.x) and np.all(result.x <= ub)
-        assert bounds_satisfied, (
-            f"Bounds violated: {result.x} not in [{lb}, {ub}]"
-        )
-        
-        # Test Case 2: Bounds that don't affect the solution (interior optimum)
-        bounds_loose = (
-            np.array([0.0, 0.0]),   # Lower bounds
-            np.array([2.0, 2.0])    # Upper bounds - don't restrict
-        )
-        
-        result_loose = lm_solve(
-            rosenbrock_func,
-            x0,
-            bounds=bounds_loose,
-            ftol=1e-8,
-            xtol=1e-8,
-            gtol=1e-6,
-            maxfev=100
-        )
-        
-        # Should find the unconstrained optimum [1, 1]
-        expected_solution_loose = np.array([1.0, 1.0])
-        solution_error_loose = np.linalg.norm(result_loose.x - expected_solution_loose)
-        
-        assert result_loose.success, (
-            f"Loosely constrained Rosenbrock should succeed, got: {result_loose.message}"
-        )
-        
-        assert solution_error_loose < 1e-3, (
-            f"Loose bounds solution {result_loose.x} not close to [1,1] (error: {solution_error_loose:.6e})"
-        )
-        
-        # Verify that loose bounds don't activate constraints
-        if len(result_loose.history) > 0 and 'total_active' in result_loose.history[-1]:
-            final_active = result_loose.history[-1]['total_active']
-            assert final_active == 0, (
-                f"Loose bounds should have no active constraints, got {final_active}"
-            )
-
     def test_box_constraints_gradient_projection(self):
         """Test gradient projection logic with a simple example."""
         from archimedes.optimize._lm import _project_gradient, _check_constrained_convergence, _compute_step
@@ -1110,19 +1137,19 @@ if __name__ == "__main__":
     print("\n" + "=" * 60)
     print("Running Rosenbrock Test")
     print("=" * 60)
-    TestLM().test_rosenbrock()
+    TestLeastSquares().test_rosenbrock()
 
     print("\n" + "=" * 60)
     print("Running Powell's Singular Function Test")
     print("=" * 60)
-    TestLM().test_powell_singular()
+    TestLeastSquares().test_powell_singular()
 
     print("\n" + "=" * 60)
     print("Running Wood's Function Test")
     print("=" * 60)
-    TestLM().test_wood_function()
+    TestLeastSquares().test_wood_function()
 
     print("\n" + "=" * 60)
     print("Running Beale's Function Test")
-    TestLM().test_beale_function()
+    TestLeastSquares().test_beale_function()
     print("=" * 60)
