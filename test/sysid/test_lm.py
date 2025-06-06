@@ -19,30 +19,14 @@ class TestLM:
         # f(x) = 100(x[1] - x[0]²)² + (1 - x[0])²
         # We define residuals: r1 = 10*(x[1] - x[0]²), r2 = (1 - x[0])
         # So that f(x) = 0.5 * (r1² + r2²)
-        def rosenbrock_res(x):
-            return np.hstack([10.0 * (x[1] - x[0] ** 2), 1.0 - x[0]])
-
         def rosenbrock_func(x):
-            # Residuals and Jacobian
-            r = rosenbrock_res(x)
-            J = arc.jac(rosenbrock_res)(x)
-
-            # Objective (half sum of squares)
-            V = 0.5 * np.sum(r**2)
-
-            # Gradient of objective: g = J.T @ r
-            g = J.T @ r
-
-            # Hessian approximation: H ≈ J.T @ J (Gauss-Newton)
-            H = J.T @ J
-
-            return V, g, H
+            return np.hstack([10.0 * (x[1] - x[0] ** 2), 1.0 - x[0]])
 
         # Initial guess
         x0 = np.array([-1.2, 1.0])
 
-        # Run optimization (correct function signature: func first, then x0)
-        result = lm_solve(rosenbrock_func, x0, maxfev=1000)
+        # Run optimization
+        result = lm_solve(rosenbrock_func, x0, maxfev=100)
 
         # Check result - the solution should be close to [1.0, 1.0]
         print(f"Optimization result: {result.x}")
@@ -158,7 +142,7 @@ class TestLM:
     def test_powell_singular(self):
         """Test optimization of Powell's singular function."""
 
-        def powell_res(x):
+        def powell_func(x):
             """
             Powell's singular function:
             f(x) = (x1 + 10*x2)² + 5*(x3 - x4)² + (x2 - 2*x3)⁴ + 10*(x1 - x4)⁴
@@ -181,26 +165,8 @@ class TestLM:
 
             return np.hstack([r1, r2, r3, r4])
 
-        def powell_func(x):
-            r = powell_res(x)
-            J = arc.jac(powell_res)(x)
-
-            # Objective: V = 0.5 * ||r||²
-            V = 0.5 * np.sum(r**2)
-
-            # Gradient: g = J^T @ r
-            g = J.T @ r
-
-            # Gauss-Newton Hessian approximation: H = J^T @ J
-            H = J.T @ J
-
-            return V, g, H
-
         # Standard starting point for Powell's function
         x0 = np.array([3.0, -1.0, 0.0, 1.0])
-
-        # Evaluate initial conditions for diagnostic purposes
-        V0, g0, H0 = powell_func(x0)
 
         # Run optimization with generous limits since this is a harder problem
         result = lm_solve(powell_func, x0, maxfev=1000, ftol=1e-12, xtol=1e-12, gtol=1e-8)
@@ -208,6 +174,14 @@ class TestLM:
         # Test assertions
         expected_solution = np.array([0.0, 0.0, 0.0, 0.0])
         solution_error = np.linalg.norm(result.x - expected_solution)
+
+        # Check result - the solution should be close to [0.0, 0.0, 0.0, 0.0]
+        print(f"Optimization result: {result.x}")
+        print(f"Final objective: {result.fun}")
+        print(f"Success: {result.success}")
+        print(f"Message: {result.message}")
+        print(f"Iterations: {result.nit}")
+        print(f"Function evaluations: {result.nfev}")
 
         assert result.success, (
             f"Powell optimization should succeed, got: {result.message}"
@@ -421,62 +395,27 @@ class TestLM:
     def test_wood_function(self):
         """Test optimization of Wood's function."""
 
-        def wood_res(x):
+        def wood_func(x):
             """
             Wood's function (4D optimization test problem):
             f(x) = 100(x2-x1²)² + (1-x1)² + 90(x4-x3²)² + (1-x3)² + 10.1((x2-1)²
                    + (x4-1)²) + 19.8(x2-1)(x4-1)
 
-            Formulated as least squares with residuals + cross term:
-            r1 = 10(x2 - x1²)
-            r2 = (1 - x1)
-            r3 = 3√10(x4 - x3²)
-            r4 = (1 - x3)
-            r5 = √10.1(x2 - 1)
-            r6 = √10.1(x4 - 1)
-            Plus cross term: 19.8(x2-1)(x4-1)
+            Formulated as pure least squares residuals:
+            f(x) = 0.5 * ||r||²
 
             Standard starting point: [-3, -1, -3, -1]
             Known solution: [1, 1, 1, 1] with f(x*) = 0
             """
-            # Residuals from the main terms
-            r1 = 10.0 * (x[1] - x[0] ** 2)
-            r2 = 1.0 - x[0]
-            r3 = 3.0 * np.sqrt(10.0) * (x[3] - x[2] ** 2)
-            r4 = 1.0 - x[2]
-            r5 = np.sqrt(10.1) * (x[1] - 1.0)
-            r6 = np.sqrt(10.1) * (x[3] - 1.0)
-
-            return np.hstack([r1, r2, r3, r4, r5, r6])
-
-        def wood_func(x):
-            # Residuals and Jacobian from the main terms
-            r = wood_res(x)
-            J = arc.jac(wood_res)(x)
-
-            # Cross term: 19.8(x2-1)(x4-1)
-            cross_term = 19.8 * (x[1] - 1.0) * (x[3] - 1.0)
-
-            # Gradient of cross term
-            cross_grad = np.zeros(4, like=x)
-            cross_grad[1] = 19.8 * (x[3] - 1.0)  # ∂/∂x2
-            cross_grad[3] = 19.8 * (x[1] - 1.0)  # ∂/∂x4
-
-            # Hessian of cross term (only non-zero element is the mixed derivative)
-            cross_hess = np.zeros((4, 4), like=x)
-            cross_hess[1, 3] = 19.8  # ∂²/∂x2∂x4
-            cross_hess[3, 1] = 19.8  # ∂²/∂x4∂x2 (symmetric)
-
-            # Total objective: V = 0.5 * ||r||² + cross_term
-            V = 0.5 * np.sum(r**2) + cross_term
-
-            # Total gradient: g = J^T @ r + cross_grad
-            g = J.T @ r + cross_grad
-
-            # Total Hessian: H = J^T @ J + cross_hess
-            H = J.T @ J + cross_hess
-
-            return V, g, H
+            return np.hstack([
+                10.0 * np.sqrt(2.0) * (x[1] - x[0]**2),    # √200 * (x2 - x1²)
+                np.sqrt(2.0) * (1.0 - x[0]),               # √2 * (1 - x1) 
+                6.0 * np.sqrt(5.0) * (x[3] - x[2]**2),     # √180 * (x4 - x3²)
+                np.sqrt(2.0) * (1.0 - x[2]),               # √2 * (1 - x3)
+                np.sqrt(0.4) * (x[1] - 1.0),               # √0.4 * (x2 - 1)
+                np.sqrt(0.4) * (x[3] - 1.0),               # √0.4 * (x4 - 1)
+                np.sqrt(19.8) * (x[1] + x[3] - 2.0)        # √19.8 * (x2 + x4 - 2)
+            ])
 
         # Standard starting point for Wood's function
         x0 = np.array([-3.0, -1.0, -3.0, -1.0])
@@ -495,39 +434,21 @@ class TestLM:
         print(f"Function evaluations: {result.nfev}")
         print(f"Final gradient norm: {result.history[-1]['grad_norm']:.6e}")
 
-        # Test starting near global minimum for comparison
-        x0_global = np.array([1.1, 1.1, 1.1, 1.1])
-        result_global = lm_solve(
-            wood_func, x0_global, maxfev=1000, ftol=1e-10, xtol=1e-10, gtol=1e-8
-        )
-
-        print("\nWood's Function Results (Near-Global Starting Point):")
-        print(f"Initial point: {x0_global}")
-        print(f"Final solution: {result_global.x}")
-        print(f"Final objective: {result_global.fun:.2e}")
-        print(f"Success: {result_global.success}")
-        print(f"Iterations: {result_global.nit}")
-
         # Test assertions - Modified to account for local vs global minima
         expected_solution = np.array([1.0, 1.0, 1.0, 1.0])
-        solution_error_global = np.linalg.norm(result_global.x - expected_solution)
+        solution_error = np.linalg.norm(result.x - expected_solution)
 
         # Basic convergence assertion
         assert result.success, (
             f"Wood optimization should succeed, got: {result.message}"
         )
-        assert result_global.success, (
-            f"Wood optimization from global start should succeed, got: "
-            f"{result_global.message}"
-        )
-
         # The algorithm should find the global minimum when started near it
-        assert solution_error_global < 1e-3, (
-            f"Solution from global start {result_global.x} not close enough to "
-            "[1,1,1,1] (error: {solution_error_global:.6e})"
+        assert solution_error < 1e-3, (
+            f"Solution {result_global.x} not close enough to "
+            f"[1,1,1,1] (error: {solution_error:.6e})"
         )
-        assert result_global.fun < 1e-6, (
-            f"Final objective from global start {result_global.fun:.6e} should be "
+        assert result.fun < 1e-6, (
+            f"Final objective from global start {result.fun:.6e} should be "
             "close to zero"
         )
 
@@ -540,10 +461,9 @@ class TestLM:
         )
 
         print("\nTest Results:")
-        print("✓ Both optimizations converged successfully")
         print(
-            f"✓ Near-global start found global minimum (error: "
-            f"{solution_error_global:.2e})"
+            f"✓ Standard start found global minimum (error: "
+            f"{solution_error:.2e})"
         )
         print(
             f"✓ Standard start found critical point (grad norm: {final_grad_norm:.2e})"
@@ -552,7 +472,7 @@ class TestLM:
     def test_beale_function(self):
         """Test optimization of Beale's function."""
 
-        def beale_res(x):
+        def beale_func(x):
             """
             Beale's function (2D optimization test problem):
             f(x,y) = (1.5 - x + xy)² + (2.25 - x + xy²)² + (2.625 - x + xy³)²
@@ -575,22 +495,6 @@ class TestLM:
             r3 = 2.625 - x_var + x_var * y_var**3
 
             return np.hstack([r1, r2, r3])
-
-
-        def beale_func(x):
-            r = beale_res(x)
-            J = arc.jac(beale_res)(x)
-
-            # Objective: V = 0.5 * ||r||²
-            V = 0.5 * np.sum(r**2)
-
-            # Gradient: g = J^T @ r
-            g = J.T @ r
-
-            # Gauss-Newton Hessian approximation: H = J^T @ J
-            H = J.T @ J
-
-            return V, g, H
 
         # Standard starting point for Beale's function
         x0 = np.array([1.0, 1.0])
@@ -644,17 +548,13 @@ class TestLM:
         """Test iteration history collection functionality."""
 
         # Use simple quadratic for predictable convergence
-        def simple_quadratic(x):
+        def func(x):
             x = np.atleast_1d(x)
-            r = x - 2.0  # residual: optimum at x=2
-            V = 0.5 * np.sum(r**2)  # objective
-            g = r  # gradient
-            H = np.eye(len(x))  # Hessian
-            return V, g, H
+            return x - 2.0  # residual: optimum at x=2
 
         # Test with history collection (always enabled now)
         result = lm_solve(
-            simple_quadratic,
+            func,
             np.array([5.0]),
             ftol=1e-8,
             xtol=1e-8,
@@ -729,19 +629,16 @@ class TestLM:
     def test_ftol_convergence_info_1(self):
         """Test convergence via ftol only (info = 1)."""
         
-        def simple_func(x):
+        def func(x):
             x = np.atleast_1d(x)
-            # Function that will have small predicted and actual reduction
-            V = 0.5 * x[0]**2 + 1e-10  # Add small constant to control reduction
-            g = np.array([x[0]], like=x)
-            H = np.array([[1.0]], like=x)
-            return V, g, H
+            # Two residuals to create: V = 0.5 * (x[0]² + 2e-10)
+            return np.hstack([x[0], np.sqrt(2e-10)])
         
         # Start close to optimum
         x0 = np.array([1e-6])
         
         result = lm_solve(
-            simple_func,
+            func,
             x0,
             ftol=1e-3,  # Relatively loose ftol
             xtol=1e-15,  # Very tight xtol to avoid that convergence
@@ -756,18 +653,17 @@ class TestLM:
 
     def test_combined_convergence_info_3(self):
         """Test combined ftol and xtol convergence (info = 3)."""
-        
-        def dual_convergence_func(x):
+
+        def func(x):
             x = np.atleast_1d(x)
             # Design function to satisfy both ftol and xtol simultaneously
-            V = 0.5 * x[0]**2 + 1e-12
-            g = np.array([x[0] + 1e-10], like=x)  # Small gradient
-            H = np.array([[1.0]], like=x)
-            return V, g, H
+            r1 = x[0] + 1e-10  # Gradient contribution: x[0] + 1e-10
+            r2 = np.sqrt(2e-12)  # Adds constant 1e-12 to objective
+            return np.hstack([r1, r2])
         
         x0 = np.array([1e-5])  # Start very close to optimum
         result = lm_solve(
-            dual_convergence_func,
+            func,
             x0,
             ftol=1e-4,  # Loose enough to trigger
             xtol=1e3,  # Loose enough to trigger (this is relative to parameter norm)
@@ -782,10 +678,10 @@ class TestLM:
 
         # Loosen xtol and make sure that triggers first
         result = lm_solve(
-            dual_convergence_func,
+            func,
             x0,
             ftol=1e-4,  # Loose enough to trigger
-            xtol=1e4,  # Loose enough to trigger (this is relative to parameter norm)
+            xtol=1e4,  # Loose enough to trigger
             gtol=1e-15,  # Very tight to avoid gradient convergence
             maxfev=10,
             log_level=20,
@@ -796,14 +692,12 @@ class TestLM:
 
     def test_maxfev_reached_in_inner_loop(self):
         """Test maxfev reached during inner loop iterations."""
-        
+
         def slow_converging_func(x):
             x = np.atleast_1d(x)
-            V = 0.5 * x[0]**2
-            g = np.array([x[0]], like=x)
-            # Use ill-conditioned Hessian to slow convergence
-            H = np.array([[1e-8]], like=x)  # Very small eigenvalue
-            return V, g, H
+            # Create ill-conditioned problem via small Jacobian entries
+            # This gives J = [[1e-4]], so H = J^T*J = [[1e-8]]
+            return 1e-4 * x[0]
         
         x0 = np.array([1.0])
         
@@ -827,11 +721,7 @@ class TestLM:
         
         def simple_quadratic(x):
             x = np.atleast_1d(x)
-            r = x - 2.0
-            V = 0.5 * np.sum(r**2)
-            g = r
-            H = np.eye(len(x), like=x)
-            return V, g, H
+            return x - 2.0
         
         # Capture printed output by redirecting stdout
         import io
@@ -897,21 +787,8 @@ class TestLM:
             
             # Residuals: r1 = (x-3), r2 = (y-2)
             r = np.array([x[0] - 3.0, x[1] - 2.0], like=x)
-            
-            # Compute Jacobian manually for this simple case
-            J = np.array([[1.0, 0.0],
-                          [0.0, 1.0]], like=x)
-            
-            # Objective: V = 0.5 * ||r||²
-            V = 0.5 * np.sum(r**2)
-            
-            # Gradient: g = J^T @ r
-            g = J.T @ r
-            
-            # Hessian: H = J^T @ J
-            H = J.T @ J
-            
-            return V, g, H
+    
+            return r
         
         # Test setup
         x0 = np.array([0.5, 0.5])  # Start in interior
@@ -994,24 +871,8 @@ class TestLM:
     def test_box_constraints_rosenbrock(self):
         """Test box constraints with Rosenbrock function."""
         
-        def rosenbrock_res(x):
-            return np.hstack([10.0 * (x[1] - x[0] ** 2), 1.0 - x[0]])
-
         def rosenbrock_func(x):
-            # Residuals and Jacobian
-            r = rosenbrock_res(x)
-            J = arc.jac(rosenbrock_res)(x)
-
-            # Objective (half sum of squares)
-            V = 0.5 * np.sum(r**2)
-
-            # Gradient of objective: g = J.T @ r
-            g = J.T @ r
-
-            # Hessian approximation: H ≈ J.T @ J (Gauss-Newton)
-            H = J.T @ J
-
-            return V, g, H
+            return np.hstack([10.0 * (x[1] - x[0] ** 2), 1.0 - x[0]])
         
         # Test Case 1: Bounds that force solution to boundary
         # Unconstrained optimum is [1, 1], but we restrict x ≤ 0.8
@@ -1246,4 +1107,22 @@ class TestLM:
 
 
 if __name__ == "__main__":
+    print("\n" + "=" * 60)
+    print("Running Rosenbrock Test")
+    print("=" * 60)
     TestLM().test_rosenbrock()
+
+    print("\n" + "=" * 60)
+    print("Running Powell's Singular Function Test")
+    print("=" * 60)
+    TestLM().test_powell_singular()
+
+    print("\n" + "=" * 60)
+    print("Running Wood's Function Test")
+    print("=" * 60)
+    TestLM().test_wood_function()
+
+    print("\n" + "=" * 60)
+    print("Running Beale's Function Test")
+    TestLM().test_beale_function()
+    print("=" * 60)

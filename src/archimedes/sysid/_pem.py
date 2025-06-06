@@ -2,7 +2,9 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Callable
 
 import numpy as np
+from scipy.optimize import minimize as scipy_minimize, OptimizeResult
 
+import archimedes as arc
 from archimedes import compile, scan, tree, jac, struct
 
 from ._lm import lm_solve
@@ -71,7 +73,7 @@ class PEMObjective:
             output = np.concatenate([x, e], axis=0)
 
             # Accumulate cost function, Jacobian, and Hessian
-            V += np.sum(e**2)
+            V += 0.5 * np.sum(e**2)
             J -= psi.T @ e
             H += psi.T @ psi
 
@@ -122,10 +124,153 @@ class PEMObjective:
 
         results = self.forward(x0, params)
         V = results["V"]
-        J = results["J"]
-        H = results["H"]
+
+        params_flat, unravel_params = tree.ravel(params)
+        def obj(x0: np.ndarray, params_flat: np.ndarray) -> float:
+            """Objective function for the optimizer."""
+            params = unravel_params(params_flat)
+            results = self.forward(x0, params)
+            return results["V"]
+
+        dx0, dp = jac(obj, argnums=(0, 1))(x0, params_flat)  # dy_hat/d[x0, params]
+
+        if self.x0 is None:
+            J = np.concatenate([dx0, dp], axis=0)
+        else:
+            J = dp
+
+        H = np.outer(J, J)  # Gauss-Newton Hessian approximation
+
         return V, J, H
 
+
+def _pem_solve_lm(
+    pem_obj: PEMObjective,
+    params_guess: T,
+    bounds: tuple[T, T] | None = None,
+    options: dict | None = None,
+) -> LMResult:
+    """Solve the PEM problem using Levenberg-Marquardt optimization."""
+    if options is None:
+        options = {}
+
+    # Set sensible defaults for system identification problems
+    default_options = {
+        "ftol": 1e-4,
+        "xtol": 1e-6,
+        "gtol": 1e-6,
+        "maxfev": 200,
+    }
+    options = {**default_options, **options}
+    return lm_solve(pem_obj, params_guess, bounds=bounds, **options)
+
+
+def _pem_solve_bfgs(
+    pem_obj: PEMObjective,
+    params_guess: T,
+    bounds: tuple[T, T] | None = None,
+    options: dict | None = None,
+) -> OptimizeResult:
+    method = "BFGS" if bounds is None else "L-BFGS-B"
+
+    if options is None:
+        options = {}
+
+    params_guess_flat, unravel = arc.tree.ravel(params_guess)
+
+    # Define an objective and gradient function for BFGS
+    @arc.compile
+    def func(params_flat):
+        V, _, _ = pem_obj(unravel(params_flat))
+        return V
+
+    jac = arc.grad(func)
+
+    # Set sensible defaults for system identification problems
+    default_options = {
+        "gtol": 1e-6,
+        "disp": True,
+        "maxiter": 200,
+    }
+
+    if method == "BFGS" and "hess_inv0" not in options:
+        # Initialize with Gauss-Newton Hessian approximation
+        J0 = jac(params_guess_flat)
+        hess_inv0 = np.linalg.inv(np.outer(J0, J0) + 1e-8 * np.eye(len(J0)))
+        hess_inv0 = 0.5 * (hess_inv0 + hess_inv0.T)  # Ensure symmetry
+        default_options["hess_inv0"] = hess_inv0
+
+    options = {**default_options, **options}
+
+    result = scipy_minimize(
+        func,
+        params_guess_flat,
+        method=method,
+        jac=jac,
+        bounds=bounds,
+        options=options,
+    )
+
+    # Replace the flat parameters with the original PyTree structure
+    result.x = unravel(result.x)
+    return result
+
+
+def _pem_solve_ipopt(
+    pem_obj: PEMObjective,
+    params_guess: T,
+    bounds: tuple[T, T] | None = None,
+    options: dict | None = None,
+) -> OptimizeResult:
+
+    if options is None:
+        options = {}
+
+    # Set sensible defaults for system identification problems
+    ipopt_default_options = {
+        "tol": 1e-6,
+        "max_iter": 200,
+        "hessian_approximation": "limited-memory",
+    }
+    default_options = {}
+
+    options["ipopt"] = {**ipopt_default_options, **options.get("ipopt", {})}
+    options = {**default_options, **options}
+
+    params_guess_flat, unravel = arc.tree.ravel(params_guess)
+    if bounds is not None:
+        lb, ub = bounds
+        lb_flat, _ = arc.tree.ravel(lb)
+        ub_flat, _ = arc.tree.ravel(ub)
+
+    # Define an objective and gradient function for BFGS
+    @arc.compile
+    def func(params_flat):
+        V, _, _ = pem_obj(unravel(params_flat))
+        return V
+
+    params_opt_flat = arc.minimize(
+        func,
+        params_guess_flat,
+        **options,
+    )
+
+    result = OptimizeResult()
+    result.x = unravel(params_opt_flat)
+    result.success = True  # Assume success for now
+    result.message = "Optimization completed successfully."
+    result.nit = -1  # Placeholder for number of iterations
+    result.fun, result.jac, result.hess = pem_obj(result.x)
+
+    return result
+
+
+
+SUPPORTED_METHODS = {
+    "lm": _pem_solve_lm,
+    "bfgs": _pem_solve_bfgs,
+    "ipopt": _pem_solve_ipopt,
+}
 
 def pem(
     predictor: KalmanFilterBase,
@@ -134,7 +279,7 @@ def pem(
     x0: np.ndarray = None,
     bounds: tuple[T, T] | None = None,
     P0: np.ndarray = None,
-    method: str = "lm",
+    method: str = "bfgs",
     options: dict | None = None,
 ) -> LMResult:
     """Estimate parameters using Prediction Error Minimization.
@@ -204,23 +349,41 @@ def pem(
         Initial state covariance matrix of shape ``(nx, nx)``. If None,
         defaults to identity matrix. Represents uncertainty in initial
         state estimate.
-    method : str, default="lm"
-        Optimization method. Currently only "lm" (Levenberg-Marquardt)
-        is supported.
+    method : str, default="bfgs"
+        Optimization method. Currently only "lm" (Levenberg-Marquardt), "ipopt",
+        and "bfgs" (BFGS) are supported. The "lm" method is a custom implementation
+        roughly based on the MINPACK algorithm, and the "bfgs" method dispatches to
+        a SciPy wrapper ("BFGS" or "L-BFGS-B", depending on whether there are bounds).
     options : dict, optional
-        Optimization options passed to the underlying LM solver:
-        
+        Optimization options passed to the underlying optimization solver.
+
+        For the "lm" method, these include:
+
         - ``ftol`` : Function tolerance (default: 1e-4)
         - ``xtol`` : Parameter tolerance (default: 1e-6)
         - ``gtol`` : Gradient tolerance (default: 1e-6)
         - ``maxfev`` : Maximum function evaluations (default: 200)
         - ``nprint`` : Progress printing interval (default: 0)
 
+        For the "bfgs" method, these include:
+
+        - ``gtol`` : Gradient tolerance (default: 1e-6)
+        - ``disp`` : Whether to print convergence information (default: True)
+        - ``maxiter`` : Maximum iterations (default: 200)
+        - ``hess_inv0`` : Initial Hessian inverse for BFGS (optional)
+
+        If ``hess_inv0`` is not provided, a Gauss-Newton-like Hessian approximation
+        is used to initialize the BFGS inverse-Hessian approximation.
+
+        For the "ipopt" method, see the :func:`archimedes.minimize` documentation
+        for available options. The solver defaults to a limited-memory approximation
+        of the Hessian.
+
     Returns
     -------
-    result : LMResult
+    result : scipy.optimize.OptimizeResult
         Optimization result with estimated parameters in ``result.x``
-        preserving the original PyTree structure. Additional fields:
+        preserving the original PyTree structure. Additional fields include:
 
         - ``success`` : Whether estimation succeeded
         - ``fun`` : Final prediction error objective value
@@ -332,21 +495,10 @@ def pem(
     .. [1] Ljung, L. "System Identification: Theory for the User." 2nd edition,
            Prentice Hall, 1999.
     """
-    if method not in {"lm"}:
-        raise ValueError(f"Unsupported method: {method}. Only 'lm' is supported.")
+    if method not in SUPPORTED_METHODS:
+        raise ValueError(f"Unsupported method: {method}.")
 
-    # Set sensible defaults for system identification problems
-    if options is None:
-        options = {}
-
-    # Apply defaults for any missing options
-    default_options = {
-        "ftol": 1e-4,
-        "xtol": 1e-6, 
-        "gtol": 1e-6,
-        "maxfev": 200
-    }
-    options = {**default_options, **options}
+    pem_solve = SUPPORTED_METHODS[method]
 
     objective = PEMObjective(
         predictor=predictor,
@@ -355,4 +507,9 @@ def pem(
         x0=x0,
     )
 
-    return lm_solve(objective, params_guess, bounds=bounds, **options)
+    return pem_solve(
+        pem_obj=objective,
+        params_guess=params_guess,
+        bounds=bounds,
+        options=options,
+    )

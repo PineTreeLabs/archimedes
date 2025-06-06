@@ -16,7 +16,8 @@ import numpy as np
 from scipy import sparse
 import osqp
 
-from archimedes import tree, compile
+import archimedes as arc
+from archimedes import tree
 
 if TYPE_CHECKING:
     from archimedes.typing import PyTree
@@ -130,7 +131,7 @@ class LMProgress:
         if not self.header_printed:
             self._print_header()
             self.header_printed = True
-        
+
         # Calculate cost reduction
         if self.prev_cost is not None:
             cost_reduction = self.prev_cost - cost
@@ -330,7 +331,7 @@ def _compute_step(hess, grad, diag, lambda_val, x, bounds=None, qp_solver=None):
         logger.warning(f"OSQP solver status: {qp_results.info.status}")
         # Fallback: project unconstrained step to bounds
         return np.clip(step, l_qp, u_qp)
-    
+
     return qp_results.x
 
 
@@ -499,6 +500,8 @@ def _check_bounds(x, bounds):
         )
 
 
+# TODO:
+# - support sparse matrices for Hessian and Jacobian
 def lm_solve(
     func: Callable,
     x0: T,
@@ -532,16 +535,8 @@ def lm_solve(
     Parameters
     ----------
     func : callable
-        Objective function with signature ``func(x, *args) -> (V, g, H)`` where:
-        
-        - ``V`` : float - Objective value (0.5 * sum of squared residuals)
-        - ``g`` : ndarray - Gradient vector of shape ``(n,)``
-        - ``H`` : ndarray - Hessian matrix or approximation of shape ``(n, n)``
-        
-        Unlike traditional least-squares formulations that work with residual
-        vectors, this interface expects the objective, gradient, and Hessian
-        directly, enabling applications like system identification with specialized
-        Hessian approximations.
+        Objective function with signature ``func(x, *args) -> r``, where ``r`` is
+        a vector of residuals.
     x0 : PyTree
         Initial parameter guess. Can be a flat array or a PyTree structure which
         will be preserved in the solution.
@@ -623,17 +618,7 @@ def lm_solve(
     >>> # Rosenbrock function as least-squares problem
     >>> def rosenbrock_func(x):
     ...     # Residuals: r1 = 10*(x[1] - x[0]²), r2 = (1 - x[0])
-    ...     def residuals(x):
-    ...         return np.hstack([10*(x[1] - x[0]**2), 1 - x[0]])
-    ...     
-    ...     r = residuals(x)
-    ...     J = arc.jac(residuals)(x)
-    ...     
-    ...     V = 0.5 * np.sum(r**2)  # Objective
-    ...     g = J.T @ r             # Gradient
-    ...     H = J.T @ J             # Gauss-Newton Hessian
-    ...     
-    ...     return V, g, H
+    ...     return np.hstack([10*(x[1] - x[0]**2), 1 - x[0]])
     >>>
     >>> # Solve unconstrained problem
     >>> result = lm_solve(rosenbrock_func, x0=np.array([-1.2, 1.0]))
@@ -696,11 +681,22 @@ def lm_solve(
         qp_solver = None
         bounds_flat = None
 
-    # Wrap the original function to apply the unravel
-    _func = compile(func)
-    def func(x_flat, *args):
+    # Wrap the original function to apply the unravel and compute
+    # gradient and Hessian
+    _func = arc.compile(func)
+    def obj_func(x_flat):
         x = unravel(x_flat)
-        return _func(x, *args)
+        r = _func(x, *args)
+        return tree.ravel(r)[0]  # Return flattened residuals
+
+    @arc.compile
+    def func(x):
+        r = obj_func(x)
+        J = arc.jac(obj_func)(x)  # Auto-differentiation
+        V = 0.5 * np.sum(r**2)
+        g = J.T @ r
+        H = J.T @ J
+        return V, g, H
 
     # Auto-detect scaling: if diag is None, use automatic scaling
     auto_scale = diag is None
@@ -719,7 +715,7 @@ def lm_solve(
     history = []
 
     # Initial evaluation
-    cost, grad, hess = func(x, *args)
+    cost, grad, hess = func(x)
     nfev += 1
 
     # Calculate gradient norm for convergence check
@@ -793,13 +789,17 @@ def lm_solve(
 
             # Compute trial point
             x_new = x + step
+            logger.debug(f"lambda: {lambda_val}")
+            logger.debug(f"Trial point: {x_new}")
 
             # Compute scaled step norm
             pnorm = np.linalg.norm(diag * step)
 
             # Evaluate function at trial point
-            cost_new, grad_new, hess_new = func(x_new, *args)
+            cost_new, grad_new, hess_new = func(x_new)
             nfev += 1
+
+            logger.debug(f"Trial func eval: cost={cost_new}, grad={grad_new}, hess={hess_new}")
 
             # Compute actual reduction
             actred = -1.0
@@ -815,12 +815,16 @@ def lm_solve(
                 ratio = actred / prered
 
             # Update lambda based on ratio (Trust region update)
-            # Use more conservative updates to prevent runaway growth
-            if ratio < 0.25:  # Poor agreement: increase damping
-                lambda_val = lambda_val * 2.0
-            elif ratio > 0.75:  # Good agreement: decrease damping
-                lambda_val = lambda_val / 2.0
-            # For 0.25 <= ratio <= 0.75, keep lambda unchanged
+            if ratio <= 0.25:
+                if actred >= 0:
+                    inv_scale = 0.5
+                else:
+                    dirder = np.dot(grad, step)
+                    inv_scale = 0.5 * dirder / (dirder + 0.5 * actred)
+                    inv_scale = max(inv_scale, 0.1)
+            else:
+                inv_scale = 2.0
+            lambda_val = lambda_val / inv_scale
 
             # Test for successful iteration
             if ratio >= 1.0e-4:  # Step provides sufficient decrease
@@ -876,6 +880,7 @@ def lm_solve(
 
         # Test convergence conditions
         # 1. Function value convergence (ftol)
+        print(actred, prered, ratio)
         if abs(actred) <= ftol and prered <= ftol and 0.5 * ratio <= 1.0:
             status = LMStatus.FTOL_REACHED
 
