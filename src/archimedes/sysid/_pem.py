@@ -104,6 +104,24 @@ class PEMObjective:
             "H": H,
         }
 
+    def residuals(self, decision_variables: np.ndarray) -> np.ndarray:
+        """Evaluate the residuals (prediction errors) for the given parameters.
+
+        Args:
+            decision_variables: optimization parameters
+
+        Returns:
+            Residuals (prediction errors) as a 1D array.
+        """
+        if self.x0 is not None:
+            x0 = self.x0
+            params = decision_variables
+        else:
+            x0, params = decision_variables
+
+        results = self.forward(x0, params)
+        return results["e"].flatten()
+
     def __call__(self, decision_variables: np.ndarray) -> tuple:
         """Evaluate the residuals
 
@@ -162,7 +180,7 @@ def _pem_solve_lm(
         "maxfev": 200,
     }
     options = {**default_options, **options}
-    return lm_solve(pem_obj, params_guess, bounds=bounds, **options)
+    return lm_solve(pem_obj.residuals, params_guess, bounds=bounds, **options)
 
 
 def _pem_solve_bfgs(
@@ -178,6 +196,12 @@ def _pem_solve_bfgs(
 
     params_guess_flat, unravel = arc.tree.ravel(params_guess)
 
+    if bounds is not None:
+        lb, ub = bounds
+        lb_flat, _ = arc.tree.ravel(lb)
+        ub_flat, _ = arc.tree.ravel(ub)
+        # Zip bounds into (lb, ub) for each parameter
+        bounds = list(zip(lb_flat, ub_flat))
     # Define an objective and gradient function for BFGS
     @arc.compile
     def func(params_flat):
@@ -242,6 +266,7 @@ def _pem_solve_ipopt(
         lb, ub = bounds
         lb_flat, _ = arc.tree.ravel(lb)
         ub_flat, _ = arc.tree.ravel(ub)
+        bounds = (lb_flat, ub_flat)
 
     # Define an objective and gradient function for BFGS
     @arc.compile
@@ -252,6 +277,7 @@ def _pem_solve_ipopt(
     params_opt_flat = arc.minimize(
         func,
         params_guess_flat,
+        bounds=bounds,
         **options,
     )
 

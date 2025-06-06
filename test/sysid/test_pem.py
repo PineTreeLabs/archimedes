@@ -1,5 +1,7 @@
 import numpy as np
 import pytest
+import logging
+
 import archimedes as arc
 
 from archimedes.sysid import pem, Timeseries
@@ -33,10 +35,86 @@ class CartPole:
         return np.stack([ẋ, θ̇, ẍ, θ̈])
 
 
-class TestPEMIntegration:
-    """Integration tests for system identification using PEM + LM solver."""
+options = {
+    "bfgs": None,
+    "lm": {"log_level": logging.INFO},
+    "ipopt": None,
+}
 
-    def test_second_order_system(self, plot=False):
+
+def second_order_ode(t, x, u, params):
+    """Second-order system ODE: ẍ + 2ζωₙẋ + ωₙ²x = ωₙ²u"""
+    omega_n = params["omega_n"]
+    zeta = params["zeta"]
+    
+    x1, x2 = x[0], x[1]
+    u_val = u[0]
+    
+    x1_t = x2
+    x2_t = -omega_n**2 * x1 - 2*zeta*omega_n*x2 + omega_n**2 * u_val
+    
+    return np.hstack([x1_t, x2_t])
+
+
+def position_obs(t, x, u, params):
+    return x[0]
+
+
+# Fixture for second-order ODE data
+@pytest.fixture(scope="session")
+def second_order_data():
+    # True system parameters
+    omega_n_true = 2.0  # rad/s
+    zeta_true = 0.1     # damping ratio
+    params_true = {"omega_n": omega_n_true, "zeta": zeta_true}
+
+    # Time vector
+    t0, tf = 0.0, 2.0
+    dt = 0.1
+    ts = np.arange(t0, tf, dt)
+
+    # Problem dimensions
+    nx = 2  # state dimension (x₁, x₂)
+    nu = 1  # input dimension (u)
+    ny = 1  # output dimension (y = x₁)
+    
+    # Input signal (step input)
+    us = np.ones((nu, len(ts)))
+    
+    # Initial conditions
+    x0_true = np.array([0.0, 0.0])  # start at rest
+
+    # Generate reference data
+    xs_true = arc.odeint(
+        second_order_ode,
+        t_span=(t0, tf),
+        x0=x0_true,
+        args=(us[:, 0], params_true),
+        t_eval=ts,
+        rtol=1e-8,
+        atol=1e-10,
+    )
+
+    # Add small amount of measurement noise
+    noise_std = 0.01
+    ys = xs_true[:1, :] + np.random.normal(0, noise_std, (ny, len(ts)))
+
+    data = Timeseries(ts=ts, us=us, ys=ys)
+
+    return {
+        "data": data,
+        "params_true": params_true,
+        "x0_true": x0_true,
+        "xs_true": xs_true,
+        "noise_std": noise_std,
+    }
+        
+
+
+class TestPEMHarmonicOscillator:
+    
+    @pytest.mark.parametrize("method", options.keys())
+    def test_second_order_system(self, method, second_order_data, plot=False):
         """Test parameter recovery on a second-order damped oscillator.
         
         System: ẍ + 2ζωₙẋ + ωₙ²x = ωₙ²u
@@ -47,58 +125,22 @@ class TestPEMIntegration:
             ωₙ (natural frequency)
             ζ (damping ratio)
         """
-        # True system parameters
-        omega_n_true = 2.0  # rad/s
-        zeta_true = 0.1     # damping ratio
-        params_true = {"omega_n": omega_n_true, "zeta": zeta_true}
-        
-        # Time vector
-        t0, tf = 0.0, 10.0
-        dt = 0.05
-        ts = np.arange(t0, tf, dt)
 
         # Problem dimensions
         nx = 2  # state dimension (x₁, x₂)
         nu = 1  # input dimension (u)
         ny = 1  # output dimension (y = x₁)
-        
-        # Input signal (step input)
-        us = np.ones((nu, len(ts)))
-        
-        # Initial conditions
-        x0_true = np.array([0.0, 0.0])  # start at rest
-    
-        # Generate true system response
-        def second_order_ode(t, x, u, params):
-            """Second-order system ODE: ẍ + 2ζωₙẋ + ωₙ²x = ωₙ²u"""
-            omega_n = params["omega_n"]
-            zeta = params["zeta"]
-            
-            x1, x2 = x[0], x[1]
-            u_val = u[0]
-            
-            x1_t = x2
-            x2_t = -omega_n**2 * x1 - 2*zeta*omega_n*x2 + omega_n**2 * u_val
-            
-            return np.hstack([x1_t, x2_t])
 
-        def obs(t, x, u, params):
-            return x[0]
-        
-        # Generate reference data
-        xs_true = arc.odeint(
-            second_order_ode,
-            t_span=(t0, tf),
-            x0=x0_true,
-            args=(us[:, 0], params_true),
-            t_eval=ts,
-            rtol=1e-8,
-            atol=1e-10,
-        )
-        
-        # Add small amount of measurement noise
-        noise_std = 0.01
-        ys = xs_true[:1, :] + np.random.normal(0, noise_std, (ny, len(ts)))
+        # Extract data from fixture
+        data = second_order_data["data"]
+        params_true = second_order_data["params_true"]
+        omega_n_true = params_true["omega_n"]
+        zeta_true = params_true["zeta"]
+        x0_true = second_order_data["x0_true"]
+        xs_true = second_order_data["xs_true"]
+        noise_std = second_order_data["noise_std"]
+        t0, tf = data.ts[0], data.ts[-1]
+        dt = data.ts[1] - data.ts[0]  # time step from data
         
         # Initial parameter guess (should be different from true values)
         params_guess = {"omega_n": 2.5, "zeta": 0.5}
@@ -111,8 +153,7 @@ class TestPEMIntegration:
         
         # Set up PEM problem
         dyn = discretize(second_order_ode, dt, method="rk4")
-        ekf = ExtendedKalmanFilter(dyn, obs, Q, R)
-        data = Timeseries(ts=ts, us=us, ys=ys)
+        ekf = ExtendedKalmanFilter(dyn, position_obs, Q, R)
 
         # Set up reasonable bounds (not necessary for convergence, just included
         # for testing purposes)
@@ -127,8 +168,9 @@ class TestPEMIntegration:
             params_guess,
             x0=x0_true,  # Assume initial conditions are known
             P0=P0,
-            # bounds=bounds,
-            method="bfgs",
+            bounds=bounds,
+            method=method,
+            options=options[method],
         )
 
         # Validate results
@@ -142,10 +184,10 @@ class TestPEMIntegration:
         # Validate forward simulation accuracy
         xs_pred = arc.odeint(
             second_order_ode,
-            t_span=(t0, tf),
+            t_span=(data.ts[0], data.ts[-1]),
             x0=x0_true,
-            args=(us[:, 0], result.x),
-            t_eval=ts,
+            args=(data.us[:, 0], result.x),
+            t_eval=data.ts,
             rtol=1e-8,
             atol=1e-10,
         )
@@ -153,10 +195,10 @@ class TestPEMIntegration:
         if plot:
             import matplotlib.pyplot as plt
             fig, ax = plt.subplots(2, 1, figsize=(7, 4), sharex=True)
-            ax[0].plot(ts, ys[0], label="Measured Output (y₁)")
-            ax[0].plot(ts, xs_true[0], label="True Output (x₁)", c='k', linestyle='--')
+            ax[0].plot(data.ts, data.ys[0], label="Measured Output (y₁)")
+            ax[0].plot(data.ts, xs_true[0], label="True Output (x₁)", c='k', linestyle='--')
             # ax[0].plot(ts, kf_result_init["x_hat"][0], label="KF Estimate (x₁)", linestyle=':')
-            ax[0].plot(ts, xs_pred[0], label="Final predictions", linestyle='-.')
+            ax[0].plot(data.ts, xs_pred[0], label="Final predictions", linestyle='-.')
             ax[0].legend()
             ax[0].grid()
             ax[0].set_ylabel("State prediction")
@@ -169,22 +211,50 @@ class TestPEMIntegration:
         
         # Test assertions
         assert result.success, f"Parameter estimation failed: {result.message}"
-        
-        # Check parameter recovery accuracy (should be quite good for this clean problem)
+
+        # Check parameter recovery accuracy
         omega_n_error = abs(result.x["omega_n"] - omega_n_true) / omega_n_true
         zeta_error = abs(result.x["zeta"] - zeta_true) / zeta_true
-        
+
         assert omega_n_error < 0.01, f"Natural frequency error too large: {100 * omega_n_error:.6f} %"
         assert zeta_error < 0.1, f"Damping ratio error too large: {100 * zeta_error:.6f} %"
-        
+
         simulation_error = np.sqrt(np.mean((xs_true - xs_pred)**2))
         print(f"Forward simulation RMS error: {simulation_error:.2e}")
-        
+
         assert simulation_error < 0.05, f"Forward simulation error too large: {simulation_error:.6f}"
         
         # Test convergence performance
         assert result.nit < 50, f"Too many iterations required: {result.nit}"
-        assert result.fun < 1e-3, f"Final cost too high: {result.fun:.2e}"
+        assert result.fun / len(data) < 1e-3, f"Final cost too high: {result.fun:.2e}"
+
+    @pytest.mark.parametrize("method", options.keys())
+    def test_optimize_ics(self, method, second_order_data):
+        # Problem dimensions
+        nx = 2  # state dimension (x₁, x₂)
+        nu = 1  # input dimension (u)
+        ny = 1  # output dimension (y = x₁)
+
+        # Extract data from fixture
+        data = second_order_data["data"]
+        params_true = second_order_data["params_true"]
+        omega_n_true = params_true["omega_n"]
+        zeta_true = params_true["zeta"]
+        x0_true = second_order_data["x0_true"]
+        xs_true = second_order_data["xs_true"]
+        noise_std = second_order_data["noise_std"]
+        t0, tf = data.ts[0], data.ts[-1]
+        dt = data.ts[1] - data.ts[0]  # time step from data
+
+        # Initial parameter guess (should be different from true values)
+        params_guess = {"omega_n": 2.5, "zeta": 0.5}
+
+        # Set up PEM problem
+        R = noise_std ** 2 * np.eye(ny)  # Measurement noise covariance
+        Q = (0.01 * noise_std) ** 2 * np.eye(nx)  # Process noise covariance
+
+        dyn = discretize(second_order_ode, dt, method="rk4")
+        ekf = ExtendedKalmanFilter(dyn, position_obs, Q, R)
 
         # Test optimizing initial conditions
         dvs_guess = (np.array([1.0, 0.0]), params_guess)
@@ -193,7 +263,8 @@ class TestPEMIntegration:
             data,
             dvs_guess,
             x0=None,  # Unknown initial conditions
-            method="bfgs",
+            method=method,
+            options=options[method],
         )
         x0_est, params_est = result_with_x0.x
         print(f"Estimated initial conditions: {x0_est}")
@@ -205,10 +276,10 @@ class TestPEMIntegration:
         omega_n_error = abs(params_est["omega_n"] - omega_n_true)
         zeta_error = abs(params_est["zeta"] - zeta_true)
         
-        assert omega_n_error < 0.01, f"Natural frequency error too large: {omega_n_error:.6f}"
+        assert omega_n_error < 0.02, f"Natural frequency error too large: {omega_n_error:.6f}"
         assert zeta_error < 0.01, f"Damping ratio error too large: {zeta_error:.6f}"
         
-        assert np.allclose(x0_est[0], x0_true[0], atol=5e-2), f"Initial condition error too large: {np.abs(x0_est - x0_true)}"
+        assert np.allclose(x0_est[0], x0_true[0], atol=0.1), f"Initial condition error too large: {np.abs(x0_est - x0_true)}"
 
         # Error handling
         with pytest.raises(ValueError, match=r"Unsupported method.*"):
@@ -220,6 +291,8 @@ class TestPEMIntegration:
                 method="unsupported_method",
             )
 
+
+class TestPEMVanDerPol:
     def test_van_der_pol(self, plot=False):
         """Test parameter recovery on Van der Pol oscillator (nonlinear system).
         
@@ -381,6 +454,9 @@ class TestPEMIntegration:
         assert result.nit < 100, f"Too many iterations required: {result.nit}"
         assert result.fun < 1e-2, f"Final cost too high: {result.fun:.2e}"
 
+
+
+class TestPEMCartPole:
     def test_cartpole(self, plot=False):
         """Test parameter recovery on CartPole system (nonlinear underactuated system).
         

@@ -104,3 +104,7 @@ class Timeseries:
             raise ValueError(
                 "Time vector size must match the number of time points in us."
             )
+
+    def __len__(self):
+        """Return the number of time samples."""
+        return self.ts.size

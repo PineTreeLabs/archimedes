@@ -692,7 +692,7 @@ def lm_solve(
     @arc.compile
     def func(x):
         r = obj_func(x)
-        J = arc.jac(obj_func)(x)  # Auto-differentiation
+        J = arc.jac(obj_func)(x)
         V = 0.5 * np.sum(r**2)
         g = J.T @ r
         H = J.T @ J
@@ -880,7 +880,6 @@ def lm_solve(
 
         # Test convergence conditions
         # 1. Function value convergence (ftol)
-        print(actred, prered, ratio)
         if abs(actred) <= ftol and prered <= ftol and 0.5 * ratio <= 1.0:
             status = LMStatus.FTOL_REACHED
 
