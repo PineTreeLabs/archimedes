@@ -46,62 +46,34 @@ class PEMObjective:
         na = params_flat.size
 
         V = 0.0  # Cost function
-        J = np.zeros((nx + na,), like=x0)  # Jacobian-like term: sum_{i=1}^N psi[i]
-        H = np.zeros(
-            (nx + na, nx + na), like=x0
-        )  # Hessian-like term: sum_{i=1}^N psi[i].T @ psi[i]
-        init_carry, unravel_carry = tree.ravel((x0, P0, params, V, J, H))
-
-        # Predicted measurement (used for sensitivity analysis)
-        def step(t, x, u, y, P, params_flat):
-            params = unravel_params(params_flat)
-            x, P, e = self.predictor.step(t, x, y, P, args=(u, params))
-            y_hat = y - e  # Recover predicted observation
-            return y_hat
-
-        # Returns tuple of gradients: (∂y/∂x₀, ∂y/∂params)
-        calc_psi = jac(step, argnums=(1, 5))  # dy_hat/d[x0, params]
+        init_carry, unravel_carry = tree.ravel((x0, P0, params, V))
 
         @compile(kind="MX")
         def scan_fn(carry_flat, input):
             t, u, y = input[0], input[1:nu+1], input[nu+1:]
-            x, P, params, V, J, H = unravel_carry(carry_flat)
-            params_flat = tree.ravel(params)[0]
-            psi_x0, psi_params = calc_psi(t, x, u, y, P, params_flat)
-            psi = np.concatenate([psi_x0, psi_params], axis=1)  # shape (ny, nx+na)
+            x, P, params, V = unravel_carry(carry_flat)
             x, P, e = self.predictor.step(t, x, y, P, args=(u, params))
             output = np.concatenate([x, e], axis=0)
 
             # Accumulate cost function, Jacobian, and Hessian
             V += 0.5 * np.sum(e**2)
-            J -= psi.T @ e
-            H += psi.T @ psi
 
-            carry, _ = tree.ravel((x, P, params, V, J, H))
+            carry, _ = tree.ravel((x, P, params, V))
             return carry, output
 
         inputs = np.vstack((ts, us, ys)).T
         carry, scan_output = scan(scan_fn, init_carry, xs=inputs)
-        _, _, _, V, J, H = unravel_carry(carry)
+        _, _, _, V = unravel_carry(carry)
         scan_output = scan_output.T
         x_hat, e = scan_output[:nx], scan_output[nx:]
 
         # Average the function results
         V /= ts.size
-        J /= ts.size
-        H /= ts.size
-
-        # If not jointly optimizing x0, trim from gradients
-        if self.x0 is not None:
-            J = J[nx:]
-            H = H[nx:, nx:]
 
         return {
             "x_hat": x_hat,
             "e": e,
             "V": V,
-            "J": J,
-            "H": H,
         }
 
     def residuals(self, decision_variables: np.ndarray) -> np.ndarray:
@@ -141,25 +113,7 @@ class PEMObjective:
             x0, params = decision_variables
 
         results = self.forward(x0, params)
-        V = results["V"]
-
-        params_flat, unravel_params = tree.ravel(params)
-        def obj(x0: np.ndarray, params_flat: np.ndarray) -> float:
-            """Objective function for the optimizer."""
-            params = unravel_params(params_flat)
-            results = self.forward(x0, params)
-            return results["V"]
-
-        dx0, dp = jac(obj, argnums=(0, 1))(x0, params_flat)  # dy_hat/d[x0, params]
-
-        if self.x0 is None:
-            J = np.concatenate([dx0, dp], axis=0)
-        else:
-            J = dp
-
-        H = np.outer(J, J)  # Gauss-Newton Hessian approximation
-
-        return V, J, H
+        return results["V"]
 
 
 def _pem_solve_lm(
@@ -202,11 +156,11 @@ def _pem_solve_bfgs(
         ub_flat, _ = arc.tree.ravel(ub)
         # Zip bounds into (lb, ub) for each parameter
         bounds = list(zip(lb_flat, ub_flat))
+
     # Define an objective and gradient function for BFGS
     @arc.compile
     def func(params_flat):
-        V, _, _ = pem_obj(unravel(params_flat))
-        return V
+        return pem_obj(unravel(params_flat))
 
     jac = arc.grad(func)
 
@@ -271,8 +225,7 @@ def _pem_solve_ipopt(
     # Define an objective and gradient function for BFGS
     @arc.compile
     def func(params_flat):
-        V, _, _ = pem_obj(unravel(params_flat))
-        return V
+        return pem_obj(unravel(params_flat))
 
     params_opt_flat = arc.minimize(
         func,
@@ -286,7 +239,7 @@ def _pem_solve_ipopt(
     result.success = True  # Assume success for now
     result.message = "Optimization completed successfully."
     result.nit = -1  # Placeholder for number of iterations
-    result.fun, result.jac, result.hess = pem_obj(result.x)
+    result.fun = pem_obj(result.x)
 
     return result
 
@@ -330,7 +283,6 @@ def pem(
     - **Noise handling**: Process and measurement noise are modeled explicitly
     - **Recursive estimation**: Kalman filter provides efficient state propagation
     - **Gradient computation**: Automatic differentiation through filter recursions
-    - **Hessian approximation**: Efficient recursive Gauss-Newton-like estimate
 
     Parameters
     ----------
@@ -432,10 +384,6 @@ def pem(
     **Physical Constraints**:
         Box constraints enable realistic parameter bounds (mass > 0, etc.)
         without sacrificing convergence properties.
-
-    **Robust Numerics**:
-        Specialized for the structure of system identification problems,
-        providing superior numerical stability compared to generic optimizers.
 
     **Kalman Filter Integration**:
         Seamless integration with both Extended and Unscented Kalman Filters

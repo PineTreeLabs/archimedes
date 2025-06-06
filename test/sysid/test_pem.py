@@ -69,8 +69,8 @@ def second_order_data():
     params_true = {"omega_n": omega_n_true, "zeta": zeta_true}
 
     # Time vector
-    t0, tf = 0.0, 2.0
-    dt = 0.1
+    t0, tf = 0.0, 5.0
+    dt = 0.05
     ts = np.arange(t0, tf, dt)
 
     # Problem dimensions
