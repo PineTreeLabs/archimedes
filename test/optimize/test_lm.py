@@ -6,7 +6,7 @@ import numpy as np
 from scipy import sparse
 
 import archimedes as arc
-from archimedes.sysid import lm_solve, LMStatus
+from archimedes.optimize import lm_solve, LMStatus
 
 
 class TestLM:
@@ -51,7 +51,7 @@ class TestLM:
 
     def test_compute_step_well_conditioned(self):
         """Test compute_step with a well-conditioned matrix."""
-        from archimedes.sysid._lm import _compute_step
+        from archimedes.optimize._lm import _compute_step
 
         # Simple 2x2 case with known solution
         hess = np.array([[4.0, 1.0], [1.0, 3.0]])  # SPD matrix
@@ -70,7 +70,7 @@ class TestLM:
 
     def test_compute_step_ill_conditioned(self):
         """Test compute_step with an ill-conditioned matrix."""
-        from archimedes.sysid._lm import _compute_step
+        from archimedes.optimize._lm import _compute_step
 
         # Ill-conditioned matrix (near-singular)
         hess = np.array([[1.0, 1.0], [1.0, 1.0001]])
@@ -88,7 +88,7 @@ class TestLM:
 
     def test_compute_step_singular(self):
         """Test compute_step with a singular matrix."""
-        from archimedes.sysid._lm import _compute_step
+        from archimedes.optimize._lm import _compute_step
 
         # Singular matrix
         hess = np.array([[1.0, 1.0], [1.0, 1.0]])
@@ -105,7 +105,7 @@ class TestLM:
 
     def test_compute_predicted_reduction(self):
         """Test predicted reduction calculation."""
-        from archimedes.sysid._lm import (
+        from archimedes.optimize._lm import (
             _compute_predicted_reduction,
         )
 
@@ -745,7 +745,7 @@ class TestLM:
 
     def test_header_logic(self, caplog):
         """Test the specific header printing logic in LMProgress."""
-        from archimedes.sysid._lm import LMProgress
+        from archimedes.optimize._lm import LMProgress
         import io
         import sys
         import logging
@@ -953,7 +953,7 @@ class TestLM:
 
     def test_box_constraints_gradient_projection(self):
         """Test gradient projection logic with a simple example."""
-        from archimedes.sysid._lm import _project_gradient, _check_constrained_convergence, _compute_step
+        from archimedes.optimize._lm import _project_gradient, _check_constrained_convergence, _compute_step
         
         # Test case: At lower bound with outward gradient
         x = np.array([0.0, 2.5])  # First variable at lower bound
@@ -995,7 +995,7 @@ class TestLM:
 
     def test_box_constraints_qp_edge_cases(self):
         """Test QP solver edge cases: difficult solves and fallback handling."""
-        from archimedes.sysid._lm import _compute_step
+        from archimedes.optimize._lm import _compute_step
         import osqp
         import io
         import sys

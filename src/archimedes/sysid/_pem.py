@@ -7,13 +7,13 @@ from scipy.optimize import minimize as scipy_minimize, OptimizeResult
 import archimedes as arc
 from archimedes import compile, scan, tree, jac, struct
 
-from ._lm import lm_solve
+from archimedes.optimize import lm_solve
 
 if TYPE_CHECKING:
     from archimedes.typing import PyTree
-    from archimedes.experimental.state_estimation import KalmanFilterBase
+    from archimedes.observers import KalmanFilterBase
     from .timeseries import Timeseries
-    from ._lm import LMResult
+    from archimedes.optimize import LMResult
 
     T = TypeVar("T", bound=PyTree)
 
