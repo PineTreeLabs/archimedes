@@ -5,13 +5,17 @@ from archimedes._core import SymbolicArray, array, compile, sym
 from archimedes.optimize import minimize
 
 
+METHODS = ("ipopt", "sqpmethod", "BFGS")
+BOUNDED_METHODS = ("ipopt", "sqpmethod", "L-BFGS-B")
+
 class TestMinimize:
-    def test_minimize(self):
+    @pytest.mark.parametrize("method", METHODS)
+    def test_minimize(self, method):
         # Basic functionality test
         def f(x):
             return x**2
 
-        result = minimize(f, x0=1.0)
+        result = minimize(f, x0=1.0, method=method)
         assert np.allclose(result.x, 0.0)
 
     def test_minimize_with_param(self):
@@ -22,11 +26,12 @@ class TestMinimize:
         result = minimize(f, x0=1.0, args=(2.0,))
         assert np.allclose(result.x, 0.0)
 
-    def test_minimize_with_bounds(self):
+    @pytest.mark.parametrize("method", BOUNDED_METHODS)
+    def test_minimize_with_bounds(self, method):
         def f(x):
             return x**2
 
-        result = minimize(f, x0=1.0, bounds=[-2.0, 2.0])
+        result = minimize(f, x0=1.0, bounds=[-2.0, 2.0], method=method)
         assert np.allclose(result.x, 0.0)
 
     @pytest.mark.parametrize("method", ("ipopt", "sqpmethod"))
@@ -93,6 +98,10 @@ class TestMinimize:
 
         with pytest.raises(ValueError):
             minimize(f, constr=g, x0=1.0)
+        
+        # Unsupported method
+        with pytest.raises(ValueError):
+            minimize(f, x0=1.0, method="unsupported_method")
 
         # Inconsistent static arguments
         def f(a, x):

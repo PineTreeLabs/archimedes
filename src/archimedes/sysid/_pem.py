@@ -171,12 +171,12 @@ def _pem_solve_bfgs(
         "maxiter": 200,
     }
 
-    if method == "BFGS" and "hess_inv0" not in options:
-        # Initialize with Gauss-Newton Hessian approximation
-        J0 = jac(params_guess_flat)
-        hess_inv0 = np.linalg.inv(np.outer(J0, J0) + 1e-8 * np.eye(len(J0)))
-        hess_inv0 = 0.5 * (hess_inv0 + hess_inv0.T)  # Ensure symmetry
-        default_options["hess_inv0"] = hess_inv0
+    # if method == "BFGS" and "hess_inv0" not in options:
+    #     # Initialize with full Hessian
+    #     J0 = jac(params_guess_flat)
+    #     hess_inv0 = np.linalg.inv(np.outer(J0, J0) + 1e-8 * np.eye(len(J0)))
+    #     hess_inv0 = 0.5 * (hess_inv0 + hess_inv0.T)  # Ensure symmetry
+    #     default_options["hess_inv0"] = hess_inv0
 
     options = {**default_options, **options}
 

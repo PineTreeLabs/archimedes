@@ -15,6 +15,8 @@ from scipy.optimize import OptimizeResult, minimize as scipy_minimize
 
 from archimedes import tree
 from archimedes._core import (
+    compile,
+    grad,
     FunctionCache,
     SymbolicArray,
     _as_casadi_array,
@@ -326,6 +328,60 @@ def nlp_solver(
     )
 
 
+SCIPY_METHODS = ["BFGS", "L-BFGS-B"]
+CASADI_METHODS = ["ipopt", "sqpmethod", "blocksqp", "feasiblesqpmethod"]
+SUPPORTED_METHDOS = SCIPY_METHODS + CASADI_METHODS
+
+
+def _minimize_with_scipy(
+    obj: Callable,
+    x0: T,
+    args: Sequence[Any] = (),
+    static_argnames: str | Sequence[str] | None = None,
+    constr: Callable | None = None,
+    bounds: T | None = None,
+    constr_bounds: ArrayLike | None = None,
+    method: str = "bfgs",
+    options: dict | None = None,
+) -> OptimizeResult:
+    if constr is not None or constr_bounds is not None:
+        raise NotImplementedError(
+            "SciPy wrapper does not yet support constraints. "
+            "Use the CasADi interface (e.g. IPOPT) for constrained optimization."
+        )
+
+    if options is None:
+        options = {}
+
+    x0_flat, unravel = tree.ravel(x0)
+
+    if bounds is not None:
+        lb, ub = bounds
+        lb_flat, _ = tree.ravel(lb)
+        ub_flat, _ = tree.ravel(ub)
+        # Zip bounds into (lb, ub) for each parameter
+        bounds = list(zip(lb_flat, ub_flat))
+
+    # Define objective, gradient, and Hessian functions
+    @compile
+    def func(x_flat):
+        return obj(unravel(x_flat), *args)
+
+    jac = grad(func)
+
+    result = scipy_minimize(
+        func,
+        x0_flat,
+        method=method,
+        jac=jac,
+        bounds=bounds,
+        options=options,
+    )
+
+    result.x = unravel(result.x)
+    return result
+    
+
 def minimize(
     obj: Callable,
     x0: T,
@@ -379,8 +435,9 @@ def minimize(
         defaults to ``(0, 0)`` for equality constraints.
     method : str, optional
         The optimization method to use. Default is "ipopt". Other options
-        may be available depending on the installed solver. See the CasADi
-        documentation for available methods.
+        may be available depending on the installed solvers (common choices include
+        "sqpmethod", "BFGS", and "L-BFGS-B"). See CasADi and SciPy documentation
+        for available methods.
     **options : dict
         Additional options passed to the optimization solver through
         :py:func:`nlp_solver`. Available options depend on the solver method.
@@ -514,6 +571,24 @@ def minimize(
     implicit : Create a function that solves ``F(x, p) = 0`` for ``x``
     scipy.optimize.minimize : SciPy's optimization interface
     """
+    if method not in SUPPORTED_METHDOS:
+        raise ValueError(
+            f"Unsupported method: {method}. Supported methods are: {SUPPORTED_METHDOS}"
+        )
+    
+    if method in SCIPY_METHODS:
+        return _minimize_with_scipy(
+            obj,
+            x0=x0,
+            args=args,
+            static_argnames=static_argnames,
+            constr=constr,
+            bounds=bounds,
+            constr_bounds=constr_bounds,
+            method=method,
+            options=options,
+        )
+
     x0 = array(x0)
     # TODO: Expand docstring
 
