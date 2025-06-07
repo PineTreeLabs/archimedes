@@ -396,7 +396,7 @@ def minimize(
     bounds: T | None = None,
     constr_bounds: ArrayLike | None = None,
     method: str = "ipopt",
-    **options,
+    options: dict | None = None,
 ) -> OptimizeResult:
     """
     Minimize a scalar function with optional constraints.
@@ -443,7 +443,7 @@ def minimize(
         may be available depending on the installed solvers (common choices include
         "sqpmethod", "BFGS", and "L-BFGS-B"). See CasADi and SciPy documentation
         for available methods.
-    **options : dict
+    options : dict
         Additional options passed to the optimization solver through
         :py:func:`nlp_solver`. Available options depend on the solver method.
         See notes for examples.
@@ -593,6 +593,9 @@ def minimize(
             method=method,
             options=options,
         )
+
+    if options is None:
+        options = {}
 
     solver = nlp_solver(
         obj,

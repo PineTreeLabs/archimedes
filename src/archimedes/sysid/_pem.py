@@ -231,7 +231,7 @@ def _pem_solve_ipopt(
         func,
         params_guess_flat,
         bounds=bounds,
-        **options,
+        options=options,
     )
 
     result.x = unravel(result.x)
