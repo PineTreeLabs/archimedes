@@ -655,15 +655,15 @@ def lm_solve(
     # Wrap the original function to apply the unravel and compute
     # gradient and Hessian
     _func = arc.compile(func)
-    def obj_func(x_flat):
+    def res_func(x_flat):
         x = unravel(x_flat)
         r = _func(x, *args)
         return tree.ravel(r)[0]  # Return flattened residuals
 
     @arc.compile
     def func(x):
-        r = obj_func(x)
-        J = arc.jac(obj_func)(x)
+        r = res_func(x)
+        J = arc.jac(res_func)(x)
         V = 0.5 * np.sum(r**2)
         g = J.T @ r
         H = J.T @ J
@@ -870,6 +870,9 @@ def lm_solve(
         status = LMStatus.MAX_FEVAL
 
     logger.info(status.message)
+    
+    # Calculate final residuals
+    res = res_func(x)
 
     # Unravel the final solution
     x = unravel(x)
@@ -880,8 +883,8 @@ def lm_solve(
         success=status.success,
         status=status,
         message=status.message,
-        fun=cost,
-        jac=grad,  # This is the gradient
+        fun=res,  # Final residuals value
+        jac=grad,
         hess=hess,
         nfev=nfev,
         njev=njev,

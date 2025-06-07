@@ -365,12 +365,7 @@ def _minimize_with_scipy(
     if options is None:
         options = {}
 
-    x0_flat, bounds, unravel = _ravel_args(x0, bounds)
-
-    if bounds is not None:
-        lb_flat, ub_flat = bounds
-        # Zip bounds into (lb, ub) for each parameter
-        bounds = list(zip(lb_flat, ub_flat))
+    x0_flat, bounds, unravel = _ravel_args(x0, bounds, zip_bounds=True)
 
     # Define objective, gradient, and Hessian functions
     @compile

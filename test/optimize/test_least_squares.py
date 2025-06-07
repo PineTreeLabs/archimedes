@@ -31,15 +31,17 @@ class TestLeastSquares:
         x0 = np.array([-1.2, 1.0])
 
         # Run optimization
-        options = {"maxfev": 100}
-        result = least_squares(rosenbrock_func, x0, options=options)
+        result = least_squares(rosenbrock_func, x0, method=method)
+
+        print(result)
 
         # Check result - the solution should be close to [1.0, 1.0]
         print(f"Optimization result: {result.x}")
-        print(f"Final objective: {result.fun}")
+        print(f"Final residuals: {result.fun}")
         print(f"Success: {result.success}")
         print(f"Message: {result.message}")
-        print(f"Iterations: {result.nit}")
+        if hasattr(result, 'nit'):
+            print(f"Iterations: {result.nit}")
         print(f"Function evaluations: {result.nfev}")
 
         # Test that optimization was successful
@@ -50,9 +52,9 @@ class TestLeastSquares:
             f"Solution {result.x} not close to expected [1.0, 1.0]"
         )
 
-        # Test that final objective is close to zero
-        assert result.fun < 1e-6, (
-            f"Final objective {result.fun} not close to zero"
+        # Test that final residuals are close to zero
+        assert np.allclose(result.fun, 0.0, atol=1e-6), (
+            f"Final residuals {result.fun} not close to zero"
         )
 
     def test_powell_singular(self):
@@ -99,7 +101,7 @@ class TestLeastSquares:
 
         # Check result - the solution should be close to [0.0, 0.0, 0.0, 0.0]
         print(f"Optimization result: {result.x}")
-        print(f"Final objective: {result.fun}")
+        print(f"Final residuals: {result.fun}")
         print(f"Success: {result.success}")
         print(f"Message: {result.message}")
         print(f"Iterations: {result.nit}")
@@ -116,8 +118,8 @@ class TestLeastSquares:
             f"{solution_error:.6e})"
         )
 
-        assert result.fun < 1e-6, (
-            f"Final objective {result.fun:.6e} should be close to zero"
+        assert np.allclose(result.fun, 0.0, atol=1e-5), (
+            f"Final objective {result.fun} should be close to zero"
         )
 
     def test_wood_function(self):
@@ -161,7 +163,7 @@ class TestLeastSquares:
         print("\nWood's Function Results (Standard Starting Point):")
         print(f"Initial point: {x0}")
         print(f"Final solution: {result.x}")
-        print(f"Final objective: {result.fun:.2e}")
+        print(f"Final residuals: {result.fun}")
         print(f"Success: {result.success}")
         print(f"Status: {result.status} - {result.message}")
         print(f"Iterations: {result.nit}")
@@ -181,9 +183,8 @@ class TestLeastSquares:
             f"Solution {result_global.x} not close enough to "
             f"[1,1,1,1] (error: {solution_error:.6e})"
         )
-        assert result.fun < 1e-6, (
-            f"Final objective from global start {result.fun:.6e} should be "
-            "close to zero"
+        assert np.allclose(result.fun, 0.0, atol=1e-6), (
+            f"Final residuals {result.fun} should be close to zero"
         )
 
         # For the standard start, we expect to find a local minimum (critical point)
@@ -246,7 +247,7 @@ class TestLeastSquares:
         print("\nBeale's Function Results:")
         print(f"Initial point: {x0}")
         print(f"Final solution: {result.x}")
-        print(f"Final objective: {result.fun:.2e}")
+        print(f"Final residuals: {result.fun}")
         print(f"Success: {result.success}")
         print(f"Status: {result.status} - {result.message}")
         print(f"Iterations: {result.nit}")
@@ -266,8 +267,8 @@ class TestLeastSquares:
             f"{solution_error:.6e})"
         )
 
-        assert result.fun < 1e-6, (
-            f"Final objective {result.fun:.6e} should be close to zero"
+        assert np.allclose(result.fun, 0.0, atol=1e-6), (
+            f"Final objective {result.fun} should be close to zero"
         )
 
         # Additional validation: verify original function value
@@ -284,8 +285,8 @@ class TestLeastSquares:
             f"{original_beale:.6e}"
         )
 
-
-    def test_box_constraints_simple_quadratic(self):
+    @pytest.mark.parametrize("method", BOUNDED_METHODS)
+    def test_box_constraints_simple_quadratic(self, method):
         """Test box constraints with a simple quadratic function."""
         
         def constrained_quadratic(x):
@@ -321,7 +322,8 @@ class TestLeastSquares:
             constrained_quadratic,
             x0,
             bounds=bounds,
-            options=options,
+            method=method,
+            # options=options,
         )
         
         # Test assertions
@@ -343,17 +345,18 @@ class TestLeastSquares:
         assert bounds_satisfied, (
             f"Bounds violated: {result.x} not in [{lb}, {ub}]"
         )
-        
-        # Check that constrained optimization info is recorded
-        if len(result.history) > 0 and 'grad_proj_norm' in result.history[-1]:
-            final_history = result.history[-1]
-            # Both variables should be at upper bounds
-            assert final_history['n_active_upper'] == 2, (
-                f"Expected 2 active upper bounds, got {final_history['n_active_upper']}"
-            )
-            assert final_history['grad_proj_norm'] < 1e-6, (
-                f"Projected gradient norm should be small: {final_history['grad_proj_norm']}"
-            )
+
+        if method == "hess-lm":
+            # Check that constrained optimization info is recorded
+            if len(result.history) > 0 and 'grad_proj_norm' in result.history[-1]:
+                final_history = result.history[-1]
+                # Both variables should be at upper bounds
+                assert final_history['n_active_upper'] == 2, (
+                    f"Expected 2 active upper bounds, got {final_history['n_active_upper']}"
+                )
+                assert final_history['grad_proj_norm'] < 1e-6, (
+                    f"Projected gradient norm should be small: {final_history['grad_proj_norm']}"
+                )
         
         # Edge case: Test ValueError for bounds structure mismatch
         bad_lower = np.array([0.0])  # Wrong size (1 instead of 2)
@@ -670,7 +673,7 @@ class TestLM:
         print(f"  Solution: {result_auto.x}")
         print(f"  Success: {result_auto.success}")
         print(f"  Iterations: {result_auto.nit}")
-        print(f"  Final cost: {result_auto.fun:.2e}")
+        print(f"  Final residuals: {result_auto.fun}")
         
         # Test 2: Custom scaling that accounts for the variable scales
         # diag[i] should be proportional to the "natural scale" of variable i
@@ -691,7 +694,7 @@ class TestLM:
         print(f"  Solution: {result_scaled.x}")
         print(f"  Success: {result_scaled.success}")
         print(f"  Iterations: {result_scaled.nit}")
-        print(f"  Final cost: {result_scaled.fun:.2e}")
+        print(f"  Final residuals: {result_scaled.fun}")
         
         # Test 3: Poor scaling (opposite of what we need)
         poor_diag = np.array([1e3, 1e-3])  # Wrong scaling
@@ -710,7 +713,7 @@ class TestLM:
         print(f"  Solution: {result_poor.x}")
         print(f"  Success: {result_poor.success}")
         print(f"  Iterations: {result_poor.nit}")
-        print(f"  Final cost: {result_poor.fun:.2e}")
+        print(f"  Final residuals: {result_poor.fun}")
         
         # Verify that at least one optimization succeeded
         assert result_auto.success or result_scaled.success, (

@@ -692,8 +692,8 @@ def _dispatch_array(x: Any, dtype: DTypeLike | None = None) -> ArrayLike:
             result_dtype = dtype or _result_type(*x)
             cs_x = list(map(_as_casadi_array, x))
             arr = cs.vcat(cs_x)  # type: ignore
-            if isinstance(arr, cs.DM):
-                return np.array(arr, dtype=result_dtype).reshape(result_shape)
+            # if isinstance(arr, cs.DM):
+            #     return np.array(arr, dtype=result_dtype).reshape(result_shape)
             return SymbolicArray(arr, dtype=result_dtype, shape=result_shape)
 
         # Case 3. x is a list of lists, arrays, etc

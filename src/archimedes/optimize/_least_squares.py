@@ -13,6 +13,7 @@ from archimedes._core import (
     grad,
 )
 from ._lm import lm_solve
+from ._common import _ravel_args
 
 if TYPE_CHECKING:
     from ..typing import PyTree
@@ -53,14 +54,12 @@ def least_squares(
             **options,
         )
 
-    if bounds is not None:
-        lb, ub = bounds
-        lb_flat, _ = arc.tree.ravel(lb)
-        ub_flat, _ = arc.tree.ravel(ub)
-        # Zip bounds into (lb, ub) for each parameter
-        bounds = list(zip(lb_flat, ub_flat))
+    x0_flat, bounds, unravel = _ravel_args(x0, bounds)
+    if bounds is None:
+        bounds = (-np.inf, np.inf)
 
-    x0_flat, unravel = arc.tree.ravel(params_guess)
+    print(f"Using method: {method}")
+    print(f"bounds: {bounds}")
 
     # Compile the function and Jacobian
     @arc.compile
@@ -71,7 +70,7 @@ def least_squares(
 
     # Call the scipy least_squares function
     result = scipy_lstsq(
-        fun_compiled,
+        obj_func,
         x0_flat,
         args=args,
         jac=arc.jac(obj_func),

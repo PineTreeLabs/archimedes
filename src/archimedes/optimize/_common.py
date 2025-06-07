@@ -1,7 +1,7 @@
 from archimedes import tree
 
 
-def _ravel_args(x, bounds):
+def _ravel_args(x, bounds, zip_bounds=False):
     # By default, just flatten/unflatten the PyTree
     x_flat, unravel_x = tree.ravel(x)
 
@@ -32,7 +32,12 @@ def _ravel_args(x, bounds):
                 f"Upper bounds must have the same number of elements as x0 but got "
                 f"{len(ub)} for upper bounds and {len(x_flat)} for x0."
             )
-        bounds_flat = (lb, ub)
+
+        if zip_bounds:
+            # Zip bounds into (lb, ub) for each parameter (for SciPy compatibility)
+            bounds_flat = list(zip(lb, ub))
+        else:
+            bounds_flat = (lb, ub)
 
     else:
         bounds_flat = None

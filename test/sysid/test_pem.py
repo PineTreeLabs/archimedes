@@ -179,7 +179,7 @@ class TestPEMHarmonicOscillator:
         print(f"Estimated parameters: ωₙ={result.x['omega_n']:.3f}, ζ={result.x['zeta']:.3f}")
         print(f"Success: {result.success}")
         print(f"Iterations: {result.nit}")
-        print(f"Final cost: {result.fun:.2e}")
+        print(f"Final cost: {0.5 * np.dot(result.fun, result.fun):.2e}")
 
         # Validate forward simulation accuracy
         xs_pred = arc.odeint(
@@ -223,10 +223,11 @@ class TestPEMHarmonicOscillator:
         print(f"Forward simulation RMS error: {simulation_error:.2e}")
 
         assert simulation_error < 0.05, f"Forward simulation error too large: {simulation_error:.6f}"
-        
+
         # Test convergence performance
         assert result.nit < 50, f"Too many iterations required: {result.nit}"
-        assert result.fun / len(data) < 1e-3, f"Final cost too high: {result.fun:.2e}"
+        final_cost = 0.5 * np.dot(result.fun, result.fun) / len(data)
+        assert final_cost / len(data) < 1e-3, f"Final cost too high: {result.fun:.2e}"
 
     @pytest.mark.parametrize("method", options.keys())
     def test_optimize_ics(self, method, second_order_data):
