@@ -596,6 +596,7 @@ def minimize(
 
     solver = nlp_solver(
         obj,
+        static_argnames=static_argnames,
         constr=constr,
         constrain_x=bounds is not None,
         method=method,

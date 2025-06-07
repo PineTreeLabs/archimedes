@@ -57,6 +57,9 @@ class TestLeastSquares:
             f"Final residuals {result.fun} not close to zero"
         )
 
+        with pytest.raises(ValueError, match=r"Method 'invalid' is not supported.*"):
+            least_squares(rosenbrock_func, x0, method="invalid")
+
     def test_powell_singular(self):
         """Test optimization of Powell's singular function."""
 
@@ -361,28 +364,44 @@ class TestLeastSquares:
         # Edge case: Test ValueError for bounds structure mismatch
         bad_lower = np.array([0.0])  # Wrong size (1 instead of 2)
         bad_upper = np.array([2.0, 1.0])  # Correct size
-        bad_bounds = (bad_lower, bad_upper)
-
         with pytest.raises(
             ValueError, match=r"Lower bounds must have the same number .*"
         ):
             least_squares(
                 constrained_quadratic,
                 x0,
-                bounds=bad_bounds,
+                bounds=(bad_lower, bad_upper),
+            )
+
+        bad_lower = {"a": np.array([0.0, 0.0])}  # Wrong PyTree structure
+        with pytest.raises(
+            ValueError, match=r"Lower bounds must have the same structure .*"
+        ):
+            least_squares(
+                constrained_quadratic,
+                x0,
+                bounds=(bad_lower, bad_upper),
             )
         
         bad_lower = np.array([0.0, 0.0])  # Correct size
         bad_upper = np.array([2.0])  # Wrong size (1 instead of 2)
-        bad_bounds = (bad_lower, bad_upper)
-        
         with pytest.raises(
             ValueError, match=r"Upper bounds must have the same number .*"
         ):
             least_squares(
                 constrained_quadratic,
                 x0,
-                bounds=bad_bounds,
+                bounds=(bad_lower, bad_upper),
+            )
+
+        bad_upper = {"a": np.array([2.0, 1.0])}  # Wrong PyTree structure
+        with pytest.raises(
+            ValueError, match=r"Upper bounds must have the same structure .*"
+        ):
+            least_squares(
+                constrained_quadratic,
+                x0,
+                bounds=(bad_lower, bad_upper),
             )
 
     def test_box_constraints_rosenbrock(self):

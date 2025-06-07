@@ -37,7 +37,7 @@ class CartPole:
 
 options = {
     "bfgs": None,
-    "lm": {"log_level": logging.INFO},
+    "lm": None,
     "ipopt": None,
 }
 

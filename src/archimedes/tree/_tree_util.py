@@ -68,8 +68,6 @@ class PyTreeDef(NamedTuple):
         return (f"PyTreeDef({star_tree})").replace("'*'", "*")
 
     def __eq__(self, other: object) -> bool:
-        if not isinstance(other, PyTreeDef):
-            return NotImplemented
         return (
             self.node_data == other.node_data
             and self.children == other.children
