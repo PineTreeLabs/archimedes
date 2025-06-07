@@ -72,6 +72,26 @@ class TestMinimize:
         result = minimize(f, x0=[-1.0, 1.0], static_argnames=("a",), args=(100.0,))
         assert np.allclose(result.x, [1.0, 1.0])
 
+    def test_minimize_pytree(self):
+        def f(params):
+            x, y = params["x"], params["y"]
+            return 100 * (y - x ** 2) ** 2 + (1 - x) ** 2
+
+        def g(params):
+            x, y = params["x"], params["y"]
+            return x + y - 1.5  # x + y >= 1.5
+        
+        # PyTree initial guess
+        x0 = {"x": 2.0, "y": 1.0}
+
+        # Solve with inequality constraint
+        result = minimize(
+            f, x0, constr=g, constr_bounds=(0.0, np.inf)
+        )
+
+        assert np.allclose(result.x["x"], 1.0, atol=1e-3)
+        assert np.allclose(result.x["y"], 1.0, atol=1e-3)
+
     def test_minimize_rosenbrock_constrained(self):
         # https://en.wikipedia.org/wiki/Test_functions_for_optimization
         #
