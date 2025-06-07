@@ -9,6 +9,20 @@
 This reference provides a detailed overview of the functions and classes in the
 Archimedes library.
 
+Modules
+==============
+
+.. autosummary::
+    :toctree: ../generated/api
+    :template: module.rst
+
+    observers
+    optimize
+    sysid
+    tree
+    tree.struct
+
+
 Core Functions
 ==============
 
@@ -16,8 +30,9 @@ Core Functions
     :toctree: ../generated/api
     :template: base.rst
 
-    codegen
     array
+    codegen
+    discretize
     sym
     sym_like
     zeros
@@ -44,13 +59,3 @@ Core Functions
     root
     qpsol
 
-
-Modules
-==============
-
-.. autosummary::
-    :toctree: ../generated/api
-    :template: module.rst
-
-    tree
-    tree.struct

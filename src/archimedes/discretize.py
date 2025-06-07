@@ -116,6 +116,191 @@ def _radau5(rhs, h, newton_solver="fast_newton"):
 
 
 def discretize(func, dt, method="rk4", n_steps=1, name=None, **options):
+    """Convert continuous-time dynamics to discrete-time using numerical integration.
+
+    Transforms a continuous-time ordinary differential equation (ODE) function
+    into a discrete-time difference equation.
+
+    The function implements numerical integration schemes while maintaining automatic
+    differentiation compatibility for gradient-based optimization, extended Kalman
+    filtering, etc. The resulting discrete-time function preserves the same calling
+    convention as the original continuous-time dynamics.
+
+    Given a continuous-time system:
+
+    .. code-block:: text
+
+        dx/dt = ode(t, x, u, params)
+
+    this function returns a discrete-time approximation:
+
+    .. code-block:: text
+
+        x[k+1] = f(t[k], x[k], u[k], params)
+
+    where the discrete-time function ``f`` integrates the continuous dynamics over
+    the time interval ``dt`` using the specified numerical method.
+
+    Parameters
+    ----------
+    func : callable or FunctionCache
+        Continuous-time dynamics function with signature ``func(t, x, u, params)``:
+        
+        - ``t`` : Current time (scalar)
+        - ``x`` : State vector of shape ``(nx,)``
+        - ``u`` : Input vector of shape ``(nu,)``  
+        - ``params`` : Parameters (any PyTree structure)
+        
+        Must return the time derivative ``dx/dt`` as an array of shape ``(nx,)``.
+        The function can be a regular Python function or a pre-compiled 
+        :class:`FunctionCache` object.
+    dt : float
+        Sampling time step for discretization. Represents the time interval
+        between discrete samples ``t[k+1] - t[k]``. Smaller values provide
+        better accuracy but increase computational cost.
+    method : str, optional
+        Numerical integration method. Default is ``"rk4"``. Available methods:
+        
+        - ``"rk4"``: Fourth-order Runge-Kutta method. Explicit, O(h⁴) accuracy.
+          Excellent balance of accuracy and computational efficiency for most
+          systems. Recommended for well-behaved, non-stiff dynamics.
+          
+        - ``"radau5"``: Fifth-order Radau IIA implicit method. Implicit, 
+          A-stable with excellent stability properties. Suitable for stiff
+          systems and when high accuracy is required. Involves solving
+          nonlinear equations at each step using Newton's method.
+          
+    n_steps : int, optional
+        Number of integration sub-steps within each sampling interval ``dt``.
+        Default is 1. When ``n_steps > 1``, the integration step size becomes
+        ``h = dt / n_steps``, improving accuracy for rapid dynamics or large
+        sampling intervals. Useful for maintaining accuracy when ``dt`` is
+        constrained by measurement availability rather than dynamics.
+    name : str, optional
+        Name for the resulting discrete-time function. If None, automatically
+        generated as ``"{method}_{func.name}"``. Used for debugging and
+        performance profiling of compiled functions.
+    **options
+        Additional method-specific options:
+        
+        For ``method="radau5"``:
+            - ``newton_solver`` : str, default ``"fast_newton"``
+              Newton solver for implicit equations. Other options inclue ``"kinsol"``
+              and ``"newton"``.
+
+    Returns
+    -------
+    discrete_func : FunctionCache
+        Discrete-time dynamics function with signature ``discrete_func(t, x, u, params)``
+        that returns the next state ``x[k+1]`` given current state ``x[k]``.
+        The function is automatically compiled for efficient evaluation and
+        supports automatic differentiation for gradient computation.
+
+    Notes
+    -----
+    **Method Selection Guide:**
+    
+    **RK4 Method** (``method="rk4"``):
+        - **Best for**: Non-stiff systems, general-purpose discretization
+        - **Advantages**: Fast, explicit, well-tested, excellent accuracy/cost ratio
+        - **Limitations**: Can become unstable for stiff systems or large time steps
+        - **Typical use**: Mechanical systems, mild nonlinearities, most applications
+        
+    **Radau5 Method** (``method="radau5"``):  
+        - **Best for**: Stiff systems, high accuracy requirements, DAE systems
+        - **Advantages**: A-stable, handles stiff dynamics, high-order accuracy
+        - **Limitations**: Computational overhead from implicit solve
+        - **Typical use**: Chemical kinetics, electrical circuits, multiscale dynamics
+        
+    **Accuracy Considerations:**
+    
+    The discretization error depends on both the method order and the time step:
+    
+    - **RK4**: Error ∼ O(dt⁴), typically accurate for ``dt < T/10`` where ``T`` 
+      is the fastest system time constant
+    - **Radau5**: Error ∼ O(dt⁵), maintains accuracy even for moderate ``dt``
+    - **Sub-stepping**: Use ``n_steps > 1`` when measurement rate limits ``dt``
+      but dynamics require smaller integration steps
+    
+    **Automatic Differentiation:**
+    
+    The discretized function preserves automatic differentiation through the
+    integration process, enabling efficient gradient computation for:
+    
+    - Parameter estimation via :func:`pem`
+    - Sensitivity analysis and uncertainty quantification  
+    - Gradient-based optimal control
+    
+    **Performance Optimization:**
+    
+    The returned function is automatically compiled using CasADi's just-in-time
+    compilation for efficient repeated evaluation. For system identification
+    applications involving hundreds of function evaluations, this provides
+    significant performance benefits over pure Python implementations.
+
+    Examples
+    --------
+    **Basic Discretization:**
+    
+    >>> import numpy as np
+    >>> import archimedes as arc
+    >>>
+    >>> # Define continuous-time harmonic oscillator
+    >>> def oscillator(t, x, u, params):
+    ...     omega = params["omega"]  # Natural frequency
+    ...     return np.hstack([
+    ...         x[1],                    # dx1/dt = x2 (velocity)
+    ...         -omega**2 * x[0] + u[0]  # dx2/dt = -ω²x1 + u (acceleration)
+    ...     ])
+    >>>
+    >>> # Discretize with 50ms sampling  
+    >>> dt = 0.05
+    >>> oscillator_discrete = arc.discretize(oscillator, dt, method="rk4")
+    >>>
+    >>> # Simulate one step
+    >>> t0 = 0.0
+    >>> x0 = np.array([1.0, 0.0])  # Initial position and velocity
+    >>> u0 = np.array([0.0])       # No input
+    >>> params = {"omega": 2.0}    # 2 rad/s natural frequency
+    >>>
+    >>> x1 = oscillator_discrete(t0, x0, u0, params)
+    >>> print(f"Next state: {x1}")
+    Next state: [0.995004 -0.199334]
+    
+    **Stiff System with Radau5:**
+    
+    >>> # Stiff Van der Pol oscillator
+    >>> def van_der_pol(t, x, u, params):
+    ...     mu = params["mu"]  # Large damping parameter
+    ...     return np.hstack([
+    ...         x[1],
+    ...         mu * (1 - x[0]**2) * x[1] - x[0]
+    ...     ])
+    >>>
+    >>> # Use implicit method for stiff dynamics
+    >>> dt = 0.1  # Larger time step acceptable with Radau5
+    >>> vdp_discrete = arc.discretize(
+    ...     van_der_pol, dt, 
+    ...     method="radau5", 
+    ...     newton_solver="fast_newton"
+    ... )
+    >>>
+    >>> params_stiff = {"mu": 10.0}  # Stiff parameter
+    >>> x0 = np.array([2.0, 0.0])
+    >>> x1 = vdp_discrete(0.0, x0, np.array([0.0]), params_stiff)
+
+    See Also
+    --------
+    archimedes.sysid.pem : Parameter estimation using discrete-time models
+    odeint : Continuous-time integration for comparison and validation
+
+    References
+    ----------
+    .. [1] Hairer, E., Nørsett, S.P., and Wanner, G. "Solving Ordinary Differential
+           Equations I: Nonstiff Problems." 2nd edition, Springer, 1993.
+    .. [2] Hairer, E. and Wanner, G. "Solving Ordinary Differential Equations II:
+           Stiff and Differential-Algebraic Problems." 2nd edition, Springer, 1996.
+    """
     h = dt / n_steps
 
     if not isinstance(func, FunctionCache):

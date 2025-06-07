@@ -1,3 +1,4 @@
+"""State estimation and Kalman filtering"""
 from ._kalman_filter import (
     KalmanFilterBase,
     ExtendedKalmanFilter,

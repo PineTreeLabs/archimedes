@@ -1,3 +1,4 @@
+"""Numerical optimization algorithms"""
 from ._minimize import minimize, nlp_solver
 from ._qpsol import qpsol
 from ._root import implicit, root

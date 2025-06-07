@@ -615,7 +615,7 @@ def lm_solve(
 
     See Also
     --------
-    pem : Parameter estimation using prediction error minimization
+    archimedes.sysid.pem : Parameter estimation using prediction error minimization
     LMStatus : Convergence status codes and meanings
     scipy.optimize.least_squares : SciPy's least-squares solver
     """
