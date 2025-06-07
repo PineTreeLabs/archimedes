@@ -96,7 +96,7 @@ class TestMinimize:
         def g(x, y):
             return x + y
 
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match=r".*must have the same number"):
             minimize(f, constr=g, x0=1.0)
         
         # Unsupported method
@@ -113,12 +113,5 @@ class TestMinimize:
         f = compile(f, static_argnames=["a"])
         g = compile(g)
 
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match=r".*must have the same number"):
             minimize(f, constr=g, x0=1.0)
-
-        # Matrix-valued decision variables
-        def f(x):
-            return np.dot(x, x)
-
-        with pytest.raises(ValueError):
-            minimize(f, x0=np.ones((2, 2)))

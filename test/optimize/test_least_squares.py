@@ -361,7 +361,7 @@ class TestLeastSquares:
         bad_bounds = (bad_lower, bad_upper)
 
         with pytest.raises(
-            ValueError, match=r"Lower bounds must have the same structure .*"
+            ValueError, match=r"Lower bounds must have the same number .*"
         ):
             least_squares(
                 constrained_quadratic,
@@ -374,7 +374,7 @@ class TestLeastSquares:
         bad_bounds = (bad_lower, bad_upper)
         
         with pytest.raises(
-            ValueError, match=r"Upper bounds must have the same structure .*"
+            ValueError, match=r"Upper bounds must have the same number .*"
         ):
             least_squares(
                 constrained_quadratic,

@@ -24,6 +24,8 @@ from archimedes._core import (
     sym_like,
 )
 
+from ._common import _ravel_args
+
 if TYPE_CHECKING:
     from ..typing import ArrayLike
 
@@ -70,13 +72,6 @@ def _make_nlp_solver(
         x0 = array(x0)
         ret_shape = x0.shape
         ret_dtype = x0.dtype
-
-        # TODO: Shape checking for bounds
-        if len(ret_shape) > 1 and ret_shape[1] > 1:
-            raise ValueError(
-                "Only scalar and vector decision variables are supported. "
-                f"Got shape {ret_shape}"
-            )
 
         # We have to flatten all of the symbolic user-defined arguments
         # into a single vector to pass to CasADi.  If there is static data,
@@ -187,10 +182,27 @@ def _make_nlp_solver(
     if name is None:
         name = f"{obj.name}_nlp"
 
-    _solve_explicit.__name__ = name
+    # Wrap for PyTree compatibility
+    def _wrapped_solve(x0, *args):
+        if constrain_x:
+            bounds = args[:2]
+            args = args[2:]
+        else:
+            bounds = None
+            
+        x0_flat, bounds_flat, unravel = _ravel_args(x0, bounds)
+
+        if bounds_flat is not None:
+            lbx, ubx = bounds_flat
+            args = (lbx, ubx, *args)
+
+        x_opt_flat = _solve_explicit(x0_flat, *args)
+        return unravel(x_opt_flat)
+
+    _wrapped_solve.__name__ = name
 
     return FunctionCache(
-        _solve_explicit,
+        _wrapped_solve,
         arg_names=tuple(arg_names),
         static_argnames=static_argnames,
         kind="MX",
@@ -353,12 +365,10 @@ def _minimize_with_scipy(
     if options is None:
         options = {}
 
-    x0_flat, unravel = tree.ravel(x0)
+    x0_flat, bounds, unravel = _ravel_args(x0, bounds)
 
     if bounds is not None:
-        lb, ub = bounds
-        lb_flat, _ = tree.ravel(lb)
-        ub_flat, _ = tree.ravel(ub)
+        lb_flat, ub_flat = bounds
         # Zip bounds into (lb, ub) for each parameter
         bounds = list(zip(lb_flat, ub_flat))
 
@@ -589,13 +599,9 @@ def minimize(
             options=options,
         )
 
-    x0 = array(x0)
-    # TODO: Expand docstring
-
     solver = nlp_solver(
         obj,
         constr=constr,
-        static_argnames=static_argnames,
         constrain_x=bounds is not None,
         method=method,
         **options,
@@ -623,4 +629,8 @@ def minimize(
     solver_args = {**solver_args, **dict(zip(arg_names, args))}
 
     x = solver(**solver_args)
-    return OptimizeResult(x=x, success=True, message="Optimization terminated successfully.")
+    return OptimizeResult(
+        x=x,
+        success=True,
+        message="Optimization terminated successfully.",
+    )

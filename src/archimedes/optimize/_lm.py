@@ -20,6 +20,8 @@ import osqp
 import archimedes as arc
 from archimedes import tree
 
+from ._common import _ravel_args
+
 if TYPE_CHECKING:
     from archimedes.typing import PyTree
 
@@ -478,29 +480,6 @@ def _check_constrained_convergence(grad, x, bounds, gtol=1e-8, atol=1e-8):
     return converged, grad_proj_norm, active_info
 
 
-def _check_bounds(x, bounds):
-    if bounds is None:
-        return
-    lower, upper = bounds
-    _, unravel_x = tree.ravel(x)
-    _, unravel_lb = tree.ravel(lower)
-    _, unravel_ub = tree.ravel(upper)
-    if unravel_x != unravel_lb:
-        x_treedef = tree.structure(x)
-        lb_treedef = tree.structure(lower)
-        raise ValueError(
-            f"Lower bounds must have the same structure as x0 but got {x_treedef}"
-            f"for x0 and {lb_treedef} for lower bounds."
-        )
-    if unravel_x != unravel_ub:
-        x_treedef = tree.structure(x)
-        ub_treedef = tree.structure(upper)
-        raise ValueError(
-            f"Upper bounds must have the same structure as x0 but got {x_treedef}"
-            f"for x0 and {ub_treedef} for upper bounds."
-        )
-
-
 # TODO:
 # - support sparse matrices for Hessian and Jacobian
 def lm_solve(
@@ -644,7 +623,7 @@ def lm_solve(
         log_level = logging.WARNING
     logger.setLevel(log_level)
 
-    _check_bounds(x0, bounds)  # Validate bounds structure
+    x0_flat, bounds_flat, unravel = _ravel_args(x0, bounds)  # Validate bounds structure
 
     progress = LMProgress(logger)  # Initialize logger
 
@@ -652,19 +631,12 @@ def lm_solve(
     MACHEP = np.finfo(float).eps  # Machine precision
     SQRT_MACHEP = np.sqrt(MACHEP)  # Square root of machine precision
 
-    # By default, just flatten/unflatten the PyTree
-    x0_flat, unravel = tree.ravel(x0)
-
     # Initialize parameters and arrays
     x = x0_flat.copy()  # Start with the flattened initial guess
     n = len(x)
 
     if bounds is not None:
-        # Unpack bounds into lower and upper arrays
-        lower_bounds, upper_bounds = bounds
-        lb, _ = tree.ravel(lower_bounds)
-        ub, _ = tree.ravel(upper_bounds)
-        bounds_flat = (lb, ub)
+        lb, ub = bounds_flat  # Unravel bounds to flat arrays
         # Initialize OSQP solver for box-constrained QP
         qp_solver = osqp.OSQP()
         qp_solver.setup(
@@ -679,7 +651,6 @@ def lm_solve(
         )
     else:
         qp_solver = None
-        bounds_flat = None
 
     # Wrap the original function to apply the unravel and compute
     # gradient and Hessian
