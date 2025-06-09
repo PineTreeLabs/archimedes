@@ -68,7 +68,7 @@ class LMStatus(IntEnum):
         convergence to a critical point.
         
     MAX_FEVAL : int = 5
-        Maximum number of function evaluations (``maxfev``) has been reached
+        Maximum number of function evaluations (``max_nfev``) has been reached
         without achieving convergence. This typically indicates that either
         more iterations are needed, the tolerances are too tight, or the
         problem is ill-conditioned.
@@ -109,7 +109,7 @@ class LMStatus(IntEnum):
             self.XTOL_REACHED: "Relative error between two consecutive iterates is at most xtol", 
             self.BOTH_TOL_REACHED: "Conditions for ftol and xtol both hold",
             self.GTOL_REACHED: "The cosine of the angle between fvec and any column of the Jacobian is at most gtol in absolute value",
-            self.MAX_FEVAL: "Number of function evaluations has reached maxfev",
+            self.MAX_FEVAL: "Number of function evaluations has reached max_nfev",
         }
         return messages.get(self, "Unknown status")
     
@@ -490,7 +490,7 @@ def lm_solve(
     ftol: float = 1e-6,
     xtol: float = 1e-6,
     gtol: float = 1e-6,
-    maxfev: int = 100,
+    max_nfev: int = 100,
     diag: T | None = None,
     lambda0: float = 1e-3,
     log_level: int | None = None,
@@ -538,7 +538,7 @@ def lm_solve(
         Tolerance for gradient norm. Convergence occurs when the infinity
         norm of the gradient (or projected gradient for constrained problems)
         falls below this threshold.
-    maxfev : int, default=100
+    max_nfev : int, default=100
         Maximum number of function evaluations.
     diag : PyTree, optional
         Diagonal scaling factors for variables, in the form of a PyTree matching
@@ -696,7 +696,7 @@ def lm_solve(
     lambda_val = lambda0  # Initial damping parameter
 
     # Main iteration loop
-    while nfev < maxfev:
+    while nfev < max_nfev:
 
         # Record iteration history before computing step
         history_entry = {
@@ -840,7 +840,7 @@ def lm_solve(
                 break
 
             # If maximum function evaluations reached during inner loop
-            if nfev >= maxfev:
+            if nfev >= max_nfev:
                 status = LMStatus.MAX_FEVAL
                 inner_loop_exit = True
                 break

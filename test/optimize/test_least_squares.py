@@ -91,7 +91,7 @@ class TestLeastSquares:
 
         # Run optimization with generous limits since this is a harder problem
         options = {
-            "maxfev": 1000,
+            "max_nfev": 1000,
             "ftol": 1e-12,
             "xtol": 1e-12,
             "gtol": 1e-8,
@@ -155,7 +155,7 @@ class TestLeastSquares:
 
         # Run optimization with reasonable limits
         options = {
-            "maxfev": 1000,
+            "max_nfev": 1000,
             "ftol": 1e-10,
             "xtol": 1e-10,
             "gtol": 1e-8,
@@ -239,7 +239,7 @@ class TestLeastSquares:
 
         # Run optimization with reasonable limits
         options = {
-            "maxfev": 1000,
+            "max_nfev": 1000,
             "ftol": 1e-10,
             "xtol": 1e-10,
             "gtol": 1e-8,
@@ -319,7 +319,7 @@ class TestLeastSquares:
             "ftol": 1e-8,
             "xtol": 1e-8,
             "gtol": 1e-6,
-            "maxfev": 50
+            "max_nfev": 50
         }
         result = least_squares(
             constrained_quadratic,
@@ -422,7 +422,7 @@ class TestLeastSquares:
             "ftol": 1e-8,
             "xtol": 1e-8,
             "gtol": 1e-6,
-            "maxfev": 100
+            "max_nfev": 100
         }
         result = least_squares(
             rosenbrock_func,
@@ -598,7 +598,7 @@ class TestLM:
             ftol=1e-8,
             xtol=1e-8,
             gtol=1e-8,
-            maxfev=200,
+            max_nfev=200,
         )
         assert result.success, (
             f"Optimization should succeed, got: {result.message}"
@@ -615,7 +615,7 @@ class TestLM:
             ftol=1e-15,
             xtol=1e-15,
             gtol=1e-15,
-            maxfev=2,
+            max_nfev=2,
         )
         assert result.status == LMStatus.MAX_FEVAL, (
             f"Should hit max iterations, got status {result.status}: {result.message}"
@@ -628,7 +628,7 @@ class TestLM:
             ftol=1e-2,
             xtol=1e-2,
             gtol=1e-2,
-            maxfev=200,
+            max_nfev=200,
         )
         assert result.success, (
             f"Should converge with loose tolerances, got: {result.message}"
@@ -685,7 +685,7 @@ class TestLM:
             ftol=1e-10,
             xtol=1e-10, 
             gtol=1e-10,
-            maxfev=100
+            max_nfev=100
         )
         
         print(f"\nAutomatic scaling (diag=None):")
@@ -706,7 +706,7 @@ class TestLM:
             ftol=1e-10,
             xtol=1e-10,
             gtol=1e-10, 
-            maxfev=100
+            max_nfev=100
         )
         
         print(f"\nCustom scaling (diag={custom_diag}):")
@@ -725,7 +725,7 @@ class TestLM:
             ftol=1e-10,
             xtol=1e-10,
             gtol=1e-10,
-            maxfev=100  
+            max_nfev=100  
         )
         
         print(f"\nPoor scaling (diag={poor_diag}):")
@@ -787,7 +787,7 @@ class TestLM:
             ftol=1e-8,
             xtol=1e-8,
             gtol=1e-8,
-            maxfev=50,
+            max_nfev=50,
         )
 
         # Verify basic optimization success
@@ -871,7 +871,7 @@ class TestLM:
             ftol=1e-3,  # Relatively loose ftol
             xtol=1e-15,  # Very tight xtol to avoid that convergence
             gtol=1e-15,  # Very tight gtol to avoid that convergence
-            maxfev=50
+            max_nfev=50
         )
         
         # Should converge due to ftol
@@ -896,7 +896,7 @@ class TestLM:
             ftol=1e-4,  # Loose enough to trigger
             xtol=1e3,  # Loose enough to trigger (this is relative to parameter norm)
             gtol=1e-15,  # Very tight to avoid gradient convergence
-            maxfev=10,
+            max_nfev=10,
             log_level=20,
         )
         
@@ -911,15 +911,15 @@ class TestLM:
             ftol=1e-4,  # Loose enough to trigger
             xtol=1e4,  # Loose enough to trigger
             gtol=1e-15,  # Very tight to avoid gradient convergence
-            maxfev=10,
+            max_nfev=10,
             log_level=20,
         )
 
         assert result.status == LMStatus.XTOL_REACHED, f"Expected xtol convergence, got {result.status}: {result.message}"
         assert result.success
 
-    def test_maxfev_reached_in_inner_loop(self):
-        """Test maxfev reached during inner loop iterations."""
+    def test_max_nfev_reached_in_inner_loop(self):
+        """Test max_nfev reached during inner loop iterations."""
 
         def slow_converging_func(x):
             x = np.atleast_1d(x)
@@ -932,7 +932,7 @@ class TestLM:
         result = lm_solve(
             slow_converging_func,
             x0,
-            maxfev=3,  # Very small limit to hit during inner loop
+            max_nfev=3,  # Very small limit to hit during inner loop
             ftol=1e-15,
             xtol=1e-15, 
             gtol=1e-15
@@ -961,7 +961,7 @@ class TestLM:
                 simple_quadratic,
                 np.array([5.0]),
                 log_level=logging.INFO,
-                maxfev=20
+                max_nfev=20
             )
 
             output = caplog.text

@@ -162,7 +162,7 @@ def least_squares(
             "ftol": 1e-6,      # Function tolerance
             "xtol": 1e-6,      # Parameter tolerance  
             "gtol": 1e-6,      # Gradient tolerance
-            "maxfev": 200,     # Maximum function evaluations
+            "max_nfev": 200,     # Maximum function evaluations
             "lambda0": 1e-3,   # Initial damping parameter
         }
         result = least_squares(func, x0, method="hess-lm", options=lm_options)
@@ -209,9 +209,6 @@ def least_squares(
     x0_flat, bounds, unravel = _ravel_args(x0, bounds)
     if bounds is None:
         bounds = (-np.inf, np.inf)
-
-    print(f"Using method: {method}")
-    print(f"bounds: {bounds}")
 
     # Compile the function and Jacobian
     @arc.compile

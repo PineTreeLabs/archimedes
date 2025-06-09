@@ -23,12 +23,68 @@ __all__ = ["pem"]
 
 @struct.pytree_node
 class PEMObjective:
+    """Prediction Error Minimization objective function for system identification.
+    
+    Low-level interface for PEM optimization that provides both residual and 
+    cost function evaluations. This class encapsulates the Kalman filter 
+    forward pass and automatic differentiation for gradient computation.
+    
+    This is typically used internally by :func:`pem`. For most applications,
+    use the higher-level :func:`pem` function directly. This can be useful mainly
+    for constructing custom optimization workflows.
+    
+    Parameters
+    ----------
+    predictor : KalmanFilterBase
+        Kalman filter implementing the system model with 
+        ``step(t, x, y, P, args)`` method.
+    data : Timeseries  
+        Input-output data with ``ts``, ``us``, and ``ys`` arrays.
+    P0 : array_like
+        Initial state covariance matrix of shape ``(nx, nx)``.
+    x0 : array_like, optional
+        Initial state estimate of shape ``(nx,)``. If None, the optimization
+        variables should include both initial state and parameters.
+        
+    Notes
+    -----
+    The objective implements the prediction error formulation:
+    
+    .. code-block:: text
+    
+        J = (1/N) Σ[k=1 to N] e[k]ᵀ e[k]
+        
+    where ``e[k]`` are the Kalman filter innovations (prediction errors).
+    
+    See Also
+    --------
+    pem : High-level parameter estimation interface
+    """
+
     predictor: KalmanFilterBase
     data: Timeseries
     P0: np.ndarray
     x0: np.ndarray = struct.field(static=True, default=None)
 
-    def forward(self, x0: np.ndarray, params: tuple) -> tuple:
+    def forward(self, x0: np.ndarray, params: PyTree) -> dict:
+        """Run Kalman filter forward pass and compute prediction errors.
+        
+        Parameters
+        ----------
+        x0 : array_like
+            Initial state estimate of shape ``(nx,)``.
+        params : PyTree
+            Model parameters with arbitrary nested structure.
+            
+        Returns
+        -------
+        dict
+            Results dictionary with keys:
+            
+            - ``"x_hat"`` : State estimates of shape ``(nx, N)``
+            - ``"e"`` : Prediction errors of shape ``(ny, N)``  
+            - ``"V"`` : Average cost function value (scalar)
+        """
         ts = self.data.ts
         us = self.data.us
         ys = self.data.ys
@@ -76,14 +132,23 @@ class PEMObjective:
             "V": V,
         }
 
-    def residuals(self, decision_variables: np.ndarray) -> np.ndarray:
-        """Evaluate the residuals (prediction errors) for the given parameters.
-
-        Args:
-            decision_variables: optimization parameters
-
-        Returns:
-            Residuals (prediction errors) as a 1D array.
+    def residuals(
+        self, decision_variables: PyTree | tuple[np.ndarray, PyTree]
+    ) -> np.ndarray:
+        """Evaluate prediction error residuals for least-squares optimization.
+        
+        Parameters
+        ----------
+        decision_variables : PyTree or tuple[np.ndarray, PyTree]
+            Optimization parameters. If ``x0`` is provided during construction,
+            this contains only model parameters. Otherwise, it contains both
+            initial state and parameters as a flattened array.
+            
+        Returns
+        -------
+        residuals : ndarray
+            Flattened prediction errors of shape ``(ny * N,)`` suitable for
+            least-squares optimization methods like Levenberg-Marquardt.
         """
         if self.x0 is not None:
             x0 = self.x0
@@ -94,17 +159,27 @@ class PEMObjective:
         results = self.forward(x0, params)
         return results["e"].flatten()
 
-    def __call__(self, decision_variables: np.ndarray) -> tuple:
-        """Evaluate the residuals
-
-        Args:
-            decision_variables: optimization parameters
-
-        Returns:
-            tuple of (V, J, H)
-            - V: cost function
-            - J: Jacobian
-            - H: Hessian approximation
+    def __call__(
+        self, decision_variables: PyTree | tuple[np.ndarray, PyTree]
+    ) -> tuple:
+        """Evaluate cost function for general optimization methods.
+        
+        Parameters
+        ----------
+        decision_variables : array_like
+            Optimization parameters. If ``x0`` is provided during construction,
+            this contains only model parameters. Otherwise, it contains both
+            initial state and parameters as a flattened array.
+            
+        Returns  
+        -------
+        cost : float
+            Average prediction error cost function value.
+            
+        Notes
+        -----
+        This method provides the scalar cost function interface needed for
+        general optimization methods (BFGS, IPOPT, etc.).
         """
         if self.x0 is not None:
             x0 = self.x0
@@ -131,7 +206,7 @@ def _pem_solve_lm(
         "ftol": 1e-4,
         "xtol": 1e-6,
         "gtol": 1e-6,
-        "maxfev": 200,
+        "max_nfev": 200,
     }
     options = {**default_options, **options}
     return lm_solve(pem_obj.residuals, params_guess, bounds=bounds, **options)
@@ -337,7 +412,7 @@ def pem(
         - ``ftol`` : Function tolerance (default: 1e-4)
         - ``xtol`` : Parameter tolerance (default: 1e-6)
         - ``gtol`` : Gradient tolerance (default: 1e-6)
-        - ``maxfev`` : Maximum function evaluations (default: 200)
+        - ``max_nfev`` : Maximum function evaluations (default: 200)
         - ``nprint`` : Progress printing interval (default: 0)
 
         For the "bfgs" method, these include:
