@@ -65,6 +65,7 @@ Documentation
 
    notebooks/multirotor/multirotor00
    notebooks/deployment/deployment00
+   notebooks/sysid/sysid00
 
 .. toctree::
    :maxdepth: 1

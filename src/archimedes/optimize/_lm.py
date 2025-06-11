@@ -27,8 +27,6 @@ if TYPE_CHECKING:
 
     T = TypeVar("T", bound=PyTree)
 
-# Set up logger for this module
-logger = logging.getLogger("levenberg_marquardt")
 
 __all__ = [
     "lm_solve",
@@ -123,7 +121,7 @@ class LMStatus(IntEnum):
 class LMProgress:
     """Handle progress reporting for LM optimization."""
 
-    def __init__(self, logger):
+    def __init__(self, logger=None):
         self.logger = logger
         self.iteration = 0
         self.prev_cost = None
@@ -148,10 +146,14 @@ class LMProgress:
         self.iteration += 1
     
     def _print_header(self):
-        self.logger.info(
+        msg = (
             f"{'Iteration':^10} {'Total nfev':^12} {'Cost':^15} "
             f"{'Cost reduction':^15} {'Step norm':^12} {'Optimality':^12}"
         )
+        if self.logger is None:
+            print(msg)
+        else:
+            self.logger.info(msg)
     
     def _print_iteration(self, iter_num, nfev, cost, cost_reduction, 
                         step_norm, grad_norm):
@@ -167,10 +169,14 @@ class LMProgress:
             cost_red_str = ""
             step_str = ""
         
-        self.logger.info(
+        msg = (
             f"{iter_num:^10} {nfev:^12} {cost_str:^15} "
             f"{cost_red_str:^15} {step_str:^12} {grad_str:^12}"
         )
+        if self.logger is None:
+            print(msg)
+        else:
+            self.logger.info(msg)
 
 
 class LMResult(OptimizeResult):
@@ -331,7 +337,7 @@ def _compute_step(hess, grad, diag, lambda_val, x, bounds=None, qp_solver=None):
     qp_results = qp_solver.solve()
     
     if qp_results.info.status != 'solved':
-        logger.warning(f"OSQP solver status: {qp_results.info.status}")
+        print(f"OSQP solver status: {qp_results.info.status}")
         # Fallback: project unconstrained step to bounds
         return np.clip(step, l_qp, u_qp)
 
@@ -506,11 +512,10 @@ def lm_solve(
 
     where ``r(x)`` are residuals computed by the objective function.
 
-    This implementation uses a direct Hessian approximation approach rather
-    than the traditional Jacobian-based formulation, enabling integration
-    with efficient special-purpose custom Hessian approximations.
-    It provides superior performance and robustness compared to general-purpose
-    optimizers, particularly for system identification applications.
+    This implementation uses a direct Hessian approximation and Cholesky
+    factorization instead of the standard QR approach.  It also supports
+    box constraints by switching to a quadratic programming solver
+    ([OSQP](https://osqp.org/)) when bounds are active.
 
     Parameters
     ----------
@@ -620,8 +625,10 @@ def lm_solve(
     scipy.optimize.least_squares : SciPy's least-squares solver
     """
     if log_level is None:
-        log_level = logging.WARNING
-    logger.setLevel(log_level)
+        logger = None
+    else:
+        logger = logging.getLogger("levenberg_marquardt")
+        logger.setLevel(log_level)
 
     x0_flat, bounds_flat, unravel = _ravel_args(x0, bounds)  # Validate bounds structure
 
@@ -760,8 +767,9 @@ def lm_solve(
 
             # Compute trial point
             x_new = x + step
-            logger.debug(f"lambda: {lambda_val}")
-            logger.debug(f"Trial point: {x_new}")
+            if logger is not None:
+                logger.debug(f"lambda: {lambda_val}")
+                logger.debug(f"Trial point: {x_new}")
 
             # Compute scaled step norm
             pnorm = np.linalg.norm(diag * step)
@@ -770,7 +778,8 @@ def lm_solve(
             cost_new, grad_new, hess_new = func(x_new)
             nfev += 1
 
-            logger.debug(f"Trial func eval: cost={cost_new}, grad={grad_new}, hess={hess_new}")
+            if logger is not None:
+                logger.debug(f"Trial func eval: cost={cost_new}, grad={grad_new}, hess={hess_new}")
 
             # Compute actual reduction
             actred = -1.0
@@ -869,7 +878,10 @@ def lm_solve(
     if status is None:
         status = LMStatus.MAX_FEVAL
 
-    logger.info(status.message)
+    if logger is None:
+        print(status.message)
+    else:
+        logger.info(status.message)
     
     # Calculate final residuals
     res = res_func(x)

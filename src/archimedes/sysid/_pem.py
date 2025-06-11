@@ -201,7 +201,7 @@ def _pem_solve_lm(
     if options is None:
         options = {}
 
-    # Set sensible defaults for system identification problems
+    # Set reasonable defaults for system identification problems
     default_options = {
         "ftol": 1e-4,
         "xtol": 1e-6,
