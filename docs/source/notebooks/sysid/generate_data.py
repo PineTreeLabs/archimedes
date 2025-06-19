@@ -57,7 +57,89 @@ def generate_linear_oscillator():
         fmt="%.6f",
     )
 
+    truth = {
+        "omega_n": omega_n,
+        "zeta": zeta,
+        "noise_std": noise_std,
+        "x0": np.zeros(nx),
+    }
+    np.savez(
+        "data/oscillator_truth.npz",
+        **truth,
+    )
+
+
+def generate_duffing_oscillator():
+    alpha = 1.0  # linear stiffness
+    beta = 5.0  # nonlinear stiffness
+    delta = 0.02  # damping
+
+    # Forcing parameters
+    gamma = 8.0  # forcing amplitude
+    omega = 0.5  # forcing frequency
+
+    # Problem dimensions
+    nx = 2  # state dimension (x₁, x₂)
+    nu = 1  # input dimension (u)
+    ny = 1  # output dimension (y = x₁)
+
+    def u(t):
+        """Forcing function: γcos(ωt)"""
+        return gamma * np.cos(omega * t)
+
+    def ode_rhs(t, x):
+        """Duffing oscillator: ẍ + δẋ + αx + βx³ = γcos(ωt)"""
+        x1, x2 = x[0], x[1]
+        x2_t = -delta * x2 - alpha * x1 - beta * x1**3 + u(t)
+        return np.hstack([x2, x2_t])
+
+    t0, tf = 0.0, 20.0  # Longer simulation to capture rich dynamics
+    dt = 0.02           # Smaller timestep for nonlinear system
+    ts = np.arange(t0, tf, dt)
+
+    x0 = np.array([1.0, 0.5])
+
+    # Generate reference data
+    xs = arc.odeint(
+        ode_rhs,
+        t_span=(t0, tf),
+        x0=x0,
+        t_eval=ts,
+    )
+
+    # Add measurement noise
+    noise_std = 0.01
+    ys = xs[:1, :] + np.random.normal(0, noise_std, (ny, len(ts)))
+    us = u(ts).reshape(1, -1)  # Reshape input to match dimensions
+
+    data = np.vstack([ts.reshape(1, -1), us, ys])
+    np.savetxt(
+        "data/duffing.csv",
+        data.T,
+        delimiter="\t",
+        header="time\t\tu\t\t\ty",
+        comments="",
+        fmt="%.6f",
+    )
+
+    truth = {
+        "alpha": alpha,
+        "beta": beta,
+        "delta": delta,
+        "gamma": gamma,
+        "omega": omega,
+        "noise_std": noise_std,
+        "x0": x0,
+    }
+    np.savez(
+        "data/duffing_truth.npz",
+        **truth,
+    )
+
 
 if __name__ == "__main__":
     generate_linear_oscillator()
-    print("Data generated and saved to 'oscillator_data.csv'")
+    print("Data generated and saved to 'data/oscillator.csv'")
+
+    generate_duffing_oscillator()
+    print("Data generated and saved to 'data/duffing.csv'")
