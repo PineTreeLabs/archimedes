@@ -2,8 +2,7 @@
 
 **You have a model of the dynamics of your system.  You have some test data from your system.  How do you get them to match?**
 
-
-With Archimedes, the answer is surprisingly simple. In this tutorial, you'll learn to automatically calibrate physics-based models to experimental data using just a few lines of code.
+With Archimedes, the answer is surprisingly simple. In this tutorial, you'll learn to automatically calibrate physics-based models with experimental data using just a few lines of code.
 Then you can leverage those calibrated models for control design and optimization.
 
 ## What You'll Accomplish
@@ -13,9 +12,7 @@ By the end of this tutorial, you'll be able to:
 - **Fit dynamic models to time series data** using modern optimization methods
 - **Handle nonlinear systems** with complex physics and multiple parameters  
 - **Incorporate physical constraints** and bounds on parameters
-- **Validate model quality** and assess parameter uncertainty
-- **Scale to multiple experiments** and datasets seamlessly
-- **Integrate with control design** workflows for end-to-end system development
+- **Scale to multiple experiments** and different types of data
 
 We'll work through three progressively sophisticated examples:
 
@@ -45,6 +42,8 @@ To follow this tutorial, you'll need:
 - Basic familiarity with Python and NumPy
 - A Python environment with Archimedes installed
 - An understanding of how to define dynamics models in Archimedes
+
+You won't need prior expertise with system identification or optimization methods.
 
 ## Tutorial overview
 
@@ -77,8 +76,8 @@ For commercial or consulting inquiries, email us at [info@archimedes.sh](mailto:
 ```{toctree}
 :maxdepth: 1
 sysid00
-sysid01
-../../generated/notebooks/sysid/sysid02
+../../generated/notebooks/sysid/sysid01
+sysid02
 ../../generated/notebooks/sysid/sysid03
 ../../generated/notebooks/sysid/sysid04
 sysid05
