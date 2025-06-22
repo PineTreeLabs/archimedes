@@ -67,6 +67,10 @@ class Timeseries:
         modification of data during analysis. Use the ``replace`` method to
         create modified copies when needed.
 
+    **Length and Indexing**:
+        The class supports indexing and length retrieval, allowing easy
+        access to specific time samples or slices of the data.
+
     Raises
     ------
     ValueError
@@ -108,3 +112,11 @@ class Timeseries:
     def __len__(self):
         """Return the number of time samples."""
         return self.ts.size
+
+    def __getitem__(self, index):
+        """Get a slice of the time series data."""
+        return Timeseries(
+            ts=self.ts[index],
+            us=self.us[:, index],
+            ys=self.ys[:, index],
+        )

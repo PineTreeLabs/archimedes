@@ -330,7 +330,7 @@ def pem(
     x0: np.ndarray = None,
     bounds: tuple[T, T] | None = None,
     P0: np.ndarray = None,
-    method: str = "bfgs",
+    method: str = "lm",
     options: dict | None = None,
 ) -> LMResult:
     """Estimate parameters using Prediction Error Minimization.

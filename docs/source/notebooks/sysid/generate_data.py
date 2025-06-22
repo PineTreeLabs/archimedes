@@ -93,7 +93,7 @@ def generate_duffing_oscillator():
         x2_t = -delta * x2 - alpha * x1 - beta * x1**3 + u(t)
         return np.hstack([x2, x2_t])
 
-    t0, tf = 0.0, 20.0  # Longer simulation to capture rich dynamics
+    t0, tf = 0.0, 40.0  # Longer simulation to capture rich dynamics
     dt = 0.02           # Smaller timestep for nonlinear system
     ts = np.arange(t0, tf, dt)
 

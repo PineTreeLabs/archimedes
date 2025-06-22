@@ -367,18 +367,12 @@ class TestPEMVanDerPol:
         dyn = discretize(van_der_pol_ode, dt, method="rk4")
         ekf = ExtendedKalmanFilter(dyn, obs, Q, R)
         data = Timeseries(ts=ts, us=us, ys=ys)
-        options = {
-            "ftol": 1e-8,
-            "xtol": 1e-8,
-            "gtol": 1e-8,
-            "log_level": 10,
-        }
         result = pem(
             ekf,
             data,
             params_guess,
             x0=x0_true,  # Assume initial conditions are known
-            options=options,
+            method="bfgs",
         )
         
         # Validate results
@@ -536,18 +530,12 @@ class TestPEMCartPole:
         dyn = discretize(cartpole_ode, dt, method="rk4")
         ekf = ExtendedKalmanFilter(dyn, obs, Q, R)
         data = Timeseries(ts=ts, us=us, ys=ys)
-        options = {
-            "ftol": 1e-6,
-            "xtol": 1e-6,
-            "gtol": 1e-6,
-            "log_level": 10,
-        }
         result = pem(
             ekf,
             data,
             params_guess,
             x0=x0_true,  # Assume initial conditions are known
-            options=options,
+            method="bfgs",
         )
         
         # Validate results

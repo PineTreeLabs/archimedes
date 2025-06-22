@@ -26,6 +26,16 @@ class TestTimeseries:
         assert np.array_equal(timeseries.us, us)
         assert np.array_equal(timeseries.ys, ys)
 
+        # Test indexing
+        timeseries_slice = timeseries[:2]
+        assert timeseries_slice.ts.shape == (2,)
+        assert timeseries_slice.us.shape == (2, 2)
+        assert timeseries_slice.ys.shape == (3, 2)
+
+        assert np.array_equal(timeseries_slice.ts, ts[:2])
+        assert np.array_equal(timeseries_slice.us, us[:, :2])
+        assert np.array_equal(timeseries_slice.ys, ys[:, :2])
+
     def test_minimal_dimensions(self):
         """Test construction with minimal valid dimensions."""
         # Single time point
