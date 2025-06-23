@@ -1,9 +1,16 @@
 # ruff: noqa: N802, N803, N806, N815, N816
 
 import numpy as np
+from scipy.signal import chirp
+
 import archimedes as arc
 
-from archimedes import struct, discretize
+from models import (
+    TransferFunction,
+    HammersteinWiener,
+    TanhNonlinearity,
+    CubicNonlinearity,
+)
 
 np.random.seed(0)
 
@@ -137,9 +144,145 @@ def generate_duffing_oscillator():
     )
 
 
+def generate_hammerstein_wiener():
+    # Transfer function with zero and mixed pole structure
+    # G(s) = K * (τ_z*s + 1) / ((τ_slow*s + 1) * (s² + 2*ζ*ω_n*s + ω_n²))
+
+    K = 20.0          # DC gain  
+    tau_z = 0.5      # Zero time constant (lead compensation character)
+    tau_slow = 2.0  # Slow pole time constant
+    omega_n = 6.0    # Natural frequency of oscillatory pair
+    zeta = 0.2       # Light damping (ζ = 0.3 gives nice oscillation)
+
+    # Resulting transfer function:
+    # G(s) = 2 * (0.5*s + 1) / ((10*s + 1) * (s² + 1.2*s + 4))
+
+    num = np.array([K * tau_z, K])
+    den = np.array([
+        tau_slow,
+        1 + 2 * tau_slow * zeta * omega_n,
+        tau_slow * omega_n**2 + 2 * zeta * omega_n,
+        omega_n**2
+    ])
+
+    # Problem dimensions
+    nx = len(den) - 1  # Number of states (order of the system)
+    nu = 1  # Single input
+    ny = 1  # Single output
+
+    hw_sys = HammersteinWiener(
+        input=TanhNonlinearity(saturation=1.5),
+        lin_sys=TransferFunction(num, den),
+        output=CubicNonlinearity(coeff=0.05),
+    )
+    noise_std = 0.01
+
+    def hw_ode(t, x, u, sys):
+        return sys.dynamics(t, x, u)
+
+    def obs(t, x, u, sys):
+        return sys.observation(t, x, u)
+    
+    vmap_obs = arc.vmap(obs, in_axes=(0, 1, 1, None))
+
+
+    def simulate_system(sys, ts, us, x0, noise_std=0.0):
+        """Simulate the Hammerstein-Wiener system."""
+        
+        def ode_rhs(t, x, sys):
+            u = np.interp(t, ts, us[0]).reshape((nu,))
+            return hw_ode(t, x, u, sys)
+
+        xs_true = arc.odeint(
+            ode_rhs,
+            t_span=(ts[0], ts[-1]),
+            x0=x0,
+            args=(sys,),
+            t_eval=ts,
+            rtol=1e-8,
+            atol=1e-10,
+        )
+
+        ys_ideal = vmap_obs(ts, xs_true, us, sys).T
+        ys = ys_ideal + np.random.normal(0, noise_std, ys_ideal.shape)
+
+        return arc.sysid.Timeseries(
+            ts=ts,
+            us=us,
+            ys=ys,
+        )
+    
+    # 1. Ladder response for steady-state
+
+    # Time vector
+    t0, tf = 0.0, 100.0
+    dt = 0.1
+    ts = np.arange(t0, tf, dt)
+
+    u_ss = np.linspace(-5, 5, 10, endpoint=True)
+    us = np.zeros((nu, len(ts)))  # Zero input
+    for i, u in enumerate(u_ss):
+        us[:, ts > i * 10.0] = u
+    
+    ladder_data = simulate_system(hw_sys, ts, us, x0=np.zeros(nx), noise_std=noise_std)
+
+    np.savetxt(
+        "data/part3_ladder.csv",
+        np.vstack([ladder_data.ts, ladder_data.us, ladder_data.ys]).T,
+        delimiter="\t",
+        header="time\t\tu\t\t\ty",
+        comments="",
+        fmt="%.6f",
+    )
+
+    # 2. Step response for transient dynamics
+    # Time vector
+    t0, tf = 0.0, 10.0
+    dt = 0.02
+    ts = np.arange(t0, tf, dt)
+
+    u0 = 2.0
+    us = u0 * np.ones((nu, len(ts)))  # Constant input
+    us[:, ts > 10.0] *= -u0  # Step down after 10 seconds
+    step_data = simulate_system(hw_sys, ts, us, x0=np.zeros(nx), noise_std=noise_std)
+
+    np.savetxt(
+        "data/part3_step.csv",
+        np.vstack([step_data.ts, step_data.us, step_data.ys]).T,
+        delimiter="\t",
+        header="time\t\tu\t\t\ty",
+        comments="",
+        fmt="%.6f",
+    )
+
+    # 3. Chirp input for frequency response
+    def dyn_res(x, u):
+        return hw_sys.dynamics(0, x, u)
+
+    u0 = 1.0
+    x0_chirp = arc.root(dyn_res, x0=np.zeros(nx), args=(u0,))
+
+    us = u0 + 0.2 * chirp(ts, f0=0.01, f1=3.0, t1=tf, method='quadratic')
+    chirp_data = simulate_system(
+        hw_sys, ts, us.reshape((nu, -1)), x0=x0_chirp, noise_std=noise_std
+    )
+
+    np.savetxt(
+        "data/part3_chirp.csv",
+        np.vstack([chirp_data.ts, chirp_data.us, chirp_data.ys]).T,
+        delimiter="\t",
+        header="time\t\tu\t\t\ty",
+        comments="",
+        fmt="%.6f",
+    )
+
+
 if __name__ == "__main__":
     generate_linear_oscillator()
-    print("Data generated and saved to 'data/oscillator.csv'")
+    print("Data generated")
 
     generate_duffing_oscillator()
-    print("Data generated and saved to 'data/duffing.csv'")
+    print("Data generated")
+
+    generate_hammerstein_wiener()
+    print("Hammerstein-Wiener data generated")
