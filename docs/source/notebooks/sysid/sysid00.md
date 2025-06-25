@@ -1,8 +1,8 @@
 # Calibrating Models with Data
 
-**You have a model of the dynamics of your system.  You have some test data from your system.  How do you get them to match?**
+**You have a model of the dynamics of your system.  You have test data from your system.  How do you get them to match?**
 
-With Archimedes, the answer is surprisingly simple. In this tutorial, you'll learn to automatically calibrate physics-based models with experimental data using just a few lines of code.
+With Archimedes, the answer can be surprisingly simple. In this tutorial, you'll learn to automatically calibrate physics-based models with experimental data using just a few lines of code.
 Then you can leverage those calibrated models for control design and optimization.
 
 ## What You'll Accomplish

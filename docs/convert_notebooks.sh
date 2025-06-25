@@ -26,5 +26,6 @@ find source/notebooks -name "*.ipynb" -type f | while read notebook; do
   
   # Convert the notebook
   ARCHIMEDES_THEME="$THEME" uv run jupyter nbconvert --to markdown \
-    --output-dir "$output_dir" --execute "$notebook"
+    --output-dir "$output_dir" --execute --ExecutePreprocessor.kernel_name=archimedes \
+    "$notebook"
 done
