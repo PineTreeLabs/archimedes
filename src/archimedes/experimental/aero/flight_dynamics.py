@@ -102,18 +102,27 @@ class FlightVehicle(metaclass=abc.ABCMeta):
 
         return dp_N, att_deriv, C_BN
 
+    def calc_inertia(self, t, x):
+        """
+        Calculate the mass and inertia matrix of the vehicle at time t and state x.
+        This can be overridden in subclasses if the mass is not constant.
+        """
+        return self.m, self.J_B
+
     def calc_dynamics(self, t, x, F_B, M_B):
+        m, J_B = self.calc_inertia(t, x)
+
         # Unpack the state
         v_B = x.v_B  # Velocity of the center of mass in body frame B
         w_B = x.w_B  # Angular velocity in body frame (ω_B)
 
         # Acceleration in body frame
-        dv_B = (F_B / self.m) - np.cross(w_B, v_B)
+        dv_B = (F_B / m) - np.cross(w_B, v_B)
 
         # Angular acceleration in body frame
         # solve Euler dynamics equation 𝛕 = I α + ω × (I ω)  for α
         # dw_B = np.linalg.inv(self.J_B) @ (M_B - np.cross(w_B, self.J_B @ w_B))
-        dw_B = np.linalg.solve(self.J_B, M_B - np.cross(w_B, self.J_B @ w_B))
+        dw_B = np.linalg.solve(J_B, M_B - np.cross(w_B, J_B @ w_B))
 
         return dv_B, dw_B
 
