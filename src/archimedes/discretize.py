@@ -115,7 +115,9 @@ def _radau5(rhs, h, newton_solver="fast_newton"):
     return scan_fun
 
 
-def discretize(func, dt, method="rk4", n_steps=1, name=None, **options):
+def discretize(
+    func=None, dt=None, method="rk4", n_steps=1, name=None, **options
+):
     """Convert continuous-time dynamics to discrete-time using numerical integration.
 
     Transforms a continuous-time ordinary differential equation (ODE) function
@@ -140,6 +142,15 @@ def discretize(func, dt, method="rk4", n_steps=1, name=None, **options):
 
     where the discrete-time function ``f`` integrates the continuous dynamics over
     the time interval ``dt`` using the specified numerical method.
+
+    Can also be used as a decorator to convert a continuous-time function
+    into a discrete-time function:
+    
+    .. code-block:: python
+
+        @discretize(dt=0.1, method="rk4")
+        def dyn(t, x, u, params):
+            # ... continuous-time dynamics implementation
 
     Parameters
     ----------
@@ -301,30 +312,81 @@ def discretize(func, dt, method="rk4", n_steps=1, name=None, **options):
     .. [2] Hairer, E. and Wanner, G. "Solving Ordinary Differential Equations II:
            Stiff and Differential-Algebraic Problems." 2nd edition, Springer, 1996.
     """
-    h = dt / n_steps
 
-    if not isinstance(func, FunctionCache):
-        func = FunctionCache(func)
+    def _discretize_impl(f, dt_val):
+        """Implementation of the discretization logic."""
+        h = dt_val / n_steps
 
-    if name is None:
-        name = f"{method}_{func.name}"
+        if not isinstance(f, FunctionCache):
+            f = FunctionCache(f)
 
-    h = dt / n_steps
-    scan_fun = {
-        "rk4": _rk4,
-        "radau5": _radau5,
-    }[method](func, h, **options)
-
-    def step(t0, x0, u, p):
-        carry = (t0, x0, u, p)
-
-        if n_steps == 1:
-            # Slightly faster compilation if scan is not used
-            carry, _ = scan_fun(carry, 0)
+        if name is None:
+            func_name = f"{method}_{f.name}"
         else:
-            carry, _ = scan(scan_fun, carry, length=n_steps)
+            func_name = name
 
-        _, xf, _, _ = carry
-        return xf
+        h = dt_val / n_steps
+        scan_fun = {
+            "rk4": _rk4,
+            "radau5": _radau5,
+        }[method](f, h, **options)
 
-    return FunctionCache(step, name=name, arg_names=["t", "x", "u", "p"])
+        def step(t0, x0, u, p):
+            carry = (t0, x0, u, p)
+
+            if n_steps == 1:
+                # Slightly faster compilation if scan is not used
+                carry, _ = scan_fun(carry, 0)
+            else:
+                carry, _ = scan(scan_fun, carry, length=n_steps)
+
+            _, xf, _, _ = carry
+            return xf
+
+        return FunctionCache(step, name=func_name, arg_names=["t", "x", "u", "p"])
+
+    # Check if we're in decorator mode (func is None) or direct mode (func provided)
+    if func is None:
+        # Decorator mode: @discretize(dt=0.1, method="rk4")
+        if dt is None:
+            raise ValueError("dt must be specified when using discretize as a decorator")
+
+        def decorator(f):
+            """Decorator function that applies discretization to the wrapped function."""
+            return _discretize_impl(f, dt)
+
+        return decorator
+    else:
+        # Direct mode: discretize(func, dt=0.1, method="rk4", ...)
+        if dt is None:
+            raise ValueError("dt must be specified")
+        
+        return _discretize_impl(func, dt)
+
+    # h = dt / n_steps
+
+    # if not isinstance(func, FunctionCache):
+    #     func = FunctionCache(func)
+
+    # if name is None:
+    #     name = f"{method}_{func.name}"
+
+    # h = dt / n_steps
+    # scan_fun = {
+    #     "rk4": _rk4,
+    #     "radau5": _radau5,
+    # }[method](func, h, **options)
+
+    # def step(t0, x0, u, p):
+    #     carry = (t0, x0, u, p)
+
+    #     if n_steps == 1:
+    #         # Slightly faster compilation if scan is not used
+    #         carry, _ = scan_fun(carry, 0)
+    #     else:
+    #         carry, _ = scan(scan_fun, carry, length=n_steps)
+
+    #     _, xf, _, _ = carry
+    #     return xf
+
+    # return FunctionCache(step, name=name, arg_names=["t", "x", "u", "p"])

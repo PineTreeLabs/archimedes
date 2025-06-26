@@ -152,7 +152,7 @@ class PEMObjective:
         """
         if self.x0 is not None:
             x0 = self.x0
-            params = decision_variables
+            _, params = decision_variables  # Dummy x0 for interface compatibility
         else:
             x0, params = decision_variables
 
@@ -183,7 +183,7 @@ class PEMObjective:
         """
         if self.x0 is not None:
             x0 = self.x0
-            params = decision_variables
+            _, params = decision_variables  # Dummy x0 for interface compatibility
         else:
             x0, params = decision_variables
 
@@ -217,9 +217,8 @@ class CompoundPEMObjective:
 
     def __call__(self, decision_variables: tuple[np.ndarray | None, PyTree]) -> tuple:
         """Evaluate cost function for compound PEM objective."""
-        total_cost = 0.0
-
         sub_dvs = self._make_sub_dvs(decision_variables)
+        total_cost = 0.0
         for (dvs, pem_obj) in zip(sub_dvs, self.sub_objectives):
             cost = pem_obj(dvs)
             total_cost += cost
@@ -228,19 +227,21 @@ class CompoundPEMObjective:
 
     def residuals(self, decision_variables: PyTree | tuple[np.ndarray, PyTree]) -> np.ndarray:
         """Evaluate residuals for compound PEM objective."""
-        total_residuals = []
         sub_dvs = self._make_sub_dvs(decision_variables)
+        total_residuals = []
         for (dvs, pem_obj) in zip(sub_dvs, self.sub_objectives):
             residuals = pem_obj.residuals(dvs)
             total_residuals.append(residuals)
-        return np.hstack(total_residuals)
-    
 
+        if len(total_residuals) == 1:
+            return total_residuals[0]
+
+        return np.hstack(total_residuals)
 
 
 def _pem_solve_lm(
     pem_obj: PEMObjective,
-    params_guess: T,
+    p_guess: T,
     bounds: tuple[T, T] | None = None,
     options: dict | None = None,
 ) -> LMResult:
@@ -256,12 +257,12 @@ def _pem_solve_lm(
         "max_nfev": 200,
     }
     options = {**default_options, **options}
-    return lm_solve(pem_obj.residuals, params_guess, bounds=bounds, **options)
+    return lm_solve(pem_obj.residuals, p_guess, bounds=bounds, **options)
 
 
 def _pem_solve_bfgs(
     pem_obj: PEMObjective,
-    params_guess: T,
+    p_guess: T,
     bounds: tuple[T, T] | None = None,
     options: dict | None = None,
 ) -> OptimizeResult:
@@ -270,7 +271,7 @@ def _pem_solve_bfgs(
     if options is None:
         options = {}
 
-    params_guess_flat, unravel = arc.tree.ravel(params_guess)
+    p_guess_flat, unravel = arc.tree.ravel(p_guess)
 
     if bounds is not None:
         lb, ub = bounds
@@ -293,18 +294,11 @@ def _pem_solve_bfgs(
         "maxiter": 200,
     }
 
-    # if method == "BFGS" and "hess_inv0" not in options:
-    #     # Initialize with full Hessian
-    #     J0 = jac(params_guess_flat)
-    #     hess_inv0 = np.linalg.inv(np.outer(J0, J0) + 1e-8 * np.eye(len(J0)))
-    #     hess_inv0 = 0.5 * (hess_inv0 + hess_inv0.T)  # Ensure symmetry
-    #     default_options["hess_inv0"] = hess_inv0
-
     options = {**default_options, **options}
 
     result = scipy_minimize(
         func,
-        params_guess_flat,
+        p_guess_flat,
         method=method,
         jac=jac,
         bounds=bounds,
@@ -318,7 +312,7 @@ def _pem_solve_bfgs(
 
 def _pem_solve_ipopt(
     pem_obj: PEMObjective,
-    params_guess: T,
+    p_guess: T,
     bounds: tuple[T, T] | None = None,
     options: dict | None = None,
 ) -> OptimizeResult:
@@ -337,7 +331,7 @@ def _pem_solve_ipopt(
     options["ipopt"] = {**ipopt_default_options, **options.get("ipopt", {})}
     options = {**default_options, **options}
 
-    params_guess_flat, unravel = arc.tree.ravel(params_guess)
+    p_guess_flat, unravel = arc.tree.ravel(p_guess)
     if bounds is not None:
         lb, ub = bounds
         lb_flat, _ = arc.tree.ravel(lb)
@@ -351,7 +345,7 @@ def _pem_solve_ipopt(
 
     result = arc.minimize(
         func,
-        params_guess_flat,
+        p_guess_flat,
         bounds=bounds,
         options=options,
     )
@@ -370,13 +364,15 @@ SUPPORTED_METHODS = {
     "ipopt": _pem_solve_ipopt,
 }
 
+
 def pem(
     predictor: KalmanFilterBase,
     data: Timeseries | tuple[Timeseries, ...],
-    params_guess: T,
-    x0: np.ndarray | None | tuple[np.ndarray, ...] = None,
+    p_guess: T,
+    x0: np.ndarray | tuple[np.ndarray, ...],
+    estimate_x0: bool | tuple[bool] = False,
     bounds: tuple[T, T] | None = None,
-    P0: np.ndarray = None,
+    P0: np.ndarray | tuple[np.ndarray] = None,
     method: str = "lm",
     options: dict | None = None,
 ) -> LMResult:
@@ -421,20 +417,29 @@ def pem(
         - ``us`` : Input signals of shape ``(nu, N)``
         - ``ys`` : Output measurements of shape ``(ny, N)``
         
-        All arrays must have consistent time dimensions.
-    params_guess : PyTree
+        All arrays must have consistent time dimensions.  Multiple
+        :class:`Timeseries` instances can be provided as a tuple for
+        multi-experiment identification, allowing joint parameter estimation
+        across different datasets.
+        
+        If multiple datasets are provided, the initial state estimates
+        (``x0``) should also be a tuple of initial conditions corresponding
+        to each dataset.
+    p_guess : PyTree
         Initial parameter guess with arbitrary nested structure
         (e.g., ``{"mass": 1.0, "damping": {"c1": 0.1, "c2": 0.2}}``).
         The optimization preserves this structure in the result, enabling
         natural organization of physical parameters.
     x0 : array_like, optional
-        Initial state estimate of shape ``(nx,)``. If None, ``params_guess``
-        should be a tuple ``(x0_guess, params_guess)`` to jointly estimate
-        initial conditions and parameters. This is useful when initial
-        conditions are uncertain or need to be optimized.
+        Initial state estimate of shape ``(nx,)``.  Used as an initial guess
+        if ``estimate_x0=True``.  For multiple datasets, this can be a tuple
+        of initial conditions, allowing different initial states for each
+        dataset.
+    estimate_x0 : bool, default=False
+        Whether to estimate the initial state ``x0`` along with parameters.
     bounds : tuple of (PyTree, PyTree), optional
         Parameter bounds as ``(lower_bounds, upper_bounds)`` with the
-        same PyTree structure as ``params_guess``. Enables physical
+        same PyTree structure as ``p_guess``. Enables physical
         constraints such as:
         
         - Positive masses, stiffnesses, damping coefficients
@@ -445,7 +450,9 @@ def pem(
     P0 : array_like, optional
         Initial state covariance matrix of shape ``(nx, nx)``. If None,
         defaults to identity matrix. Represents uncertainty in initial
-        state estimate.
+        state estimate.  Can be a tuple of matrices if multiple
+        datasets are provided, allowing different initial uncertainties
+        for each dataset.
     method : str, default="bfgs"
         Optimization method. Currently only "lm" (Levenberg-Marquardt), "ipopt",
         and "bfgs" (BFGS) are supported. The "lm" method is a custom implementation
@@ -489,7 +496,7 @@ def pem(
 
     Notes
     -----
-    This implementation provides significant advantages for system identification:
+    This implementation provides:
 
     **Automatic Gradients**:
         Efficient gradient computation through automatic differentiation of
@@ -509,8 +516,12 @@ def pem(
         enables handling of linear and nonlinear systems with appropriate
         accuracy-efficiency tradeoffs.
 
+    **Multi-Experiment Support**:
+        Can handle multiple datasets simultaneously, allowing joint parameter
+        estimation across different experiments or operating conditions.
+
     The method automatically computes gradients with respect to both initial
-    conditions (when ``x0=None``) and model parameters using efficient
+    conditions (when ``estimate_x0=True``) and model parameters using efficient
     automatic differentiation through the Kalman filter recursions. This
     avoids the computational expense and numerical issues of finite difference
     approximations.
@@ -559,10 +570,10 @@ def pem(
     >>> ekf = ExtendedKalmanFilter(dyn_discrete, observation, Q, R)
     >>>
     >>> data = Timeseries(ts=ts, us=us, ys=ys)
-    >>> params_guess = {"omega_n": 2.5, "zeta": 0.5}
+    >>> p_guess = {"omega_n": 2.5, "zeta": 0.5}
     >>>
     >>> # Estimate parameters with known initial conditions
-    >>> result = pem(ekf, data, params_guess, x0=x0)
+    >>> result = pem(ekf, data, p_guess, x0=x0)
     >>> print(f"Estimated parameters: {result.x}")
     Estimated parameters: {'omega_n': array(1.9709515), 'zeta': array(0.11517324)}
     >>> print(f"Converged in {result.nit} iterations")
@@ -573,7 +584,7 @@ def pem(
     ...     {"omega_n": 0.0, "zeta": 0.0},     # Lower bounds (positive values)
     ...     {"omega_n": 10.0, "zeta": 1.0},    # Upper bounds (reasonable ranges)
     ... )
-    >>> result = pem(ekf, data, params_guess, x0=x0, bounds=bounds)
+    >>> result = pem(ekf, data, p_guess, x0=x0, bounds=bounds)
 
     See Also
     --------
@@ -593,35 +604,65 @@ def pem(
 
     pem_solve = SUPPORTED_METHODS[method]
 
-    if isinstance(data, (tuple, list)):
-        if x0 is None:
-            x0 = [None] * len(data)
-        elif isinstance(x0, np.ndarray):
-            x0 = [x0] * len(data)
+    if not isinstance(data, (tuple, list)):
+        data = (data,)
 
-        sub_objectives = []
-        for (sub_data, sub_x0) in zip(data, x0):
-            sub_objectives.append(
-                PEMObjective(
-                    predictor=predictor,
-                    data=sub_data,
-                    P0=P0,
-                    x0=sub_x0,
-                )
+    n_expt = len(data)
+
+    # For each argument, replicate for all experiments if needed
+
+    if isinstance(x0, np.ndarray):
+        x0 = [x0] * n_expt
+
+    if P0 is None or isinstance(P0, np.ndarray):
+        P0 = [P0] * n_expt
+
+    if isinstance(estimate_x0, bool):
+        estimate_x0 = [estimate_x0] * n_expt
+
+    sub_objectives = []
+    x0_guess = []
+    for i in range(n_expt):
+        if estimate_x0[i]:
+            x0_guess.append(x0[i])
+            sub_x0 = None
+        else:
+            x0_guess.append(None)
+            sub_x0 = x0[i]
+
+        sub_objectives.append(
+            PEMObjective(
+                predictor=predictor,
+                data=data[i],
+                P0=P0[i],
+                x0=sub_x0,
             )
-        objective = CompoundPEMObjective(sub_objectives=sub_objectives)
-
-    else:
-        objective = PEMObjective(
-            predictor=predictor,
-            data=data,
-            P0=P0,
-            x0=x0,
         )
 
-    return pem_solve(
+    objective = CompoundPEMObjective(sub_objectives=sub_objectives)
+    dvs_guess = (x0_guess, p_guess)
+
+    if bounds is not None:
+        x0_bounds = [None] * n_expt
+        lb, ub = bounds
+        lb = (x0_bounds, lb)
+        ub = (x0_bounds, ub)
+        bounds = (lb, ub)
+
+    result = pem_solve(
         pem_obj=objective,
-        params_guess=params_guess,
+        p_guess=dvs_guess,
         bounds=bounds,
         options=options,
     )
+
+    x0_opt, params_opt = result.x
+    delattr(result, "x")
+    result.p = params_opt
+
+    if n_expt == 1:
+        x0_opt = x0_opt[0]
+
+    result.x0 = x0_opt  # Store optimized initial condition
+
+    return result

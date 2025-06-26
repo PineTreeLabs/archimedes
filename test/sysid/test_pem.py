@@ -108,7 +108,6 @@ def second_order_data():
         "xs_true": xs_true,
         "noise_std": noise_std,
     }
-        
 
 
 class TestPEMHarmonicOscillator:
@@ -172,11 +171,12 @@ class TestPEMHarmonicOscillator:
             method=method,
             options=options[method],
         )
+        params_opt = result.p
 
         # Validate results
         print(f"\nSecond-Order System ID Results:")
         print(f"True parameters: ωₙ={omega_n_true:.3f}, ζ={zeta_true:.3f}")
-        print(f"Estimated parameters: ωₙ={result.x['omega_n']:.3f}, ζ={result.x['zeta']:.3f}")
+        print(f"Estimated parameters: ωₙ={params_opt['omega_n']:.3f}, ζ={params_opt['zeta']:.3f}")
         print(f"Success: {result.success}")
         print(f"Iterations: {result.nit}")
         print(f"Final cost: {0.5 * np.dot(result.fun, result.fun):.2e}")
@@ -186,7 +186,7 @@ class TestPEMHarmonicOscillator:
             second_order_ode,
             t_span=(data.ts[0], data.ts[-1]),
             x0=x0_true,
-            args=(data.us[:, 0], result.x),
+            args=(data.us[:, 0], params_opt),
             t_eval=data.ts,
             rtol=1e-8,
             atol=1e-10,
@@ -213,8 +213,8 @@ class TestPEMHarmonicOscillator:
         assert result.success, f"Parameter estimation failed: {result.message}"
 
         # Check parameter recovery accuracy
-        omega_n_error = abs(result.x["omega_n"] - omega_n_true) / omega_n_true
-        zeta_error = abs(result.x["zeta"] - zeta_true) / zeta_true
+        omega_n_error = abs(params_opt["omega_n"] - omega_n_true) / omega_n_true
+        zeta_error = abs(params_opt["zeta"] - zeta_true) / zeta_true
 
         assert omega_n_error < 0.01, f"Natural frequency error too large: {100 * omega_n_error:.6f} %"
         assert zeta_error < 0.1, f"Damping ratio error too large: {100 * zeta_error:.6f} %"
@@ -258,20 +258,20 @@ class TestPEMHarmonicOscillator:
         ekf = ExtendedKalmanFilter(dyn, position_obs, Q, R)
 
         # Test optimizing initial conditions
-        dvs_guess = (np.array([1.0, 0.0]), params_guess)
-        result_with_x0 = pem(
+        result = pem(
             ekf,
             data,
-            dvs_guess,
-            x0=None,  # Unknown initial conditions
+            params_guess,
+            x0=np.array([1.0, 0.0]),
+            estimate_x0=True,
             method=method,
             options=options[method],
         )
-        x0_est, params_est = result_with_x0.x
+        x0_est, params_est = result.x0, result.p
         print(f"Estimated initial conditions: {x0_est}")
         print(f"Estimated parameters with x0: {params_est}")
 
-        assert result_with_x0.success, f"Parameter estimation with x0 failed: {result_with_x0.message}"
+        assert result.success, f"Parameter estimation with x0 failed: {result_with_x0.message}"
 
         # Check parameter recovery accuracy (should be quite good for this clean problem)
         omega_n_error = abs(params_est["omega_n"] - omega_n_true)
@@ -374,11 +374,12 @@ class TestPEMVanDerPol:
             x0=x0_true,  # Assume initial conditions are known
             method="bfgs",
         )
+        params_opt = result.p
         
         # Validate results
         print(f"\nVan der Pol Oscillator ID Results:")
         print(f"True parameter: μ={mu_true:.3f}")
-        print(f"Estimated parameter: μ={result.x['mu']:.3f}")
+        print(f"Estimated parameter: μ={params_opt['mu']:.3f}")
         print(f"Success: {result.success}")
         print(f"Iterations: {result.nit}")
         print(f"Final cost: {result.fun:.2e}")
@@ -388,7 +389,7 @@ class TestPEMVanDerPol:
             van_der_pol_ode,
             t_span=(t0, tf),
             x0=x0_true,
-            args=(us[:, 0], result.x),
+            args=(us[:, 0], params_opt),
             t_eval=ts,
             rtol=1e-8,
             atol=1e-10,
@@ -397,7 +398,7 @@ class TestPEMVanDerPol:
         if plot:
             import matplotlib.pyplot as plt
             kf_result_init = pem_obj.forward(x0_true, params_guess)
-            kf_result_opt = pem_obj.forward(x0_true, result.x)
+            kf_result_opt = pem_obj.forward(x0_true, params_opt)
             
             fig, ax = plt.subplots(3, 1, figsize=(8, 6), sharex=True)
             
@@ -435,7 +436,7 @@ class TestPEMVanDerPol:
         
         # Check parameter recovery accuracy
         # Note: Nonlinear systems are typically harder to identify than linear ones
-        mu_error = abs(result.x["mu"] - mu_true)
+        mu_error = abs(params_opt["mu"] - mu_true)
         
         assert mu_error < 0.05, f"Nonlinearity parameter error too large: {mu_error:.6f}"
         
@@ -537,11 +538,12 @@ class TestPEMCartPole:
             x0=x0_true,  # Assume initial conditions are known
             method="bfgs",
         )
+        params_opt = result.p
         
         # Validate results
         print(f"\nCartPole System ID Results:")
         print(f"True parameters: m1={m1_true:.3f}, m2={m2_true:.3f}, L={L_true:.3f}")
-        print(f"Estimated parameters: m2={result.x['m2']:.3f}, L={result.x['L']:.3f}")
+        print(f"Estimated parameters: m2={params_opt['m2']:.3f}, L={params_opt['L']:.3f}")
         print(f"Success: {result.success}")
         print(f"Iterations: {result.nit}")
         print(f"Final cost: {result.fun:.2e}")
@@ -551,7 +553,7 @@ class TestPEMCartPole:
             ode_rhs,
             t_span=(t0, tf),
             x0=x0_true,
-            args=(result.x,),
+            args=(params_opt,),
             t_eval=ts,
             rtol=1e-8,
             atol=1e-10,
@@ -560,7 +562,7 @@ class TestPEMCartPole:
         if plot:
             import matplotlib.pyplot as plt
             kf_result_init = pem_obj.forward(x0_true, params_guess)
-            kf_result_opt = pem_obj.forward(x0_true, result.x)
+            kf_result_opt = pem_obj.forward(x0_true, params_opt)
             
             fig, ax = plt.subplots(4, 1, figsize=(10, 8), sharex=True)
             
@@ -605,8 +607,8 @@ class TestPEMCartPole:
         
         # Check parameter recovery accuracy
         # CartPole is challenging due to underactuation and nonlinearity
-        m2_error = abs(result.x["m2"] - m2_true) / m2_true  
-        L_error = abs(result.x["L"] - L_true) / L_true
+        m2_error = abs(params_opt["m2"] - m2_true) / m2_true  
+        L_error = abs(params_opt["L"] - L_true) / L_true
         
         print(f"Relative parameter errors: m2={m2_error:.3f}, L={L_error:.3f}")
         
