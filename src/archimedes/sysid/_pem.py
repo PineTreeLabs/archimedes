@@ -190,6 +190,53 @@ class PEMObjective:
         results = self.forward(x0, params)
         return results["V"]
 
+@struct.pytree_node
+class CompoundPEMObjective:
+    """Compound PEM objective function for multiple sub-objectives.
+
+    Shares the same interface as `PEMObjective` but allows
+    combining multiple PEM objectives into a single cost function.
+    """
+    sub_objectives: list[PEMObjective]
+
+    def _make_sub_dvs(self, decision_variables: tuple[np.ndarray | None, PyTree]) -> list[tuple[np.ndarray | None, PyTree]]:
+        """Prepare sub-decision variables for each sub-objective."""
+        sub_x0, params = decision_variables
+        sub_dvs = []
+
+        for (x0, pem_obj) in zip(sub_x0, self.sub_objectives):
+            if pem_obj.x0 is not None:
+                # If x0 is provided, use it directly
+                sub_dvs.append((None, params))
+
+            else:
+                # Otherwise, include x0 in the decision variables
+                sub_dvs.append((x0, params))
+
+        return sub_dvs
+
+    def __call__(self, decision_variables: tuple[np.ndarray | None, PyTree]) -> tuple:
+        """Evaluate cost function for compound PEM objective."""
+        total_cost = 0.0
+
+        sub_dvs = self._make_sub_dvs(decision_variables)
+        for (dvs, pem_obj) in zip(sub_dvs, self.sub_objectives):
+            cost = pem_obj(dvs)
+            total_cost += cost
+
+        return total_cost
+
+    def residuals(self, decision_variables: PyTree | tuple[np.ndarray, PyTree]) -> np.ndarray:
+        """Evaluate residuals for compound PEM objective."""
+        total_residuals = []
+        sub_dvs = self._make_sub_dvs(decision_variables)
+        for (dvs, pem_obj) in zip(sub_dvs, self.sub_objectives):
+            residuals = pem_obj.residuals(dvs)
+            total_residuals.append(residuals)
+        return np.hstack(total_residuals)
+    
+
+
 
 def _pem_solve_lm(
     pem_obj: PEMObjective,
@@ -325,9 +372,9 @@ SUPPORTED_METHODS = {
 
 def pem(
     predictor: KalmanFilterBase,
-    data: Timeseries,
+    data: Timeseries | tuple[Timeseries, ...],
     params_guess: T,
-    x0: np.ndarray = None,
+    x0: np.ndarray | None | tuple[np.ndarray, ...] = None,
     bounds: tuple[T, T] | None = None,
     P0: np.ndarray = None,
     method: str = "lm",
@@ -546,12 +593,31 @@ def pem(
 
     pem_solve = SUPPORTED_METHODS[method]
 
-    objective = PEMObjective(
-        predictor=predictor,
-        data=data,
-        P0=P0,
-        x0=x0,
-    )
+    if isinstance(data, (tuple, list)):
+        if x0 is None:
+            x0 = [None] * len(data)
+        elif isinstance(x0, np.ndarray):
+            x0 = [x0] * len(data)
+
+        sub_objectives = []
+        for (sub_data, sub_x0) in zip(data, x0):
+            sub_objectives.append(
+                PEMObjective(
+                    predictor=predictor,
+                    data=sub_data,
+                    P0=P0,
+                    x0=sub_x0,
+                )
+            )
+        objective = CompoundPEMObjective(sub_objectives=sub_objectives)
+
+    else:
+        objective = PEMObjective(
+            predictor=predictor,
+            data=data,
+            P0=P0,
+            x0=x0,
+        )
 
     return pem_solve(
         pem_obj=objective,
