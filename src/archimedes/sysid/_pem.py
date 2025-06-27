@@ -574,7 +574,7 @@ def pem(
     >>>
     >>> # Estimate parameters with known initial conditions
     >>> result = pem(ekf, data, p_guess, x0=x0)
-    >>> print(f"Estimated parameters: {result.x}")
+    >>> print(f"Estimated parameters: {result.p}")
     Estimated parameters: {'omega_n': array(1.9709515), 'zeta': array(0.11517324)}
     >>> print(f"Converged in {result.nit} iterations")
     Converged in 26 iterations
@@ -588,11 +588,11 @@ def pem(
 
     See Also
     --------
-    lm_solve : Underlying Levenberg-Marquardt optimizer
+    archimedes.optimize.lm_solve : Underlying Levenberg-Marquardt optimizer
     Timeseries : Data container for input-output time series
-    ExtendedKalmanFilter : EKF for mildly nonlinear systems
-    UnscentedKalmanFilter : UKF for highly nonlinear systems
-    discretize : Convert continuous-time dynamics to discrete-time
+    archimedes.observers.ExtendedKalmanFilter : EKF for mildly nonlinear systems
+    archimedes.observers.UnscentedKalmanFilter : UKF for highly nonlinear systems
+    archimedes.discretize : Convert continuous-time dynamics to discrete-time
 
     References
     ----------

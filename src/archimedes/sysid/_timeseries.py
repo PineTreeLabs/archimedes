@@ -83,7 +83,6 @@ class Timeseries:
     See Also
     --------
     pem : Uses Timeseries objects for parameter estimation
-    ExtendedKalmanFilter : Processes time series data for state estimation
     """
     ts: np.ndarray
     us: np.ndarray

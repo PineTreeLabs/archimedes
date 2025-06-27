@@ -591,6 +591,7 @@ def lm_solve(
     the bounds, the algorithm switches to solving the quadratic program:
 
     .. code-block:: text
+
         minimize    0.5 * p^T * (H + λI) * p + g^T * p
         subject to  lb <= x + p <= ub
 

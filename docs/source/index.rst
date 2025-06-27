@@ -61,11 +61,11 @@ Documentation
 
 .. toctree::
    :maxdepth: 1
-   :caption: Examples
+   :caption: Applications
 
-   notebooks/multirotor/multirotor00
    notebooks/deployment/deployment00
-   notebooks/sysid/sysid00
+   generated/notebooks/sysid/parameter-estimation
+   notebooks/multirotor/multirotor00
 
 .. toctree::
    :maxdepth: 1

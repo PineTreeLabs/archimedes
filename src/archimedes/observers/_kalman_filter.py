@@ -187,13 +187,25 @@ class ExtendedKalmanFilter(KalmanFilterBase):
         F[k] ≈ ∂f/∂x |_{x[k|k-1]}    (dynamics Jacobian)
         H[k] ≈ ∂h/∂x |_{x[k|k-1]}    (observation Jacobian)
 
-    These Jacobians are computed automatically using the ``archimedes.jac``
-    function, enabling seamless integration with the automatic differentiation
-    framework.
+    These Jacobians are computed using automatic differentiation for accuracy and
+    efficiency.
 
     Parameters
     ----------
-    Inherits all parameters from :class:`KalmanFilterBase`.
+    dyn : callable
+        Dynamics function with signature ``f(t, x, *args)`` that returns the
+        predicted state at the next time step. Must be compatible with automatic
+        differentiation for gradient-based filters.
+    obs : callable  
+        Observation function with signature ``h(t, x, *args)`` that maps state
+        to expected measurements. Must be compatible with automatic differentiation
+        for gradient-based filters.
+    Q : array_like
+        Process noise covariance matrix of shape ``(nx, nx)`` where ``nx`` is
+        the state dimension. Must be positive semi-definite.
+    R : array_like
+        Measurement noise covariance matrix of shape ``(ny, ny)`` where ``ny`` is
+        the measurement dimension. Must be positive definite.
 
     Notes
     -----
@@ -377,11 +389,6 @@ class ExtendedKalmanFilter(KalmanFilterBase):
 
         The automatic differentiation ensures that Jacobians are computed
         accurately and efficiently, even for complex nonlinear functions.
-
-        Examples
-        --------
-        >>> # Complete filtering step
-        >>> x_k, P_k, innov = ekf.step(t_k, x_prev, y_k, P_prev)
         """
         f = self.dyn
         h = self.obs
@@ -451,8 +458,20 @@ class UnscentedKalmanFilter(KalmanFilterBase):
 
     Parameters
     ----------
-    Inherits all parameters from :class:`KalmanFilterBase`.
-    
+    dyn : callable
+        Dynamics function with signature ``f(t, x, *args)`` that returns the
+        predicted state at the next time step. Must be compatible with automatic
+        differentiation for gradient-based filters.
+    obs : callable  
+        Observation function with signature ``h(t, x, *args)`` that maps state
+        to expected measurements. Must be compatible with automatic differentiation
+        for gradient-based filters.
+    Q : array_like
+        Process noise covariance matrix of shape ``(nx, nx)`` where ``nx`` is
+        the state dimension. Must be positive semi-definite.
+    R : array_like
+        Measurement noise covariance matrix of shape ``(ny, ny)`` where ``ny`` is
+        the measurement dimension. Must be positive definite.
     kappa : float, default=0.0
         Sigma point scaling parameter. Controls the spread of sigma points
         around the mean. Typical values:
