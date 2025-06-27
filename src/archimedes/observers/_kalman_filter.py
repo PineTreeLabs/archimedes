@@ -1,3 +1,5 @@
+# ruff: noqa: N803, N806
+
 from __future__ import annotations
 
 import abc
@@ -5,10 +7,8 @@ from typing import Callable
 
 import numpy as np
 from scipy.linalg import cholesky  # For Cholesky decomposition
-import casadi as cs
 
-from archimedes import jac, struct, compile
-
+from archimedes import jac, struct
 
 __all__ = [
     "KalmanFilterBase",
@@ -51,7 +51,7 @@ class KalmanFilterBase(metaclass=abc.ABCMeta):
         Dynamics function with signature ``f(t, x, *args)`` that returns the
         predicted state at the next time step. Must be compatible with automatic
         differentiation for gradient-based filters.
-    obs : callable  
+    obs : callable
         Observation function with signature ``h(t, x, *args)`` that maps state
         to expected measurements. Must be compatible with automatic differentiation
         for gradient-based filters.
@@ -66,7 +66,7 @@ class KalmanFilterBase(metaclass=abc.ABCMeta):
     ----------
     nx : int
         State dimension, derived from the shape of ``Q``.
-    ny : int  
+    ny : int
         Measurement dimension, derived from the shape of ``R``.
 
     Notes
@@ -92,7 +92,7 @@ class KalmanFilterBase(metaclass=abc.ABCMeta):
     ...         # Implementation-specific filtering logic
     ...         return x_new, P_new, innovation
     >>>
-    >>> # Define system dynamics and observations  
+    >>> # Define system dynamics and observations
     >>> def f(t, x):
     ...     return np.array([x[0] + 0.1*x[1], 0.9*x[1]], like=x)
     >>>
@@ -114,6 +114,7 @@ class KalmanFilterBase(metaclass=abc.ABCMeta):
     UnscentedKalmanFilter : Unscented Kalman Filter implementation
 
     """
+
     dyn: Callable = struct.field(static=True)
     obs: Callable = struct.field(static=True)
     Q: np.ndarray
@@ -196,7 +197,7 @@ class ExtendedKalmanFilter(KalmanFilterBase):
         Dynamics function with signature ``f(t, x, *args)`` that returns the
         predicted state at the next time step. Must be compatible with automatic
         differentiation for gradient-based filters.
-    obs : callable  
+    obs : callable
         Observation function with signature ``h(t, x, *args)`` that maps state
         to expected measurements. Must be compatible with automatic differentiation
         for gradient-based filters.
@@ -210,16 +211,16 @@ class ExtendedKalmanFilter(KalmanFilterBase):
     Notes
     -----
     The EKF is most suitable for systems where:
-    
+
     - Nonlinearities are mild (locally approximately linear)
-    - Computational efficiency is important  
+    - Computational efficiency is important
     - The system dynamics and observations are smooth and differentiable
-    
+
     For highly nonlinear systems, consider using :class:`UnscentedKalmanFilter`
     which can better capture nonlinear transformations of uncertainty.
 
     The EKF algorithm consists of two steps:
-    
+
     1. **Prediction**: Propagate state and covariance using linearized dynamics
     2. **Update**: Incorporate measurements using linearized observation model
 
@@ -251,7 +252,7 @@ class ExtendedKalmanFilter(KalmanFilterBase):
     >>>
     >>> # Filtering step
     >>> x = np.array([0.1, 0.0])  # Initial state
-    >>> P = np.eye(2) * 0.1       # Initial covariance  
+    >>> P = np.eye(2) * 0.1       # Initial covariance
     >>> y = np.array([0.12])      # Measurement
     >>> x_new, P_new, innov = ekf.step(0.0, x, y, P)
 
@@ -315,7 +316,7 @@ class ExtendedKalmanFilter(KalmanFilterBase):
         .. code-block:: text
 
             innovation = y - h(x_prior)
-            S = H @ P_prior @ H.T + R  
+            S = H @ P_prior @ H.T + R
             K = P_prior @ H.T @ S^(-1)
             x_post = x_prior + K @ innovation
             P_post = (I - K @ H) @ P_prior
@@ -324,7 +325,7 @@ class ExtendedKalmanFilter(KalmanFilterBase):
         --------
         >>> # Apply correction with custom prediction
         >>> x_pred = custom_prediction_step(x_prev)
-        >>> P_pred = custom_covariance_prediction(P_prev)  
+        >>> P_pred = custom_covariance_prediction(P_prev)
         >>> x_new, P_new, innov = ekf.correct(t, x_pred, y, P_pred)
         """
         h = self.obs
@@ -343,7 +344,6 @@ class ExtendedKalmanFilter(KalmanFilterBase):
         P = (np.eye(len(x)) - K @ H) @ P  # Updated state covariance
 
         return x, P, e
-
 
     def step(self, t, x, y, P, args=None):
         """Perform one complete EKF step (prediction + update).
@@ -379,7 +379,7 @@ class ExtendedKalmanFilter(KalmanFilterBase):
         -----
         The method performs the following sequence:
 
-        1. **Prediction Step**: 
+        1. **Prediction Step**:
            - Compute dynamics Jacobian ``F = ∂f/∂x``
            - Propagate state: ``x_pred = f(t, x)``
            - Propagate covariance: ``P_pred = F @ P @ F.T + Q``
@@ -391,9 +391,7 @@ class ExtendedKalmanFilter(KalmanFilterBase):
         accurately and efficiently, even for complex nonlinear functions.
         """
         f = self.dyn
-        h = self.obs
         Q = self.Q
-        R = self.R
 
         if args is None:
             args = ()
@@ -416,20 +414,21 @@ def _julier_sigma_points(x_center, P_cov, kappa):
 
     # Cholesky decomposition - scipy returns upper triangular
     U = cholesky((n + kappa) * P_cov)
-    
-    sigmas = np.zeros((2*n + 1, n))
+
+    sigmas = np.zeros((2 * n + 1, n))
     sigmas[0] = x_center
-    
+
     for k in range(n):
         # Note: U[k] accesses the k-th row of the upper triangular matrix
-        sigmas[k + 1] = x_center + U[k]      # x + U[k]
+        sigmas[k + 1] = x_center + U[k]  # x + U[k]
         sigmas[n + k + 1] = x_center - U[k]  # x - U[k]
-        
+
     return sigmas
+
 
 def _julier_weights(n, kappa):
     """Compute Julier weights"""
-    Wm = np.full(2*n + 1, 0.5 / (n + kappa))
+    Wm = np.full(2 * n + 1, 0.5 / (n + kappa))
     Wm[0] = kappa / (n + kappa)
     Wc = Wm.copy()  # For Julier, Wm and Wc are the same
     return Wm, Wc
@@ -446,7 +445,7 @@ class UnscentedKalmanFilter(KalmanFilterBase):
     to higher-order accuracy.
 
     The UKF provides several advantages over the Extended Kalman Filter:
-    
+
     - **Higher accuracy**: Captures mean and covariance to 2nd order for any
       nonlinearity (3rd order for Gaussian distributions)
     - **No Jacobian computation**: Uses sigma points instead of derivatives
@@ -462,7 +461,7 @@ class UnscentedKalmanFilter(KalmanFilterBase):
         Dynamics function with signature ``f(t, x, *args)`` that returns the
         predicted state at the next time step. Must be compatible with automatic
         differentiation for gradient-based filters.
-    obs : callable  
+    obs : callable
         Observation function with signature ``h(t, x, *args)`` that maps state
         to expected measurements. Must be compatible with automatic differentiation
         for gradient-based filters.
@@ -475,29 +474,29 @@ class UnscentedKalmanFilter(KalmanFilterBase):
     kappa : float, default=0.0
         Sigma point scaling parameter. Controls the spread of sigma points
         around the mean. Typical values:
-        
+
         - ``kappa = 0`` (default): Minimal spread, good for most applications
         - ``kappa = 3 - n``: Traditional choice for Gaussian distributions
         - ``kappa > 0``: Larger spread, may help with highly nonlinear systems
-        
+
         where ``n`` is the state dimension.
 
     Notes
     -----
     The UKF is most suitable for systems where:
-    
+
     - Nonlinearities are moderate to strong
     - Higher accuracy is needed than EKF can provide
     - The computational cost (≈ 3x EKF) is acceptable
     - Robustness to modeling errors is important
-    
+
     For mildly nonlinear systems where computational efficiency is critical,
     :class:`ExtendedKalmanFilter` may be more appropriate.
 
     The UKF algorithm consists of:
-    
+
     1. **Sigma point generation**: Create 2n+1 points capturing mean/covariance
-    2. **Prediction**: Propagate points through dynamics, compute statistics  
+    2. **Prediction**: Propagate points through dynamics, compute statistics
     3. **Update**: Propagate points through observation model, apply correction
 
     The implementation uses the Julier symmetric sigma point scheme with equal
@@ -532,7 +531,7 @@ class UnscentedKalmanFilter(KalmanFilterBase):
     >>>
     >>> # Create UKF with appropriate scaling
     >>> Q = np.eye(7) * 0.01  # Process noise
-    >>> R = np.eye(3) * 0.1   # Measurement noise  
+    >>> R = np.eye(3) * 0.1   # Measurement noise
     >>> ukf = UnscentedKalmanFilter(dyn=f, obs=h, Q=Q, R=R, kappa=0.0)
     >>>
     >>> # Filtering step
@@ -555,6 +554,7 @@ class UnscentedKalmanFilter(KalmanFilterBase):
     .. [3] Van der Merwe, R. "Sigma-Point Kalman Filters for Probabilistic
            Inference in Dynamic State-Space Models." PhD thesis, 2004.
     """
+
     kappa: float = 0.0
 
     def step(self, t, x, y, P, args=None):
@@ -636,7 +636,7 @@ class UnscentedKalmanFilter(KalmanFilterBase):
         Q = self.Q
         R = self.R
         kappa = self.kappa
-        
+
         if args is None:
             args = ()
 
@@ -649,18 +649,18 @@ class UnscentedKalmanFilter(KalmanFilterBase):
         sigmas = _julier_sigma_points(x, P, kappa)
 
         # PREDICT STEP - propagate sigma points through dynamics
-        sigmas_f = np.zeros((2*n + 1, n))
-        for i in range(2*n + 1):
+        sigmas_f = np.zeros((2 * n + 1, n))
+        for i in range(2 * n + 1):
             sigmas_f[i] = f(t, sigmas[i], *args)
 
         # Predicted mean (unscented transform)
         x_pred = np.zeros(n)
-        for i in range(2*n + 1):
+        for i in range(2 * n + 1):
             x_pred += Wm[i] * sigmas_f[i]
-        
+
         # Predicted covariance
         P_pred = Q.copy()
-        for i in range(2*n + 1):
+        for i in range(2 * n + 1):
             diff = sigmas_f[i] - x_pred
             P_pred += Wc[i] * np.outer(diff, diff)
 
@@ -669,37 +669,37 @@ class UnscentedKalmanFilter(KalmanFilterBase):
 
         # UPDATE STEP - propagate predicted sigma points through measurement function
         dim_z = len(y)
-        sigmas_h = np.zeros((2*n + 1, dim_z))
-        for i in range(2*n + 1):
+        sigmas_h = np.zeros((2 * n + 1, dim_z))
+        for i in range(2 * n + 1):
             sigmas_h[i] = h(t, sigmas_pred[i], *args)
-        
+
         # Predicted measurement mean
         y_pred = np.zeros(dim_z)
-        for i in range(2*n + 1):
+        for i in range(2 * n + 1):
             y_pred += Wm[i] * sigmas_h[i]
-        
+
         # Innovation covariance
         S = R.copy()
-        for i in range(2*n + 1):
+        for i in range(2 * n + 1):
             diff_y = sigmas_h[i] - y_pred
             S += Wc[i] * np.outer(diff_y, diff_y)
-        
+
         # Cross-covariance
         Pxz = np.zeros((n, dim_z))
-        for i in range(2*n + 1):
+        for i in range(2 * n + 1):
             diff_x = sigmas_pred[i] - x_pred
             diff_y = sigmas_h[i] - y_pred
             Pxz += Wc[i] * np.outer(diff_x, diff_y)
 
         # Kalman gain
         K = Pxz @ np.linalg.inv(S)
-        
+
         # Innovation
         e = y - y_pred
-        
+
         # Updated state estimate
         x_new = x_pred + K @ e
-        
+
         # Updated covariance
         P_new = P_pred - K @ S @ K.T
 

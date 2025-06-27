@@ -25,11 +25,11 @@ def generate_linear_oscillator():
 
     def simulate_system(ts, us, noise_std=0.0):
         """Simulate the Hammerstein-Wiener system."""
-        
+
         def ode_rhs(t, x):
             u = np.interp(t, ts, us[0])
             x1, x2 = x[0], x[1]
-            x2_t = -omega_n**2 * x1 - 2*zeta*omega_n*x2 + omega_n**2 * u
+            x2_t = -(omega_n**2) * x1 - 2 * zeta * omega_n * x2 + omega_n**2 * u
             return np.hstack([x2, x2_t])
 
         xs = arc.odeint(
@@ -44,7 +44,7 @@ def generate_linear_oscillator():
         ys = xs[:1, :] + np.random.normal(0, noise_std, (ny, len(ts)))
 
         return ys
-    
+
     # Step response
     us = np.ones((nu, len(ts)))  # Constant input (step)
     ys = simulate_system(ts, us, noise_std)
@@ -60,7 +60,7 @@ def generate_linear_oscillator():
     )
 
     # Chirp response
-    us = chirp(ts, f0=0.01, f1=3.0, t1=tf, method='quadratic').reshape(1, -1)
+    us = chirp(ts, f0=0.01, f1=3.0, t1=tf, method="quadratic").reshape(1, -1)
     ys = simulate_system(ts, us, noise_std)
 
     data = np.vstack([ts.reshape(1, -1), us.reshape(1, -1), ys])

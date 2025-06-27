@@ -11,16 +11,17 @@ from typing import TYPE_CHECKING, Any, Callable, Sequence, TypeVar, cast
 
 import casadi as cs
 import numpy as np
-from scipy.optimize import OptimizeResult, minimize as scipy_minimize
+from scipy.optimize import OptimizeResult
+from scipy.optimize import minimize as scipy_minimize
 
 from archimedes import tree
 from archimedes._core import (
-    compile,
-    grad,
     FunctionCache,
     SymbolicArray,
     _as_casadi_array,
     array,
+    compile,
+    grad,
     sym_like,
 )
 
@@ -200,7 +201,7 @@ def _make_nlp_solver(
             args = args[2:]
         else:
             bounds = None
-            
+
         x0_flat, bounds_flat, unravel_func = _ravel_args(x0, bounds)
         unravel._unravel = unravel_func  # store unravel function
 
@@ -397,7 +398,7 @@ def _minimize_with_scipy(
 
     result.x = unravel(result.x)
     return result
-    
+
 
 def minimize(
     obj: Callable,
@@ -405,7 +406,7 @@ def minimize(
     args: Sequence[Any] = (),
     static_argnames: str | Sequence[str] | None = None,
     constr: Callable | None = None,
-    bounds: Tuple[T, T] | None = None,
+    bounds: tuple[T, T] | None = None,
     constr_bounds: ArrayLike | None = None,
     method: str = "ipopt",
     options: dict | None = None,
@@ -440,15 +441,15 @@ def minimize(
     x0 : PyTree
         Initial guess for the optimization. Can be a flat array, nested dictionary,
         dataclass, or any PyTree structure. The solution will preserve this structure.
-        
+
         Examples::
-        
+
             # Flat array
             x0 = np.array([1.0, 2.0])
-            
+
             # Nested dictionary (preserved in solution)
             x0 = {"mass": 1.0, "damping": {"c1": 0.1, "c2": 0.2}}
-            
+
             # Dataclass-like nested structure
             @archimedes.struct.pytree_node
             class Params:
@@ -456,7 +457,7 @@ def minimize(
                 stiffness: float
 
             x0 = Params(mass=1.0, stiffness=100.0)
-            
+
     args : tuple, optional
         Extra arguments passed to the objective and constraint functions.
     static_argnames : tuple of str, optional
@@ -472,24 +473,24 @@ def minimize(
         Bounds on the decision variables, given as a tuple ``(lb, ub)``.
         Each bound must have the same PyTree structure as ``x0``. Use ``-np.inf``
         and ``np.inf`` for unbounded variables.
-        
+
         Examples::
-        
+
             # Array bounds
             bounds = (np.array([0.0, -1.0]), np.array([10.0, 1.0]))
-            
+
             # PyTree bounds (matching x0 structure)
             bounds = (
                 {"mass": 0.1, "damping": {"c1": 0.0, "c2": 0.0}},  # lower bounds
                 {"mass": 10.0, "damping": {"c1": 1.0, "c2": 1.0}}  # upper bounds
             )
-            
+
     constr_bounds : tuple of (array_like, array_like), optional
         Bounds on the constraint values, given as a tuple ``(lbg, ubg)``.
         If None and constr is provided, defaults to ``(0, 0)`` for equality constraints
     method : str, optional
         The optimization method to use. Default is "ipopt". Available methods:
-        
+
         **CasADi Methods (support constraints):**
             - ``"ipopt"`` (default): Interior point method, excellent for large
                 constrained problems
@@ -508,9 +509,9 @@ def minimize(
     -------
     result : OptimizeResult
         Optimization result with PyTree structure preserved:
-        
+
         - ``x`` : Solution parameters (same PyTree structure as ``x0``)
-        - ``success`` : Whether optimization succeeded  
+        - ``success`` : Whether optimization succeeded
         - ``message`` : Descriptive termination message
         - ``fun`` : Final objective value
         - ``nfev`` : Number of function evaluations
@@ -519,49 +520,49 @@ def minimize(
     Notes
     -----
     **Method Selection Guide:**
-    
+
     - **Constrained problems**: Use ``"ipopt"`` (default) or SQP methods
-    - **Unconstrained problems**: Use ``"BFGS"`` for fast convergence with exact gradients
+    - **Unconstrained problems**: Use ``"BFGS"`` for fast convergence
     - **Box constraints only**: Use ``"L-BFGS-B"`` for memory efficiency
-    - **Least-squares problems**: Use :py:func:`least_squares` with ``method="hess-lm"`` 
+    - **Least-squares problems**: Use :py:func:`least_squares` with ``method="hess-lm"``
       for specialized Levenberg-Marquardt algorithm
-      
+
     **Automatic Differentiation:**
-    
+
     All methods use exact gradients computed via automatic differentiation.
     For CasADi methods, both gradients and Hessians are computed exactly.
     For SciPy methods, gradients are exact and Hessians are approximated using BFGS.
-    
+
     **PyTree Structure Preservation:**
-    
-    The solution ``result.x`` maintains the exact same nested structure as the 
-    initial guess ``x0``. This enables natural parameter organization for 
+
+    The solution ``result.x`` maintains the exact same nested structure as the
+    initial guess ``x0``. This enables natural parameter organization for
     complex models::
-    
+
         # Initial parameters
         params = {"dynamics": {"mass": 1.0, "damping": 0.1}, "controller": {"kp": 1.0}}
-        
+
         # After optimization - same structure
         result = minimize(objective, params)
         final_params = result.x  # Has same nested structure
         print(final_params["dynamics"]["mass"])  # Optimized mass value
-        
+
     **IPOPT Configuration** (method="ipopt"):
-    
+
     Common IPOPT options passed via ``options={"ipopt": {...}}``::
-    
+
         ipopt_opts = {
             "print_level": 0,        # Suppress output
-            "max_iter": 100,         # Maximum iterations  
+            "max_iter": 100,         # Maximum iterations
             "tol": 1e-6,            # Convergence tolerance
             "acceptable_tol": 1e-4,  # Acceptable tolerance
         }
         result = minimize(obj, x0, method="ipopt", options={"ipopt": ipopt_opts})
-        
+
     **SQP Configuration** (method="sqpmethod"):
-    
+
     Common SQP options passed directly via ``options``::
-    
+
         options = {
             "qpsol": "osqp",                    # QP solver
             "hessian_approximation": "exact",   # Use exact Hessian
@@ -570,28 +571,28 @@ def minimize(
             "tol_du": 1e-6,                     # Dual feasibility tolerance
             }
         result = minimize(obj, x0, method="sqpmethod", options=options)
-        
+
     **SciPy Integration** (method="BFGS" or "L-BFGS-B"):
-    
+
     SciPy methods receive exact gradients via autodiff and support standard SciPy
     options::
-    
+
         result = minimize(
             obj, x0,
-            method="BFGS", 
+            method="BFGS",
             options={"gtol": 1e-8, "maxiter": 100}
         )
 
     Examples
     --------
     **Basic Usage:**
-    
+
     >>> import numpy as np
     >>> import archimedes as arc
     >>>
     >>> # Rosenbrock function with PyTree parameters
     >>> def rosenbrock(params):
-    ...     x, y = params["x"], params["y"] 
+    ...     x, y = params["x"], params["y"]
     ...     return 100 * (y - x ** 2) ** 2 + (1 - x) ** 2
     >>>
     >>> # PyTree initial guess
@@ -601,9 +602,9 @@ def minimize(
     >>> result = arc.optimize.minimize(rosenbrock, x0, method="BFGS")
     >>> print(result.x)  # Preserves PyTree structure
     {'x': 0.9999999999999994, 'y': 0.9999999999999989}
-    
+
     **Constrained Optimization:**
-    
+
     >>> # Add constraints
     >>> def constraint(params):
     ...     x, y = params["x"], params["y"]
@@ -611,18 +612,18 @@ def minimize(
     >>>
     >>> # Solve with inequality constraint
     >>> result = arc.optimize.minimize(
-    ...     rosenbrock, x0, 
+    ...     rosenbrock, x0,
     ...     constr=constraint,
     ...     constr_bounds=(0.0, np.inf),  # g(x) >= 0.0
     ...     method="ipopt"
     ... )
-    
+
     **Box Constraints with PyTree:**
-    
-    >>> # PyTree bounds matching x0 structure  
+
+    >>> # PyTree bounds matching x0 structure
     >>> bounds = (
     ...     {"x": 0.0, "y": 0.0},      # Lower bounds
-    ...     {"x": 2.0, "y": 2.0}       # Upper bounds  
+    ...     {"x": 2.0, "y": 2.0}       # Upper bounds
     ... )
     >>> result = arc.optimize.minimize(rosenbrock, x0, bounds=bounds)
 
@@ -630,14 +631,14 @@ def minimize(
     --------
     least_squares : Specialized Levenberg-Marquardt solver for residual minimization
     nlp_solver : Create a reusable solver for repeated optimization
-    root : Find roots of nonlinear equations  
+    root : Find roots of nonlinear equations
     scipy.optimize.minimize : SciPy's optimization interface
     """
     if method not in SUPPORTED_METHDOS:
         raise ValueError(
             f"Unsupported method: {method}. Supported methods are: {SUPPORTED_METHDOS}"
         )
-    
+
     if method in SCIPY_METHODS:
         return _minimize_with_scipy(
             obj,

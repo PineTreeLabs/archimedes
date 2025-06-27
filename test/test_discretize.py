@@ -1,6 +1,5 @@
-import pytest
-
 import numpy as np
+import pytest
 
 from archimedes import discretize
 
@@ -65,13 +64,14 @@ class TestRadau5:
     def test_error_handling(self):
         def f(t, x, u, p):
             return np.stack([x[1], -x[0]])
-        
+
         # No dt argument
         with pytest.raises(ValueError, match="dt must be specified"):
             discretize(f, method="rk4")
 
         # Decorator mode without dt
         with pytest.raises(ValueError, match="dt must be specified"):
+
             @discretize(method="rk4")
             def f(t, x, u, p):
                 return np.stack([x[1], -x[0]])

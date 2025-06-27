@@ -1,4 +1,5 @@
 """Utilities for discretizing a continuous ODE function"""
+# ruff: noqa: N802, N806
 
 import numpy as np
 
@@ -6,7 +7,7 @@ from archimedes import scan
 from archimedes._core import FunctionCache
 from archimedes.optimize import implicit
 
-__all__ = ["discretize_rk4", "discretize_radau5"]
+__all__ = ["discretize"]
 
 # # NOTE: This implementation fails because alpha[i] is not allowed
 # # when i is symbolic.  In theory this would be a better way to do it
@@ -115,9 +116,7 @@ def _radau5(rhs, h, newton_solver="fast_newton"):
     return scan_fun
 
 
-def discretize(
-    func=None, dt=None, method="rk4", n_steps=1, name=None, **options
-):
+def discretize(func=None, dt=None, method="rk4", n_steps=1, name=None, **options):
     """Convert continuous-time dynamics to discrete-time using numerical integration.
 
     Transforms a continuous-time ordinary differential equation (ODE) function
@@ -145,7 +144,7 @@ def discretize(
 
     Can also be used as a decorator to convert a continuous-time function
     into a discrete-time function:
-    
+
     .. code-block:: python
 
         @discretize(dt=0.1, method="rk4")
@@ -156,14 +155,14 @@ def discretize(
     ----------
     func : callable or FunctionCache
         Continuous-time dynamics function with signature ``func(t, x, u, params)``:
-        
+
         - ``t`` : Current time (scalar)
         - ``x`` : State vector of shape ``(nx,)``
-        - ``u`` : Input vector of shape ``(nu,)``  
+        - ``u`` : Input vector of shape ``(nu,)``
         - ``params`` : Parameters (any PyTree structure)
-        
+
         Must return the time derivative ``dx/dt`` as an array of shape ``(nx,)``.
-        The function can be a regular Python function or a pre-compiled 
+        The function can be a regular Python function or a pre-compiled
         :class:`FunctionCache` object.
     dt : float
         Sampling time step for discretization. Represents the time interval
@@ -171,16 +170,16 @@ def discretize(
         better accuracy but increase computational cost.
     method : str, optional
         Numerical integration method. Default is ``"rk4"``. Available methods:
-        
+
         - ``"rk4"``: Fourth-order Runge-Kutta method. Explicit, O(h⁴) accuracy.
           Excellent balance of accuracy and computational efficiency for most
           systems. Recommended for well-behaved, non-stiff dynamics.
-          
-        - ``"radau5"``: Fifth-order Radau IIA implicit method. Implicit, 
+
+        - ``"radau5"``: Fifth-order Radau IIA implicit method. Implicit,
           A-stable with excellent stability properties. Suitable for stiff
           systems and when high accuracy is required. Involves solving
           nonlinear equations at each step using Newton's method.
-          
+
     n_steps : int, optional
         Number of integration sub-steps within each sampling interval ``dt``.
         Default is 1. When ``n_steps > 1``, the integration step size becomes
@@ -193,7 +192,7 @@ def discretize(
         performance profiling of compiled functions.
     **options
         Additional method-specific options:
-        
+
         For ``method="radau5"``:
             - ``newton_solver`` : str, default ``"fast_newton"``
               Newton solver for implicit equations. Other options inclue ``"kinsol"``
@@ -202,48 +201,49 @@ def discretize(
     Returns
     -------
     discrete_func : FunctionCache
-        Discrete-time dynamics function with signature ``discrete_func(t, x, u, params)``
-        that returns the next state ``x[k+1]`` given current state ``x[k]``.
-        The function is automatically compiled for efficient evaluation and
-        supports automatic differentiation for gradient computation.
+        Discrete-time dynamics function with signature
+        ``discrete_func(t, x, u, params)`` that returns the next state
+        ``x[k+1]`` given current state ``x[k]``. The function is automatically
+        compiled for efficient evaluation and supports automatic differentiation
+        for gradient computation.
 
     Notes
     -----
     **Method Selection Guide:**
-    
+
     **RK4 Method** (``method="rk4"``):
         - **Best for**: Non-stiff systems, general-purpose discretization
         - **Advantages**: Fast, explicit, well-tested, excellent accuracy/cost ratio
         - **Limitations**: Can become unstable for stiff systems or large time steps
         - **Typical use**: Mechanical systems, mild nonlinearities, most applications
-        
-    **Radau5 Method** (``method="radau5"``):  
+
+    **Radau5 Method** (``method="radau5"``):
         - **Best for**: Stiff systems, high accuracy requirements, DAE systems
         - **Advantages**: A-stable, handles stiff dynamics, high-order accuracy
         - **Limitations**: Computational overhead from implicit solve
         - **Typical use**: Chemical kinetics, electrical circuits, multiscale dynamics
-        
+
     **Accuracy Considerations:**
-    
+
     The discretization error depends on both the method order and the time step:
-    
-    - **RK4**: Error ∼ O(dt⁴), typically accurate for ``dt < T/10`` where ``T`` 
+
+    - **RK4**: Error ∼ O(dt⁴), typically accurate for ``dt < T/10`` where ``T``
       is the fastest system time constant
     - **Radau5**: Error ∼ O(dt⁵), maintains accuracy even for moderate ``dt``
     - **Sub-stepping**: Use ``n_steps > 1`` when measurement rate limits ``dt``
       but dynamics require smaller integration steps
-    
+
     **Automatic Differentiation:**
-    
+
     The discretized function preserves automatic differentiation through the
     integration process, enabling efficient gradient computation for:
-    
+
     - Parameter estimation via :func:`pem`
-    - Sensitivity analysis and uncertainty quantification  
+    - Sensitivity analysis and uncertainty quantification
     - Gradient-based optimal control
-    
+
     **Performance Optimization:**
-    
+
     The returned function is automatically compiled using CasADi's just-in-time
     compilation for efficient repeated evaluation. For system identification
     applications involving hundreds of function evaluations, this provides
@@ -252,7 +252,7 @@ def discretize(
     Examples
     --------
     **Basic Discretization:**
-    
+
     >>> import numpy as np
     >>> import archimedes as arc
     >>>
@@ -264,7 +264,7 @@ def discretize(
     ...         -omega**2 * x[0] + u[0]  # dx2/dt = -ω²x1 + u (acceleration)
     ...     ])
     >>>
-    >>> # Discretize with 50ms sampling  
+    >>> # Discretize with 50ms sampling
     >>> dt = 0.05
     >>> oscillator_discrete = arc.discretize(oscillator, dt, method="rk4")
     >>>
@@ -277,9 +277,9 @@ def discretize(
     >>> x1 = oscillator_discrete(t0, x0, u0, params)
     >>> print(f"Next state: {x1}")
     Next state: [0.995004 -0.199334]
-    
+
     **Stiff System with Radau5:**
-    
+
     >>> # Stiff Van der Pol oscillator
     >>> def van_der_pol(t, x, u, params):
     ...     mu = params["mu"]  # Large damping parameter
@@ -291,8 +291,8 @@ def discretize(
     >>> # Use implicit method for stiff dynamics
     >>> dt = 0.1  # Larger time step acceptable with Radau5
     >>> vdp_discrete = arc.discretize(
-    ...     van_der_pol, dt, 
-    ...     method="radau5", 
+    ...     van_der_pol, dt,
+    ...     method="radau5",
     ...     newton_solver="fast_newton"
     ... )
     >>>
@@ -349,10 +349,10 @@ def discretize(
     if func is None:
         # Decorator mode: @discretize(dt=0.1, method="rk4")
         if dt is None:
-            raise ValueError("dt must be specified when using discretize as a decorator")
+            raise ValueError("dt must be specified")
 
         def decorator(f):
-            """Decorator function that applies discretization to the wrapped function."""
+            # Decorator function that applies discretization to the wrapped function
             return _discretize_impl(f, dt)
 
         return decorator
@@ -360,7 +360,7 @@ def discretize(
         # Direct mode: discretize(func, dt=0.1, method="rk4", ...)
         if dt is None:
             raise ValueError("dt must be specified")
-        
+
         return _discretize_impl(func, dt)
 
     # h = dt / n_steps

@@ -1,21 +1,15 @@
+# ruff: noqa: N806
+
 from __future__ import annotations
-from typing import (
-    TYPE_CHECKING,
-    Dict,
-    Tuple,
-    Optional,
-    Callable,
-    Any,
-    List,
-    NamedTuple
-)
-from enum import IntEnum
+
 import logging
+from enum import IntEnum
+from typing import TYPE_CHECKING, Any, Callable, Tuple, TypeVar
 
 import numpy as np
+import osqp
 from scipy import sparse
 from scipy.optimize import OptimizeResult
-import osqp
 
 import archimedes as arc
 from archimedes import tree
@@ -37,47 +31,47 @@ __all__ = [
 
 class LMStatus(IntEnum):
     """Status codes for Levenberg-Marquardt optimization results.
-    
+
     These codes follow the MINPACK convention and provide detailed information
     about the termination condition of the optimization algorithm. Understanding
     these codes is essential for interpreting optimization results and diagnosing
     potential issues.
-    
+
     Attributes
     ----------
     FTOL_REACHED : int = 1
         Both actual and predicted relative reductions in the objective function
         are at most ``ftol``. This indicates convergence based on minimal
         improvement in the objective function.
-        
+
     XTOL_REACHED : int = 2
         Relative error between two consecutive parameter iterates is at most
         ``xtol``. This indicates convergence based on minimal change in the
         parameters.
-        
+
     BOTH_TOL_REACHED : int = 3
         Both ``ftol`` and ``xtol`` conditions are satisfied simultaneously.
         This represents the strongest convergence criterion.
-        
+
     GTOL_REACHED : int = 4
         The cosine of the angle between the gradient and any column of the
         Jacobian is at most ``gtol`` in absolute value. For constrained
         problems, this applies to the projected gradient. This indicates
         convergence to a critical point.
-        
+
     MAX_FEVAL : int = 5
         Maximum number of function evaluations (``max_nfev``) has been reached
         without achieving convergence. This typically indicates that either
         more iterations are needed, the tolerances are too tight, or the
         problem is ill-conditioned.
-    
+
     Notes
     -----
     **Success vs. Failure**:
         Status codes 1-4 indicate successful convergence, while code 5 indicates
         failure to converge within the iteration limit. Use the ``success``
         property to check for overall success.
-        
+
     **Interpretation Guide**:
         - **FTOL_REACHED**: Good for most applications, indicates objective
           function has stopped improving significantly
@@ -89,33 +83,45 @@ class LMStatus(IntEnum):
         - **MAX_FEVAL**: Check if more iterations are needed or if the problem
           requires reformulation
     """
-    
+
     # Success codes (convergence achieved)
-    FTOL_REACHED = 1      # Function tolerance convergence
-    XTOL_REACHED = 2      # Parameter tolerance convergence  
+    FTOL_REACHED = 1  # Function tolerance convergence
+    XTOL_REACHED = 2  # Parameter tolerance convergence
     BOTH_TOL_REACHED = 3  # Both ftol and xtol satisfied
-    GTOL_REACHED = 4      # Gradient tolerance convergence
-    
+    GTOL_REACHED = 4  # Gradient tolerance convergence
+
     # Failure codes
-    MAX_FEVAL = 5         # Maximum function evaluations reached
+    MAX_FEVAL = 5  # Maximum function evaluations reached
 
     @property
     def message(self) -> str:
         """Get descriptive message for this status code."""
         messages = {
-            self.FTOL_REACHED: "Both actual and predicted relative reductions in the sum of squares are at most ftol",
-            self.XTOL_REACHED: "Relative error between two consecutive iterates is at most xtol", 
+            self.FTOL_REACHED: (
+                "Both actual and predicted relative reductions in the sum of squares "
+                "are at most ftol"
+            ),
+            self.XTOL_REACHED: (
+                "Relative error between two consecutive iterates is at most xtol"
+            ),
             self.BOTH_TOL_REACHED: "Conditions for ftol and xtol both hold",
-            self.GTOL_REACHED: "The cosine of the angle between fvec and any column of the Jacobian is at most gtol in absolute value",
+            self.GTOL_REACHED: (
+                "The cosine of the angle between fvec and any column of the Jacobian "
+                "is at most gtol in absolute value"
+            ),
             self.MAX_FEVAL: "Number of function evaluations has reached max_nfev",
         }
         return messages.get(self, "Unknown status")
-    
-    @property 
+
+    @property
     def success(self) -> bool:
         """Check if this status indicates successful convergence."""
-        return self in (self.FTOL_REACHED, self.XTOL_REACHED, 
-                       self.BOTH_TOL_REACHED, self.GTOL_REACHED)
+        return self in (
+            self.FTOL_REACHED,
+            self.XTOL_REACHED,
+            self.BOTH_TOL_REACHED,
+            self.GTOL_REACHED,
+        )
 
 
 class LMProgress:
@@ -138,13 +144,14 @@ class LMProgress:
             cost_reduction = self.prev_cost - cost
         else:
             cost_reduction = None
-        
-        self._print_iteration(self.iteration, nfev, cost, cost_reduction, 
-                            step_norm, grad_norm)
-        
+
+        self._print_iteration(
+            self.iteration, nfev, cost, cost_reduction, step_norm, grad_norm
+        )
+
         self.prev_cost = cost
         self.iteration += 1
-    
+
     def _print_header(self):
         msg = (
             f"{'Iteration':^10} {'Total nfev':^12} {'Cost':^15} "
@@ -154,21 +161,22 @@ class LMProgress:
             print(msg)
         else:
             self.logger.info(msg)
-    
-    def _print_iteration(self, iter_num, nfev, cost, cost_reduction, 
-                        step_norm, grad_norm):
+
+    def _print_iteration(
+        self, iter_num, nfev, cost, cost_reduction, step_norm, grad_norm
+    ):
         """Print a single iteration row."""
         # Format numbers with appropriate precision
         cost_str = f"{cost:.4e}"
         grad_str = f"{grad_norm:.2e}"
-        
+
         if cost_reduction is not None:
             cost_red_str = f"{cost_reduction:.2e}"
             step_str = f"{step_norm:.2e}" if step_norm is not None else ""
         else:
             cost_red_str = ""
             step_str = ""
-        
+
         msg = (
             f"{iter_num:^10} {nfev:^12} {cost_str:^15} "
             f"{cost_red_str:^15} {step_str:^12} {grad_str:^12}"
@@ -221,7 +229,7 @@ class LMResult(OptimizeResult):
         function evaluations due to the trust region approach.
     history : List[Dict[str, Any]]
         Detailed iteration history containing convergence diagnostics:
-        
+
         - ``iter`` : Iteration number
         - ``cost`` : Objective function value
         - ``grad_norm`` : Gradient norm (or projected gradient for constrained)
@@ -254,7 +262,7 @@ class LMResult(OptimizeResult):
 def _compute_step(hess, grad, diag, lambda_val, x, bounds=None, qp_solver=None):
     """
     Compute the Levenberg-Marquardt step by solving the damped normal equations.
-    
+
     Uses hybrid approach: first try unconstrained step, then QP if bounds violated.
 
     Parameters
@@ -303,14 +311,14 @@ def _compute_step(hess, grad, diag, lambda_val, x, bounds=None, qp_solver=None):
         except np.linalg.LinAlgError:
             # Last resort: gradient descent direction with normalization
             step = -grad / (np.linalg.norm(grad) + 1e-8)
-    
+
     # Step 2: Check if bounds are satisfied
     if bounds is None:
         return step
-        
+
     lb, ub = bounds
     x_trial = x + step
-    
+
     # Check if trial point violates bounds
     violates_bounds = np.any(x_trial < lb) or np.any(x_trial > ub)
 
@@ -326,17 +334,17 @@ def _compute_step(hess, grad, diag, lambda_val, x, bounds=None, qp_solver=None):
     # Rearranged: (lb - x) <= p <= (ub - x)
     l_qp = lb - x  # Lower bounds for step
     u_qp = ub - x  # Upper bounds for step
-    
+
     # Update the QP problem
     qp_solver.update(P=H_damped, q=grad, l=l_qp, u=u_qp)
-    
+
     # Warm start with unconstrained solution (projected to bounds)
     qp_solver.warm_start(x=np.clip(step, l_qp, u_qp))
-    
+
     # Solve QP
     qp_results = qp_solver.solve()
-    
-    if qp_results.info.status != 'solved':
+
+    if qp_results.info.status != "solved":
         print(f"OSQP solver status: {qp_results.info.status}")
         # Fallback: project unconstrained step to bounds
         return np.clip(step, l_qp, u_qp)
@@ -373,7 +381,8 @@ def _compute_predicted_reduction(grad, step, hess, current_objective=None):
     quadratic_term = 0.5 * np.dot(step, hess @ step)
     pred_red = -(linear_term + quadratic_term)
 
-    # Scale by current objective to make it relative (like MINPACK does with residual norm)
+    # Scale by current objective to make it relative
+    # (like MINPACK does with residual norm)
     if current_objective is not None and current_objective > 0:
         # Add small epsilon to prevent division by zero near optimum
         epsilon = 1e-16
@@ -385,11 +394,11 @@ def _compute_predicted_reduction(grad, step, hess, current_objective=None):
 def _project_gradient(grad, x, bounds, atol=1e-8):
     """
     Project gradient onto the tangent cone of box constraints.
-    
+
     This computes the "projected gradient" which is the correct measure
     for convergence in constrained optimization. At a constrained optimum,
     the projected gradient should be zero, not the full gradient.
-    
+
     Parameters
     ----------
     grad : ndarray, shape (n,)
@@ -401,58 +410,58 @@ def _project_gradient(grad, x, bounds, atol=1e-8):
         Use -np.inf/np.inf for unbounded variables
     atol : float, optional
         Absolute tolerance for determining if a variable is at its bound
-        
+
     Returns
     -------
     grad_proj : ndarray, shape (n,)
         Projected gradient
     active_lower : ndarray, shape (n,), dtype=bool
         True where lower bounds are active
-    active_upper : ndarray, shape (n,), dtype=bool  
+    active_upper : ndarray, shape (n,), dtype=bool
         True where upper bounds are active
-        
+
     Mathematical Notes
     -----------------
     For box constraints l ≤ x ≤ u, the projected gradient is:
-    
+
     g_proj[i] = {
         0       if x[i] = l[i] and g[i] > 0  (at lower bound, gradient points out)
-        0       if x[i] = u[i] and g[i] < 0  (at upper bound, gradient points out)  
+        0       if x[i] = u[i] and g[i] < 0  (at upper bound, gradient points out)
         g[i]    otherwise                    (interior or admissible direction)
     }
-    
+
     This captures the KKT optimality conditions:
     - Interior variables: g_proj[i] = g[i] = 0 at optimum
     - Boundary variables: g_proj[i] = 0 always (projected out)
     """
     lower, upper = bounds
-    
+
     # Determine which constraints are active (within tolerance)
     active_lower = (x <= lower + atol) & np.isfinite(lower)
     active_upper = (x >= upper - atol) & np.isfinite(upper)
-    
+
     # Start with full gradient
     grad_proj = grad.copy()
-    
+
     # Zero out gradient components that point "outward" from active constraints
     # At lower bound: zero positive gradients (can't move further left)
     grad_proj = np.where(active_lower & (grad > 0), 0.0, grad_proj)
-    
-    # At upper bound: zero negative gradients (can't move further right)  
+
+    # At upper bound: zero negative gradients (can't move further right)
     grad_proj = np.where(active_upper & (grad < 0), 0.0, grad_proj)
-    
+
     return grad_proj, active_lower, active_upper
 
 
 def _check_constrained_convergence(grad, x, bounds, gtol=1e-8, atol=1e-8):
     """
     Check convergence for box-constrained optimization using projected gradient.
-    
+
     Parameters
     ----------
     grad : ndarray
         Current gradient
-    x : ndarray  
+    x : ndarray
         Current parameters
     bounds : tuple of (lower, upper)
         Box constraints
@@ -460,7 +469,7 @@ def _check_constrained_convergence(grad, x, bounds, gtol=1e-8, atol=1e-8):
         Gradient tolerance for convergence
     atol : float
         Tolerance for determining active constraints
-        
+
     Returns
     -------
     converged : bool
@@ -471,18 +480,18 @@ def _check_constrained_convergence(grad, x, bounds, gtol=1e-8, atol=1e-8):
         Information about active constraints
     """
     grad_proj, active_lower, active_upper = _project_gradient(grad, x, bounds, atol)
-    
+
     grad_proj_norm = np.linalg.norm(grad_proj, np.inf)
     converged = grad_proj_norm <= gtol
-    
+
     active_info = {
-        'n_active_lower': np.sum(active_lower),
-        'n_active_upper': np.sum(active_upper), 
-        'total_active': np.sum(active_lower | active_upper),
-        'grad_proj_norm': grad_proj_norm,
-        'full_grad_norm': np.linalg.norm(grad, np.inf)
+        "n_active_lower": np.sum(active_lower),
+        "n_active_upper": np.sum(active_upper),
+        "total_active": np.sum(active_lower | active_upper),
+        "grad_proj_norm": grad_proj_norm,
+        "full_grad_norm": np.linalg.norm(grad, np.inf),
     }
-    
+
     return converged, grad_proj_norm, active_info
 
 
@@ -561,7 +570,7 @@ def lm_solve(
     -------
     result : OptimizeResult
         Optimization result containing:
-        
+
         - ``x`` : Solution parameters with same structure as ``x0``
         - ``success`` : Whether optimization succeeded
         - ``status`` : Termination status (:class:`LMStatus`)
@@ -663,6 +672,7 @@ def lm_solve(
     # Wrap the original function to apply the unravel and compute
     # gradient and Hessian
     _func = arc.compile(func)
+
     def res_func(x_flat):
         x = unravel(x_flat)
         r = _func(x, *args)
@@ -705,7 +715,6 @@ def lm_solve(
 
     # Main iteration loop
     while nfev < max_nfev:
-
         # Record iteration history before computing step
         history_entry = {
             "iter": iter,
@@ -714,19 +723,21 @@ def lm_solve(
             "lambda": float(lambda_val),
             "x": x.copy(),  # Current parameter values
         }
-        
+
         # Add constrained optimization info if bounds are present
         if bounds_flat is not None:
             _, g_proj_norm, active_info = _check_constrained_convergence(
                 grad, x, bounds_flat, gtol
             )
-            history_entry.update({
-                "grad_proj_norm": float(g_proj_norm),
-                "n_active_lower": int(active_info['n_active_lower']),
-                "n_active_upper": int(active_info['n_active_upper']),
-                "total_active": int(active_info['total_active']),
-            })
-        
+            history_entry.update(
+                {
+                    "grad_proj_norm": float(g_proj_norm),
+                    "n_active_lower": int(active_info["n_active_lower"]),
+                    "n_active_upper": int(active_info["n_active_upper"]),
+                    "total_active": int(active_info["total_active"]),
+                }
+            )
+
         history.append(history_entry)
 
         # Increment Jacobian evaluations counter
@@ -780,7 +791,10 @@ def lm_solve(
             nfev += 1
 
             if logger is not None:
-                logger.debug(f"Trial func eval: cost={cost_new}, grad={grad_new}, hess={hess_new}")
+                logger.debug(
+                    f"Trial func eval: cost={cost_new}, grad={grad_new}, "
+                    f"hess={hess_new}"
+                )
 
             # Compute actual reduction
             actred = -1.0
@@ -814,7 +828,7 @@ def lm_solve(
                 cost, grad, hess = cost_new, grad_new, hess_new
                 g_norm = np.linalg.norm(grad, np.inf)
                 xnorm = np.linalg.norm(diag * x)
-                
+
                 # Update effective gradient norm for progress reporting
                 if bounds_flat is not None:
                     _, g_proj_norm, _ = _check_constrained_convergence(
@@ -826,9 +840,10 @@ def lm_solve(
 
                 # Report progress (use appropriate gradient norm)
                 progress.report(cost, effective_grad_norm, pnorm, nfev)
-                
-                # Machine precision check: if step norm is tiny relative to parameter norm,
-                # we're likely at numerical precision limits and should terminate
+
+                # Machine precision check: if step norm is tiny relative to
+                # parameter norm, we're likely at numerical precision limits
+                # and should terminate
                 if pnorm <= SQRT_MACHEP * max(xnorm, 1.0):
                     status = LMStatus.XTOL_REACHED
                     break
@@ -868,7 +883,7 @@ def lm_solve(
         # Check step size relative to parameter magnitude
         if pnorm <= xtol * xnorm:
             # Check if we also satisfied ftol for combined convergence
-            if (status == LMStatus.FTOL_REACHED):
+            if status == LMStatus.FTOL_REACHED:
                 status = LMStatus.BOTH_TOL_REACHED
             else:
                 status = LMStatus.XTOL_REACHED
@@ -883,7 +898,7 @@ def lm_solve(
         print(status.message)
     else:
         logger.info(status.message)
-    
+
     # Calculate final residuals
     res = res_func(x)
 

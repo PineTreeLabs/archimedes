@@ -1,22 +1,20 @@
-
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Callable, Sequence, TypeVar, cast
+from typing import TYPE_CHECKING, Any, Callable, Sequence, TypeVar
 
 import numpy as np
-from scipy.optimize import OptimizeResult, least_squares as scipy_lstsq
+from scipy.optimize import OptimizeResult
+from scipy.optimize import least_squares as scipy_lstsq
 
 import archimedes as arc
 from archimedes import tree
-from archimedes._core import (
-    compile,
-    grad,
-)
-from ._lm import lm_solve
+
 from ._common import _ravel_args
+from ._lm import lm_solve
 
 if TYPE_CHECKING:
     from ..typing import PyTree
+
     T = TypeVar("T", bound=PyTree)
 
 
@@ -54,68 +52,69 @@ def least_squares(
     ----------
     func : callable
         Residual function with signature ``func(x, *args) -> residuals``, where
-        ``residuals`` is an array-like object. The parameter ``x`` can be any 
+        ``residuals`` is an array-like object. The parameter ``x`` can be any
         PyTree structure matching ``x0``.
-    x0 : PyTree  
+    x0 : PyTree
         Initial parameter guess. Can be a flat array, nested dictionary, dataclass,
         or any PyTree structure. The solution preserves this exact structure.
-        
+
         Examples::
-        
+
             # Physical system parameters
             x0 = {
-                "dynamics": {"mass": 1.0, "damping": 0.1}, 
+                "dynamics": {"mass": 1.0, "damping": 0.1},
                 "sensor": {"bias": 0.0, "scale": 1.0}
             }
-            
+
             # Simple array
             x0 = np.array([1.0, 0.1, 0.0, 1.0])
-            
+
     args : tuple, optional
         Extra arguments passed to the residual function.
     method : str, optional
         Least-squares method to use. Default is ``"hess-lm"``. Available methods:
-        
+
         **Archimedes Methods:**
             - ``"hess-lm"`` (default): Custom Levenberg-Marquardt with direct Hessian.
               Supports box constraints and specialized convergence criteria.
-              
+
         **SciPy Methods:**
             - ``"trf"``: Trust Region Reflective, robust for large problems
-            - ``"dogbox"``: Dog-leg method in rectangular trust regions  
+            - ``"dogbox"``: Dog-leg method in rectangular trust regions
             - ``"lm"``: Standard SciPy Levenberg-Marquardt (unconstrained only)
-            
+
     bounds : tuple of (PyTree, PyTree), optional
         Box constraints specified as ``(lower_bounds, upper_bounds)`` with the same
         PyTree structure as ``x0``. Use ``-np.inf`` and ``np.inf`` for unbounded
         variables.
-        
+
         Examples::
-        
+
             # PyTree bounds for physical constraints
             bounds = (
                 {"dynamics": {"mass": 0.1, "damping": 0.0}},  # Lower bounds
-                {"dynamics": {"mass": 10.0, "damping": 1.0}}   # Upper bounds  
+                {"dynamics": {"mass": 10.0, "damping": 1.0}}   # Upper bounds
             )
-            
+
             # Array bounds
             bounds = (np.array([0.1, 0.0]), np.array([10.0, 1.0]))
-            
+
     options : dict, optional
-        Method-specific options. For ``"hess-lm"``, see :py:func:`lm_solve` documentation.
-        For SciPy methods, see ``scipy.optimize.least_squares`` documentation.
+        Method-specific options. For ``"hess-lm"``, see :py:func:`lm_solve`
+        documentation. For SciPy methods, see ``scipy.optimize.least_squares``
+        documentation.
 
     Returns
     -------
     result : OptimizeResult
         Optimization result with preserved PyTree structure:
-        
+
         - ``x`` : Solution parameters (same PyTree structure as ``x0``)
         - ``success`` : Whether optimization converged successfully
         - ``status`` : Termination status (LMStatus for "hess-lm")
         - ``message`` : Descriptive termination message
         - ``fun`` : Final residual vector
-        - ``cost`` : Final objective value (0.5 * ||residuals||²) 
+        - ``cost`` : Final objective value (0.5 * ||residuals||²)
         - ``nfev`` : Number of function evaluations
         - ``nit`` : Number of iterations
         - Additional method-specific fields
@@ -123,9 +122,9 @@ def least_squares(
     Notes
     -----
     **PyTree Parameter Organization:**
-    
+
     PyTree support enables natural organization of complex parameter structures::
-    
+
         # Organized system parameters
         params = {
             "mechanical": {
@@ -134,19 +133,19 @@ def least_squares(
                 "stiffness": {"linear": 100.0, "cubic": 0.001}
             },
             "electrical": {
-                "resistance": 10.0, 
+                "resistance": 10.0,
                 "inductance": 0.01,
                 "capacitance": 1e-6
             },
             "initial_conditions": np.array([0.0, 0.0])
         }
-        
+
         # After optimization - same structure preserved
         result = least_squares(residuals_func, params)
         optimized_params = result.x  # Maintains full nested structure
-        
+
     **Custom Hessian Method** (``"hess-lm"``):
-    
+
     The default method leverages specialized Hessian approximations for efficient
     parameter estimation.  This method solves the damped normal equations directly
     using a Cholesky factorization instead of the typical QR approach.  This can
@@ -156,11 +155,11 @@ def least_squares(
     ([OSQP](https://osqp.org/)) when bounds are active.
 
     Key options passed via ``options`` dict::
-    
+
         # Common options for custom LM method
         lm_options = {
             "ftol": 1e-6,      # Function tolerance
-            "xtol": 1e-6,      # Parameter tolerance  
+            "xtol": 1e-6,      # Parameter tolerance
             "gtol": 1e-6,      # Gradient tolerance
             "max_nfev": 200,     # Maximum function evaluations
             "lambda0": 1e-3,   # Initial damping parameter

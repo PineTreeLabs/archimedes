@@ -1,4 +1,5 @@
 import numpy as np
+
 from archimedes import struct
 
 __all__ = ["Timeseries"]
@@ -46,22 +47,22 @@ class Timeseries:
         The class follows the convention that time varies along the second
         dimension (columns), while different signals vary along the first
         dimension (rows).
-        
+
     **Validation**:
         The class automatically validates that:
-        
+
         - Time vector is one-dimensional
         - Input and output matrices are two-dimensional
         - All time dimensions are consistent (same N)
         - Data types are compatible with numerical operations
-        
+
     **PyTree Compatibility**:
         As a PyTree node, ``Timeseries`` objects can be:
 
         - Flattened, reconstructed, and manipulated using PyTree utilities
         - Stored and manipulated as structured data
         - Used in optimization algorithms that expect PyTree parameters
-        
+
     **Immutability**:
         Instances are frozen (immutable) after creation, preventing accidental
         modification of data during analysis. Use the ``replace`` method to
@@ -84,6 +85,7 @@ class Timeseries:
     --------
     pem : Uses Timeseries objects for parameter estimation
     """
+
     ts: np.ndarray
     us: np.ndarray
     ys: np.ndarray

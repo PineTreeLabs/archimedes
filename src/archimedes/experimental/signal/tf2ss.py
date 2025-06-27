@@ -2,6 +2,7 @@ import numpy as np
 
 __all__ = ["tf2ss"]
 
+
 # Almost verbatim from scipy.signal.tf2ss
 # https://github.com/scipy/scipy/blob/v1.14.1/scipy/signal/_lti_conversion.py#L18-L112
 def tf2ss(num, den):
@@ -80,8 +81,12 @@ def tf2ss(num, den):
         msg = "Improper transfer function. `num` is longer than `den`."
         raise ValueError(msg)
     if M == 0 or K == 0:  # Null system
-        return (np.array([], float), np.array([], float),
-                np.array([], float), np.array([], float))
+        return (
+            np.array([], float),
+            np.array([], float),
+            np.array([], float),
+            np.array([], float),
+        )
 
     # pad numerator to have same number of columns has denominator
     num = np.hstack((np.zeros((num.shape[0], K - M), dtype=num.dtype), num))
@@ -99,8 +104,12 @@ def tf2ss(num, den):
     if K == 1:
         D = D.reshape(num.shape)
 
-        return (np.zeros((1, 1)), np.zeros((1, D.shape[1])),
-                np.zeros((D.shape[0], 1)), D)
+        return (
+            np.zeros((1, 1)),
+            np.zeros((1, D.shape[1])),
+            np.zeros((D.shape[0], 1)),
+            D,
+        )
 
     frow = -np.array([den[1:]], like=den)
     # A = np.r_[frow, np.eye(K - 2, K - 1)]

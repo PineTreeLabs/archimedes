@@ -1,5 +1,6 @@
 """System identification and parameter estimation functionality"""
-from ._pem import pem, PEMObjective
+
+from ._pem import PEMObjective, pem
 from ._timeseries import Timeseries
 
 __all__ = [

@@ -121,7 +121,11 @@ class OCPBase(metaclass=abc.ABCMeta):
         obj = self.build_objective(domain)
         cons = self.build_constraints(domain)
         opt_result = minimize(
-            obj, initial_guess, constr=cons, constr_bounds=(lower, upper), options=options
+            obj,
+            initial_guess,
+            constr=cons,
+            constr_bounds=(lower, upper),
+            options=options,
         )
         opt_dvs = opt_result.x
         return self.postprocess(opt_dvs, domain)

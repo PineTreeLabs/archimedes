@@ -1,19 +1,23 @@
+# ruff: noqa: N806, N803
+
 from __future__ import annotations
-from typing import TYPE_CHECKING, Callable
+
+from typing import TYPE_CHECKING, TypeVar
 
 import numpy as np
-from scipy.optimize import minimize as scipy_minimize, OptimizeResult
+from scipy.optimize import OptimizeResult
+from scipy.optimize import minimize as scipy_minimize
 
 import archimedes as arc
-from archimedes import compile, scan, tree, jac, struct
-
+from archimedes import compile, scan, struct, tree
 from archimedes.optimize import lm_solve
 
 if TYPE_CHECKING:
-    from archimedes.typing import PyTree
     from archimedes.observers import KalmanFilterBase
-    from .timeseries import Timeseries
     from archimedes.optimize import LMResult
+    from archimedes.typing import PyTree
+
+    from ._timeseries import Timeseries
 
     T = TypeVar("T", bound=PyTree)
 
@@ -24,38 +28,38 @@ __all__ = ["pem"]
 @struct.pytree_node
 class PEMObjective:
     """Prediction Error Minimization objective function for system identification.
-    
-    Low-level interface for PEM optimization that provides both residual and 
-    cost function evaluations. This class encapsulates the Kalman filter 
+
+    Low-level interface for PEM optimization that provides both residual and
+    cost function evaluations. This class encapsulates the Kalman filter
     forward pass and automatic differentiation for gradient computation.
-    
+
     This is typically used internally by :func:`pem`. For most applications,
     use the higher-level :func:`pem` function directly. This can be useful mainly
     for constructing custom optimization workflows.
-    
+
     Parameters
     ----------
     predictor : KalmanFilterBase
-        Kalman filter implementing the system model with 
+        Kalman filter implementing the system model with
         ``step(t, x, y, P, args)`` method.
-    data : Timeseries  
+    data : Timeseries
         Input-output data with ``ts``, ``us``, and ``ys`` arrays.
     P0 : array_like
         Initial state covariance matrix of shape ``(nx, nx)``.
     x0 : array_like, optional
         Initial state estimate of shape ``(nx,)``. If None, the optimization
         variables should include both initial state and parameters.
-        
+
     Notes
     -----
     The objective implements the prediction error formulation:
-    
+
     .. code-block:: text
-    
+
         J = (1/N) Σ[k=1 to N] e[k]ᵀ e[k]
-        
+
     where ``e[k]`` are the Kalman filter innovations (prediction errors).
-    
+
     See Also
     --------
     pem : High-level parameter estimation interface
@@ -68,21 +72,21 @@ class PEMObjective:
 
     def forward(self, x0: np.ndarray, params: PyTree) -> dict:
         """Run Kalman filter forward pass and compute prediction errors.
-        
+
         Parameters
         ----------
         x0 : array_like
             Initial state estimate of shape ``(nx,)``.
         params : PyTree
             Model parameters with arbitrary nested structure.
-            
+
         Returns
         -------
         dict
             Results dictionary with keys:
-            
+
             - ``"x_hat"`` : State estimates of shape ``(nx, N)``
-            - ``"e"`` : Prediction errors of shape ``(ny, N)``  
+            - ``"e"`` : Prediction errors of shape ``(ny, N)``
             - ``"V"`` : Average cost function value (scalar)
         """
         ts = self.data.ts
@@ -91,22 +95,20 @@ class PEMObjective:
 
         nx = self.predictor.nx
         nu = us.shape[0]
-        ny = ys.shape[0]
 
         if self.P0 is None:
             P0 = np.eye(nx)
         else:
             P0 = self.P0
 
-        params_flat, unravel_params = tree.ravel(params)
-        na = params_flat.size
+        params_flat, _ = tree.ravel(params)
 
         V = 0.0  # Cost function
         init_carry, unravel_carry = tree.ravel((x0, P0, params, V))
 
         @compile(kind="MX")
         def scan_fn(carry_flat, input):
-            t, u, y = input[0], input[1:nu+1], input[nu+1:]
+            t, u, y = input[0], input[1 : nu + 1], input[nu + 1 :]
             x, P, params, V = unravel_carry(carry_flat)
             x, P, e = self.predictor.step(t, x, y, P, args=(u, params))
             output = np.concatenate([x, e], axis=0)
@@ -136,14 +138,14 @@ class PEMObjective:
         self, decision_variables: PyTree | tuple[np.ndarray, PyTree]
     ) -> np.ndarray:
         """Evaluate prediction error residuals for least-squares optimization.
-        
+
         Parameters
         ----------
         decision_variables : PyTree or tuple[np.ndarray, PyTree]
             Optimization parameters. If ``x0`` is provided during construction,
             this contains only model parameters. Otherwise, it contains both
             initial state and parameters as a flattened array.
-            
+
         Returns
         -------
         residuals : ndarray
@@ -159,23 +161,21 @@ class PEMObjective:
         results = self.forward(x0, params)
         return results["e"].flatten()
 
-    def __call__(
-        self, decision_variables: PyTree | tuple[np.ndarray, PyTree]
-    ) -> tuple:
+    def __call__(self, decision_variables: PyTree | tuple[np.ndarray, PyTree]) -> tuple:
         """Evaluate cost function for general optimization methods.
-        
+
         Parameters
         ----------
         decision_variables : array_like
             Optimization parameters. If ``x0`` is provided during construction,
             this contains only model parameters. Otherwise, it contains both
             initial state and parameters as a flattened array.
-            
-        Returns  
+
+        Returns
         -------
         cost : float
             Average prediction error cost function value.
-            
+
         Notes
         -----
         This method provides the scalar cost function interface needed for
@@ -190,6 +190,7 @@ class PEMObjective:
         results = self.forward(x0, params)
         return results["V"]
 
+
 @struct.pytree_node
 class CompoundPEMObjective:
     """Compound PEM objective function for multiple sub-objectives.
@@ -197,14 +198,17 @@ class CompoundPEMObjective:
     Shares the same interface as `PEMObjective` but allows
     combining multiple PEM objectives into a single cost function.
     """
+
     sub_objectives: list[PEMObjective]
 
-    def _make_sub_dvs(self, decision_variables: tuple[np.ndarray | None, PyTree]) -> list[tuple[np.ndarray | None, PyTree]]:
+    def _make_sub_dvs(
+        self, decision_variables: tuple[np.ndarray | None, PyTree]
+    ) -> list[tuple[np.ndarray | None, PyTree]]:
         """Prepare sub-decision variables for each sub-objective."""
         sub_x0, params = decision_variables
         sub_dvs = []
 
-        for (x0, pem_obj) in zip(sub_x0, self.sub_objectives):
+        for x0, pem_obj in zip(sub_x0, self.sub_objectives):
             if pem_obj.x0 is not None:
                 # If x0 is provided, use it directly
                 sub_dvs.append((None, params))
@@ -219,17 +223,19 @@ class CompoundPEMObjective:
         """Evaluate cost function for compound PEM objective."""
         sub_dvs = self._make_sub_dvs(decision_variables)
         total_cost = 0.0
-        for (dvs, pem_obj) in zip(sub_dvs, self.sub_objectives):
+        for dvs, pem_obj in zip(sub_dvs, self.sub_objectives):
             cost = pem_obj(dvs)
             total_cost += cost
 
         return total_cost
 
-    def residuals(self, decision_variables: PyTree | tuple[np.ndarray, PyTree]) -> np.ndarray:
+    def residuals(
+        self, decision_variables: PyTree | tuple[np.ndarray, PyTree]
+    ) -> np.ndarray:
         """Evaluate residuals for compound PEM objective."""
         sub_dvs = self._make_sub_dvs(decision_variables)
         total_residuals = []
-        for (dvs, pem_obj) in zip(sub_dvs, self.sub_objectives):
+        for dvs, pem_obj in zip(sub_dvs, self.sub_objectives):
             residuals = pem_obj.residuals(dvs)
             total_residuals.append(residuals)
 
@@ -316,7 +322,6 @@ def _pem_solve_ipopt(
     bounds: tuple[T, T] | None = None,
     options: dict | None = None,
 ) -> OptimizeResult:
-
     if options is None:
         options = {}
 
@@ -355,7 +360,6 @@ def _pem_solve_ipopt(
     result.fun = pem_obj(result.x)
 
     return result
-
 
 
 SUPPORTED_METHODS = {
@@ -412,16 +416,16 @@ def pem(
         and noise characteristics (``Q``, ``R`` matrices).
     data : Timeseries
         Input-output data containing synchronized time series:
-        
+
         - ``ts`` : Time vector of shape ``(N,)``
         - ``us`` : Input signals of shape ``(nu, N)``
         - ``ys`` : Output measurements of shape ``(ny, N)``
-        
+
         All arrays must have consistent time dimensions.  Multiple
         :class:`Timeseries` instances can be provided as a tuple for
         multi-experiment identification, allowing joint parameter estimation
         across different datasets.
-        
+
         If multiple datasets are provided, the initial state estimates
         (``x0``) should also be a tuple of initial conditions corresponding
         to each dataset.
@@ -441,11 +445,11 @@ def pem(
         Parameter bounds as ``(lower_bounds, upper_bounds)`` with the
         same PyTree structure as ``p_guess``. Enables physical
         constraints such as:
-        
+
         - Positive masses, stiffnesses, damping coefficients
         - Bounded gain parameters, time constants
         - Realistic physical parameter ranges
-        
+
         Use ``-np.inf`` and ``np.inf`` for unbounded parameters.
     P0 : array_like, optional
         Initial state covariance matrix of shape ``(nx, nx)``. If None,
@@ -537,7 +541,7 @@ def pem(
     >>> def dynamics(t, x, u, params):
     ...     omega_n = params["omega_n"]  # Natural frequency
     ...     zeta = params["zeta"]        # Damping ratio
-    ...     
+    ...
     ...     return np.hstack([
     ...         x[1],  # velocity
     ...         -omega_n**2 * x[0] - 2*zeta*omega_n*x[1] + omega_n**2 * u[0]
@@ -549,7 +553,7 @@ def pem(
     >>> # Generate synthetic measurement data
     >>> dt = 0.05
     >>> ts = np.arange(0, 10, dt)
-    >>> x0 = np.array([0.0, 0.0]) 
+    >>> x0 = np.array([0.0, 0.0])
     >>> params_true = {"omega_n": 2.0, "zeta": 0.1}
     >>> us = np.ones((1, len(ts)))  # Step input
     >>> # Generate step response

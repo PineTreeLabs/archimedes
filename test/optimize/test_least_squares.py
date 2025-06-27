@@ -1,13 +1,10 @@
 # ruff: noqa: N802, N803, N806, E741
 
-import pytest
-
 import numpy as np
+import pytest
 from scipy import sparse
 
-import archimedes as arc
-from archimedes.optimize import least_squares, lm_solve, LMStatus
-
+from archimedes.optimize import LMStatus, least_squares, lm_solve
 
 METHODS = ["lm", "hess-lm"]
 BOUNDED_METHODS = ["trf", "hess-lm"]
@@ -40,7 +37,7 @@ class TestLeastSquares:
         print(f"Final residuals: {result.fun}")
         print(f"Success: {result.success}")
         print(f"Message: {result.message}")
-        if hasattr(result, 'nit'):
+        if hasattr(result, "nit"):
             print(f"Iterations: {result.nit}")
         print(f"Function evaluations: {result.nfev}")
 
@@ -140,15 +137,17 @@ class TestLeastSquares:
             Standard starting point: [-3, -1, -3, -1]
             Known solution: [1, 1, 1, 1] with f(x*) = 0
             """
-            return np.hstack([
-                10.0 * np.sqrt(2.0) * (x[1] - x[0]**2),    # √200 * (x2 - x1²)
-                np.sqrt(2.0) * (1.0 - x[0]),               # √2 * (1 - x1) 
-                6.0 * np.sqrt(5.0) * (x[3] - x[2]**2),     # √180 * (x4 - x3²)
-                np.sqrt(2.0) * (1.0 - x[2]),               # √2 * (1 - x3)
-                np.sqrt(0.4) * (x[1] - 1.0),               # √0.4 * (x2 - 1)
-                np.sqrt(0.4) * (x[3] - 1.0),               # √0.4 * (x4 - 1)
-                np.sqrt(19.8) * (x[1] + x[3] - 2.0)        # √19.8 * (x2 + x4 - 2)
-            ])
+            return np.hstack(
+                [
+                    10.0 * np.sqrt(2.0) * (x[1] - x[0] ** 2),  # √200 * (x2 - x1²)
+                    np.sqrt(2.0) * (1.0 - x[0]),  # √2 * (1 - x1)
+                    6.0 * np.sqrt(5.0) * (x[3] - x[2] ** 2),  # √180 * (x4 - x3²)
+                    np.sqrt(2.0) * (1.0 - x[2]),  # √2 * (1 - x3)
+                    np.sqrt(0.4) * (x[1] - 1.0),  # √0.4 * (x2 - 1)
+                    np.sqrt(0.4) * (x[3] - 1.0),  # √0.4 * (x4 - 1)
+                    np.sqrt(19.8) * (x[1] + x[3] - 2.0),  # √19.8 * (x2 + x4 - 2)
+                ]
+            )
 
         # Standard starting point for Wood's function
         x0 = np.array([-3.0, -1.0, -3.0, -1.0])
@@ -183,7 +182,7 @@ class TestLeastSquares:
         )
         # The algorithm should find the global minimum when started near it
         assert solution_error < 1e-3, (
-            f"Solution {result_global.x} not close enough to "
+            f"Solution {result.x} not close enough to "
             f"[1,1,1,1] (error: {solution_error:.6e})"
         )
         assert np.allclose(result.fun, 0.0, atol=1e-6), (
@@ -199,10 +198,7 @@ class TestLeastSquares:
         )
 
         print("\nTest Results:")
-        print(
-            f"✓ Standard start found global minimum (error: "
-            f"{solution_error:.2e})"
-        )
+        print(f"✓ Standard start found global minimum (error: {solution_error:.2e})")
         print(
             f"✓ Standard start found critical point (grad norm: {final_grad_norm:.2e})"
         )
@@ -291,76 +287,70 @@ class TestLeastSquares:
     @pytest.mark.parametrize("method", BOUNDED_METHODS)
     def test_box_constraints_simple_quadratic(self, method):
         """Test box constraints with a simple quadratic function."""
-        
+
         def constrained_quadratic(x):
             """
             Minimize f(x,y) = (x-3)² + (y-2)²
             Subject to: 0 ≤ x ≤ 2, 0 ≤ y ≤ 1
-            
+
             Unconstrained optimum: (3, 2)
             Constrained optimum: (2, 1) - both variables at upper bounds
             """
             x = np.atleast_1d(x)
-            
+
             # Residuals: r1 = (x-3), r2 = (y-2)
             r = np.array([x[0] - 3.0, x[1] - 2.0], like=x)
-    
+
             return r
-        
+
         # Test setup
         x0 = np.array([0.5, 0.5])  # Start in interior
         bounds = (
             np.array([0.0, 0.0]),  # Lower bounds
-            np.array([2.0, 1.0])   # Upper bounds  
+            np.array([2.0, 1.0]),  # Upper bounds
         )
-        
+
         # Solve constrained problem
-        options = {
-            "ftol": 1e-8,
-            "xtol": 1e-8,
-            "gtol": 1e-6,
-            "max_nfev": 50
-        }
         result = least_squares(
             constrained_quadratic,
             x0,
             bounds=bounds,
             method=method,
-            # options=options,
         )
-        
+
         # Test assertions
         expected_solution = np.array([2.0, 1.0])
         solution_error = np.linalg.norm(result.x - expected_solution)
-        
+
         assert result.success, (
             f"Constrained quadratic optimization should succeed, got: {result.message}"
         )
-        
+
         assert solution_error < 1e-4, (
-            f"Solution {result.x} not close enough to [2,1] (error: {solution_error:.6e})"
+            "Solution {result.x} not close enough to [2,1] (error: "
+            f"{solution_error:.6e})"
         )
-        
+
         # Check constraint satisfaction
         lb, ub = bounds
         tol = 1e-6  # Tolerance for bounds checking
         bounds_satisfied = np.all(lb <= result.x + tol) and np.all(result.x - tol <= ub)
-        assert bounds_satisfied, (
-            f"Bounds violated: {result.x} not in [{lb}, {ub}]"
-        )
+        assert bounds_satisfied, f"Bounds violated: {result.x} not in [{lb}, {ub}]"
 
         if method == "hess-lm":
             # Check that constrained optimization info is recorded
-            if len(result.history) > 0 and 'grad_proj_norm' in result.history[-1]:
+            if len(result.history) > 0 and "grad_proj_norm" in result.history[-1]:
                 final_history = result.history[-1]
                 # Both variables should be at upper bounds
-                assert final_history['n_active_upper'] == 2, (
-                    f"Expected 2 active upper bounds, got {final_history['n_active_upper']}"
+                assert final_history["n_active_upper"] == 2, (
+                    "Expected 2 active upper bounds, got "
+                    "{final_history['n_active_upper']}"
                 )
-                assert final_history['grad_proj_norm'] < 1e-6, (
-                    f"Projected gradient norm should be small: {final_history['grad_proj_norm']}"
+                assert final_history["grad_proj_norm"] < 1e-6, (
+                    "Projected gradient norm should be small: "
+                    f"{final_history['grad_proj_norm']}"
                 )
-        
+
         # Edge case: Test ValueError for bounds structure mismatch
         bad_lower = np.array([0.0])  # Wrong size (1 instead of 2)
         bad_upper = np.array([2.0, 1.0])  # Correct size
@@ -382,7 +372,7 @@ class TestLeastSquares:
                 x0,
                 bounds=(bad_lower, bad_upper),
             )
-        
+
         bad_lower = np.array([0.0, 0.0])  # Correct size
         bad_upper = np.array([2.0])  # Wrong size (1 instead of 2)
         with pytest.raises(
@@ -406,83 +396,79 @@ class TestLeastSquares:
 
     def test_box_constraints_rosenbrock(self):
         """Test box constraints with Rosenbrock function."""
-        
+
         def rosenbrock_func(x):
             return np.hstack([10.0 * (x[1] - x[0] ** 2), 1.0 - x[0]])
-        
+
         # Test Case 1: Bounds that force solution to boundary
         # Unconstrained optimum is [1, 1], but we restrict x ≤ 0.8
         x0 = np.array([0.0, 0.0])  # Start at origin
         bounds = (
-            np.array([0.0, 0.0]),   # Lower bounds
-            np.array([0.8, 2.0])    # Upper bounds - restrict first variable
+            np.array([0.0, 0.0]),  # Lower bounds
+            np.array([0.8, 2.0]),  # Upper bounds - restrict first variable
         )
-        
-        options = {
-            "ftol": 1e-8,
-            "xtol": 1e-8,
-            "gtol": 1e-6,
-            "max_nfev": 100
-        }
+
+        options = {"ftol": 1e-8, "xtol": 1e-8, "gtol": 1e-6, "max_nfev": 100}
         result = least_squares(
             rosenbrock_func,
             x0,
             bounds=bounds,
             options=options,
         )
-        
+
         # The constrained optimum should be at x[0] = 0.8, x[1] = 0.8² = 0.64
         expected_solution = np.array([0.8, 0.64])
         solution_error = np.linalg.norm(result.x - expected_solution)
-        
+
         assert result.success, (
             f"Constrained Rosenbrock optimization should succeed, got: {result.message}"
         )
-        
+
         assert solution_error < 1e-2, (
-            f"Solution {result.x} not close enough to [0.8, 0.64] (error: {solution_error:.6e})"
+            f"Solution {result.x} not close enough to [0.8, 0.64] (error: "
+            f"{solution_error:.6e})"
         )
-        
+
         # Check that first variable is at upper bound
         assert abs(result.x[0] - 0.8) < 1e-6, (
             f"First variable should be at upper bound 0.8, got {result.x[0]}"
         )
-        
+
         # Check constraint satisfaction
         lb, ub = bounds
         bounds_satisfied = np.all(lb <= result.x) and np.all(result.x <= ub)
-        assert bounds_satisfied, (
-            f"Bounds violated: {result.x} not in [{lb}, {ub}]"
-        )
-        
+        assert bounds_satisfied, f"Bounds violated: {result.x} not in [{lb}, {ub}]"
+
         # Test Case 2: Bounds that don't affect the solution (interior optimum)
         bounds_loose = (
-            np.array([0.0, 0.0]),   # Lower bounds
-            np.array([2.0, 2.0])    # Upper bounds - don't restrict
+            np.array([0.0, 0.0]),  # Lower bounds
+            np.array([2.0, 2.0]),  # Upper bounds - don't restrict
         )
-        
+
         result_loose = least_squares(
             rosenbrock_func,
             x0,
             bounds=bounds_loose,
             options=options,
         )
-        
+
         # Should find the unconstrained optimum [1, 1]
         expected_solution_loose = np.array([1.0, 1.0])
         solution_error_loose = np.linalg.norm(result_loose.x - expected_solution_loose)
-        
+
         assert result_loose.success, (
-            f"Loosely constrained Rosenbrock should succeed, got: {result_loose.message}"
+            "Loosely constrained Rosenbrock should succeed, got: "
+            f"{result_loose.message}"
         )
-        
+
         assert solution_error_loose < 1e-3, (
-            f"Loose bounds solution {result_loose.x} not close to [1,1] (error: {solution_error_loose:.6e})"
+            f"Loose bounds solution {result_loose.x} not close to [1,1] (error: "
+            f"{solution_error_loose:.6e})"
         )
-        
+
         # Verify that loose bounds don't activate constraints
-        if len(result_loose.history) > 0 and 'total_active' in result_loose.history[-1]:
-            final_active = result_loose.history[-1]['total_active']
+        if len(result_loose.history) > 0 and "total_active" in result_loose.history[-1]:
+            final_active = result_loose.history[-1]["total_active"]
             assert final_active == 0, (
                 f"Loose bounds should have no active constraints, got {final_active}"
             )
@@ -600,13 +586,13 @@ class TestLM:
             gtol=1e-8,
             max_nfev=200,
         )
-        assert result.success, (
-            f"Optimization should succeed, got: {result.message}"
-        )
-        assert result.status in [LMStatus.FTOL_REACHED, LMStatus.XTOL_REACHED, 
-                                LMStatus.BOTH_TOL_REACHED, LMStatus.GTOL_REACHED], (
-            f"Should have valid convergence status, got {result.status}"
-        )
+        assert result.success, f"Optimization should succeed, got: {result.message}"
+        assert result.status in [
+            LMStatus.FTOL_REACHED,
+            LMStatus.XTOL_REACHED,
+            LMStatus.BOTH_TOL_REACHED,
+            LMStatus.GTOL_REACHED,
+        ], f"Should have valid convergence status, got {result.status}"
 
         # Test 2: Verify we can hit maximum iterations
         result = lm_solve(
@@ -636,7 +622,7 @@ class TestLM:
 
     def test_diagonal_scaling(self):
         """Test custom diagonal scaling vs automatic scaling."""
-        
+
         # Create an ill-conditioned problem with very different variable scales
         # Variable 1: operates around 1e-3 scale
         # Variable 2: operates around 1e3 scale
@@ -644,80 +630,81 @@ class TestLM:
             """
             Problem where variables have very different natural scales:
             f(x) = 0.5 * ((1000*x[0] - 1)^2 + (x[1]/1000 - 1)^2)
-            
+
             Solution is at x[0] = 1e-3, x[1] = 1e3
             Without proper scaling, this is very hard to optimize.
             """
             x = np.atleast_1d(x)
-            
+
             # Residuals with very different scales
-            r1 = 1000.0 * x[0] - 1.0  # x[0] should be ~1e-3  
+            r1 = 1000.0 * x[0] - 1.0  # x[0] should be ~1e-3
             r2 = x[1] / 1000.0 - 1.0  # x[1] should be ~1e3
-            
+
             r = np.array([r1, r2], like=x)
-            
+
             # Compute Jacobian manually for this simple case
-            J = np.array([[1000.0, 0.0],
-                          [0.0, 1.0/1000.0]], like=x)
-            
-            # Objective: V = 0.5 * ||r||^2  
+            J = np.array([[1000.0, 0.0], [0.0, 1.0 / 1000.0]], like=x)
+
+            # Objective: V = 0.5 * ||r||^2
             V = 0.5 * np.sum(r**2)
-            
+
             # Gradient: g = J^T @ r
             g = J.T @ r
-            
+
             # Hessian approximation: H = J^T @ J
             H = J.T @ J
-            
+
             return V, g, H
-        
+
         # Starting point away from optimum
         x0 = np.array([0.1, 0.1])  # Both variables start at wrong scale
-        
+
         print("\nDiagonal Scaling Test:")
-        print(f"True solution: x* = [1e-3, 1e3] = [0.001, 1000.0]")
+        print("True solution: x* = [1e-3, 1e3] = [0.001, 1000.0]")
         print(f"Starting point: x0 = {x0}")
-        
+
         # Test 1: Automatic scaling (diag=None, default)
         result_auto = lm_solve(
-            ill_conditioned_func, 
+            ill_conditioned_func,
             x0.copy(),
             ftol=1e-10,
-            xtol=1e-10, 
+            xtol=1e-10,
             gtol=1e-10,
-            max_nfev=100
+            max_nfev=100,
         )
-        
-        print(f"\nAutomatic scaling (diag=None):")
+
+        print("\nAutomatic scaling (diag=None):")
         print(f"  Solution: {result_auto.x}")
         print(f"  Success: {result_auto.success}")
         print(f"  Iterations: {result_auto.nit}")
         print(f"  Final residuals: {result_auto.fun}")
-        
+
         # Test 2: Custom scaling that accounts for the variable scales
         # diag[i] should be proportional to the "natural scale" of variable i
         # For our problem: x[0] ~ 1e-3, x[1] ~ 1e3
-        custom_diag = np.array([1e-3, 1e3])  # Scale factors matching expected solution magnitude
-        
+        custom_diag = np.array(
+            [1e-3, 1e3]
+        )  # Scale factors matching expected solution magnitude
+
         result_scaled = lm_solve(
             ill_conditioned_func,
-            x0.copy(), 
+            x0.copy(),
             diag=custom_diag,
             ftol=1e-10,
             xtol=1e-10,
-            gtol=1e-10, 
-            max_nfev=100
+            gtol=1e-10,
+            max_nfev=100,
         )
-        
+
         print(f"\nCustom scaling (diag={custom_diag}):")
         print(f"  Solution: {result_scaled.x}")
         print(f"  Success: {result_scaled.success}")
         print(f"  Iterations: {result_scaled.nit}")
         print(f"  Final residuals: {result_scaled.fun}")
-        
+
         # Test 3: Poor scaling (opposite of what we need)
         poor_diag = np.array([1e3, 1e-3])  # Wrong scaling
-        
+
         result_poor = lm_solve(
             ill_conditioned_func,
             x0.copy(),
@@ -725,52 +712,54 @@ class TestLM:
             ftol=1e-10,
             xtol=1e-10,
             gtol=1e-10,
-            max_nfev=100  
+            max_nfev=100,
         )
-        
+
         print(f"\nPoor scaling (diag={poor_diag}):")
         print(f"  Solution: {result_poor.x}")
         print(f"  Success: {result_poor.success}")
         print(f"  Iterations: {result_poor.nit}")
         print(f"  Final residuals: {result_poor.fun}")
-        
+
         # Verify that at least one optimization succeeded
         assert result_auto.success or result_scaled.success, (
             "At least one scaling approach should succeed"
         )
-        
+
         # The expected solution
         expected_solution = np.array([1e-3, 1e3])
-        
+
         # Check solution accuracy for successful runs
         if result_auto.success:
             auto_error = np.linalg.norm(result_auto.x - expected_solution)
             print(f"  Auto scaling error: {auto_error:.2e}")
-        
+
         if result_scaled.success:
-            scaled_error = np.linalg.norm(result_scaled.x - expected_solution) 
+            scaled_error = np.linalg.norm(result_scaled.x - expected_solution)
             print(f"  Custom scaling error: {scaled_error:.2e}")
-            
+
             # Custom scaling should be reasonably close to the solution
             assert scaled_error < 1e-2, (
-                f"Custom scaling should find accurate solution, error: {scaled_error:.2e}"
+                "Custom scaling should find accurate solution, error: "
+                f"{scaled_error:.2e}"
             )
-        
+
         # Verify that the custom diag array was actually used
         # We can check this by verifying that auto_scale was set to False
-        # This is tested indirectly by ensuring that our custom scaling affects the results
-        
+        # This is tested indirectly by ensuring that our custom scaling affects
+        # the results
+
         print("\n✓ Diagonal scaling test completed!")
         print("✓ Custom diag parameter functionality verified!")
-        
+
         # Test that custom diag is actually different from auto scaling
         # (both should work, but give different iteration counts/paths)
         if result_auto.success and result_scaled.success:
             # They should both converge but potentially with different efficiency
-            assert (result_auto.nit != result_scaled.nit or 
-                   abs(result_auto.fun - result_scaled.fun) > 1e-15), (
-                "Custom and automatic scaling should behave differently"
-            )
+            assert (
+                result_auto.nit != result_scaled.nit
+                or abs(result_auto.fun - result_scaled.fun) > 1e-15
+            ), "Custom and automatic scaling should behave differently"
 
     def test_iteration_history(self):
         """Test iteration history collection functionality."""
@@ -791,9 +780,7 @@ class TestLM:
         )
 
         # Verify basic optimization success
-        assert result.success, (
-            f"Optimization should succeed, got: {result.message}"
-        )
+        assert result.success, f"Optimization should succeed, got: {result.message}"
         assert np.isclose(result.x[0], 2.0, atol=1e-6), (
             f"Solution should be close to 2.0, got {result.x[0]}"
         )
@@ -856,28 +843,29 @@ class TestLM:
 
     def test_ftol_convergence_info_1(self):
         """Test convergence via ftol only (info = 1)."""
-        
+
         def func(x):
             x = np.atleast_1d(x)
             # Two residuals to create: V = 0.5 * (x[0]² + 2e-10)
             return np.hstack([x[0], np.sqrt(2e-10)])
-        
+
         # Start close to optimum
         x0 = np.array([1e-6])
-        
+
         result = lm_solve(
             func,
             x0,
             ftol=1e-3,  # Relatively loose ftol
             xtol=1e-15,  # Very tight xtol to avoid that convergence
             gtol=1e-15,  # Very tight gtol to avoid that convergence
-            max_nfev=50
+            max_nfev=50,
         )
-        
-        # Should converge due to ftol
-        assert result.status == LMStatus.FTOL_REACHED, f"Expected ftol convergence, got {result.status}: {result.message}"
-        assert result.success
 
+        # Should converge due to ftol
+        assert result.status == LMStatus.FTOL_REACHED, (
+            f"Expected ftol convergence, got {result.status}: {result.message}"
+        )
+        assert result.success
 
     def test_combined_convergence_info_3(self):
         """Test combined ftol and xtol convergence (info = 3)."""
@@ -888,7 +876,7 @@ class TestLM:
             r1 = x[0] + 1e-10  # Gradient contribution: x[0] + 1e-10
             r2 = np.sqrt(2e-12)  # Adds constant 1e-12 to objective
             return np.hstack([r1, r2])
-        
+
         x0 = np.array([1e-5])  # Start very close to optimum
         result = lm_solve(
             func,
@@ -899,9 +887,11 @@ class TestLM:
             max_nfev=10,
             log_level=20,
         )
-        
+
         # Should converge with combined criteria
-        assert result.status == LMStatus.BOTH_TOL_REACHED, f"Expected combined convergence, got {result.status}: {result.message}"
+        assert result.status == LMStatus.BOTH_TOL_REACHED, (
+            f"Expected combined convergence, got {result.status}: {result.message}"
+        )
         assert result.success
 
         # Loosen xtol and make sure that triggers first
@@ -915,7 +905,9 @@ class TestLM:
             log_level=20,
         )
 
-        assert result.status == LMStatus.XTOL_REACHED, f"Expected xtol convergence, got {result.status}: {result.message}"
+        assert result.status == LMStatus.XTOL_REACHED, (
+            f"Expected xtol convergence, got {result.status}: {result.message}"
+        )
         assert result.success
 
     def test_max_nfev_reached_in_inner_loop(self):
@@ -926,46 +918,42 @@ class TestLM:
             # Create ill-conditioned problem via small Jacobian entries
             # This gives J = [[1e-4]], so H = J^T*J = [[1e-8]]
             return 1e-4 * x[0]
-        
+
         x0 = np.array([1.0])
-        
+
         result = lm_solve(
             slow_converging_func,
             x0,
             max_nfev=3,  # Very small limit to hit during inner loop
             ftol=1e-15,
-            xtol=1e-15, 
-            gtol=1e-15
+            xtol=1e-15,
+            gtol=1e-15,
         )
-        
+
         # Should fail due to max function evaluations
-        assert result.status == LMStatus.MAX_FEVAL, f"Expected max fev, got {result.status}: {result.message}"
+        assert result.status == LMStatus.MAX_FEVAL, (
+            f"Expected max fev, got {result.status}: {result.message}"
+        )
         assert not result.success
         assert result.nfev >= 3  # Should have hit the limit
 
-
     def test_progress_reporting_with_nprint(self, caplog):
         """Test progress reporting functionality (nprint > 0)."""
-        
+
         def simple_quadratic(x):
             x = np.atleast_1d(x)
             return x - 2.0
-        
+
         # Capture printed output by redirecting stdout
-        import io
-        import sys
         import logging
-        
+
         with caplog.at_level(logging.INFO):
             result = lm_solve(
-                simple_quadratic,
-                np.array([5.0]),
-                log_level=logging.INFO,
-                max_nfev=20
+                simple_quadratic, np.array([5.0]), log_level=logging.INFO, max_nfev=20
             )
 
             output = caplog.text
-            
+
             # Check that headers and iteration info were printed
             assert "Iteration" in output, "Should print iteration header"
             assert "Cost" in output, "Should print cost header"
@@ -973,44 +961,49 @@ class TestLM:
 
     def test_header_logic(self, caplog):
         """Test the specific header printing logic in LMProgress."""
-        from archimedes.optimize._lm import LMProgress
-        import io
-        import sys
         import logging
 
+        from archimedes.optimize._lm import LMProgress
+
         logger = logging.getLogger("test_header_logic")
-        
+
         # Test LMProgress class directly
         with caplog.at_level(logging.INFO):
             progress = LMProgress(logger)
-            
+
             # First report (iteration 0) - should print header
             progress.report(1.0, 0.1, 0.01, 5)
-    
+
             # Second report (iteration 1) - should print again
             progress.report(0.25, 0.025, 0.0025, 7)
             output = caplog.text
-            
+
             # Should contain headers and specific iteration data
             assert "Iteration" in output, "Should contain header"
             assert "Cost" in output, "Should contain cost header"
-            
+
             # Check that it printed for iterations 0 and 2
-            lines = output.strip().split('\n')
+            lines = output.strip().split("\n")
             # Should have: header line + iteration 0 + iteration 2 = 3 lines minimum
-            assert len(lines) >= 3, f"Expected at least 3 lines of output, got {len(lines)}"
+            assert len(lines) >= 3, (
+                f"Expected at least 3 lines of output, got {len(lines)}"
+            )
 
     def test_box_constraints_gradient_projection(self):
         """Test gradient projection logic with a simple example."""
-        from archimedes.optimize._lm import _project_gradient, _check_constrained_convergence, _compute_step
-        
+        from archimedes.optimize._lm import (
+            _check_constrained_convergence,
+            _compute_step,
+            _project_gradient,
+        )
+
         # Test case: At lower bound with outward gradient
         x = np.array([0.0, 2.5])  # First variable at lower bound
         grad = np.array([0.5, -0.2])  # Positive gradient for bounded variable
         bounds = (np.array([0.0, 0.0]), np.array([3.0, 3.0]))
-        
+
         grad_proj, active_lower, active_upper = _project_gradient(grad, x, bounds)
-        
+
         # First component should be projected to 0, second unchanged
         assert grad_proj[0] == 0.0, (
             f"First component should be projected to 0, got {grad_proj[0]}"
@@ -1018,37 +1011,47 @@ class TestLM:
         assert grad_proj[1] == grad[1], (
             f"Second component should be unchanged, got {grad_proj[1]} vs {grad[1]}"
         )
-        assert active_lower[0] == True, "First variable should be detected as active lower"
-        assert active_lower[1] == False, "Second variable should not be active"
-        
+        assert active_lower[0], "First variable should be detected as active lower"
+        assert not active_lower[1], "Second variable should not be active"
+
         # Test convergence check
         converged, proj_norm, active_info = _check_constrained_convergence(
             grad, x, bounds, gtol=1e-1
         )
-        
-        assert converged == False, "Should not converge with large projected gradient"
-        assert proj_norm == abs(grad[1]), "Projected norm should be second component only"
-        assert active_info['n_active_lower'] == 1, "Should detect one active lower bound"
-        assert active_info['total_active'] == 1, "Should have one total active constraint"
-        
+
+        assert not converged, "Should not converge with large projected gradient"
+        assert proj_norm == abs(grad[1]), (
+            "Projected norm should be second component only"
+        )
+        assert active_info["n_active_lower"] == 1, (
+            "Should detect one active lower bound"
+        )
+        assert active_info["total_active"] == 1, (
+            "Should have one total active constraint"
+        )
+
         # Edge case: Test ValueError when qp_solver is None but bounds are present
         hess = np.eye(2)
         diag = np.ones(2)
         lambda_val = 0.1
-        
+
         try:
             _compute_step(hess, grad, diag, lambda_val, x, bounds, qp_solver=None)
             assert False, "Should have raised ValueError for missing qp_solver"
         except ValueError as e:
-            assert "qp_solver must be provided" in str(e), f"Unexpected error message: {e}"
+            assert "qp_solver must be provided" in str(e), (
+                f"Unexpected error message: {e}"
+            )
 
     def test_box_constraints_qp_edge_cases(self):
         """Test QP solver edge cases: difficult solves and fallback handling."""
-        from archimedes.optimize._lm import _compute_step
-        import osqp
         import io
         import sys
-        
+
+        import osqp
+
+        from archimedes.optimize._lm import _compute_step
+
         # Set up basic QP problem data
         n = 2
         hess = np.eye(n)
@@ -1056,12 +1059,12 @@ class TestLM:
         diag = np.ones(n)
         lambda_val = 0.1
         x_current = np.array([0.0, 0.0])
-        
+
         # Test case 1: QP with very tight constraints that might cause solver issues
         # Use extremely small feasible region
         epsilon = 1e-10  # Very tight bounds
         bounds_tight = (np.array([-epsilon, -epsilon]), np.array([epsilon, epsilon]))
-        
+
         # Set up OSQP solver with settings that might cause early termination
         qp_solver = osqp.OSQP()
         qp_solver.setup(
@@ -1071,37 +1074,38 @@ class TestLM:
             l=np.array([-epsilon, -epsilon]),
             u=np.array([epsilon, epsilon]),
             verbose=False,
-            max_iter=1,    # Very few iterations to force early termination
+            max_iter=1,  # Very few iterations to force early termination
             eps_abs=1e-3,  # Loose tolerance
             eps_rel=1e-3,
         )
-        
+
         # Capture printed output
         captured_output = io.StringIO()
         sys.stdout = captured_output
-        
+
         try:
-            # This might trigger suboptimal solve due to tight constraints + few iterations
+            # This might trigger suboptimal solve due to tight constraints
+            # + few iterations
             step = _compute_step(
                 hess, grad, diag, lambda_val, x_current, bounds_tight, qp_solver
             )
-            
+
             # Should return a valid step regardless of QP solver status
             assert step is not None, "Step should not be None even with difficult QP"
             assert not np.any(np.isnan(step)), "Step should not contain NaN"
             assert not np.any(np.isinf(step)), "Step should not contain Inf"
             assert len(step) == n, "Step should have correct dimension"
-            
+
         finally:
             sys.stdout = sys.__stdout__
-            
+
         # Test case 2: Test fast path vs QP path decision logic
         # This tests the bounds violation detection more directly
-        
+
         # Case where unconstrained step doesn't violate bounds (should use fast path)
         grad_small = np.array([0.01, 0.01])  # Small gradient
         bounds_loose = (np.array([-10.0, -10.0]), np.array([10.0, 10.0]))
-        
+
         qp_solver_test = osqp.OSQP()
         qp_solver_test.setup(
             P=sparse.csc_matrix(np.ones((n, n))),
@@ -1109,48 +1113,65 @@ class TestLM:
             A=sparse.csc_matrix(np.eye(n)),
             l=np.array([-10.0, -10.0]),
             u=np.array([10.0, 10.0]),
-            verbose=False
+            verbose=False,
         )
-        
+
         step_fast = _compute_step(
             hess, grad_small, diag, lambda_val, x_current, bounds_loose, qp_solver_test
         )
-        
+
         # Case where unconstrained step would violate bounds (should use QP path)
         grad_large = np.array([5.0, 5.0])  # Large gradient that will violate bounds
         bounds_tight_valid = (np.array([-0.1, -0.1]), np.array([0.1, 0.1]))
-        
+
         qp_solver_test.update(l=np.array([-0.1, -0.1]), u=np.array([0.1, 0.1]))
-        
+
         step_qp = _compute_step(
-            hess, grad_large, diag, lambda_val, x_current, bounds_tight_valid, qp_solver_test
+            hess,
+            grad_large,
+            diag,
+            lambda_val,
+            x_current,
+            bounds_tight_valid,
+            qp_solver_test,
         )
-        
+
         # Both should return valid steps, but they should be different
         assert not np.allclose(step_fast, step_qp, atol=1e-6), (
             "Fast path and QP path should give different steps for this problem"
         )
-        
+
         # QP step should respect bounds after adding to x_current
         x_trial_qp = x_current + step_qp
         lb, ub = bounds_tight_valid
         bounds_tolerance = 1e-6
-        assert np.all(x_trial_qp >= lb - bounds_tolerance), "QP step should respect lower bounds"
-        assert np.all(x_trial_qp <= ub + bounds_tolerance), "QP step should respect upper bounds"
-        
+        assert np.all(x_trial_qp >= lb - bounds_tolerance), (
+            "QP step should respect lower bounds"
+        )
+        assert np.all(x_trial_qp <= ub + bounds_tolerance), (
+            "QP step should respect upper bounds"
+        )
+
         # Test case 3: Simulate QP solver failure by causing numerical issues
         # Use pathological problem that might stress the QP solver
         hess_ill = np.array([[1e-12, 0], [0, 1e12]])  # Very ill-conditioned
         grad_mixed = np.array([1e6, 1e-6])  # Mixed scales
-        
+
         # This combination might cause the QP solver to struggle
         step_pathological = _compute_step(
-            hess_ill, grad_mixed, diag, lambda_val, x_current,
-            bounds_tight_valid, qp_solver_test
+            hess_ill,
+            grad_mixed,
+            diag,
+            lambda_val,
+            x_current,
+            bounds_tight_valid,
+            qp_solver_test,
         )
-        
+
         # Should still return a valid step via fallback mechanisms
-        assert step_pathological is not None, "Step should not be None even with pathological QP"
+        assert step_pathological is not None, (
+            "Step should not be None even with pathological QP"
+        )
         assert not np.any(np.isnan(step_pathological)), "Step should not contain NaN"
         assert len(step_pathological) == n, "Step should have correct dimension"
 

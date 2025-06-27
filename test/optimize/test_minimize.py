@@ -4,9 +4,9 @@ import pytest
 from archimedes._core import SymbolicArray, array, compile, sym
 from archimedes.optimize import minimize
 
-
 METHODS = ("ipopt", "sqpmethod", "BFGS")
 BOUNDED_METHODS = ("ipopt", "sqpmethod", "L-BFGS-B")
+
 
 class TestMinimize:
     @pytest.mark.parametrize("method", METHODS)
@@ -75,19 +75,17 @@ class TestMinimize:
     def test_minimize_pytree(self):
         def f(params):
             x, y = params["x"], params["y"]
-            return 100 * (y - x ** 2) ** 2 + (1 - x) ** 2
+            return 100 * (y - x**2) ** 2 + (1 - x) ** 2
 
         def g(params):
             x, y = params["x"], params["y"]
             return x + y - 1.5  # x + y >= 1.5
-        
+
         # PyTree initial guess
         x0 = {"x": 2.0, "y": 1.0}
 
         # Solve with inequality constraint
-        result = minimize(
-            f, x0, constr=g, constr_bounds=(0.0, np.inf)
-        )
+        result = minimize(f, x0, constr=g, constr_bounds=(0.0, np.inf))
 
         assert np.allclose(result.x["x"], 1.0, atol=1e-3)
         assert np.allclose(result.x["y"], 1.0, atol=1e-3)
@@ -118,7 +116,7 @@ class TestMinimize:
 
         with pytest.raises(ValueError, match=r".*must have the same number"):
             minimize(f, constr=g, x0=1.0)
-        
+
         # Unsupported method
         with pytest.raises(ValueError):
             minimize(f, x0=1.0, method="unsupported_method")

@@ -53,9 +53,7 @@ def test_block_push():
     # Initial solution
     domain = cc.RadauFiniteElements(N=[5], knots=[])
     options = {"ipopt": {"print_level": 0}}
-    sol = ocp.solve(
-        domain, t_guess=(t0, tf_guess), x_guess=x_guess, options=options
-    )
+    sol = ocp.solve(domain, t_guess=(t0, tf_guess), x_guess=x_guess, options=options)
 
     # Refine mesh
     max_iter = 10
