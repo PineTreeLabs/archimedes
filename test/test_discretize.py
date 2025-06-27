@@ -12,7 +12,7 @@ class TestRK4:
             return np.stack([x[1], -x[0]])
 
         h = 1e-2
-        step = discretize(f, h, method="rk4", n_steps=n_steps)
+        step = discretize(f, h, method="rk4", n_steps=n_steps, name="test_rk4")
 
         x0 = np.array([1, 0])
         t0 = 0
@@ -61,3 +61,22 @@ class TestRadau5:
             plt.show()
 
         assert np.allclose(x_arc, x_ex)
+
+    def test_error_handling(self):
+        def f(t, x, u, p):
+            return np.stack([x[1], -x[0]])
+        
+        # No dt argument
+        with pytest.raises(ValueError, match="dt must be specified"):
+            discretize(f, method="rk4")
+
+        # Decorator mode without dt
+        with pytest.raises(ValueError, match="dt must be specified"):
+            @discretize(method="rk4")
+            def f(t, x, u, p):
+                return np.stack([x[1], -x[0]])
+
+    def test_decorator_usage(self):
+        @discretize(dt=0.01, method="rk4")
+        def f(t, x, u, p):
+            return np.stack([x[1], -x[0]])

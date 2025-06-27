@@ -230,6 +230,54 @@ class TestPEMHarmonicOscillator:
         assert final_cost / len(data) < 1e-3, f"Final cost too high: {result.fun:.2e}"
 
     @pytest.mark.parametrize("method", options.keys())
+    def test_multi_experiment(self, method, second_order_data):
+        # Problem dimensions
+        nx = 2  # state dimension (x₁, x₂)
+        nu = 1  # input dimension (u)
+        ny = 1  # output dimension (y = x₁)
+
+        # Extract data from fixture
+        data = second_order_data["data"]
+        params_true = second_order_data["params_true"]
+        omega_n_true = params_true["omega_n"]
+        zeta_true = params_true["zeta"]
+        x0_true = second_order_data["x0_true"]
+        xs_true = second_order_data["xs_true"]
+        noise_std = second_order_data["noise_std"]
+        t0, tf = data.ts[0], data.ts[-1]
+        dt = data.ts[1] - data.ts[0]  # time step from data
+        
+        # Initial parameter guess (should be different from true values)
+        params_guess = {"omega_n": 2.5, "zeta": 0.5}
+
+        R = noise_std ** 2 * np.eye(ny)  # Measurement noise covariance
+        Q = noise_std ** 2 * np.eye(nx)  # Process noise covariance
+        
+        # Set up PEM problem
+        dyn = discretize(second_order_ode, dt, method="rk4")
+        ekf = ExtendedKalmanFilter(dyn, position_obs, Q, R)
+
+        result = pem(
+            ekf,
+            [data, data],
+            params_guess,
+            x0=[x0_true, x0_true],
+            method=method,
+            options=options[method],
+        )
+        params_opt = result.p
+
+        # Test assertions
+        assert result.success, f"Parameter estimation failed: {result.message}"
+
+        # Check parameter recovery accuracy
+        omega_n_error = abs(params_opt["omega_n"] - omega_n_true) / omega_n_true
+        zeta_error = abs(params_opt["zeta"] - zeta_true) / zeta_true
+
+        assert omega_n_error < 0.01, f"Natural frequency error too large: {100 * omega_n_error:.6f} %"
+        assert zeta_error < 0.1, f"Damping ratio error too large: {100 * zeta_error:.6f} %"
+
+    @pytest.mark.parametrize("method", options.keys())
     def test_optimize_ics(self, method, second_order_data):
         # Problem dimensions
         nx = 2  # state dimension (x₁, x₂)
