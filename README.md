@@ -7,19 +7,19 @@
 
 Archimedes is an open-source Python framework designed to simplify complex modeling and simulation tasks, with the ultimate goal of making it possible to do practical hardware engineering with Python.
 
-For more details, see the [documentation site](archimedes.sh/docs)
+For more details, see the [documentation site](https://pinetreelabs.github.io/archimedes/)
 
 ### Key features
 
 By combining the powerful symbolic capabilities of [CasADi](https://web.casadi.org/docs/) with the intuitive interface designs of NumPy, PyTorch, and JAX, Archimedes provides a number of key features:
 
 * NumPy-compatible array API with automatic dispatch
-* Efficient execution of computational graphs in compiled C++
-* Automatic differentiation with forward- and reverse-mode sparse autodiff
-* Interface to "plugin" solvers for ODE/DAEs, root-finding, and nonlinear programming
-* Automated C code generation for embedded applications
 * JAX-style function transformations
 * PyTorch-style hierarchical data structures for parameters and dynamics modeling
+* Efficient execution of computational graphs in compiled C++
+* Automatic differentiation with forward- and reverse-mode sparse autodiff
+* Automated C code generation for embedded applications
+* Interface to "plugin" solvers for ODE/DAEs, root-finding, and nonlinear programming
 
 ### ⚠️ WARNING: PRE-RELEASE! ⚠️
 
@@ -83,14 +83,31 @@ x_opt = arc.minimize(f, constr=g, x0=[2.0, 0.0], constr_bounds=(-np.inf, 0))
 print(np.allclose(x_opt, [1.0, 1.0], atol=1e-3))
 ```
 
+### C code generation
+
+Archimedes can convert plain NumPy functions to standalone C code for use in embedded applications:
+
+```python
+def f(x, y):
+    return x + np.sin(y)
+
+# Create templates with appropriate shapes and dtypes
+x_type = np.zeros((), dtype=float)
+y_type = np.zeros((2,), dtype=float)
+
+arc.codegen(f, "func.c", (x_type, y_type), header=True)
+```
+
+For more details, see the tutorial on [deploying to hardware](https://pinetreelabs.github.io/archimedes/notebooks/deployment/deployment00.html)
+
 ### Extended examples
 
-- [Trajectory optimization with feedforward stabilization](examples/cartpole/finite-horizon.ipynb) (Work in progress)
-- [System identification with nonlinear Kalman filters](examples/cartpole/sysid.ipynb) (Work in progress)
-- [Multirotor vehicle dynamics](examples/multirotor/quadrotor.ipynb)
-- [Pressure-fed rocket engine](examples/draco/draco-model.ipynb)
-- [Subsonic F-16 benchmark](examples/f16/f16_plant.py)
-- [Adaptive optimal control with pseudospectral collocation](examples/coco/)
+- [Multirotor vehicle dynamics](https://pinetreelabs.github.io/archimedes/notebooks/multirotor/multirotor00.html)
+- [Code generation for Arduino](https://pinetreelabs.github.io/archimedes/notebooks/deployment/deployment00.html)
+<!-- - [Pressure-fed rocket engine](examples/draco/draco-model.ipynb) -->
+<!-- - [Adaptive optimal control with pseudospectral collocation](examples/coco/) -->
+- [Subsonic F-16 benchmark](examples/f16/f16_plant.py) (Work in progress)
+- [CartPole control](examples/cartpole/finite-horizon.ipynb) (Work in progress)
 
 
 # Installation
@@ -159,8 +176,8 @@ uv run pytest --nbmake docs/source/notebooks/**/*.ipynb
 Linting and formatting is done with [ruff](https://docs.astral.sh/ruff/):
 
 ```bash
-uv run ruff check --fix src test docs
 uv run ruff format src test docs
+uv run ruff check --fix src test docs
 ```
 
 Finally, to build the documentation locally, run

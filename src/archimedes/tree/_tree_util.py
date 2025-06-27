@@ -67,6 +67,13 @@ class PyTreeDef(NamedTuple):
         star_tree = self.unflatten(stars)
         return (f"PyTreeDef({star_tree})").replace("'*'", "*")
 
+    def __eq__(self, other: object) -> bool:
+        return (
+            self.node_data == other.node_data
+            and self.children == other.children
+            and self.num_leaves == other.num_leaves
+        )
+
 
 LEAF = PyTreeDef(None, (), 1)
 NONE_DEF = PyTreeDef(None, (), 0)

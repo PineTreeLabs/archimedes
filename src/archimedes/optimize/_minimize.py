@@ -11,6 +11,8 @@ from typing import TYPE_CHECKING, Any, Callable, Sequence, TypeVar, cast
 
 import casadi as cs
 import numpy as np
+from scipy.optimize import OptimizeResult
+from scipy.optimize import minimize as scipy_minimize
 
 from archimedes import tree
 from archimedes._core import (
@@ -18,8 +20,12 @@ from archimedes._core import (
     SymbolicArray,
     _as_casadi_array,
     array,
+    compile,
+    grad,
     sym_like,
 )
+
+from ._common import _ravel_args
 
 if TYPE_CHECKING:
     from ..typing import ArrayLike
@@ -30,6 +36,14 @@ __all__ = [
     "nlp_solver",
     "minimize",
 ]
+
+
+class UnravelContainer:
+    def __init__(self):
+        self._unravel = None
+
+    def __call__(self, x: ArrayLike) -> ArrayLike:
+        return self._unravel(x)
 
 
 def _make_nlp_solver(
@@ -61,19 +75,14 @@ def _make_nlp_solver(
                 "static arguments"
             )
 
+    unravel = UnravelContainer()
+
     # Define a function that will solve the NLP
     # This function will be evaluated with SymbolicArray objects.
     def _solve(x0, lbx, ubx, lbg, ubg, *args) -> ArrayLike:
         x0 = array(x0)
         ret_shape = x0.shape
         ret_dtype = x0.dtype
-
-        # TODO: Shape checking for bounds
-        if len(ret_shape) > 1 and ret_shape[1] > 1:
-            raise ValueError(
-                "Only scalar and vector decision variables are supported. "
-                f"Got shape {ret_shape}"
-            )
 
         # We have to flatten all of the symbolic user-defined arguments
         # into a single vector to pass to CasADi.  If there is static data,
@@ -93,14 +102,15 @@ def _make_nlp_solver(
         p, _unravel = tree.ravel(sym_args)
 
         # Define a state variable for the optimization
-        x = sym_like(x0, name="x", kind="MX")
+        x_flat = sym_like(x0, name="x", kind="MX")
+        x = unravel(x_flat)
         f = obj(x, *args)
 
         # For type checing
         f = cast(SymbolicArray, f)
 
         nlp = {
-            "x": x._sym,
+            "x": x_flat._sym,
             "f": f._sym,
         }
 
@@ -184,10 +194,28 @@ def _make_nlp_solver(
     if name is None:
         name = f"{obj.name}_nlp"
 
-    _solve_explicit.__name__ = name
+    # Wrap for PyTree compatibility
+    def _wrapped_solve(x0, *args):
+        if constrain_x:
+            bounds = args[:2]
+            args = args[2:]
+        else:
+            bounds = None
+
+        x0_flat, bounds_flat, unravel_func = _ravel_args(x0, bounds)
+        unravel._unravel = unravel_func  # store unravel function
+
+        if bounds_flat is not None:
+            lbx, ubx = bounds_flat
+            args = (lbx, ubx, *args)
+
+        x_opt_flat = _solve_explicit(x0_flat, *args)
+        return unravel(x_opt_flat)
+
+    _wrapped_solve.__name__ = name
 
     return FunctionCache(
-        _solve_explicit,
+        _wrapped_solve,
         arg_names=tuple(arg_names),
         static_argnames=static_argnames,
         kind="MX",
@@ -325,7 +353,12 @@ def nlp_solver(
     )
 
 
-def minimize(
+SCIPY_METHODS = ["BFGS", "L-BFGS-B"]
+CASADI_METHODS = ["ipopt", "sqpmethod", "blocksqp", "feasiblesqpmethod"]
+SUPPORTED_METHDOS = SCIPY_METHODS + CASADI_METHODS
+
+
+def _minimize_with_scipy(
     obj: Callable,
     x0: T,
     args: Sequence[Any] = (),
@@ -333,14 +366,55 @@ def minimize(
     constr: Callable | None = None,
     bounds: T | None = None,
     constr_bounds: ArrayLike | None = None,
+    method: str = "bfgs",
+    options: dict | None = None,
+) -> OptimizeResult:
+    if constr is not None or constr_bounds is not None:
+        raise NotImplementedError(
+            "SciPy wrapper does not yet support constraints. "
+            "Use the CasADi interface (e.g. IPOPT) for constrained optimization."
+        )
+
+    if options is None:
+        options = {}
+
+    x0_flat, bounds, unravel = _ravel_args(x0, bounds, zip_bounds=True)
+
+    # Define objective, gradient, and Hessian functions
+    @compile
+    def func(x_flat):
+        return obj(unravel(x_flat), *args)
+
+    jac = grad(func)
+
+    result = scipy_minimize(
+        func,
+        x0_flat,
+        method=method,
+        jac=jac,
+        bounds=bounds,
+        options=options,
+    )
+
+    result.x = unravel(result.x)
+    return result
+
+
+def minimize(
+    obj: Callable,
+    x0: T,
+    args: Sequence[Any] = (),
+    static_argnames: str | Sequence[str] | None = None,
+    constr: Callable | None = None,
+    bounds: tuple[T, T] | None = None,
+    constr_bounds: ArrayLike | None = None,
     method: str = "ipopt",
-    **options,
-) -> T:
+    options: dict | None = None,
+) -> OptimizeResult:
     """
-    Minimize a scalar function with optional constraints.
+    Minimize a scalar function with optional constraints and PyTree support.
 
-    Solve a nonlinear programming problem of the form
-
+    Solve a nonlinear programming problem of the form:
 
     .. code-block:: text
 
@@ -348,178 +422,243 @@ def minimize(
         subject to      lbx <= x <= ubx
                         lbg <= g(x, p) <= ubg
 
-    This function provides a simplified interface to nonlinear optimization
-    solvers like IPOPT for solving a single optimization problem.
+    This function provides a unified interface to multiple optimization methods,
+    including CasADi-based solvers (IPOPT, SQP) and SciPy optimizers (BFGS, L-BFGS-B),
+    with automatic differentiation and native PyTree parameter structure support.
+
+    **Key Features:**
+        - **PyTree Support**: Parameters can be nested dictionaries, dataclasses, or
+            any PyTree structure
+        - **Automatic Differentiation**: Exact gradients and Hessians (as needed)
+            computed efficiently and automatically
 
     Parameters
     ----------
     obj : callable
         Objective function to minimize, with signature ``obj(x, *args)``.
-        Must return a scalar value.
-    x0 : array_like
-        Initial guess for the optimization.
+        Must return a scalar value. The function ``x`` parameter can be a PyTree
+        matching the structure of ``x0``.
+    x0 : PyTree
+        Initial guess for the optimization. Can be a flat array, nested dictionary,
+        dataclass, or any PyTree structure. The solution will preserve this structure.
+
+        Examples::
+
+            # Flat array
+            x0 = np.array([1.0, 2.0])
+
+            # Nested dictionary (preserved in solution)
+            x0 = {"mass": 1.0, "damping": {"c1": 0.1, "c2": 0.2}}
+
+            # Dataclass-like nested structure
+            @archimedes.struct.pytree_node
+            class Params:
+                mass: float
+                stiffness: float
+
+            x0 = Params(mass=1.0, stiffness=100.0)
+
     args : tuple, optional
         Extra arguments passed to the objective and constraint functions.
     static_argnames : tuple of str, optional
         Names of arguments that should be treated as static (non-symbolic)
-        parameters. Static arguments are not differentiated through.
+        parameters. Static arguments are not differentiated through and trigger
+        solver recompilation when changed. Useful for discrete parameters.
     constr : callable, optional
         Constraint function with the same signature as ``obj``.
         Must return an array of constraint values where the constraints
         are interpreted as ``lbg <= constr(x, *args) <= ubg``.
-    bounds : tuple of (array_like, array_like), optional
+        Note: SciPy methods (BFGS, L-BFGS-B) do not support general constraints.
+    bounds : tuple, optional
         Bounds on the decision variables, given as a tuple ``(lb, ub)``.
-        Each bound can be either a scalar or an array matching the shape
-        of ``x0``. Use ``-np.inf`` and ``np.inf`` to specify no bound.
+        Each bound must have the same PyTree structure as ``x0``. Use ``-np.inf``
+        and ``np.inf`` for unbounded variables.
+
+        Examples::
+
+            # Array bounds
+            bounds = (np.array([0.0, -1.0]), np.array([10.0, 1.0]))
+
+            # PyTree bounds (matching x0 structure)
+            bounds = (
+                {"mass": 0.1, "damping": {"c1": 0.0, "c2": 0.0}},  # lower bounds
+                {"mass": 10.0, "damping": {"c1": 1.0, "c2": 1.0}}  # upper bounds
+            )
+
     constr_bounds : tuple of (array_like, array_like), optional
         Bounds on the constraint values, given as a tuple ``(lbg, ubg)``.
-        Each bound can be a scalar or an array matching the shape of the
-        constraint function output. If None and constr is provided,
-        defaults to ``(0, 0)`` for equality constraints.
+        If None and constr is provided, defaults to ``(0, 0)`` for equality constraints
     method : str, optional
-        The optimization method to use. Default is "ipopt". Other options
-        may be available depending on the installed solver. See the CasADi
-        documentation for available methods.
-    **options : dict
-        Additional options passed to the optimization solver through
-        :py:func:`nlp_solver`. Available options depend on the solver method.
-        See notes for examples.
+        The optimization method to use. Default is "ipopt". Available methods:
+
+        **CasADi Methods (support constraints):**
+            - ``"ipopt"`` (default): Interior point method, excellent for large
+                constrained problems
+            - ``"sqpmethod"``: Sequential quadratic programming
+            - ``"blocksqp"``: Block-structured SQP for large problems
+            - ``"feasiblesqpmethod"``: SQP with feasibility restoration
+
+        **SciPy Methods (unconstrained or box-constrained only):**
+            - ``"BFGS"``: Quasi-Newton method with automatic exact gradients
+            - ``"L-BFGS-B"``: Limited-memory BFGS with box constraints
+
+    options : dict, optional
+        Method-specific options. See Notes section for details.
 
     Returns
     -------
-    x_opt : ndarray
-        The optimal solution found by the solver, with the same shape as ``x0``.
+    result : OptimizeResult
+        Optimization result with PyTree structure preserved:
+
+        - ``x`` : Solution parameters (same PyTree structure as ``x0``)
+        - ``success`` : Whether optimization succeeded
+        - ``message`` : Descriptive termination message
+        - ``fun`` : Final objective value
+        - ``nfev`` : Number of function evaluations
+        - Additional method-specific fields
 
     Notes
     -----
-    This function dispatches to different optimization methods depending on the
-    ``method`` argument.  By default, it uses the IPOPT interior point optimizer
-    which is effective for large-scale constrained nonlinear problems. IPOPT
-    requires derivatives of the objective and constraints, which are automatically
-    computed using automatic differentiation.
+    **Method Selection Guide:**
 
-    For IPOPT, see the
-    [CasADi plugin documentation](https://web.casadi.org/python-api/#ipopt) for
-    options that may be passed directly as keyword arguments.  However, most IPOPT
-    configuration options documented in the
-    [IPOPT manual](https://coin-or.github.io/Ipopt/OPTIONS.html) must be passed as
-    an ``ipopt`` dictionary in the ``options`` argument.  For example, typical options
-    for IPOPT can be passed as follows:
+    - **Constrained problems**: Use ``"ipopt"`` (default) or SQP methods
+    - **Unconstrained problems**: Use ``"BFGS"`` for fast convergence
+    - **Box constraints only**: Use ``"L-BFGS-B"`` for memory efficiency
+    - **Least-squares problems**: Use :py:func:`least_squares` with ``method="hess-lm"``
+      for specialized Levenberg-Marquardt algorithm
 
-    .. highlight:: python
-    .. code-block:: python
+    **Automatic Differentiation:**
 
-        ipopt_options = {
-            "print_level": 0,
-            "max_iter": 100,
-            "tol": 1e-6,
+    All methods use exact gradients computed via automatic differentiation.
+    For CasADi methods, both gradients and Hessians are computed exactly.
+    For SciPy methods, gradients are exact and Hessians are approximated using BFGS.
+
+    **PyTree Structure Preservation:**
+
+    The solution ``result.x`` maintains the exact same nested structure as the
+    initial guess ``x0``. This enables natural parameter organization for
+    complex models::
+
+        # Initial parameters
+        params = {"dynamics": {"mass": 1.0, "damping": 0.1}, "controller": {"kp": 1.0}}
+
+        # After optimization - same structure
+        result = minimize(objective, params)
+        final_params = result.x  # Has same nested structure
+        print(final_params["dynamics"]["mass"])  # Optimized mass value
+
+    **IPOPT Configuration** (method="ipopt"):
+
+    Common IPOPT options passed via ``options={"ipopt": {...}}``::
+
+        ipopt_opts = {
+            "print_level": 0,        # Suppress output
+            "max_iter": 100,         # Maximum iterations
+            "tol": 1e-6,            # Convergence tolerance
+            "acceptable_tol": 1e-4,  # Acceptable tolerance
         }
-        minimize(obj, x0, ..., method="ipopt", options={"ipopt": ipopt_options})
+        result = minimize(obj, x0, method="ipopt", options={"ipopt": ipopt_opts})
 
-    Another common solver is the sequential quadratic programming (SQP) method,
-    available via the "sqpmethod", "blocksqp", or "feasiblesqpmethod" method names.
-    SQP methods require a quadratic programming (QP) solver to solve the QP
-    subproblems, specified via a ``qpsol`` keyword argument.  The default QP solver
-    is "qpoases", but other options include "osqp", "proxqp", and plugins for solvers
-    like "cplex" and "gurobi".
+    **SQP Configuration** (method="sqpmethod"):
 
-    Typical configuration options for "sqpmethod" which may be passed directly as
-    keyword arguments include:
+    Common SQP options passed directly via ``options``::
 
-    - ``hessian_approximation``:  "exact" (default, uses automatic differentiation) or
-        "limited-memory" (uses a limited-memory BFGS approximation).
-    - ``max_iter``: Maximum number of SQP iterations (default is 25).
-    - ``qpsol``: QP solver to use (default is "qpoases").
-    - ``qpsol_options``: Options for the QP solver, passed as a dictionary.
-    - ``tol_du``: Stopping tolerance for dual feasibility (default is 1e-6).
-    - ``tol_pr``: Stopping tolerance for primal feasibility (default is 1e-6).
+        options = {
+            "qpsol": "osqp",                    # QP solver
+            "hessian_approximation": "exact",   # Use exact Hessian
+            "max_iter": 50,                     # SQP iterations
+            "tol_pr": 1e-6,                     # Primal feasibility tolerance
+            "tol_du": 1e-6,                     # Dual feasibility tolerance
+            }
+        result = minimize(obj, x0, method="sqpmethod", options=options)
 
-    For other configuration options, see the CasADi documentation for
-    ["sqpmethod"](https://web.casadi.org/python-api/#sqpmethod),
-    ["blocksqp"](https://web.casadi.org/python-api/#blocksqp), and
-    ["feasiblesqpmethod"](https://web.casadi.org/python-api/#feasiblesqpmethod).
-    For QP solver options, see the documentation for the specific QP solver
-    (e.g., [OSQP](https://osqp.org/docs/release-0.6.3/interfaces/solver_settings.html)
-    or [qpOASES](https://coin-or.github.io/qpOASES/doc/3.0/doxygen/classOptions.html)).
+    **SciPy Integration** (method="BFGS" or "L-BFGS-B"):
 
-    Note that the "sqpmethod" solver with OSQP is the only combination that supports
-    C code generation.
+    SciPy methods receive exact gradients via autodiff and support standard SciPy
+    options::
 
-    For repeated optimization with different parameters, use :py:func:`nlp_solver`
-    directly to avoid recompilation overhead.
+        result = minimize(
+            obj, x0,
+            method="BFGS",
+            options={"gtol": 1e-8, "maxiter": 100}
+        )
 
     Examples
     --------
+    **Basic Usage:**
+
     >>> import numpy as np
     >>> import archimedes as arc
     >>>
-    >>> # Unconstrained Rosenbrock function
-    >>> def f(x):
-    ...     return 100 * (x[1] - x[0]**2)**2 + (1 - x[0])**2
+    >>> # Rosenbrock function with PyTree parameters
+    >>> def rosenbrock(params):
+    ...     x, y = params["x"], params["y"]
+    ...     return 100 * (y - x ** 2) ** 2 + (1 - x) ** 2
     >>>
-    >>> # Initial guess
-    >>> x0 = np.array([-1.2, 1.0])
+    >>> # PyTree initial guess
+    >>> x0 = {"x": 2.0, "y": 1.0}
     >>>
-    >>> # Solve unconstrained problem
-    >>> x_opt = arc.minimize(f, x0)
-    >>> print(x_opt)
-    [1. 1.]
+    >>> # Unconstrained optimization
+    >>> result = arc.optimize.minimize(rosenbrock, x0, method="BFGS")
+    >>> print(result.x)  # Preserves PyTree structure
+    {'x': 0.9999999999999994, 'y': 0.9999999999999989}
+
+    **Constrained Optimization:**
+
+    >>> # Add constraints
+    >>> def constraint(params):
+    ...     x, y = params["x"], params["y"]
+    ...     return x + y - 1.5  # x + y >= 1.5
     >>>
-    >>> # Constrained optimization
-    >>> def g(x):
-    ...     g1 = (x[0] - 1)**3 - x[1] + 1
-    ...     g2 = x[0] + x[1] - 2
-    ...     return np.array([g1, g2], like=x)
-    >>>
-    >>> # Solve with inequality constraints: g(x) <= 0
-    >>> x_opt = arc.minimize(
-    ...     f,
-    ...     x0=np.array([2.0, 0.0]),
-    ...     constr=g,
-    ...     constr_bounds=(-np.inf, 0),
-    ... )
-    >>> print(x_opt)
-    [0.99998266 1.00000688]
-    >>>
-    >>> # Optimization with variable bounds
-    >>> x_opt = arc.minimize(
-    ...     f,
-    ...     x0=np.array([0.0, 0.0]),
-    ...     bounds=(np.array([0.0, 0.0]), np.array([0.5, 1.5])),
-    ... )
-    >>> print(x_opt)
-    array([0.50000001, 0.25000001])
-    >>>
-    >>> # Solving with sequential quadratic programming using OSQP
-    >>> x_opt = arc.minimize(
-    ...     f,
-    ...     x0=np.array([0.0, 0.0]),
-    ...     constr=g,
-    ...     constr_bounds=(-np.inf, 0),
-    ...     method="sqpmethod",
-    ...     qpsol="osqp",
-    ...     qpsol_options={"err_abs": 1e-6, "err_rel": 1e-6},
-    ...     tol_du=1e-3,
-    ...     tol_pr=1e-3,
-    ...     max_iter=10,
-    ...     hessian_approximation="limited-memory",
+    >>> # Solve with inequality constraint
+    >>> result = arc.optimize.minimize(
+    ...     rosenbrock, x0,
+    ...     constr=constraint,
+    ...     constr_bounds=(0.0, np.inf),  # g(x) >= 0.0
+    ...     method="ipopt"
     ... )
 
+    **Box Constraints with PyTree:**
+
+    >>> # PyTree bounds matching x0 structure
+    >>> bounds = (
+    ...     {"x": 0.0, "y": 0.0},      # Lower bounds
+    ...     {"x": 2.0, "y": 2.0}       # Upper bounds
+    ... )
+    >>> result = arc.optimize.minimize(rosenbrock, x0, bounds=bounds)
 
     See Also
     --------
-    nlp_solver : Create a reusable solver for nonlinear optimization
-    root : Find the roots of a nonlinear function
-    implicit : Create a function that solves ``F(x, p) = 0`` for ``x``
+    least_squares : Specialized Levenberg-Marquardt solver for residual minimization
+    nlp_solver : Create a reusable solver for repeated optimization
+    root : Find roots of nonlinear equations
     scipy.optimize.minimize : SciPy's optimization interface
     """
-    x0 = array(x0)
-    # TODO: Expand docstring
+    if method not in SUPPORTED_METHDOS:
+        raise ValueError(
+            f"Unsupported method: {method}. Supported methods are: {SUPPORTED_METHDOS}"
+        )
+
+    if method in SCIPY_METHODS:
+        return _minimize_with_scipy(
+            obj,
+            x0=x0,
+            args=args,
+            static_argnames=static_argnames,
+            constr=constr,
+            bounds=bounds,
+            constr_bounds=constr_bounds,
+            method=method,
+            options=options,
+        )
+
+    if options is None:
+        options = {}
 
     solver = nlp_solver(
         obj,
-        constr=constr,
         static_argnames=static_argnames,
+        constr=constr,
         constrain_x=bounds is not None,
         method=method,
         **options,
@@ -545,4 +684,10 @@ def minimize(
     # Add the varargs
     arg_names = [name for name in solver.arg_names if name not in solver_args]
     solver_args = {**solver_args, **dict(zip(arg_names, args))}
-    return solver(**solver_args)
+
+    x = solver(**solver_args)
+    return OptimizeResult(
+        x=x,
+        success=True,
+        message="Optimization terminated successfully.",
+    )

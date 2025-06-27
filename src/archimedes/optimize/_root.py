@@ -228,12 +228,16 @@ def implicit(
         # the output of the residual `x` in anticipation that we will be
         # enclosing it in the `rootfinder`.
         sym_args = [x._sym]
-        arg_names = ["x0"]
+        arg_names = ["x"]
         if has_aux:
             sym_args.append(z._sym)
             arg_names.append("z")
 
-        cs_func = cs.Function("F", sym_args, [g._sym], arg_names, ["x"])
+        # Note: as of casadi 3.7.0, the root-finder will append a trailing "0"
+        # to the first argument, so ["x"] becomes ["x0"].  The output will be
+        # under the original key "x" regardless of what the specified return name
+        # is in the Function object.  Here we use "res" as this return name.
+        cs_func = cs.Function("F", sym_args, [g._sym], arg_names, ["res"])
         root_solver = cs.rootfinder("solver", solver, cs_func, options)
 
         # Before calling the CasADi rootfinder, we have to make sure

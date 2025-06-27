@@ -116,13 +116,18 @@ class OCPBase(metaclass=abc.ABCMeta):
     def dynamics_residual(self, sol, element, x, t0, tf):
         """Compute the residual of the dynamics for a given solution"""
 
-    def solve(self, domain, t_guess=None, x_guess=None, u_guess=None, **options):
+    def solve(self, domain, t_guess=None, x_guess=None, u_guess=None, options=None):
         initial_guess, lower, upper = self.initialize(domain, t_guess, x_guess, u_guess)
         obj = self.build_objective(domain)
         cons = self.build_constraints(domain)
-        opt_dvs = minimize(
-            obj, initial_guess, constr=cons, constr_bounds=(lower, upper), **options
+        opt_result = minimize(
+            obj,
+            initial_guess,
+            constr=cons,
+            constr_bounds=(lower, upper),
+            options=options,
         )
+        opt_dvs = opt_result.x
         return self.postprocess(opt_dvs, domain)
 
 

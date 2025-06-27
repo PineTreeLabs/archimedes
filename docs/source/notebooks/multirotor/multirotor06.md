@@ -20,9 +20,8 @@ Beyond illustrating multirotor flight vehicle modeling, this code (or a similar 
 
 We also discussed the design of a modular and extensible modeling framework, combining a hierarchy of classes (inheritance) with nested callable classes that implement well-defined abstract interfaces (composition). By thoughtfully structuring the framework, we were able to add a significantly more complex component model (the blade-element model) while fully reusing our existing code. Similar principles can be applied to a wide range of physics models.
 
-With careful development and application of these modeling principles, Archimedes provides a powerful tool for aerospace engineering and beyond. We encourage you to explore Archimedes further:
+To explore Archimedes further, check out:
 
-1. Visit our [GitHub repository](https://github.com/pinetreelabs/archimedes) to access the full codebase
-2. Visit the [website](https://archimedes.sh/docs) site for tutorials and in-depth documentation
+1. The [GitHub repository](https://github.com/pinetreelabs/archimedes) to access the full codebase
+2. The [website](https://archimedes.sh/docs) site for tutorials and in-depth documentation
 3. Join our [community forum](https://github.com/pinetreelabs/archimedes/discussions) to discuss your projects and get help from other users
-4. Stay tuned for upcoming tutorials on trajectory optimization, parameter estimation, and more

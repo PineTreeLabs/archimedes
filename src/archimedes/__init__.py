@@ -1,4 +1,3 @@
-from . import error, theme, tree
 from ._core import (
     array,
     callback,
@@ -21,20 +20,26 @@ from ._core import (
     zeros,
     zeros_like,
 )
+from .discretize import discretize
 from .optimize import implicit, minimize, nlp_solver, qpsol, root
 from .simulate import integrator, odeint
 from .theme import set_theme
 from .tree import struct
 
+from . import error, observers, sysid, theme, tree  # isort: skip
+
 __all__ = [
     "error",
     "theme",
     "set_theme",
+    "observers",
     "tree",
     "struct",
+    "sysid",
+    "array",
     "callback",
     "codegen",
-    "array",
+    "discretize",
     "sym",
     "sym_like",
     "zeros",

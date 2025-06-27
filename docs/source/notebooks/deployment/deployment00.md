@@ -51,7 +51,6 @@ Before we get started, one last comment: the full "path to hardware" includes no
 
 ```{toctree}
 :maxdepth: 1
-deployment00
 ../../generated/notebooks/deployment/deployment01
 ../../generated/notebooks/deployment/deployment02
 ../../generated/notebooks/deployment/deployment03
