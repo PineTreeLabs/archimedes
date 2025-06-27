@@ -36,7 +36,7 @@ def generate_linear_oscillator():
         u = np.interp(t, ts, us[0, :])  # Interpolate input at time t
 
         x1_t = x2
-        x2_t = -omega_n**2 * x1 - 2*zeta*omega_n*x2 + omega_n**2 * u
+        x2_t = -(omega_n**2) * x1 - 2 * zeta * omega_n * x2 + omega_n**2 * u
 
         return np.hstack([x2, x2_t])
 
@@ -101,7 +101,7 @@ def generate_duffing_oscillator():
         return np.hstack([x2, x2_t])
 
     t0, tf = 0.0, 40.0  # Longer simulation to capture rich dynamics
-    dt = 0.02           # Smaller timestep for nonlinear system
+    dt = 0.02  # Smaller timestep for nonlinear system
     ts = np.arange(t0, tf, dt)
 
     x0 = np.array([1.0, 0.5])
@@ -148,22 +148,24 @@ def generate_hammerstein_wiener():
     # Transfer function with zero and mixed pole structure
     # G(s) = K * (τ_z*s + 1) / ((τ_slow*s + 1) * (s² + 2*ζ*ω_n*s + ω_n²))
 
-    K = 20.0          # DC gain  
-    tau_z = 0.5      # Zero time constant (lead compensation character)
+    K = 20.0  # DC gain
+    tau_z = 0.5  # Zero time constant (lead compensation character)
     tau_slow = 2.0  # Slow pole time constant
-    omega_n = 6.0    # Natural frequency of oscillatory pair
-    zeta = 0.2       # Light damping (ζ = 0.3 gives nice oscillation)
+    omega_n = 6.0  # Natural frequency of oscillatory pair
+    zeta = 0.2  # Light damping (ζ = 0.3 gives nice oscillation)
 
     # Resulting transfer function:
     # G(s) = 2 * (0.5*s + 1) / ((10*s + 1) * (s² + 1.2*s + 4))
 
     num = np.array([K * tau_z, K])
-    den = np.array([
-        tau_slow,
-        1 + 2 * tau_slow * zeta * omega_n,
-        tau_slow * omega_n**2 + 2 * zeta * omega_n,
-        omega_n**2
-    ])
+    den = np.array(
+        [
+            tau_slow,
+            1 + 2 * tau_slow * zeta * omega_n,
+            tau_slow * omega_n**2 + 2 * zeta * omega_n,
+            omega_n**2,
+        ]
+    )
 
     # Problem dimensions
     nx = len(den) - 1  # Number of states (order of the system)
@@ -182,13 +184,12 @@ def generate_hammerstein_wiener():
 
     def obs(t, x, u, sys):
         return sys.observation(t, x, u)
-    
-    vmap_obs = arc.vmap(obs, in_axes=(0, 1, 1, None))
 
+    vmap_obs = arc.vmap(obs, in_axes=(0, 1, 1, None))
 
     def simulate_system(sys, ts, us, x0, noise_std=0.0):
         """Simulate the Hammerstein-Wiener system."""
-        
+
         def ode_rhs(t, x, sys):
             u = np.interp(t, ts, us[0]).reshape((nu,))
             return hw_ode(t, x, u, sys)
@@ -211,7 +212,7 @@ def generate_hammerstein_wiener():
             us=us,
             ys=ys,
         )
-    
+
     # 1. Ladder response for steady-state
 
     # Time vector
@@ -223,7 +224,7 @@ def generate_hammerstein_wiener():
     us = np.zeros((nu, len(ts)))  # Zero input
     for i, u in enumerate(u_ss):
         us[:, ts > i * 10.0] = u
-    
+
     ladder_data = simulate_system(hw_sys, ts, us, x0=np.zeros(nx), noise_std=noise_std)
 
     np.savetxt(
@@ -262,7 +263,7 @@ def generate_hammerstein_wiener():
     u0 = 1.0
     x0_chirp = arc.root(dyn_res, x0=np.zeros(nx), args=(u0,))
 
-    us = u0 + 0.2 * chirp(ts, f0=0.01, f1=3.0, t1=tf, method='quadratic')
+    us = u0 + 0.2 * chirp(ts, f0=0.01, f1=3.0, t1=tf, method="quadratic")
     chirp_data = simulate_system(
         hw_sys, ts, us.reshape((nu, -1)), x0=x0_chirp, noise_std=noise_std
     )

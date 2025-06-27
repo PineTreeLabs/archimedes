@@ -49,7 +49,7 @@ class StaticNonlinearity:
     def __call__(self, x):
         """Apply nonlinearity to input."""
         raise NotImplementedError("StaticNonlinearity must implement __call__ method.")
-    
+
 
 @struct.pytree_node
 class HammersteinWiener:
