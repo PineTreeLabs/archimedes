@@ -101,8 +101,6 @@ class PEMObjective:
         else:
             P0 = self.P0
 
-        params_flat, _ = tree.ravel(params)
-
         V = 0.0  # Cost function
         init_carry, unravel_carry = tree.ravel((x0, P0, params, V))
 
