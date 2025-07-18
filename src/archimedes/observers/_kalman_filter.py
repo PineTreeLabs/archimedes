@@ -355,8 +355,8 @@ class ExtendedKalmanFilter(KalmanFilterBase):
 
         # Skip correction if measurement is missing
         is_missing = self.missing(y)
-        e = np.where(is_missing, 0 * e, e)
-        K = np.where(is_missing, 0 * K, K)
+        e = np.where(is_missing, np.zeros_like(e), e)
+        K = np.where(is_missing, np.zeros_like(K), K)
 
         x = x + K @ e  # Updated state estimate
         P = (np.eye(len(x)) - K @ H) @ P  # Updated state covariance
@@ -714,8 +714,8 @@ class UnscentedKalmanFilter(KalmanFilterBase):
 
         # Skip correction if measurement is missing
         is_missing = self.missing(y)
-        e = np.where(is_missing, 0 * e, e)
-        K = np.where(is_missing, 0 * K, K)
+        e = np.where(is_missing, np.zeros_like(e), e)
+        K = np.where(is_missing, np.zeros_like(K), K)
 
         x_new = x_pred + K @ e  # Updated state estimate
         P_new = P_pred - K @ S @ K.T  # Updated covariance
