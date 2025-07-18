@@ -354,8 +354,9 @@ class ExtendedKalmanFilter(KalmanFilterBase):
         K = P @ H.T @ np.linalg.inv(S)  # Kalman gain
 
         # Skip correction if measurement is missing
-        e = np.where(self.missing(y), 0 * e, e)
-        K = np.where(self.missing(y), 0 * K, K)
+        is_missing = self.missing(y)
+        e = np.where(is_missing, 0 * e, e)
+        K = np.where(is_missing, 0 * K, K)
 
         x = x + K @ e  # Updated state estimate
         P = (np.eye(len(x)) - K @ H) @ P  # Updated state covariance
