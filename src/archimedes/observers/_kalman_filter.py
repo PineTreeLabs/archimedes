@@ -713,8 +713,9 @@ class UnscentedKalmanFilter(KalmanFilterBase):
         K = Pxz @ np.linalg.inv(S)  # Kalman gain
 
         # Skip correction if measurement is missing
-        e = np.where(self.missing(y), 0 * e, e)
-        K = np.where(self.missing(y), 0 * K, K)
+        is_missing = self.missing(y)
+        e = np.where(is_missing, 0 * e, e)
+        K = np.where(is_missing, 0 * K, K)
 
         x_new = x_pred + K @ e  # Updated state estimate
         P_new = P_pred - K @ S @ K.T  # Updated covariance
