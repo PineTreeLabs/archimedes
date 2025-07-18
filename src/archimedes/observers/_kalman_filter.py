@@ -28,6 +28,10 @@ __all__ = [
 #     return 2.0 * sum(np.log(L[i, i]) for i in range(A.shape[0]))
 
 
+def _default_missing(y):
+    return False
+
+
 @struct.pytree_node
 class KalmanFilterBase(metaclass=abc.ABCMeta):
     """Abstract base class for Kalman filter implementations.
@@ -61,6 +65,12 @@ class KalmanFilterBase(metaclass=abc.ABCMeta):
     R : array_like
         Measurement noise covariance matrix of shape ``(ny, ny)`` where ``ny`` is
         the measurement dimension. Must be positive definite.
+    missing : callable, optional
+        Function to check if a value is missing (default: always returns False).
+        The function should accept a single argument and return a boolean indicating
+        whether the measurement is considered missing or corrupted.  The "correct"
+        step will be skipped if the measurement is missing, and the filter step will
+        return zero innovation with pure prediction for state and covariance.
 
     Attributes
     ----------
@@ -119,6 +129,8 @@ class KalmanFilterBase(metaclass=abc.ABCMeta):
     obs: Callable = struct.field(static=True)
     Q: np.ndarray
     R: np.ndarray
+
+    missing: Callable = struct.field(default=_default_missing, static=True)
 
     @abc.abstractmethod
     def step(self, t, x, y, P, args=None):
@@ -340,6 +352,12 @@ class ExtendedKalmanFilter(KalmanFilterBase):
         e = y - h(t, x, *args)  # Innovation or measurement residual
         S = H @ P @ H.T + R  # Innovation covariance
         K = P @ H.T @ np.linalg.inv(S)  # Kalman gain
+
+        # Skip correction if measurement is missing
+        is_missing = self.missing(y)
+        e = np.where(is_missing, np.zeros_like(e), e)
+        K = np.where(is_missing, np.zeros_like(K), K)
+
         x = x + K @ e  # Updated state estimate
         P = (np.eye(len(x)) - K @ H) @ P  # Updated state covariance
 
@@ -691,16 +709,15 @@ class UnscentedKalmanFilter(KalmanFilterBase):
             diff_y = sigmas_h[i] - y_pred
             Pxz += Wc[i] * np.outer(diff_x, diff_y)
 
-        # Kalman gain
-        K = Pxz @ np.linalg.inv(S)
+        e = y - y_pred  # Innovation
+        K = Pxz @ np.linalg.inv(S)  # Kalman gain
 
-        # Innovation
-        e = y - y_pred
+        # Skip correction if measurement is missing
+        is_missing = self.missing(y)
+        e = np.where(is_missing, np.zeros_like(e), e)
+        K = np.where(is_missing, np.zeros_like(K), K)
 
-        # Updated state estimate
-        x_new = x_pred + K @ e
-
-        # Updated covariance
-        P_new = P_pred - K @ S @ K.T
+        x_new = x_pred + K @ e  # Updated state estimate
+        P_new = P_pred - K @ S @ K.T  # Updated covariance
 
         return x_new, P_new, e
