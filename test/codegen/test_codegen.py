@@ -43,11 +43,11 @@ y_type = np.array(3, dtype=float)
 
 @pytest.fixture
 def context():
-    # Basic context for consistent driver template rendering
+    # Basic context for consistent application template rendering
     # Note this needs to match the test_func above
     return {
         "filename": "gen",
-        "driver_name": "test_driver",
+        "app_name": "test_app",
         "function_name": "test_func",
         "sample_rate": 0.01,
         "float_type": "float",
@@ -124,36 +124,36 @@ class TestCodegen:
         arc.codegen(func, f"{file}.c", (x_type, y_type), **kwargs)
 
         # Check that the file was created
-        assert os.path.exists(f"{file}.c")
-        assert os.path.exists(f"{file}.h")
+        assert os.path.exists(f"{file}_kernel.c")
+        assert os.path.exists(f"{file}_kernel.h")
 
         # Check that the header includes a proper function signature
-        check_in_file(f"{file}.h", "int func")
+        check_in_file(f"{file}_kernel.h", "int func")
 
         # Clean up
-        os.remove(f"{file}.c")
-        os.remove(f"{file}.h")
+        os.remove(f"{file}_kernel.c")
+        os.remove(f"{file}_kernel.h")
 
     def test_codegen(self, myfunc):
         self._gen_code("gen", myfunc)
 
-    def test_codegen_with_driver(self, temp_dir, myfunc):
+    def test_codegen_with_app(self, temp_dir, myfunc):
         name = "test_func"
         func = arc.compile(myfunc, name=name, return_names=("x_new", "z"))
 
-        output_path = f"{temp_dir}/test_driver.c"
+        output_path = f"{temp_dir}/test_app.c"
         kwargs = {
             "float_type": np.float32,
             "int_type": np.int32,
-            "driver": "c",
-            "driver_config": {
+            "application": "c",
+            "app_config": {
                 "output_path": output_path,
                 "sample_rate": 0.01,
             },
         }
         file = "gen"
         arc.codegen(func, f"{file}.c", (x_type, y_type), **kwargs)
-        expected_file = "expected_c_driver.c"
+        expected_file = "expected_c_app.c"
         compare_files(expected_file, output_path)
 
         # Run with integer arguments to check type conversion
@@ -167,15 +167,15 @@ class TestCodegen:
         arc.codegen(func, f"{file}.c", (x_type,), **kwargs)
         check_in_file(output_path, "float y = 5.0;")
 
-        # Run with no driver_config to check no errors
-        kwargs.pop("driver_config")
+        # Run with no app_config to check no errors
+        kwargs.pop("app_config")
         kwargs.pop("kwargs")
         arc.codegen(func, f"{file}.c", (x_type, y_type), **kwargs)
-        os.remove("main.c")  # Default C driver
+        os.remove("main.c")  # Default C application
 
         # Clean up
-        os.remove(f"{file}.c")
-        os.remove(f"{file}.h")
+        os.remove(f"{file}_kernel.c")
+        os.remove(f"{file}_kernel.h")
 
     def test_error_handling(self, temp_dir, myfunc):
         with pytest.raises(RuntimeError):
@@ -221,24 +221,24 @@ class TestExtractProtectedRegions:
 
 class TestRender:
     @pytest.mark.parametrize(
-        "driver_type,expected_file",
+        "app_type,expected_file",
         [
-            ("c", "expected_c_driver.c"),
+            ("c", "expected_c_app.c"),
             ("arduino", "expected_arduino.ino"),
         ],
     )
-    def test_initial_render(self, driver_type, expected_file, temp_dir, context):
+    def test_initial_render(self, app_type, expected_file, temp_dir, context):
         extension = expected_file.split(".")[-1]
-        filename = f"{context['driver_name']}.{extension}"
+        filename = f"{context['app_name']}.{extension}"
         output_path = os.path.join(temp_dir, filename)
 
         # Render the template
-        _render_template(driver_type, context, output_path=output_path)
+        _render_template(app_type, context, output_path=output_path)
         compare_files(expected_file, output_path)
 
-    @pytest.mark.parametrize("driver_type", ["c", "arduino"])
-    def test_default_output_path(self, driver_type, context):
-        renderer = _render_template(driver_type, context, output_path=None)
+    @pytest.mark.parametrize("app_type", ["c", "arduino"])
+    def test_default_output_path(self, app_type, context):
+        renderer = _render_template(app_type, context, output_path=None)
 
         # Check that the file exists with the default name
         assert os.path.exists(renderer.default_output_path)
@@ -246,9 +246,9 @@ class TestRender:
 
     def test_invalid_renderer(self, context):
         with pytest.raises(ValueError, match=r"Template .* not found."):
-            _render_template("invalid_driver", context)
+            _render_template("invalid_app", context)
 
-        with pytest.raises(ValueError, match=r"Driver must be a .*"):
+        with pytest.raises(ValueError, match=r"Application must be a .*"):
             _render_template(type(self), context)
 
     def test_direct_renderer(self, temp_dir, context):
@@ -257,7 +257,7 @@ class TestRender:
         _render_template(ArduinoRenderer, context, output_path=output_path)
 
     def test_preserve_protected(self, temp_dir, context):
-        output_path = os.path.join(temp_dir, f"{context['driver_name']}.c")
+        output_path = os.path.join(temp_dir, f"{context['app_name']}.c")
 
         # Initial render
         _render_template("c", context, output_path=output_path)
@@ -285,7 +285,7 @@ class TestRender:
         assert 'printf("Custom code\\n");' in final_content
 
     def test_context_changes(self, temp_dir, context):
-        output_path = os.path.join(temp_dir, f"{context['driver_name']}.c")
+        output_path = os.path.join(temp_dir, f"{context['app_name']}.c")
 
         # Render with initial context
         _render_template("c", context, output_path=output_path)

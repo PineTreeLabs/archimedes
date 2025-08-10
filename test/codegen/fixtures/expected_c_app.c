@@ -1,4 +1,4 @@
-// gcc test_driver.c gen.c
+// gcc test_app.c gen.c
 
 #include "gen.h"
 

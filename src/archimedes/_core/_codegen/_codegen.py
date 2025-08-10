@@ -53,9 +53,9 @@ def codegen(
     float_type: type = float,
     int_type: type = int,
     options: dict[str, Any] | None = None,
-    driver: str | RendererBase | None = None,
-    driver_config: dict[str, str] | None = None,
-    driver_context: dict[str, Any] | None = None,
+    application: str | RendererBase | None = None,
+    app_config: dict[str, str] | None = None,
+    app_context: dict[str, Any] | None = None,
 ) -> None:
     """Generate C/C++ code from a compiled function.
 
@@ -104,12 +104,13 @@ def codegen(
         - with_mem: If True, generate a simplified C API with memory helpers.
         - indent: The number of spaces to use for indentation in the generated code.
 
-    driver : str | RendererBase, optional
-        Name of the template to use for generating driver code, or a custom
-        implementation of ``RendererBase``. If None, no driver code will be generated.
-    driver_config : dict[str, str], optional
-        Additional options for rendering the driver template.  This might include the
-        following keys:
+    application : str | RendererBase, optional
+        Name of the template to use for generating application code, or a custom
+        implementation of ``RendererBase``. If None, no application code will be
+        generated.
+    app_config : dict[str, str], optional
+        Additional options for rendering the application template.  This might include
+        the following keys:
 
         - template_path: Path to a custom template file, if not using the default.
         - output_path: Path where the generated code will be written.
@@ -120,8 +121,8 @@ def codegen(
         - output_descriptions: Dictionary mapping output names to descriptions.
           Used for generating comments in the code.
 
-    driver_context : dict, optional
-        Additional context for the driver template. This can include additional
+    app_context : dict, optional
+        Additional context for the application template. This can include additional
         variables that are used by custom templates. This context is passed directly
         to the Jinja2 template renderer.
 
@@ -150,11 +151,11 @@ def codegen(
     1. "Close over" the values in your function definition, or
     2. Pass them as hashable static arguments
 
-    Driver generation:
-    Optionally, this function can also be used to generate templated "driver" code
-    for different applications.  For example, this can be used to create a basic
-    C program that allocates memory and calls the generated function, or to create
-    code for deployment to an embedded system.
+    Application generation:
+    Optionally, this function can also be used to generate templated "application" code
+    for different use cases.  For example, this can be used to create a basic C program
+    that allocates memory and calls the generated function, or to create code for
+    deployment to an embedded system.
 
     Examples
     --------
@@ -238,22 +239,25 @@ def codegen(
     # Evaluate for the template arguments to get the correct return types
     results = specialized_func(*sym_args)
 
-    # Now we can generate the function code
-    specialized_func.codegen(filename, options)
+    # Now we can generate the "kernel" function code with CasADi
+    file_base = filename.split(".")[0]
+    specialized_func.codegen(f"{file_base}_kernel.c", options)
 
-    # Generate a template/driver file if requested
-    if driver is None:
+    # Generate the "runtime" code that calls the kernel functions
+
+    # Generate a template/application file if requested
+    if application is None:
         return
 
-    if driver_config is None:
-        driver_config = {}
+    if app_config is None:
+        app_config = {}
 
-    if driver_context is None:
-        driver_context = {}
+    if app_context is None:
+        app_context = {}
 
     # Build the context for the renderer
     context = {
-        **driver_context,
+        **app_context,
         "filename": filename.split(".")[0],
         "function_name": func.name,
         "float_type": dtype_to_c[float_type],
@@ -262,7 +266,7 @@ def codegen(
         "outputs": [],
     }
 
-    ts = driver_config.pop("sample_rate", None)
+    ts = app_config.pop("sample_rate", None)
     if ts is not None:
         context["sample_rate"] = {
             "hz": int(1 / ts),  # Approximate, used for comments
@@ -272,7 +276,7 @@ def codegen(
         }
 
     input_helper = ContextHelper(
-        float_type, int_type, driver_config.pop("input_descriptions", {})
+        float_type, int_type, app_config.pop("input_descriptions", {})
     )
     for name, arg in zip(func.arg_names, args):
         input_context = input_helper(arg, name)
@@ -283,13 +287,13 @@ def codegen(
         context["inputs"].append(input_context)
 
     output_helper = ContextHelper(
-        float_type, int_type, driver_config.pop("output_descriptions", {})
+        float_type, int_type, app_config.pop("output_descriptions", {})
     )
     for name, ret in zip(func.return_names, results):
         output_context = output_helper(ret, name)
         context["outputs"].append(output_context)
 
-    _render_template(driver, context, **driver_config)
+    _render_template(application, context, **app_config)
 
 
 @dataclasses.dataclass

@@ -58,7 +58,7 @@ class RendererBase(metaclass=abc.ABCMeta):
 
     def __call__(self, context, output_path=None):
         """
-        Render a C driver file from a Jinja2 template.
+        Render a C application from a Jinja2 template.
 
         Args:
             context: Dictionary with template variables
@@ -70,7 +70,7 @@ class RendererBase(metaclass=abc.ABCMeta):
         if output_path is None:
             output_path = self.default_output_path
 
-        context["driver_name"] = os.path.basename(output_path)
+        context["app_name"] = os.path.basename(output_path)
 
         # Extract existing protected regions if the file exists
         protected_regions = {}
@@ -108,10 +108,10 @@ class RendererBase(metaclass=abc.ABCMeta):
             f.write(rendered_code)
 
 
-class CDriverRenderer(RendererBase):
+class CAppRenderer(RendererBase):
     @property
     def default_template_name(self):
-        return "c_driver.j2"
+        return "c_app.j2"
 
     @property
     def default_output_path(self):
@@ -129,13 +129,13 @@ class ArduinoRenderer(RendererBase):
 
 
 _builtin_templates = {
-    "c": CDriverRenderer,
+    "c": CAppRenderer,
     "arduino": ArduinoRenderer,
 }
 
 
 def _render_template(
-    driver: str | RendererBase,
+    application: str | RendererBase,
     context: dict,
     template_path: str | None = None,
     output_path: str | None = None,
@@ -144,26 +144,26 @@ def _render_template(
     Render a template with the given context and save it to the specified path.
 
     Args:
-        driver: Name of the driver template to render
+        application: Name of the application template to render
         context: Dictionary with template variables
         output_path: Path where the generated code will be written
         template_path: Path to the Jinja2 template file
     """
-    if isinstance(driver, str):
-        if driver not in _builtin_templates:
-            raise ValueError(f"Template '{driver}' not found.")
+    if isinstance(application, str):
+        if application not in _builtin_templates:
+            raise ValueError(f"Template '{application}' not found.")
 
-        renderer = _builtin_templates[driver](template_path)
+        renderer = _builtin_templates[application](template_path)
 
     else:
         try:
-            # Will also raise a TypeError if driver is not a class
-            if issubclass(driver, RendererBase):
-                renderer = driver(template_path)
+            # Will also raise a TypeError if application is not a class
+            if issubclass(application, RendererBase):
+                renderer = application(template_path)
             else:
                 raise TypeError
         except TypeError:
-            raise ValueError("Driver must be a string or RendererBase class.")
+            raise ValueError("Application must be a string or RendererBase class.")
 
     renderer(context, output_path)
 
