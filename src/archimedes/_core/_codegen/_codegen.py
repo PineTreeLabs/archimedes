@@ -14,8 +14,8 @@ if TYPE_CHECKING:
     from ._renderer import RendererBase
 
 dtype_to_c = {
-    float: "double",
-    int: "long long int",
+    float: "float",
+    int: "long int",
     bool: "bool",
     np.float64: "double",
     np.int64: "long long int",
@@ -52,10 +52,12 @@ def codegen(
     kwargs: dict[str, Any] | None = None,
     float_type: type = float,
     int_type: type = int,
+    input_descriptions: dict[str, str] | None = None,
+    output_descriptions: dict[str, str] | None = None,
+    output_path: str | None = None,
     options: dict[str, Any] | None = None,
     application: str | RendererBase | None = None,
     app_config: dict[str, str] | None = None,
-    app_context: dict[str, Any] | None = None,
 ) -> None:
     """Generate C/C++ code from a compiled function.
 
@@ -94,6 +96,13 @@ def codegen(
         The C type to use for floating point numbers.
     int_type : type, default=int
         The C type to use for integers.
+    input_descriptions : dict[str, str], optional
+        Descriptions for the input arguments. Used for generating comments in the code.
+    output_descriptions : dict[str, str], optional
+        Descriptions for the output values. Used for generating comments in the code.
+    output_path : str, optional
+        Path where the generated code will be written. If None, defaults to
+        a name defined by the renderer.
     options : dict, optional
         Additional options for code generation. This can include:
 
@@ -113,18 +122,8 @@ def codegen(
         the following keys:
 
         - template_path: Path to a custom template file, if not using the default.
-        - output_path: Path where the generated code will be written.
         - sample_rate: Sample rate for the loop function in seconds (not used by all
           templates).
-        - input_descriptions: Dictionary mapping input names to descriptions.
-          Used for generating comments in the code.
-        - output_descriptions: Dictionary mapping output names to descriptions.
-          Used for generating comments in the code.
-
-    app_context : dict, optional
-        Additional context for the application template. This can include additional
-        variables that are used by custom templates. This context is passed directly
-        to the Jinja2 template renderer.
 
     Returns
     -------
@@ -244,20 +243,13 @@ def codegen(
     specialized_func.codegen(f"{file_base}_kernel.c", options)
 
     # Generate the "runtime" code that calls the kernel functions
+    if output_descriptions is None:
+        output_descriptions = {}
 
-    # Generate a template/application file if requested
-    if application is None:
-        return
+    if input_descriptions is None:
+        input_descriptions = {}
 
-    if app_config is None:
-        app_config = {}
-
-    if app_context is None:
-        app_context = {}
-
-    # Build the context for the renderer
     context = {
-        **app_context,
         "filename": filename.split(".")[0],
         "function_name": func.name,
         "float_type": dtype_to_c[float_type],
@@ -266,6 +258,31 @@ def codegen(
         "outputs": [],
     }
 
+    input_helper = ContextHelper(float_type, int_type, input_descriptions)
+    for name, arg in zip(func.arg_names, args):
+        input_context = input_helper(arg, name)
+        context["inputs"].append(input_context)
+
+    for name, val in kwargs.items():
+        input_context = input_helper(val, name)
+        context["inputs"].append(input_context)
+
+    output_helper = ContextHelper(float_type, int_type, output_descriptions)
+    for name, ret in zip(func.return_names, results):
+        output_context = output_helper(ret, name)
+        context["outputs"].append(output_context)
+
+    _render_template("runtime_header", context, output_path=f"{file_base}.h")
+    _render_template("runtime", context, output_path=f"{file_base}.c")
+
+    # Generate a template/application file if requested
+    if application is None:
+        return
+
+    if app_config is None:
+        app_config = {}
+
+    # Build additional context for the application renderer
     ts = app_config.pop("sample_rate", None)
     if ts is not None:
         context["sample_rate"] = {
@@ -275,25 +292,7 @@ def codegen(
             "us": int(ts * 1e6),  # Sample rate in microseconds
         }
 
-    input_helper = ContextHelper(
-        float_type, int_type, app_config.pop("input_descriptions", {})
-    )
-    for name, arg in zip(func.arg_names, args):
-        input_context = input_helper(arg, name)
-        context["inputs"].append(input_context)
-
-    for name, val in kwargs.items():
-        input_context = input_helper(val, name)
-        context["inputs"].append(input_context)
-
-    output_helper = ContextHelper(
-        float_type, int_type, app_config.pop("output_descriptions", {})
-    )
-    for name, ret in zip(func.return_names, results):
-        output_context = output_helper(ret, name)
-        context["outputs"].append(output_context)
-
-    _render_template(application, context, **app_config)
+    _render_template(application, context, output_path=output_path, **app_config)
 
 
 @dataclasses.dataclass
@@ -314,13 +313,15 @@ class ContextHelper:
             is_addr = True
         else:
             initial_value = "{" + ", ".join(map(str, arg.flatten())) + "}"
-            dims = str(arg.size)
+            # dims = str(arg.size)
+            dims = arg.size
             is_addr = False
         return {
             "type": dtype_to_c[dtype],
             "name": name,
             "dims": dims,
             "initial_value": initial_value,
+            "initial_data": arg,
             "description": self.descriptions.get(name, None),
             "is_addr": is_addr,
         }

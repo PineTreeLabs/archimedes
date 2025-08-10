@@ -4,6 +4,8 @@ import re
 
 import jinja2
 
+__all__ = ["_render_template"]
+
 DEFAULT_TEMPLATE_PATH = os.path.join(
     os.path.dirname(__file__),
     "_templates",
@@ -108,6 +110,23 @@ class RendererBase(metaclass=abc.ABCMeta):
             f.write(rendered_code)
 
 
+class RuntimeHeaderRenderer(RendererBase):
+    @property
+    def default_template_name(self):
+        return "runtime.h.j2"
+
+    @property
+    def default_output_path(self):
+        raise RuntimeError("Runtime renderer does not have a default output path.")
+
+
+class RuntimeRenderer(RuntimeHeaderRenderer):
+    @property
+    def default_template_name(self):
+        return "runtime.c.j2"
+
+
+
 class CAppRenderer(RendererBase):
     @property
     def default_template_name(self):
@@ -129,6 +148,8 @@ class ArduinoRenderer(RendererBase):
 
 
 _builtin_templates = {
+    "runtime": RuntimeRenderer,
+    "runtime_header": RuntimeHeaderRenderer,
     "c": CAppRenderer,
     "arduino": ArduinoRenderer,
 }
