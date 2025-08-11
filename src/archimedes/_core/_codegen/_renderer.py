@@ -53,12 +53,7 @@ class RendererBase(metaclass=abc.ABCMeta):
     def default_template_name(self):
         """Default template name for this renderer."""
 
-    @property
-    @abc.abstractmethod
-    def default_output_path(self):
-        """Default output file name."""
-
-    def __call__(self, context, output_path=None):
+    def __call__(self, context, output_path):
         """
         Render a C application from a Jinja2 template.
 
@@ -68,9 +63,6 @@ class RendererBase(metaclass=abc.ABCMeta):
         """
         template_dir = os.path.dirname(self.template_path)
         template_name = os.path.basename(self.template_path)
-
-        if output_path is None:
-            output_path = self.default_output_path
 
         context["app_name"] = os.path.basename(output_path)
 
@@ -110,53 +102,41 @@ class RendererBase(metaclass=abc.ABCMeta):
             f.write(rendered_code)
 
 
-class RuntimeHeaderRenderer(RendererBase):
+
+class APIRenderer(RendererBase):
     @property
     def default_template_name(self):
-        return "runtime.h.j2"
-
-    @property
-    def default_output_path(self):
-        raise RuntimeError("Runtime renderer does not have a default output path.")
+        return "c_api.c.j2"
 
 
-class RuntimeRenderer(RuntimeHeaderRenderer):
+class APIHeaderRenderer(APIRenderer):
     @property
     def default_template_name(self):
-        return "runtime.c.j2"
+        return "c_api.h.j2"
+    
 
-
-
-class CAppRenderer(RendererBase):
+class CApplicationRenderer(RendererBase):
     @property
     def default_template_name(self):
-        return "c_app.j2"
-
-    @property
-    def default_output_path(self):
-        return "main.c"
-
+        return "c_application.j2"
+    
 
 class ArduinoRenderer(RendererBase):
     @property
     def default_template_name(self):
         return "arduino.j2"
 
-    @property
-    def default_output_path(self):
-        return "sketch.ino"
-
 
 _builtin_templates = {
-    "runtime": RuntimeRenderer,
-    "runtime_header": RuntimeHeaderRenderer,
-    "c": CAppRenderer,
+    "c_app": CApplicationRenderer,
+    "api": APIRenderer,
+    "api_header": APIHeaderRenderer,
     "arduino": ArduinoRenderer,
 }
 
 
 def _render_template(
-    application: str | RendererBase,
+    template: str | RendererBase,
     context: dict,
     template_path: str | None = None,
     output_path: str | None = None,
@@ -165,26 +145,26 @@ def _render_template(
     Render a template with the given context and save it to the specified path.
 
     Args:
-        application: Name of the application template to render
+        template: Name of the template to render, or a RendererBase instance
         context: Dictionary with template variables
         output_path: Path where the generated code will be written
         template_path: Path to the Jinja2 template file
     """
-    if isinstance(application, str):
-        if application not in _builtin_templates:
-            raise ValueError(f"Template '{application}' not found.")
+    if isinstance(template, str):
+        if template not in _builtin_templates:
+            raise ValueError(f"Template '{template}' not found.")
 
-        renderer = _builtin_templates[application](template_path)
+        renderer = _builtin_templates[template](template_path)
 
     else:
         try:
-            # Will also raise a TypeError if application is not a class
-            if issubclass(application, RendererBase):
-                renderer = application(template_path)
+            # Will also raise a TypeError if template is not a class
+            if issubclass(template, RendererBase):
+                renderer = template(template_path)
             else:
                 raise TypeError
         except TypeError:
-            raise ValueError("Application must be a string or RendererBase class.")
+            raise ValueError("Template must be a string or RendererBase class.")
 
     renderer(context, output_path)
 

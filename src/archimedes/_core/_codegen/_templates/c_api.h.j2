@@ -1,0 +1,42 @@
+
+#ifndef {{ filename | upper }}_H
+#define {{ filename | upper }}_H
+
+#include "{{ filename }}_kernel.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+// Input arguments struct
+typedef struct {
+    {% for input in inputs %}
+    {{ input.type }} {{ input.name }}{% if input.dims %}[{{ input.dims }}]{% endif %};{% if input.description %}  // {{ input.description }}{% endif %}
+    
+    {% endfor %}
+} {{ function_name }}_arg_t;
+
+// Output results struct
+typedef struct {
+    {% for output in outputs %}
+    {{ output.type }} {{ output.name }}{% if output.dims %}[{{ output.dims }}]{% endif %};{% if output.description %}  // {{ output.description }}{% endif %}
+
+    {% endfor %}
+} {{ function_name }}_res_t;
+
+// Workspace struct
+typedef struct {
+    {{ int_type }} iw[{{ function_name }}_SZ_IW];
+    {{ float_type }} w[{{ function_name }}_SZ_W];
+} {{ function_name }}_workspace_t;
+
+// Runtime API
+int {{ function_name }}_init({{ function_name }}_arg_t* arg, {{ function_name }}_res_t* res, {{ function_name }}_workspace_t* workspace);
+int {{ function_name }}_step({{ function_name }}_arg_t* arg, {{ function_name }}_res_t* res, {{ function_name }}_workspace_t* workspace);
+
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif // {{ filename | upper }}_H
