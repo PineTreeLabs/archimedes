@@ -114,6 +114,11 @@ class TestCodegen:
         check_in_file(f"{temp_dir}/{c_file}", "arg->y = 5.0;")
 
     def test_error_handling(self, myfunc):
+        # Test with unknown return names.  By design choice, this raises an error
+        # in order to help generate more readable code.
+        with pytest.raises(ValueError, match=r"Return names must be provided"):
+            arc.codegen(myfunc, (x_type, y_type))
+
         func = arc.compile(myfunc, name="func", return_names=("x_new", "z"))
 
         # Can't use non-numeric inputs

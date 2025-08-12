@@ -80,8 +80,9 @@ def codegen(
         `func` is already a FunctionCache.
     return_names : tuple, optional
         The names of the return values of the function. Ignored if `func` is
-        already a FunctionCache. If not provided, the function will use default
-        names like ``y0``, ``y1``, etc.
+        already a FunctionCache. For the sake of readability, this argument is
+        required to be provided, either directly or when separately compiling
+        the function to a FunctionCache.
     kwargs : dict, optional
         Keyword arguments to pass to the function during specialization.
     float_type : type, default=float
@@ -93,15 +94,11 @@ def codegen(
     output_descriptions : dict[str, str], optional
         Descriptions for the output values. Used for generating comments in the code.
     output_dir : str, optional
-        Path where the generated code will be written. If None, defaults to the current
-        directory with the function name as the base.
+        Path where the generated code will be written.
     options : dict, optional
         Additional options for code generation. This can include:
 
         - verbose: If True, include additional comments in the generated code.
-        - cpp: If True, generate C++ code instead of C code.
-        - main: If True, generate a main function entry point.
-        - with_header: If True, also generate a header file with the extension `.h`.
         - with_mem: If True, generate a simplified C API with memory helpers.
         - indent: The number of spaces to use for indentation in the generated code.
 
@@ -189,6 +186,19 @@ def codegen(
             return_names=return_names,
         )
 
+    elif func.default_return_names is not None:
+        return_names = func.return_names
+
+    # Design choice: enforce return_names to be provided by user.
+    # Otherwise there's no way to know meaningful names and we'd
+    # have to autogenerate names like y0, y1, etc.
+    # This results in hard-to-read code, so we require names.
+    if return_names is None and func.default_return_names:
+        raise ValueError(
+            "Return names must be provided, either as an argument to `codegen` "
+            "or `compile`."
+        )
+
     if options is None:
         options = {}
 
@@ -241,7 +251,7 @@ def codegen(
         context["inputs"].append(input_context)
 
     output_helper = ContextHelper(float_type, int_type, output_descriptions)
-    for name, ret in zip(func.return_names, results):
+    for name, ret in zip(return_names, results):
         output_context = output_helper(ret, name)
         context["outputs"].append(output_context)
 
