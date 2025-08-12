@@ -7,17 +7,17 @@
 // Declare the argument, result, and workspace structures
 fib_arg_t arg;
 fib_res_t res;
-fib_workspace_t workspace;
+fib_work_t work;
 
 
 int main() {
 
     // Initialize the structs
-    fib_init(&arg, &res, &workspace);
+    fib_init(&arg, &res, &work);
 
     for (int i = 0; i < 10; i++) {
         // Perform a step in the Fibonacci sequence
-        fib_step(&arg, &res, &workspace);
+        fib_step(&arg, &res, &work);
 
         // Update the arguments for the next step
         arg.a = res.a_new;
