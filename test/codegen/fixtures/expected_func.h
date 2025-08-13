@@ -24,11 +24,11 @@ typedef struct {
 typedef struct {
     long int iw[func_SZ_IW];
     float w[func_SZ_W];
-} func_workspace_t;
+} func_work_t;
 
 // Runtime API
-int func_init(func_arg_t* arg, func_res_t* res, func_workspace_t* workspace);
-int func_step(func_arg_t* arg, func_res_t* res, func_workspace_t* workspace);
+int func_init(func_arg_t* arg, func_res_t* res, func_work_t* work);
+int func_step(func_arg_t* arg, func_res_t* res, func_work_t* work);
 
 
 #ifdef __cplusplus

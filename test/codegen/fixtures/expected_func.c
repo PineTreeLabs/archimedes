@@ -1,8 +1,9 @@
 
+#include <string.h>
 #include "func.h"
 
-int func_init(func_arg_t* arg, func_res_t* res, func_workspace_t* workspace) {
-    if (!arg || !res || !workspace) {
+int func_init(func_arg_t* arg, func_res_t* res, func_work_t* work) {
+    if (!arg || !res || !work) {
         return -1; // Invalid pointers
     }
 
@@ -19,8 +20,8 @@ int func_init(func_arg_t* arg, func_res_t* res, func_workspace_t* workspace) {
     return 0;
 }
 
-int func_step(func_arg_t* arg, func_res_t* res, func_workspace_t* workspace) {
-    if (!arg || !res || !workspace) {
+int func_step(func_arg_t* arg, func_res_t* res, func_work_t* work) {
+    if (!arg || !res || !work) {
         return -1; // Invalid pointers
     }
     
@@ -35,5 +36,5 @@ int func_step(func_arg_t* arg, func_res_t* res, func_workspace_t* workspace) {
     kernel_res[1] = res->z;
     
     // Call kernel function
-    return func(kernel_arg, kernel_res, workspace->iw, workspace->w, 0);
+    return func(kernel_arg, kernel_res, work->iw, work->w, 0);
 }

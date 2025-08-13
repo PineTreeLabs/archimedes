@@ -102,7 +102,6 @@ class RendererBase(metaclass=abc.ABCMeta):
             f.write(rendered_code)
 
 
-
 class APIRenderer(RendererBase):
     @property
     def default_template_name(self):
@@ -113,13 +112,13 @@ class APIHeaderRenderer(APIRenderer):
     @property
     def default_template_name(self):
         return "c_api.h.j2"
-    
+
 
 class CApplicationRenderer(RendererBase):
     @property
     def default_template_name(self):
         return "c_application.j2"
-    
+
 
 class ArduinoRenderer(RendererBase):
     @property

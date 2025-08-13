@@ -2,15 +2,14 @@
 
 from __future__ import annotations
 
-import os
 import dataclasses
+import os
 from typing import Any, Callable, Sequence
 
 import numpy as np
 
 from .._function import FunctionCache
 from ._renderer import _render_template
-
 
 dtype_to_c = {
     float: "float",

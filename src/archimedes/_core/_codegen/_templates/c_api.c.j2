@@ -1,8 +1,9 @@
 
+#include <string.h>
 #include "{{ filename }}.h"
 
-int {{ function_name }}_init({{ function_name }}_arg_t* arg, {{ function_name }}_res_t* res, {{ function_name }}_workspace_t* workspace) {
-    if (!arg || !res || !workspace) {
+int {{ function_name }}_init({{ function_name }}_arg_t* arg, {{ function_name }}_res_t* res, {{ function_name }}_work_t* work) {
+    if (!arg || !res || !work) {
         return -1; // Invalid pointers
     }
 
@@ -25,8 +26,8 @@ int {{ function_name }}_init({{ function_name }}_arg_t* arg, {{ function_name }}
     return 0;
 }
 
-int {{ function_name }}_step({{ function_name }}_arg_t* arg, {{ function_name }}_res_t* res, {{ function_name }}_workspace_t* workspace) {
-    if (!arg || !res || !workspace) {
+int {{ function_name }}_step({{ function_name }}_arg_t* arg, {{ function_name }}_res_t* res, {{ function_name }}_work_t* work) {
+    if (!arg || !res || !work) {
         return -1; // Invalid pointers
     }
     
@@ -43,5 +44,5 @@ int {{ function_name }}_step({{ function_name }}_arg_t* arg, {{ function_name }}
     {% endfor %}
     
     // Call kernel function
-    return {{ function_name }}(kernel_arg, kernel_res, workspace->iw, workspace->w, 0);
+    return {{ function_name }}(kernel_arg, kernel_res, work->iw, work->w, 0);
 }

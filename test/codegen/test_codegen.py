@@ -40,7 +40,6 @@ x_type = np.array([1, 2], dtype=float)
 y_type = np.array(3, dtype=float)
 
 
-
 def compare_files(expected_file, output_dir):
     expected_output = os.path.join(
         os.path.dirname(__file__),
@@ -66,14 +65,13 @@ def check_in_file(file, pattern):
 
 
 class TestCodegen:
-
     def test_codegen(self, temp_dir, myfunc):
         kwargs = {
             "float_type": np.float32,
             "output_dir": temp_dir,
         }
 
-        # Generate code for the function.  This iteration will also compile the function.
+        # Generate code for the function.  This iteration will also compile
         arc.codegen(myfunc, (x_type, y_type), return_names=("x_new", "z"), **kwargs)
 
         # Pre-compile the function for the remaining tests
@@ -133,8 +131,6 @@ class TestCodegen:
             specialized_func.codegen("invalid/func.c", {})
 
 
-
-
 class TestExtractProtectedRegions:
     def test_basic_extraction(self):
         # Create a temporary file with test content
@@ -170,7 +166,6 @@ class TestExtractProtectedRegions:
         filename = "nonexistent_file.c"
         regions = _extract_protected_regions(filename)
         assert regions == {}
-
 
 
 @pytest.fixture

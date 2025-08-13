@@ -95,7 +95,7 @@ def f(x, y):
 x_type = np.zeros((), dtype=float)
 y_type = np.zeros((2,), dtype=float)
 
-arc.codegen(f, "func.c", (x_type, y_type), header=True)
+arc.codegen(f, (x_type, y_type), return_names=("z", ))
 ```
 
 For more details, see the tutorial on [deploying to hardware](https://pinetreelabs.github.io/archimedes/notebooks/deployment/deployment00.html)
