@@ -305,9 +305,12 @@ def test_register_dataclass_metadata():
 
 
 class TestRavel:
-    def _test_ravel_unravel(self, struct):
+    def _test_ravel_unravel(self, struct, compile_fn=False):
         flat, unravel = tree.ravel(struct)
         assert isinstance(flat, SymbolicArray)
+
+        if compile_fn:
+            unravel = compile(unravel)
 
         # Check that the unraveling works
         unraveled = unravel(flat)
@@ -377,6 +380,11 @@ class TestRavel:
         )
 
         unraveled = self._test_ravel_unravel(struct)
+        assert isinstance(unraveled, Point)
+
+        # Test that this still works when the unravel function is compiled
+        # See https://github.com/PineTreeLabs/archimedes/issues/30 for previous bug
+        unraveled = self._test_ravel_unravel(struct, compile_fn=True)
         assert isinstance(unraveled, Point)
 
     def test_ravel_dict(self):
