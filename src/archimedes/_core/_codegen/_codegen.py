@@ -186,7 +186,7 @@ def codegen(
         )
 
     elif func.default_return_names is not None:
-        return_names = func.return_names
+    elif not func.default_return_names:
 
     # Design choice: enforce return_names to be provided by user.
     # Otherwise there's no way to know meaningful names and we'd
