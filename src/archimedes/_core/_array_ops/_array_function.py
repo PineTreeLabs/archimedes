@@ -894,7 +894,7 @@ SUPPORTED_FUNCTIONS = {
     "flip": NotImplemented,
     "arccos": NotImplemented,
     "histogram2d": NotImplemented,
-    "trace": NotImplemented,
+    "trace": unary_op(cs.trace, shape_inference="unary_to_scalar"),
     "nanmax": NotImplemented,
     "cholesky": unary_op(cs.chol),
     "min_scalar_type": NotImplemented,
