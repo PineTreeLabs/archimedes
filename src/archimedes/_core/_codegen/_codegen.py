@@ -266,7 +266,6 @@ def codegen(
             for suffix in ["_kernel", ""]:
                 src_file = f"{file_base}{suffix}.{ext}"
                 dst_file = os.path.join(output_dir, os.path.basename(src_file))
-                print(f"Moving {src_file} to {dst_file}")
                 os.rename(src_file, dst_file)
 
 
