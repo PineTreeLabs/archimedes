@@ -12,6 +12,12 @@ At this early stage of the project:
 
 We hope to open the project for code contributions in the future as our processes mature.
 
+## Contributor License Agreement
+
+Before we can accept your first contribution, you'll need to sign our Contributor License Agreement (CLA). This is standard practice for projects with potential commercial applications and is based on the widely-used Apache CLA. The agreement allows us to distribute your contributions under different licenses while ensuring you retain copyright ownership of your work.
+
+When you submit your first pull request, our CLA bot will guide you through the simple electronic signing process.
+
 ## Reporting Issues
 
 When reporting issues, please use our issue template and include:
