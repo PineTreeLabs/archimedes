@@ -38,9 +38,9 @@ This tutorial contains three parts:
     - Preserving modifications within protected regions
     - Customizing generated code with the templating system
 
-4. [**Example: Arduino Deployment**](../../generated/notebooks/deployment/deployment04)
+<!-- 4. [**Example: Arduino Deployment**](../../generated/notebooks/deployment/deployment04)
     - Targeting specific hardware with driver templates
-    - Deploying generated code to an Arduino
+    - Deploying generated code to an Arduino -->
 
 ## Prerequisites
 
