@@ -8,12 +8,16 @@ from IPython.display import Markdown, display
 
 def cleanup():
     for filename in (
-        "main.c",
-        "main_custom.c",
+        "main",
         "iir_filter.c",
         "iir_filter.h",
-        "iir_filter2.c",
-        "iir_filter2.h",
+        "iir_filter_kernel.c",
+        "iir_filter_kernel.h",
+        "fib.c",
+        "fib.h",
+        "fib_kernel.c",
+        "fib_kernel.h",
+        "output.txt",
     ):
         if os.path.exists(filename):
             os.remove(filename)

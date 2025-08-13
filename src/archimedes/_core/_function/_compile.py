@@ -150,6 +150,7 @@ class FunctionCache:
         # specified explicitly, it will be inferred using `inspect.signature`
         self.signature = _resolve_signature(func, arg_names)
 
+        self.default_return_names = return_names is None
         self.return_names = return_names  # Can still be None at this point
 
         if static_argnums is not None and static_argnames is not None:

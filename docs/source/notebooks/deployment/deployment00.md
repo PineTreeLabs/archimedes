@@ -12,29 +12,35 @@ This avoids both the performance limitations of education-oriented tools for run
 
 In this tutorial, we will walk through a simple example of this process.  We will develop an IIR filter using SciPy's signal processing tools and generate code for deployment to an Arduino.  Although this is a simplified example, it illustrates the key steps of the Archimedes hardware deployment model.
 
-The core workflow involves three pieces of code:
+The core workflow involves four pieces of code:
 
 1. An Archimedes-compatible Python function (written by you)
-2. A C implementation of the same function (generated automatically)
-3. A platform-specific "driver" code in C (generated semi-automatically)
+2. The embedded C application (written by you)
+3. A low-level C "kernel" implementation of the same function (generated automatically)
+4. An "interface" layer providing a consistent and easy-to-use API for the kernel code.
 
 We'll get into the details later on.  For now, the key idea is that only the C code gets deployed to the target hardware, but you can modify the Python code to quickly make changes that automatically propagate to the C source code. This unlocks streamlined workflows for quickly moving from modeling, simulation, and analysis to deployment and testing.
 
 This tutorial contains three parts:
 
-1. [**Code Generation Basics**](../../generated/notebooks/deployment/deployment01)
+1. [**Quickstart**](../../generated/notebooks/deployment/deployment01)
+    - Overview of the full workflow
+    - Basic usage of the auto-generated API
+    - Minimal C application example
+
+2. [**Code Generation Basics**](../../generated/notebooks/deployment/deployment02)
     - Converting Python functions to optimized C code
-    - Characteristics of the generated code
+    - Characteristics of the generated "kernel" code
     - The CasADi API for generated C code
 
-2. [**Driver Code Generation**](../../generated/notebooks/deployment/deployment02)
+3. [**Interface Code Generation**](../../generated/notebooks/deployment/deployment03)
     - Creating boilerplate code for calling generated C code
     - Preserving modifications within protected regions
     - Customizing generated code with the templating system
 
-3. [**Hardware Deployment**](../../generated/notebooks/deployment/deployment03)
+<!-- 4. [**Example: Arduino Deployment**](../../generated/notebooks/deployment/deployment04)
     - Targeting specific hardware with driver templates
-    - Deploying generated code to an Arduino
+    - Deploying generated code to an Arduino -->
 
 ## Prerequisites
 

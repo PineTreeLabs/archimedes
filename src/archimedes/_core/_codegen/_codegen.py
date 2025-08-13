@@ -3,19 +3,17 @@
 from __future__ import annotations
 
 import dataclasses
-from typing import TYPE_CHECKING, Any, Callable, Sequence
+import os
+from typing import Any, Callable, Sequence
 
 import numpy as np
 
 from .._function import FunctionCache
 from ._renderer import _render_template
 
-if TYPE_CHECKING:
-    from ._renderer import RendererBase
-
 dtype_to_c = {
-    float: "double",
-    int: "long long int",
+    float: "float",
+    int: "long int",
     bool: "bool",
     np.float64: "double",
     np.int64: "long long int",
@@ -36,7 +34,6 @@ DEFAULT_OPTIONS = {
     "verbose": False,
     "cpp": False,
     "main": False,
-    "with_header": True,
     "with_mem": False,
     "indent": 4,
 }
@@ -44,7 +41,6 @@ DEFAULT_OPTIONS = {
 
 def codegen(
     func: Callable | FunctionCache,
-    filename: str,
     args: Sequence[Any],
     static_argnums: int | Sequence[int] | None = None,
     static_argnames: str | Sequence[str] | None = None,
@@ -52,10 +48,10 @@ def codegen(
     kwargs: dict[str, Any] | None = None,
     float_type: type = float,
     int_type: type = int,
+    input_descriptions: dict[str, str] | None = None,
+    output_descriptions: dict[str, str] | None = None,
+    output_dir: str | None = None,
     options: dict[str, Any] | None = None,
-    driver: str | RendererBase | None = None,
-    driver_config: dict[str, str] | None = None,
-    driver_context: dict[str, Any] | None = None,
 ) -> None:
     """Generate C/C++ code from a compiled function.
 
@@ -69,9 +65,6 @@ def codegen(
     func : Callable | FunctionCache
         The compiled function to generate code for. If not already a FunctionCache,
         it will be compiled automatically.
-    filename : str
-        The file to write the code to. Must be specified as string is not supported.
-        A header file will also be generated if `header=True`.
     args : tuple
         Arguments to the function that specify shapes and dtypes. These can be:
         - SymbolicArray objects
@@ -86,44 +79,27 @@ def codegen(
         `func` is already a FunctionCache.
     return_names : tuple, optional
         The names of the return values of the function. Ignored if `func` is
-        already a FunctionCache. If not provided, the function will use default
-        names like ``y0``, ``y1``, etc.
+        already a FunctionCache. For the sake of readability, this argument is
+        required to be provided, either directly or when separately compiling
+        the function to a FunctionCache.
     kwargs : dict, optional
         Keyword arguments to pass to the function during specialization.
     float_type : type, default=float
         The C type to use for floating point numbers.
     int_type : type, default=int
         The C type to use for integers.
+    input_descriptions : dict[str, str], optional
+        Descriptions for the input arguments. Used for generating comments in the code.
+    output_descriptions : dict[str, str], optional
+        Descriptions for the output values. Used for generating comments in the code.
+    output_dir : str, optional
+        Path where the generated code will be written.
     options : dict, optional
         Additional options for code generation. This can include:
 
         - verbose: If True, include additional comments in the generated code.
-        - cpp: If True, generate C++ code instead of C code.
-        - main: If True, generate a main function entry point.
-        - with_header: If True, also generate a header file with the extension `.h`.
         - with_mem: If True, generate a simplified C API with memory helpers.
         - indent: The number of spaces to use for indentation in the generated code.
-
-    driver : str | RendererBase, optional
-        Name of the template to use for generating driver code, or a custom
-        implementation of ``RendererBase``. If None, no driver code will be generated.
-    driver_config : dict[str, str], optional
-        Additional options for rendering the driver template.  This might include the
-        following keys:
-
-        - template_path: Path to a custom template file, if not using the default.
-        - output_path: Path where the generated code will be written.
-        - sample_rate: Sample rate for the loop function in seconds (not used by all
-          templates).
-        - input_descriptions: Dictionary mapping input names to descriptions.
-          Used for generating comments in the code.
-        - output_descriptions: Dictionary mapping output names to descriptions.
-          Used for generating comments in the code.
-
-    driver_context : dict, optional
-        Additional context for the driver template. This can include additional
-        variables that are used by custom templates. This context is passed directly
-        to the Jinja2 template renderer.
 
     Returns
     -------
@@ -145,16 +121,13 @@ def codegen(
 
     Currently, this function uses CasADi's code generation directly, so the
     generated code will contain CASADI_* prefixes and follow CasADi's conventions.
+    The function will also generate an "interface" API layer with struct definitions
+    for inputs and outputs, along with convenience functions for initialization and
+    function calls.
 
     To store numerical constants in the generated code, either:
     1. "Close over" the values in your function definition, or
     2. Pass them as hashable static arguments
-
-    Driver generation:
-    Optionally, this function can also be used to generate templated "driver" code
-    for different applications.  For example, this can be used to create a basic
-    C program that allocates memory and calls the generated function, or to create
-    code for deployment to an embedded system.
 
     Examples
     --------
@@ -175,10 +148,10 @@ def codegen(
     >>> theta_type = np.array(0.0, dtype=float)
     >>>
     >>> # Generate C code
-    >>> arc.codegen(rotate, "rotate_function.c", (x_type, theta_type))
+    >>> arc.codegen(rotate, (x_type, theta_type))
 
-    The above code will generate 'rotate_function.c' and 'rotate_function.h'
-    files that implement the rotation function in C.
+    The above code will generate files including 'rotate.c' and 'rotate.h'
+    that implement the rotation function in C.
 
     To use numerical constants, declaring arguments as static will fix the
     value in the generated code:
@@ -191,8 +164,7 @@ def codegen(
     ...     ], like=x)
     ...     return scale * (R @ x)
     >>>
-    >>> arc.codegen(scaled_rotation, "scaled_rotation.c",
-    ...            (x_type, theta_type, 5.0))
+    >>> arc.codegen(scaled_rotation, (x_type, theta_type, 5.0))
 
     See Also
     --------
@@ -213,9 +185,20 @@ def codegen(
             return_names=return_names,
         )
 
-    if filename is None:
+    # If return_names is not provided but known by the function,
+    # use the function's names.  If both are known, use the names
+    # provided by the user to this function - overriding the FunctionCache's names
+    elif return_names is None and not func.default_return_names:
+        return_names = func.return_names
+
+    # Design choice: enforce return_names to be provided by user.
+    # Otherwise there's no way to know meaningful names and we'd
+    # have to autogenerate names like y0, y1, etc.
+    # This results in hard-to-read code, so we require names.
+    if return_names is None and func.default_return_names:
         raise ValueError(
-            "Must provide filename. Returning code as a string is not yet supported"
+            "Return names must be provided, either as an argument to `codegen` "
+            "or `compile`."
         )
 
     if options is None:
@@ -226,6 +209,7 @@ def codegen(
         "casadi_real": dtype_to_c[float_type],
         "casadi_int": dtype_to_c[int_type],
         **options,
+        "with_header": True,  # Always generate a header file
     }
 
     # Next we have to compile the function to get the signature
@@ -238,23 +222,20 @@ def codegen(
     # Evaluate for the template arguments to get the correct return types
     results = specialized_func(*sym_args)
 
-    # Now we can generate the function code
-    specialized_func.codegen(filename, options)
+    # Now we can generate the "kernel" function code with CasADi.
+    # This will also generate the header file with the function signature.
+    file_base = func.name
+    specialized_func.codegen(f"{file_base}_kernel.c", options)
 
-    # Generate a template/driver file if requested
-    if driver is None:
-        return
+    # Generate the "runtime" code that calls the kernel functions
+    if output_descriptions is None:
+        output_descriptions = {}
 
-    if driver_config is None:
-        driver_config = {}
+    if input_descriptions is None:
+        input_descriptions = {}
 
-    if driver_context is None:
-        driver_context = {}
-
-    # Build the context for the renderer
     context = {
-        **driver_context,
-        "filename": filename.split(".")[0],
+        "filename": file_base,
         "function_name": func.name,
         "float_type": dtype_to_c[float_type],
         "int_type": dtype_to_c[int_type],
@@ -262,18 +243,7 @@ def codegen(
         "outputs": [],
     }
 
-    ts = driver_config.pop("sample_rate", None)
-    if ts is not None:
-        context["sample_rate"] = {
-            "hz": int(1 / ts),  # Approximate, used for comments
-            "s": ts,  # Sample rate in seconds
-            "ms": int(ts * 1e3),  # Sample rate in microseconds
-            "us": int(ts * 1e6),  # Sample rate in microseconds
-        }
-
-    input_helper = ContextHelper(
-        float_type, int_type, driver_config.pop("input_descriptions", {})
-    )
+    input_helper = ContextHelper(float_type, int_type, input_descriptions)
     for name, arg in zip(func.arg_names, args):
         input_context = input_helper(arg, name)
         context["inputs"].append(input_context)
@@ -282,14 +252,24 @@ def codegen(
         input_context = input_helper(val, name)
         context["inputs"].append(input_context)
 
-    output_helper = ContextHelper(
-        float_type, int_type, driver_config.pop("output_descriptions", {})
-    )
-    for name, ret in zip(func.return_names, results):
+    output_helper = ContextHelper(float_type, int_type, output_descriptions)
+    for name, ret in zip(return_names, results):
         output_context = output_helper(ret, name)
         context["outputs"].append(output_context)
 
-    _render_template(driver, context, **driver_config)
+    _render_template("api", context, output_path=f"{file_base}.c")
+    _render_template("api_header", context, output_path=f"{file_base}.h")
+
+    # Move files to the specified output path if provided
+    if output_dir is not None:
+        output_dir = os.path.abspath(output_dir)
+        os.makedirs(output_dir, exist_ok=True)
+
+        for ext in ["c", "h"]:
+            for suffix in ["_kernel", ""]:
+                src_file = f"{file_base}{suffix}.{ext}"
+                dst_file = os.path.join(output_dir, os.path.basename(src_file))
+                os.rename(src_file, dst_file)
 
 
 @dataclasses.dataclass
@@ -310,13 +290,21 @@ class ContextHelper:
             is_addr = True
         else:
             initial_value = "{" + ", ".join(map(str, arg.flatten())) + "}"
-            dims = str(arg.size)
+            # dims = str(arg.size)
+            dims = arg.size
             is_addr = False
+
+        # At this point we have the actual dtype information.  However,
+        # CasADi treats everything as a float, so here we discard this
+        # and just use the float_type for all arguments and returns.
+        dtype = self.float_type
+
         return {
             "type": dtype_to_c[dtype],
             "name": name,
             "dims": dims,
             "initial_value": initial_value,
+            "initial_data": arg,
             "description": self.descriptions.get(name, None),
             "is_addr": is_addr,
         }

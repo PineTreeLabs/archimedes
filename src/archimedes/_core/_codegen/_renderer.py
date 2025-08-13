@@ -4,6 +4,8 @@ import re
 
 import jinja2
 
+__all__ = ["_render_template"]
+
 DEFAULT_TEMPLATE_PATH = os.path.join(
     os.path.dirname(__file__),
     "_templates",
@@ -51,14 +53,9 @@ class RendererBase(metaclass=abc.ABCMeta):
     def default_template_name(self):
         """Default template name for this renderer."""
 
-    @property
-    @abc.abstractmethod
-    def default_output_path(self):
-        """Default output file name."""
-
-    def __call__(self, context, output_path=None):
+    def __call__(self, context, output_path):
         """
-        Render a C driver file from a Jinja2 template.
+        Render a C application from a Jinja2 template.
 
         Args:
             context: Dictionary with template variables
@@ -67,10 +64,7 @@ class RendererBase(metaclass=abc.ABCMeta):
         template_dir = os.path.dirname(self.template_path)
         template_name = os.path.basename(self.template_path)
 
-        if output_path is None:
-            output_path = self.default_output_path
-
-        context["driver_name"] = os.path.basename(output_path)
+        context["app_name"] = os.path.basename(output_path)
 
         # Extract existing protected regions if the file exists
         protected_regions = {}
@@ -108,14 +102,22 @@ class RendererBase(metaclass=abc.ABCMeta):
             f.write(rendered_code)
 
 
-class CDriverRenderer(RendererBase):
+class APIRenderer(RendererBase):
     @property
     def default_template_name(self):
-        return "c_driver.j2"
+        return "c_api.c.j2"
 
+
+class APIHeaderRenderer(APIRenderer):
     @property
-    def default_output_path(self):
-        return "main.c"
+    def default_template_name(self):
+        return "c_api.h.j2"
+
+
+class CApplicationRenderer(RendererBase):
+    @property
+    def default_template_name(self):
+        return "c_application.j2"
 
 
 class ArduinoRenderer(RendererBase):
@@ -123,19 +125,17 @@ class ArduinoRenderer(RendererBase):
     def default_template_name(self):
         return "arduino.j2"
 
-    @property
-    def default_output_path(self):
-        return "sketch.ino"
-
 
 _builtin_templates = {
-    "c": CDriverRenderer,
+    "c_app": CApplicationRenderer,
+    "api": APIRenderer,
+    "api_header": APIHeaderRenderer,
     "arduino": ArduinoRenderer,
 }
 
 
 def _render_template(
-    driver: str | RendererBase,
+    template: str | RendererBase,
     context: dict,
     template_path: str | None = None,
     output_path: str | None = None,
@@ -144,26 +144,26 @@ def _render_template(
     Render a template with the given context and save it to the specified path.
 
     Args:
-        driver: Name of the driver template to render
+        template: Name of the template to render, or a RendererBase instance
         context: Dictionary with template variables
         output_path: Path where the generated code will be written
         template_path: Path to the Jinja2 template file
     """
-    if isinstance(driver, str):
-        if driver not in _builtin_templates:
-            raise ValueError(f"Template '{driver}' not found.")
+    if isinstance(template, str):
+        if template not in _builtin_templates:
+            raise ValueError(f"Template '{template}' not found.")
 
-        renderer = _builtin_templates[driver](template_path)
+        renderer = _builtin_templates[template](template_path)
 
     else:
         try:
-            # Will also raise a TypeError if driver is not a class
-            if issubclass(driver, RendererBase):
-                renderer = driver(template_path)
+            # Will also raise a TypeError if template is not a class
+            if issubclass(template, RendererBase):
+                renderer = template(template_path)
             else:
                 raise TypeError
         except TypeError:
-            raise ValueError("Driver must be a string or RendererBase class.")
+            raise ValueError("Template must be a string or RendererBase class.")
 
     renderer(context, output_path)
 
