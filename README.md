@@ -1,8 +1,8 @@
 # Archimedes
 
-![Build Status](https://github.com/jcallaham/archimedes/actions/workflows/ci.yaml/badge.svg)
-![Security Scan](https://github.com/jcallaham/archimedes/actions/workflows/security.yaml/badge.svg)
-[![codecov](https://codecov.io/gh/jcallaham/archimedes/graph/badge.svg?token=37QNTHS42R)](https://codecov.io/gh/jcallaham/archimedes)
+![Build Status](https://github.com/pinetreelabs/archimedes/actions/workflows/ci.yaml/badge.svg)
+![Security Scan](https://github.com/pinetreelabs/archimedes/actions/workflows/security.yaml/badge.svg)
+[![codecov](https://codecov.io/gh/pinetreelabs/archimedes/graph/badge.svg?token=37QNTHS42R)](https://codecov.io/gh/pinetreelabs/archimedes)
 [![REUSE status](https://api.reuse.software/badge/github.com/PineTreeLabs/archimedes)](https://api.reuse.software/info/github.com/PineTreeLabs/archimedes)
 
 Archimedes is an open-source Python framework designed to simplify complex modeling and simulation tasks, with the ultimate goal of making it possible to do practical hardware engineering with Python.
@@ -117,7 +117,7 @@ For more details, see the tutorial on [deploying to hardware](https://pinetreela
 Archimedes is currently not available on PyPI (pending resolution of an existing defunct project on PyPI also named Archimedes), but can be installed from source:
 
 ```bash
-git clone https://github.com/jcallaham/archimedes.git
+git clone https://github.com/pinetreelabs/archimedes.git
 cd archimedes
 pip install .
 ```
@@ -131,7 +131,7 @@ For development (or just a more robust environment configuration), we recommend 
 uv venv
 source .venv/bin/activate
 
-git clone https://github.com/jcallaham/archimedes.git
+git clone https://github.com/pinetreelabs/archimedes.git
 cd archimedes
 
 # Install the package with development dependencies
