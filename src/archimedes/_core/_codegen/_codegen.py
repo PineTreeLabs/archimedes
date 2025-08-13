@@ -185,8 +185,11 @@ def codegen(
             return_names=return_names,
         )
 
-    elif func.default_return_names is not None:
-    elif not func.default_return_names:
+    # If return_names is not provided but known by the function,
+    # use the function's names.  If both are known, use the names
+    # provided by the user to this function - overriding the FunctionCache's names
+    elif return_names is None and not func.default_return_names:
+        return_names = func.return_names
 
     # Design choice: enforce return_names to be provided by user.
     # Otherwise there's no way to know meaningful names and we'd

@@ -130,7 +130,9 @@ class KalmanFilterBase(metaclass=abc.ABCMeta):
     Q: np.ndarray
     R: np.ndarray
 
-    missing: Callable[[Any], bool] = struct.field(default=_default_missing, static=True)
+    missing: Callable[[np.ndarray], bool] = struct.field(
+        default=_default_missing, static=True
+    )
 
     @abc.abstractmethod
     def step(self, t, x, y, P, args=None):
