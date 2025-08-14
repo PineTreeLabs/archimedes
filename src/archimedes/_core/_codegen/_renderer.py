@@ -49,9 +49,9 @@ class RendererBase(metaclass=abc.ABCMeta):
         self.template_path = template_path
 
     @property
-    @abc.abstractmethod
     def default_template_name(self):
         """Default template name for this renderer."""
+        raise NotImplementedError("Renderer must define a default template name.")
 
     def __call__(self, context, output_path):
         """
@@ -135,11 +135,11 @@ _builtin_templates = {
 
 
 def _render_template(
-    template: str | RendererBase,
+    template: str | type[RendererBase],
     context: dict,
     template_path: str | None = None,
     output_path: str | None = None,
-) -> None:
+) -> RendererBase:
     """
     Render a template with the given context and save it to the specified path.
 
