@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import dataclasses
 import os
-from typing import Any, Callable, Sequence
+from typing import Any, Callable, Sequence, cast
 
 import numpy as np
 
@@ -185,12 +185,6 @@ def codegen(
             return_names=return_names,
         )
 
-    # If return_names is not provided but known by the function,
-    # use the function's names.  If both are known, use the names
-    # provided by the user to this function - overriding the FunctionCache's names
-    elif return_names is None and not func.default_return_names:
-        return_names = func.return_names
-
     # Design choice: enforce return_names to be provided by user.
     # Otherwise there's no way to know meaningful names and we'd
     # have to autogenerate names like y0, y1, etc.
@@ -200,6 +194,15 @@ def codegen(
             "Return names must be provided, either as an argument to `codegen` "
             "or `compile`."
         )
+
+    # If return_names is not provided but known by the function,
+    # use the function's names.  If both are known, use the names
+    # provided by the user to this function - overriding the FunctionCache's names
+    elif return_names is None and not func.default_return_names:
+        return_names = func.return_names
+    
+    # Now we're sure `return_names` is not None
+    return_names = cast(Sequence[str], return_names)
 
     if options is None:
         options = {}
@@ -274,8 +277,8 @@ def codegen(
 
 @dataclasses.dataclass
 class ContextHelper:
-    float_type: str
-    int_type: str
+    float_type: type
+    int_type: type
     descriptions: dict[str, str]
 
     def __call__(self, arg, name):
