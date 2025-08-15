@@ -180,6 +180,12 @@ uv run ruff format src test docs
 uv run ruff check --fix src test docs
 ```
 
+We also have a CI test for static type checking with [mypy](https://mypy-lang.org/):
+
+```bash
+uv run mypy src/
+```
+
 Finally, to build the documentation locally, run
 
 ```bash
