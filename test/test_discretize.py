@@ -85,4 +85,4 @@ class TestRadau5:
 
 
 if __name__ == "__main__":
-    TestExplicitRK().test_explicit_rk(n_steps=1, method="euler", plot=True)
+    TestExplicitRK().test_explicit_rk(n_steps=1, method="euler", atol=1e-2, plot=True)
