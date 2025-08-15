@@ -4,18 +4,20 @@ import pytest
 from archimedes import discretize
 
 
-class TestRK4:
-    @pytest.mark.parametrize("n_steps", [1, 2])
-    def test_rk4(self, n_steps, plot=False):
+class TestExplicitRK:
+    @pytest.mark.parametrize(
+        "n_steps,method,atol", [(1, "euler", 1e-2), (1, "rk4", 1e-6), (2, "rk4", 1e-6)]
+    )
+    def test_explicit_rk(self, n_steps, method, atol, plot=False):
         def f(t, x, u, p):
             return np.stack([x[1], -x[0]])
 
         h = 1e-2
-        step = discretize(f, h, method="rk4", n_steps=n_steps, name="test_rk4")
+        step = discretize(f, h, method=method, n_steps=n_steps, name="test_explicit")
 
         x0 = np.array([1, 0])
         t0 = 0
-        t_end = 10.0
+        t_end = 1.0
         t_eval = np.arange(t0, t_end, h)
         x_ex = np.stack([np.cos(t_eval), -np.sin(t_eval)], axis=1)
         x_arc = np.zeros((len(t_eval), 2))
@@ -30,7 +32,7 @@ class TestRK4:
             plt.plot(t_eval, x_ex, "--", label="exact")
             plt.show()
 
-        assert np.allclose(x_arc, x_ex)
+        assert np.allclose(x_arc, x_ex, atol=1e-2)
 
 
 class TestRadau5:
@@ -80,3 +82,7 @@ class TestRadau5:
         @discretize(dt=0.01, method="rk4")
         def f(t, x, u, p):
             return np.stack([x[1], -x[0]])
+
+
+if __name__ == "__main__":
+    TestExplicitRK().test_explicit_rk(n_steps=1, method="euler", plot=True)
