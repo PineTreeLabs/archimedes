@@ -28,7 +28,7 @@ def temp_dir():
 
 
 @pytest.fixture()
-def myfunc():
+def scalar_func():
     def func(x, y):
         return x, np.sin(y) * x
 
@@ -71,17 +71,17 @@ def check_in_file(file, pattern):
 
 
 class TestCodegen:
-    def test_codegen(self, temp_dir, myfunc):
+    def test_basic_codegen(self, temp_dir, scalar_func):
         kwargs = {
             "float_type": np.float32,
             "output_dir": temp_dir,
         }
 
         # Generate code for the function.  This iteration will also compile
-        arc.codegen(myfunc, (x_type, y_type), return_names=("x_new", "z"), **kwargs)
+        arc.codegen(scalar_func, (x_type, y_type), return_names=("x_new", "z"), **kwargs)
 
         # Pre-compile the function for the remaining tests
-        func = arc.compile(myfunc, name="func", return_names=("x_new", "z"))
+        func = arc.compile(scalar_func, name="func", return_names=("x_new", "z"))
 
         # Check that the files were created
         assert os.path.exists(f"{temp_dir}/{func.name}_kernel.c")
@@ -97,8 +97,8 @@ class TestCodegen:
         check_in_file(f"{temp_dir}/{func.name}.h", "int func_step")
 
         # Compare to expected output
-        compare_files(f"expected_{func.name}.h", f"{temp_dir}/{func.name}.h")
-        compare_files(f"expected_{func.name}.c", f"{temp_dir}/{func.name}.c")
+        compare_files(f"{func.name}.h", f"{temp_dir}/{func.name}.h")
+        compare_files(f"{func.name}.c", f"{temp_dir}/{func.name}.c")
 
         c_file = f"{func.name}.c"
         h_file = f"{func.name}.h"
@@ -117,13 +117,13 @@ class TestCodegen:
         check_in_file(f"{temp_dir}/{h_file}", "float y;")
         check_in_file(f"{temp_dir}/{c_file}", "arg->y = 5.000000f;")
 
-    def test_error_handling(self, myfunc):
+    def test_error_handling(self, scalar_func):
         # Test with unknown return names.  By design choice, this raises an error
         # in order to help generate more readable code.
         with pytest.raises(ValueError, match=r"Return names must be provided"):
-            arc.codegen(myfunc, (x_type, y_type))
+            arc.codegen(scalar_func, (x_type, y_type))
 
-        func = arc.compile(myfunc, name="func", return_names=("x_new", "z"))
+        func = arc.compile(scalar_func, name="func", return_names=("x_new", "z"))
 
         # Can't use non-numeric inputs
         with pytest.raises(TypeError, match="data type 'string' not understood"):
