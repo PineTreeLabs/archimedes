@@ -44,7 +44,9 @@ typedef struct {
     {% for output in outputs %}
     {% if output.ctx_type == "node" %}
     {{ output.type_ }}_t {{ output.name }};{% if output.description %}  // {{ output.description }}{% endif %}
-    {% else %}
+    {% elif output.ctx_type == "list" %}
+    {{ output.type_ }}_t {{ output.name }}[{{ output.length }}];{% if output.description %}  // {{ output.description }}{% endif %}
+    {% elif output.ctx_type == "leaf" %}
     {{ output.type_ }} {{ output.name }}{% if output.dims %}[{{ output.dims }}]{% endif %};{% if output.description %}  // {{ output.description }}{% endif %}
     {% endif %}
 

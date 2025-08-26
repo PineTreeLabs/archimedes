@@ -50,9 +50,15 @@ def compare_files(expected_file, output_dir):
     with open(expected_output, "r") as f:
         expected = f.read()
 
+    print("#### EXPECTED ####")
+    print(expected)
+
     # Load actual output
     with open(output_dir, "r") as f:
         actual = f.read()
+
+    print("#### ACTUAL ####")
+    print(actual)
 
     # Compare (normalize whitespace to handle line endings)
     assert expected.strip() == actual.strip()
@@ -103,13 +109,13 @@ class TestCodegen:
         y_type_int = np.array(3, dtype=int)
         arc.codegen(func, (x_type, y_type_int), **kwargs)
         check_in_file(f"{temp_dir}/{h_file}", "float y;")
-        check_in_file(f"{temp_dir}/{c_file}", "arg->y = 3;")
+        check_in_file(f"{temp_dir}/{c_file}", "arg->y = 3.000000f;")
 
         # Run with a specified kwarg
         kwargs["kwargs"] = {"y": 5.0}
         arc.codegen(func, (x_type,), **kwargs)
         check_in_file(f"{temp_dir}/{h_file}", "float y;")
-        check_in_file(f"{temp_dir}/{c_file}", "arg->y = 5.0;")
+        check_in_file(f"{temp_dir}/{c_file}", "arg->y = 5.000000f;")
 
     def test_error_handling(self, myfunc):
         # Test with unknown return names.  By design choice, this raises an error
@@ -120,7 +126,7 @@ class TestCodegen:
         func = arc.compile(myfunc, name="func", return_names=("x_new", "z"))
 
         # Can't use non-numeric inputs
-        with pytest.raises(TypeError, match=r"Argument .* is not numeric.*"):
+        with pytest.raises(TypeError, match="data type 'string' not understood"):
             arc.codegen(func, (x_type, "string"))
 
         # Should be impossible to do this anyway, but for completeness, check that

@@ -8,10 +8,11 @@
 extern "C" {
 #endif
 
+
 // Input arguments struct
 typedef struct {
-    float x[2];    
-    float y;    
+    float x[2];
+    float y;
 } func_arg_t;
 
 // Output results struct

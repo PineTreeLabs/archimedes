@@ -285,12 +285,16 @@ def codegen(
         print("\t", marshalling)
 
     output_helper = ContextHelper(float_type, int_type, output_descriptions)
-    if not isinstance(results, tuple) and not hasattr(results, "_fields"):
+    print(type(results))
+    if not isinstance(results, (tuple, list)) and not hasattr(results, "_fields"):
         results = (results,)
 
     for name, ret in zip(return_names, results):
         output_context = output_helper(ret, name)
         context["outputs"].append(output_context)
+
+    print("outputs")
+    print(context["outputs"])
 
     context["unique_types"].update(_unique_types(context["outputs"]))
 
@@ -360,7 +364,7 @@ class ContextHelper:
     def _process_leaf(self, arg: Any, name: str) -> LeafContext:
         """Process a 'leaf' value (scalar or array)."""
         print(f"Processing leaf '{name}' ({arg}) for codegen...")
-        
+
         arg = np.asarray(arg)
         if np.issubdtype(arg.dtype, np.floating):
             dtype = self.float_type

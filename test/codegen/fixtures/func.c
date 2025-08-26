@@ -7,15 +7,16 @@ int func_init(func_arg_t* arg, func_res_t* res, func_work_t* work) {
         return -1; // Invalid pointers
     }
 
-    // Initialize inputs
-    arg->x[0] = 1.0;
-    arg->x[1] = 2.0;
+    /* Initialize inputs */
+    memset(arg, 0, sizeof(func_arg_t));
 
-    arg->y = 3.0;
-
-    
-    // Initialize outputs
+    /* Initialize outputs */
     memset(res, 0, sizeof(*res));
+
+    /* Nonzero assignments */
+    arg->x[0] = 1.000000f;
+    arg->x[1] = 2.000000f;
+    arg->y = 3.000000f;
 
     return 0;
 }
@@ -24,7 +25,7 @@ int func_step(func_arg_t* arg, func_res_t* res, func_work_t* work) {
     if (!arg || !res || !work) {
         return -1; // Invalid pointers
     }
-    
+
     // Marshal inputs to CasADi format
     const float* kernel_arg[func_SZ_ARG];
     kernel_arg[0] = arg->x;
