@@ -28,15 +28,15 @@ int {{ function_name }}_step({{ function_name }}_arg_t* arg, {{ function_name }}
 
     // Marshal inputs to CasADi format
     const {{ float_type }}* kernel_arg[{{ function_name }}_SZ_ARG];
-    {% for assignment in marshalled_inputs %}
+{% for assignment in marshalled_inputs %}
     kernel_arg[{{ loop.index0 }}] = {{ assignment.path }};
-    {% endfor %}
+{% endfor %}
     
     // Marshal outputs to CasADi format
     {{ float_type }}* kernel_res[{{ function_name }}_SZ_RES];
-    {% for assignment in marshalled_outputs %}
+{% for assignment in marshalled_outputs %}
     kernel_res[{{ loop.index0 }}] = {{ assignment.path }};
-    {% endfor %}
+{% endfor %}
     
     // Call kernel function
     return {{ function_name }}(kernel_arg, kernel_res, work->iw, work->w, 0);
