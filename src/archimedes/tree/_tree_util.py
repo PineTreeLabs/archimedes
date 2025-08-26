@@ -61,11 +61,14 @@ class PyTreeDef(NamedTuple):
 
     def unflatten(self, xs: list[Any]) -> Any:
         return tree_unflatten(self, xs)
+    
+    @property
+    def tree_str(self) -> str:
+        stars = ["*"] * self.num_leaves
+        return self.unflatten(stars)
 
     def __repr__(self) -> str:
-        stars = ["*"] * self.num_leaves
-        star_tree = self.unflatten(stars)
-        return (f"PyTreeDef({star_tree})").replace("'*'", "*")
+        return (f"PyTreeDef({self.tree_str})").replace("'*'", "*")
 
     def __eq__(self, other: object) -> bool:
         return (

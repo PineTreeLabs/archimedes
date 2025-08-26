@@ -7,21 +7,16 @@ int {{ function_name }}_init({{ function_name }}_arg_t* arg, {{ function_name }}
         return -1; // Invalid pointers
     }
 
-    // Initialize inputs
-    {% for input in inputs %}
-    {%- if input.description %}// {{ input.description }}{% endif %}
-    {%- if input.dims %}
-    {% for i in range(input.dims) %}
-    arg->{{ input.name }}[{{ i }}] = {{ input.initial_data[i] }};
-    {% endfor %}
-    {%- else %}
-    arg->{{ input.name }} = {{ input.initial_data }};
-    {%- endif %}
+    /* Initialize inputs */
+    memset(arg, 0, sizeof({{ function_name }}_arg_t));
 
-    {% endfor %}
-    
-    // Initialize outputs
+    /* Initialize outputs */
     memset(res, 0, sizeof(*res));
+
+    /* Nonzero assignments */
+{% for assignment in assignments %}
+    {{ assignment.path }} = {{ assignment.value }};
+{% endfor %}
 
     return 0;
 }
@@ -30,6 +25,8 @@ int {{ function_name }}_step({{ function_name }}_arg_t* arg, {{ function_name }}
     if (!arg || !res || !work) {
         return -1; // Invalid pointers
     }
+
+    {# TODO: Pick up here - need to marshal nested data structures #}
     
     // Marshal inputs to CasADi format
     const {{ float_type }}* kernel_arg[{{ function_name }}_SZ_ARG];

@@ -8,16 +8,6 @@
 extern "C" {
 #endif
 
-{#
-// Input arguments struct
-typedef struct {
-    {% for input in inputs %}
-    {{ input.type_ }} {{ input.name }}{% if input.dims %}[{{ input.dims }}]{% endif %};{% if input.description %}  // {{ input.description }}{% endif %}
-    
-    {% endfor %}
-} {{ function_name }}_arg_t;
-#}
-
 {# Generate unique type definitions #}
 {% for type_name, type_ctx in unique_types.items() %}
 // {{ type_ctx.description or ("Type definition for " + type_name) }}
@@ -25,13 +15,14 @@ typedef struct {
 {% for child in type_ctx.children -%}
 {% if child.ctx_type == "node" %}
     {{ child.type_ }}_t {{ child.name }};{% if child.description %}  // {{ child.description }}{% endif %}
-{% else %}
+{% elif child.ctx_type == "list" %}
+    {{ child.type_ }}_t {{ child.name }}[{{ child.length }}];{% if child.description %}  // {{ child.description }}{% endif %}
+{% elif child.ctx_type == "leaf" %}
     {{ child.type_ }} {{ child.name }}{% if child.dims %}[{{ child.dims }}]{% endif %};{% if child.description %}  // {{ child.description }}{% endif %}
 {% endif %}
 
 {% endfor -%}
 } {{ type_name }}_t;
-
 {% endfor %}
 
 // Input arguments struct
@@ -39,7 +30,9 @@ typedef struct {
     {% for input in inputs %}
     {% if input.ctx_type == "node" %}
     {{ input.type_ }}_t {{ input.name }};{% if input.description %}  // {{ input.description }}{% endif %}
-    {% else %}
+    {% elif input.ctx_type == "list" %}
+    {{ input.type_ }}_t {{ input.name }}[{{ input.length }}];{% if input.description %}  // {{ input.description }}{% endif %}
+    {% elif input.ctx_type == "leaf" %}
     {{ input.type_ }} {{ input.name }}{% if input.dims %}[{{ input.dims }}]{% endif %};{% if input.description %}  // {{ input.description }}{% endif %}
     {% endif %}
 
