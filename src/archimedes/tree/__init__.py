@@ -27,10 +27,12 @@ from ._tree_util import (
 from ._tree_util import (
     tree_unflatten as unflatten,
 )
+from ._tree_util import is_leaf
 
 __all__ = [
     "register_pytree_node",
     "register_dataclass",
+    "is_leaf",
     "flatten",
     "unflatten",
     "structure",

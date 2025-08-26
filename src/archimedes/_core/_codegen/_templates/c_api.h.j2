@@ -8,20 +8,54 @@
 extern "C" {
 #endif
 
+{#
 // Input arguments struct
 typedef struct {
     {% for input in inputs %}
-    {{ input.type }} {{ input.name }}{% if input.dims %}[{{ input.dims }}]{% endif %};{% if input.description %}  // {{ input.description }}{% endif %}
+    {{ input.type_ }} {{ input.name }}{% if input.dims %}[{{ input.dims }}]{% endif %};{% if input.description %}  // {{ input.description }}{% endif %}
     
     {% endfor %}
+} {{ function_name }}_arg_t;
+#}
+
+{# Generate unique type definitions #}
+{% for type_name, type_ctx in unique_types.items() %}
+// {{ type_ctx.description or ("Type definition for " + type_name) }}
+typedef struct {
+{% for child in type_ctx.children -%}
+{% if child.ctx_type == "node" %}
+    {{ child.type_ }}_t {{ child.name }};{% if child.description %}  // {{ child.description }}{% endif %}
+{% else %}
+    {{ child.type_ }} {{ child.name }}{% if child.dims %}[{{ child.dims }}]{% endif %};{% if child.description %}  // {{ child.description }}{% endif %}
+{% endif %}
+
+{% endfor -%}
+} {{ type_name }}_t;
+
+{% endfor %}
+
+// Input arguments struct
+typedef struct {
+    {% for input in inputs %}
+    {% if input.ctx_type == "node" %}
+    {{ input.type_ }}_t {{ input.name }};{% if input.description %}  // {{ input.description }}{% endif %}
+    {% else %}
+    {{ input.type_ }} {{ input.name }}{% if input.dims %}[{{ input.dims }}]{% endif %};{% if input.description %}  // {{ input.description }}{% endif %}
+    {% endif %}
+
+    {% endfor -%}
 } {{ function_name }}_arg_t;
 
 // Output results struct
 typedef struct {
     {% for output in outputs %}
-    {{ output.type }} {{ output.name }}{% if output.dims %}[{{ output.dims }}]{% endif %};{% if output.description %}  // {{ output.description }}{% endif %}
+    {% if output.ctx_type == "node" %}
+    {{ output.type_ }}_t {{ output.name }};{% if output.description %}  // {{ output.description }}{% endif %}
+    {% else %}
+    {{ output.type_ }} {{ output.name }}{% if output.dims %}[{{ output.dims }}]{% endif %};{% if output.description %}  // {{ output.description }}{% endif %}
+    {% endif %}
 
-    {% endfor %}
+    {% endfor -%}
 } {{ function_name }}_res_t;
 
 // Workspace struct

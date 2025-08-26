@@ -607,3 +607,23 @@ def tree_reduce(
     """
     flat, _treedef = tree_flatten(tree, is_leaf)
     return reduce(function, flat, initializer)
+
+
+def is_leaf(x: Any) -> bool:
+    """Check if a value is a leaf in a pytree.
+    
+    Returns True if the value is not a container (i.e. is an array,
+    a scalar, or None).
+
+    Parameters
+    ----------
+    x : Any
+        The value to check.
+
+    Returns
+    -------
+    bool
+        True if the value is a leaf, False otherwise.
+    """
+    treedef = tree_structure(x)
+    return treedef is LEAF or treedef is NONE_DEF

@@ -9,14 +9,14 @@ int {{ function_name }}_init({{ function_name }}_arg_t* arg, {{ function_name }}
 
     // Initialize inputs
     {% for input in inputs %}
-    {% if input.description %}// {{ input.description }}{% endif %}
-    {% if input.dims %}
+    {%- if input.description %}// {{ input.description }}{% endif %}
+    {%- if input.dims %}
     {% for i in range(input.dims) %}
     arg->{{ input.name }}[{{ i }}] = {{ input.initial_data[i] }};
     {% endfor %}
-    {% else %}
+    {%- else %}
     arg->{{ input.name }} = {{ input.initial_data }};
-    {% endif %}
+    {%- endif %}
 
     {% endfor %}
     

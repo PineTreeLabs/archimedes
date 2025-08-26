@@ -4,10 +4,12 @@ from __future__ import annotations
 
 import dataclasses
 import os
+import re
 from typing import Any, Callable, Sequence
 
 import numpy as np
 
+from archimedes import tree
 from .._function import FunctionCache
 from ._renderer import _render_template
 
@@ -38,6 +40,9 @@ DEFAULT_OPTIONS = {
     "indent": 4,
 }
 
+
+def _to_snake_case(name: str) -> str:
+    return re.sub(r'(?<!^)(?=[A-Z])', '_', name).lower()
 
 def codegen(
     func: Callable | FunctionCache,
@@ -252,7 +257,15 @@ def codegen(
         input_context = input_helper(val, name)
         context["inputs"].append(input_context)
 
+    context["unique_types"] = _unique_types(context["inputs"])
+
+    print(context["inputs"])
+    print("types", context["unique_types"])
+
     output_helper = ContextHelper(float_type, int_type, output_descriptions)
+    if not isinstance(results, tuple) and not hasattr(results, "_fields"):
+        results = (results,)
+
     for name, ret in zip(return_names, results):
         output_context = output_helper(ret, name)
         context["outputs"].append(output_context)
@@ -273,12 +286,37 @@ def codegen(
 
 
 @dataclasses.dataclass
+class LeafContext:
+    type_: str
+    name: str
+    initial_value: str
+    is_addr: bool
+    dims: int
+    initial_data: np.ndarray
+    initial_value: str  # NOTE: Currently unused
+    description: str | None
+    ctx_type: str = dataclasses.field(default="leaf")
+
+
+@dataclasses.dataclass
+class NodeContext:
+    type_: str
+    name: str
+    children: list[NodeContext | LeafContext]
+    description: str | None = None
+    ctx_type: str = dataclasses.field(default="node")
+
+
+@dataclasses.dataclass
 class ContextHelper:
     float_type: str
     int_type: str
     descriptions: dict[str, str]
 
-    def __call__(self, arg, name):
+    def _process_leaf(self, arg, name):
+        """Process a 'leaf' value (scalar or array)."""
+        print(f"Processing leaf '{name}' ({arg}) for codegen...")
+        
         arg = np.asarray(arg)
         if np.issubdtype(arg.dtype, np.floating):
             dtype = self.float_type
@@ -299,12 +337,63 @@ class ContextHelper:
         # and just use the float_type for all arguments and returns.
         dtype = self.float_type
 
-        return {
-            "type": dtype_to_c[dtype],
-            "name": name,
-            "dims": dims,
-            "initial_value": initial_value,
-            "initial_data": arg,
-            "description": self.descriptions.get(name, None),
-            "is_addr": is_addr,
-        }
+        return LeafContext(
+            type_=dtype_to_c[dtype],
+            name=name,
+            initial_value=initial_value,
+            is_addr=is_addr,
+            dims=dims,
+            initial_data=arg,
+            description=self.descriptions.get(name, None),
+        )
+
+    def _process_node(self, arg, name):
+        print(f"Processing node '{name}' ({arg}) for codegen...")
+        # Note that all "static" data will be embedded in the computational
+        # graph, so here we just need to process the child nodes and leaves
+        return {}
+    
+    def _process_struct(self, arg, name):
+        print(f"Processing struct '{name}' ({arg}) for codegen...")
+        children = []
+        for field in tree.struct.fields(arg):
+            if field.metadata.get("static", False):
+                continue
+            child_name = field.name
+            child_context = self._process_arg(getattr(arg, child_name), child_name)
+            children.append(child_context)
+        return NodeContext(
+            type_=_to_snake_case(arg.__class__.__name__),
+            name=name,
+            children=children,
+            description=self.descriptions.get(name, None),
+        )
+    
+    def _process_arg(self, arg, name):
+        """Process a generic arg, which may be a leaf or a node"""
+        if tree.is_leaf(arg):
+            return self._process_leaf(arg, name)
+        elif tree.struct.is_pytree_node(arg):
+            return self._process_struct(arg, name)
+        else:
+            return self._process_node(arg, name)
+
+    def __call__(self, arg, name):
+        return self._process_arg(arg, name)
+
+
+def _unique_types(contexts: list[NodeContext | LeafContext]) -> dict[str, NodeContext]:
+    """Collect all unique NodeContext types, keyed by type_ field."""
+    unique_types = {}
+    
+    def _traverse(ctx):
+        if isinstance(ctx, NodeContext) and ctx.type_ not in unique_types:
+            unique_types[ctx.type_] = ctx
+            # Recursively traverse children to find nested types
+            for child in ctx.children:
+                _traverse(child)
+    
+    for ctx in contexts:
+        _traverse(ctx)
+
+    return unique_types
