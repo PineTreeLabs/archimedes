@@ -1,6 +1,7 @@
 import os
 import shutil
 import tempfile
+from typing import NamedTuple
 
 import numpy as np
 import pytest
@@ -38,6 +39,24 @@ def scalar_func():
 # Create arrays of the right shape and dtype
 x_type = np.array([1, 2], dtype=float)
 y_type = np.array(3, dtype=float)
+
+
+class Point2D(NamedTuple):
+    x: float
+    y: float
+
+@arc.struct.pytree_node
+class Cluster:
+    center: Point2D
+    points: list[Point2D]  # Array of structs
+    weights: np.ndarray    # Simple array
+
+def nested_func(
+    scalar: float,
+    arr: np.ndarray,
+    clusters: list[Cluster],   # array of structs containing arrays of named tuples
+) -> float:
+    return scalar + clusters[0].points[1].x
 
 
 def compare_files(expected_file, output_dir):
@@ -116,6 +135,63 @@ class TestCodegen:
         arc.codegen(func, (x_type,), **kwargs)
         check_in_file(f"{temp_dir}/{h_file}", "float y;")
         check_in_file(f"{temp_dir}/{c_file}", "arg->y = 5.000000f;")
+
+    def test_nested_codegen(self, temp_dir):
+        kwargs = {
+            "float_type": np.float32,
+            "output_dir": temp_dir,
+        }
+
+        # Pre-compile the function
+        func = arc.compile(nested_func, name="nested_func", return_names=("z",))
+
+        # Generate code
+        args = (
+            42.0,  # scalar
+            np.array([1.0, 2.0, 3.0]),  # arr
+            [
+                Cluster(
+                    center=Point2D(1.0, 2.0),
+                    points=[
+                        Point2D(1.0, 2.0),
+                        Point2D(2.0, 3.0),
+                        Point2D(3.0, 4.0),
+                    ],
+                    weights=np.array([0.1, 0.2, 0.3]),
+                ),
+                Cluster(
+                    center=Point2D(4.0, 5.0),
+                    points=[
+                        Point2D(4.0, 5.0),
+                        Point2D(5.0, 6.0),
+                    ],
+                    weights=np.array([0.4, 0.5, 0.6]),
+                )
+            ]
+        )
+        # First, raise an error (second Cluster only has two points)
+        with pytest.raises(ValueError, match="All items in list 'clusters' must have the same structure."):
+            arc.codegen(func, args, **kwargs)
+
+        args[2][1].points.append(Point2D(6.0, 7.0))  # Fix by adding a point
+        arc.codegen(func, args, **kwargs)
+    
+        # Check that the files were created
+        assert os.path.exists(f"{temp_dir}/{func.name}_kernel.c")
+        assert os.path.exists(f"{temp_dir}/{func.name}_kernel.h")
+        assert os.path.exists(f"{temp_dir}/{func.name}.c")
+        assert os.path.exists(f"{temp_dir}/{func.name}.h")
+
+        # # Check that the kernel header includes a proper function signature
+        # check_in_file(f"{temp_dir}/{func.name}_kernel.h", "int func")
+
+        # # Check that the API header includes correct functions
+        # check_in_file(f"{temp_dir}/{func.name}.h", "int func_init")
+        # check_in_file(f"{temp_dir}/{func.name}.h", "int func_step")
+
+        # Compare to expected output
+        compare_files(f"{func.name}.h", f"{temp_dir}/{func.name}.h")
+        compare_files(f"{func.name}.c", f"{temp_dir}/{func.name}.c")
 
     def test_error_handling(self, scalar_func):
         # Test with unknown return names.  By design choice, this raises an error
