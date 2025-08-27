@@ -1,4 +1,4 @@
-from ._codegen import codegen, CodegenError
+from ._codegen import CodegenError, codegen
 
 __all__ = [
     "codegen",

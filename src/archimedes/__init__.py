@@ -1,8 +1,8 @@
 from ._core import (
+    CodegenError,
     array,
     callback,
     codegen,
-    CodegenError,
     compile,
     eye,
     grad,

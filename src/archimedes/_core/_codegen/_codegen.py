@@ -2,22 +2,22 @@
 
 from __future__ import annotations
 
-import dataclasses
 import os
 import re
 from typing import (
     Any,
     Callable,
-    Sequence,
-    OrderedDict,
     NamedTuple,
-    cast,
+    OrderedDict,
     Protocol,
+    Sequence,
+    cast,
 )
 
 import numpy as np
 
 from archimedes import tree
+
 from .._function import FunctionCache
 from ._renderer import _render_template
 
@@ -54,7 +54,8 @@ class CodegenError(ValueError):
 
 
 def _to_snake_case(name: str) -> str:
-    return re.sub(r'(?<!^)(?=[A-Z])', '_', name).lower()
+    return re.sub(r"(?<!^)(?=[A-Z])", "_", name).lower()
+
 
 def codegen(
     func: Callable | FunctionCache,
@@ -276,7 +277,9 @@ def codegen(
         print("\t", ctx)
 
     print("\nflat inputs")
-    flat_ctx = tree.leaves(context["inputs"], is_leaf=lambda x: isinstance(x, LeafContext))
+    flat_ctx = tree.leaves(
+        context["inputs"], is_leaf=lambda x: isinstance(x, LeafContext)
+    )
     for ctx in flat_ctx:
         print("\t", ctx)
     print()
@@ -287,7 +290,9 @@ def codegen(
     #     print("\t", assn)
     # print("types", context["unique_types"])
 
-    context["marshalled_inputs"] = _generate_marshalling(context["inputs"], prefix="arg")
+    context["marshalled_inputs"] = _generate_marshalling(
+        context["inputs"], prefix="arg"
+    )
     print("marshalling inputs")
     for marshalling in context["marshalled_inputs"]:
         print("\t", marshalling)
@@ -306,7 +311,9 @@ def codegen(
 
     context["unique_types"].update(_unique_types(context["outputs"]))
 
-    context["marshalled_outputs"] = _generate_marshalling(context["outputs"], prefix="res")
+    context["marshalled_outputs"] = _generate_marshalling(
+        context["outputs"], prefix="res"
+    )
     print("marshalling outputs")
     for marshalling in context["marshalled_outputs"]:
         print("\t", marshalling)
@@ -442,7 +449,7 @@ class ContextHelper:
             name=name,
             elements=elements,
             description=self.descriptions.get(name, None),
-            length=len(elements)
+            length=len(elements),
         )
 
     def _process_struct(self, arg: Any, name: str) -> NodeContext:
@@ -560,8 +567,7 @@ class Assignment:
 
 
 def _generate_assignments(
-    contexts: list[Context],
-    prefix: str = "arg"
+    contexts: list[Context], prefix: str = "arg"
 ) -> list[Assignment]:
     """Generate flat list of all non-zero assignments."""
     assignments = []
@@ -573,7 +579,6 @@ def _generate_assignments(
 
     def _traverse(ctx: Context, current_path: str):
         if isinstance(ctx, LeafContext):
-
             if not np.all(ctx.initial_data == 0):
                 if ctx.dims:  # Array
                     # Handle array initialization from initial data
@@ -582,15 +587,19 @@ def _generate_assignments(
                     # This will then generate assignments in the correct order.
                     for i, val in enumerate(ctx.initial_data.flatten("F")):
                         if val != 0:
-                            assignments.append(Assignment(
-                                path=f"{current_path}[{i}]",
-                                value=_format_value(val, ctx.type_),
-                            ))
+                            assignments.append(
+                                Assignment(
+                                    path=f"{current_path}[{i}]",
+                                    value=_format_value(val, ctx.type_),
+                                )
+                            )
                 else:  # Scalar
-                    assignments.append(Assignment(
-                        path=current_path,
-                        value=_format_value(ctx.initial_data, ctx.type_),
-                    ))
+                    assignments.append(
+                        Assignment(
+                            path=current_path,
+                            value=_format_value(ctx.initial_data, ctx.type_),
+                        )
+                    )
 
         elif isinstance(ctx, ListContext):
             for i, child in enumerate(ctx.elements):
@@ -605,7 +614,7 @@ def _generate_assignments(
     for ctx in contexts:
         base_path = f"{prefix}->{ctx.name}" if ctx.name else prefix
         _traverse(ctx, base_path)
-    
+
     return assignments
 
 

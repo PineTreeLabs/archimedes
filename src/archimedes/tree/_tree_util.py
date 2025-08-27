@@ -61,7 +61,7 @@ class PyTreeDef(NamedTuple):
 
     def unflatten(self, xs: list[Any]) -> Any:
         return tree_unflatten(self, xs)
-    
+
     @property
     def tree_str(self) -> str:
         stars = ["*"] * self.num_leaves
@@ -614,7 +614,7 @@ def tree_reduce(
 
 def is_leaf(x: Any) -> bool:
     """Check if a value is a leaf in a pytree.
-    
+
     Returns True if the value is not a container (i.e. is an array,
     a scalar, or None).
 

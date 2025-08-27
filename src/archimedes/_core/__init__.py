@@ -15,7 +15,7 @@ from ._array_impl import (
 # imported from there.
 from ._array_ops import SymbolicArray
 from ._autodiff import grad, hess, jac, jvp, vjp
-from ._codegen import codegen, CodegenError
+from ._codegen import CodegenError, codegen
 from ._function import (
     FunctionCache,
     callback,

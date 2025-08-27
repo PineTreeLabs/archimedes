@@ -80,7 +80,6 @@ class TestCodegen:
         compare_files(f"{func_name}.h", f"{temp_dir}/{func_name}.h")
         compare_files(f"{func_name}.c", f"{temp_dir}/{func_name}.c")
 
-
     def test_basic_codegen(self, temp_dir, scalar_func):
         kwargs = {
             "float_type": np.float32,
@@ -88,7 +87,9 @@ class TestCodegen:
         }
 
         # Generate code for the function.  This iteration will also compile
-        arc.codegen(scalar_func, (x_type, y_type), return_names=("x_new", "z"), **kwargs)
+        arc.codegen(
+            scalar_func, (x_type, y_type), return_names=("x_new", "z"), **kwargs
+        )
         self._check_files(temp_dir, "func")
 
         # Pre-compile the function for the remaining tests
@@ -138,14 +139,16 @@ class TestCodegen:
         class Cluster:
             center: Point
             points: list[Point]  # Array of structs
-            weights: np.ndarray    # Simple array
+            weights: np.ndarray  # Simple array
 
         def nested_func(
             scalar: float,
             arr: np.ndarray,
-            clusters: list[Cluster],   # array of structs containing arrays of named tuples
+            clusters: list[
+                Cluster
+            ],  # array of structs containing arrays of named tuples
             empty_struct: EmptyStruct,
-            static_str: str = "default"  # Static arg should be ignored
+            static_str: str = "default",  # Static arg should be ignored
         ) -> float:
             return scalar + clusters[0].points[1].x
 
@@ -154,7 +157,7 @@ class TestCodegen:
             nested_func,
             name=nested_func.__name__,
             return_names=("z",),
-            static_argnames=("static_str",)
+            static_argnames=("static_str",),
         )
 
         # Initial arguments
@@ -178,12 +181,15 @@ class TestCodegen:
                         Point(5.0, 6.0),
                     ],
                     weights=np.array([0.4, 0.5, 0.6]),
-                )
+                ),
             ],
             EmptyStruct(arr=np.array([])),  # empty struct
         )
         # First, raise an error (second Cluster only has two points)
-        with pytest.raises(ValueError, match="All items in list 'clusters' must have the same structure."):
+        with pytest.raises(
+            ValueError,
+            match="All items in list 'clusters' must have the same structure.",
+        ):
             arc.codegen(func, args, **kwargs)
 
         # Fix the error and generate code
@@ -198,28 +204,19 @@ class TestCodegen:
         }
 
         def dict_func(
-            config: dict[str, float],      # {"lr": 0.01, "momentum": 0.9}
-            bounds: tuple[float, float],   # (0.0, 1.0)  
+            config: dict[str, float],  # {"lr": 0.01, "momentum": 0.9}
+            bounds: tuple[float, float],  # (0.0, 1.0)
             empty_dict: dict[str, float],  # {} - empty
-            empty_list: list[float],       # [] - empty
-            single_tuple: tuple[float],    # (42.0,) - single element
-            none_arg: None,                # empty
+            empty_list: list[float],  # [] - empty
+            single_tuple: tuple[float],  # (42.0,) - single element
+            none_arg: None,  # empty
         ) -> dict[str, float | None]:
             return {"result": config["lr"] + bounds[0], "none_res": None}
 
         # Pre-compile the function
-        func = arc.compile(
-            dict_func, name=dict_func.__name__, return_names=("output",)
-        )
+        func = arc.compile(dict_func, name=dict_func.__name__, return_names=("output",))
 
-        args = (
-            {"lr": 0.01, "momentum": 0.9},
-            (0.0, 1.0),
-            {},
-            [],
-            (42.0,),
-            None
-        )
+        args = ({"lr": 0.01, "momentum": 0.9}, (0.0, 1.0), {}, [], (42.0,), None)
 
         arc.codegen(func, args, **kwargs)
         self._check_files(temp_dir, func.name)
@@ -229,17 +226,18 @@ class TestCodegen:
             "float_type": np.float32,
             "output_dir": temp_dir,
         }
+
         @arc.struct.pytree_node
         class EdgeCase:
-            empty: np.ndarray     # []
-            single: np.ndarray    # [1] 
+            empty: np.ndarray  # []
+            single: np.ndarray  # [1]
 
         def array_func(
-            zero_d: float,        # 0D array that becomes scalar
+            zero_d: float,  # 0D array that becomes scalar
             one_d_single: np.ndarray,  # [1] array
             one_d_normal: np.ndarray,  # [5] array
             two_d_normal: np.ndarray,  # [[1,2],[3,4]] array
-            edge_case: EdgeCase
+            edge_case: EdgeCase,
         ) -> float:
             return np.sum(two_d_normal), zero_d + one_d_single[0], edge_case
 
@@ -258,14 +256,13 @@ class TestCodegen:
             EdgeCase(
                 empty=np.array([]),
                 single=np.array([1.0]),
-            )
+            ),
         )
 
         arc.codegen(func, args, **kwargs)
         self._check_files(temp_dir, func.name)
 
     def test_error_handling(self, scalar_func):
-
         # Test with unknown return names.  By design choice, this raises an error
         # in order to help generate more readable code.
         with pytest.raises(arc.CodegenError, match=r"Return names must be provided"):

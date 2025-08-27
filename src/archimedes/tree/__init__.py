@@ -6,6 +6,7 @@ from ._registry import (
     register_dataclass,
     register_pytree_node,
 )
+from ._tree_util import is_leaf
 from ._tree_util import (
     tree_all as all,
 )
@@ -27,7 +28,6 @@ from ._tree_util import (
 from ._tree_util import (
     tree_unflatten as unflatten,
 )
-from ._tree_util import is_leaf
 
 __all__ = [
     "register_pytree_node",
