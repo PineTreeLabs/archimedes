@@ -23,6 +23,7 @@ typedef struct {
     config_t config;
     float bounds[2];
     // empty_dict was empty, no fields generated
+    // empty_list was empty, no fields generated
     float single_tuple[1];
     // none_arg was empty, no fields generated
 } dict_func_arg_t;

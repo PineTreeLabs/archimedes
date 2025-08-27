@@ -124,6 +124,10 @@ class TestCodegen:
             "output_dir": temp_dir,
         }
 
+        @arc.struct.pytree_node
+        class EmptyStruct:
+            arr: np.ndarray  # Empty array
+
         class Point(NamedTuple):
             x: float
             y: float
@@ -138,11 +142,18 @@ class TestCodegen:
             scalar: float,
             arr: np.ndarray,
             clusters: list[Cluster],   # array of structs containing arrays of named tuples
+            empty_struct: EmptyStruct,
+            static_str: str = "default"  # Static arg should be ignored
         ) -> float:
             return scalar + clusters[0].points[1].x
 
         # Pre-compile the function
-        func = arc.compile(nested_func, name=nested_func.__name__, return_names=("z",))
+        func = arc.compile(
+            nested_func,
+            name=nested_func.__name__,
+            return_names=("z",),
+            static_argnames=("static_str",)
+        )
 
         # Initial arguments
         args = (
@@ -166,7 +177,8 @@ class TestCodegen:
                     ],
                     weights=np.array([0.4, 0.5, 0.6]),
                 )
-            ]
+            ],
+            EmptyStruct(arr=np.array([])),  # empty struct
         )
         # First, raise an error (second Cluster only has two points)
         with pytest.raises(ValueError, match="All items in list 'clusters' must have the same structure."):
@@ -187,6 +199,7 @@ class TestCodegen:
             config: dict[str, float],      # {"lr": 0.01, "momentum": 0.9}
             bounds: tuple[float, float],   # (0.0, 1.0)  
             empty_dict: dict[str, float],  # {} - empty
+            empty_list: list[float],       # [] - empty
             single_tuple: tuple[float],    # (42.0,) - single element
             none_arg: None,                # empty
         ) -> dict[str, float | None]:
@@ -201,6 +214,7 @@ class TestCodegen:
             {"lr": 0.01, "momentum": 0.9},
             (0.0, 1.0),
             {},
+            [],
             (42.0,),
             None
         )

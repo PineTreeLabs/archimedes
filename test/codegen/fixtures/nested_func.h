@@ -24,6 +24,7 @@ typedef struct {
     float scalar;
     float arr[3];
     cluster_t clusters[2];
+    // empty_struct was empty, no fields generated
 } nested_func_arg_t;
 
 // Output results struct

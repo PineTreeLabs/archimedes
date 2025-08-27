@@ -381,8 +381,8 @@ class ContextHelper:
         """Process a 'leaf' value (scalar or array)."""
         print(f"\tProcessing leaf '{name}' ({arg}) for codegen...")
 
-        if arg is None:
-            arg = np.array([])
+        # if arg is None:
+        #     arg = np.array([])
 
         arg = np.asarray(arg)
         if arg.size == 0:
@@ -453,7 +453,8 @@ class ContextHelper:
             child_context = self._process_arg(getattr(arg, child_name), child_name)
             children.append(child_context)
 
-        if len(children) == 0:
+        print(f"Processed struct '{name}': {children}")
+        if len(children) == 0 or all(isinstance(c, NoneContext) for c in children):
             return self._process_none(name)
 
         return NodeContext(
@@ -474,7 +475,7 @@ class ContextHelper:
             child_context = self._process_arg(value, key)
             children.append(child_context)
 
-        if len(children) == 0:
+        if len(children) == 0 or all(isinstance(c, NoneContext) for c in children):
             return self._process_none(name)
 
         if type_ is None:
