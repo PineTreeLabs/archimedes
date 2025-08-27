@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import dataclasses
 import os
 import re
 from typing import (
@@ -70,6 +71,7 @@ def codegen(
     output_descriptions: dict[str, str] | None = None,
     output_dir: str | None = None,
     options: dict[str, Any] | None = None,
+    debug: bool = False,
 ) -> None:
     """Generate C/C++ code from a compiled function.
 
@@ -118,6 +120,9 @@ def codegen(
         - verbose: If True, include additional comments in the generated code.
         - with_mem: If True, generate a simplified C API with memory helpers.
         - indent: The number of spaces to use for indentation in the generated code.
+    debug: bool, default=False
+        If True, print debugging information about the codegen process. Useful for
+        development purposes only and subject to removal in future versions.
 
     Returns
     -------
@@ -261,7 +266,7 @@ def codegen(
         "outputs": [],
     }
 
-    input_helper = ContextHelper(float_type, int_type, input_descriptions)
+    input_helper = ContextHelper(float_type, int_type, input_descriptions, debug=debug)
     for name, arg in zip(func.arg_names, args):
         input_context = input_helper(arg, name)
         context["inputs"].append(input_context)
@@ -270,35 +275,9 @@ def codegen(
         input_context = input_helper(val, name)
         context["inputs"].append(input_context)
 
-    context["unique_types"] = _unique_types(context["inputs"])
-
-    print("inputs")
-    for ctx in context["inputs"]:
-        print("\t", ctx)
-
-    print("\nflat inputs")
-    flat_ctx = tree.leaves(
-        context["inputs"], is_leaf=lambda x: isinstance(x, LeafContext)
+    output_helper = ContextHelper(
+        float_type, int_type, output_descriptions, debug=debug
     )
-    for ctx in flat_ctx:
-        print("\t", ctx)
-    print()
-
-    context["assignments"] = _generate_assignments(context["inputs"], prefix="arg")
-    # print("assignments")
-    # for assn in context["assignments"]:
-    #     print("\t", assn)
-    # print("types", context["unique_types"])
-
-    context["marshalled_inputs"] = _generate_marshalling(
-        context["inputs"], prefix="arg"
-    )
-    print("marshalling inputs")
-    for marshalling in context["marshalled_inputs"]:
-        print("\t", marshalling)
-
-    output_helper = ContextHelper(float_type, int_type, output_descriptions)
-    print(type(results))
     if not isinstance(results, (tuple, list)) and not hasattr(results, "_fields"):
         results = (results,)
 
@@ -306,17 +285,44 @@ def codegen(
         output_context = output_helper(ret, name)
         context["outputs"].append(output_context)
 
-    print("outputs")
-    print(context["outputs"])
-
+    context["unique_types"] = _unique_types(context["inputs"])
     context["unique_types"].update(_unique_types(context["outputs"]))
-
+    context["assignments"] = _generate_assignments(context["inputs"], prefix="arg")
+    context["marshalled_inputs"] = _generate_marshalling(
+        context["inputs"], prefix="arg"
+    )
     context["marshalled_outputs"] = _generate_marshalling(
         context["outputs"], prefix="res"
     )
-    print("marshalling outputs")
-    for marshalling in context["marshalled_outputs"]:
-        print("\t", marshalling)
+
+    if debug:
+        print("inputs")
+        for ctx in context["inputs"]:
+            print("\t", ctx)
+
+        print("\nflat inputs")
+        flat_ctx = tree.leaves(
+            context["inputs"], is_leaf=lambda x: isinstance(x, LeafContext)
+        )
+        for ctx in flat_ctx:
+            print("\t", ctx)
+
+        print("\nassignments")
+        for assn in context["assignments"]:
+            print("\t", assn)
+        print("types", context["unique_types"])
+
+        print("\nmarshalled inputs")
+        for marshalling in context["marshalled_inputs"]:
+            print("\t", marshalling)
+
+        print("\noutputs")
+        for ctx in context["outputs"]:
+            print("\t", ctx)
+
+        print("\nmarshalled outputs")
+        for marshalling in context["marshalled_outputs"]:
+            print("\t", marshalling)
 
     _render_template("api", context, output_path=f"{file_base}.c")
     _render_template("api_header", context, output_path=f"{file_base}.h")
@@ -378,22 +384,22 @@ class ListContext(Context):
     ctx_type: str = tree.struct.field(static=True, default="list")
 
 
-@tree.struct.pytree_node
+@dataclasses.dataclass
 class ContextHelper:
     float_type: str
     int_type: str
     descriptions: dict[str, str]
+    debug: bool
 
     def _process_none(self, name: str) -> NoneContext:
-        print(f"\tProcessing None '{name}' for codegen...")
+        if self.debug:
+            print(f"\tProcessing None '{name}' for codegen...")
         return NoneContext(name=name, description=self.descriptions.get(name, None))
 
     def _process_leaf(self, arg: Any, name: str) -> LeafContext:
         """Process a 'leaf' value (scalar or array)."""
-        print(f"\tProcessing leaf '{name}' ({arg}) for codegen...")
-
-        # if arg is None:
-        #     arg = np.array([])
+        if self.debug:
+            print(f"\tProcessing leaf '{name}' ({arg}) for codegen...")
 
         arg = np.asarray(arg)
         if arg.size == 0:
@@ -425,7 +431,8 @@ class ContextHelper:
         )
 
     def _process_list(self, arg: list | tuple, name: str) -> NodeContext:
-        print(f"\tProcessing list '{name}' ({arg}) for codegen...")
+        if self.debug:
+            print(f"\tProcessing list '{name}' ({arg}) for codegen...")
         # Empty lists are treated as None
         if not arg:
             return self._process_none(name)
@@ -453,7 +460,8 @@ class ContextHelper:
         )
 
     def _process_struct(self, arg: Any, name: str) -> NodeContext:
-        print(f"\tProcessing struct '{name}' ({arg}) for codegen...")
+        if self.debug:
+            print(f"\tProcessing struct '{name}' ({arg}) for codegen...")
         # Note that all "static" data will be embedded in the computational
         # graph, so here we just need to process the child nodes and leaves
         children = []
@@ -464,7 +472,6 @@ class ContextHelper:
             child_context = self._process_arg(getattr(arg, child_name), child_name)
             children.append(child_context)
 
-        print(f"Processed struct '{name}': {children}")
         if len(children) == 0 or all(isinstance(c, NoneContext) for c in children):
             return self._process_none(name)
 
@@ -478,7 +485,8 @@ class ContextHelper:
     def _process_dict(
         self, arg: dict[str, Any], name: str, type_: str = None
     ) -> NodeContext:
-        print(f"\tProcessing dict '{name}' ({arg}) for codegen...")
+        if self.debug:
+            print(f"\tProcessing dict '{name}' ({arg}) for codegen...")
 
         # A dict is treated as a struct since it has named fields
         children = []
@@ -508,7 +516,8 @@ class ContextHelper:
                 "reserved for struct typedefs."
             )
 
-        print(f"Processing arg {name} ({arg}) with type {type(arg)}")
+        if self.debug:
+            print(f"Processing arg {name} ({arg}) with type {type(arg)}")
 
         if arg is None:
             return self._process_none(name)
