@@ -11,7 +11,7 @@ int nested_func_init(nested_func_arg_t* arg, nested_func_res_t* res, nested_func
     memset(arg, 0, sizeof(nested_func_arg_t));
 
     /* Initialize outputs */
-    memset(res, 0, sizeof(*res));
+    memset(res, 0, sizeof(nested_func_res_t));
 
     /* Nonzero assignments */
     arg->scalar = 42.000000f;

@@ -8,13 +8,11 @@
 extern "C" {
 #endif
 
-// Type definition for config
 typedef struct {
     float lr;
     float momentum;
 } config_t;
 
-// Type definition for output
 typedef struct {
     // none_res was empty, no fields generated
     float result;

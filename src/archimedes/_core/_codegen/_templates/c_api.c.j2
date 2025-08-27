@@ -11,7 +11,7 @@ int {{ function_name }}_init({{ function_name }}_arg_t* arg, {{ function_name }}
     memset(arg, 0, sizeof({{ function_name }}_arg_t));
 
     /* Initialize outputs */
-    memset(res, 0, sizeof(*res));
+    memset(res, 0, sizeof({{ function_name }}_res_t));
 
     /* Nonzero assignments */
 {% for assignment in assignments %}

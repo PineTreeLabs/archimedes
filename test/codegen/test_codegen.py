@@ -69,6 +69,18 @@ def check_in_file(file, pattern):
 
 
 class TestCodegen:
+    def _check_files(self, temp_dir, func_name):
+        # Check that the files were created
+        assert os.path.exists(f"{temp_dir}/{func_name}_kernel.c")
+        assert os.path.exists(f"{temp_dir}/{func_name}_kernel.h")
+        assert os.path.exists(f"{temp_dir}/{func_name}.c")
+        assert os.path.exists(f"{temp_dir}/{func_name}.h")
+
+        # Compare to expected output
+        compare_files(f"{func_name}.h", f"{temp_dir}/{func_name}.h")
+        compare_files(f"{func_name}.c", f"{temp_dir}/{func_name}.c")
+
+
     def test_basic_codegen(self, temp_dir, scalar_func):
         kwargs = {
             "float_type": np.float32,
@@ -77,15 +89,10 @@ class TestCodegen:
 
         # Generate code for the function.  This iteration will also compile
         arc.codegen(scalar_func, (x_type, y_type), return_names=("x_new", "z"), **kwargs)
+        self._check_files(temp_dir, "func")
 
         # Pre-compile the function for the remaining tests
         func = arc.compile(scalar_func, name="func", return_names=("x_new", "z"))
-
-        # Check that the files were created
-        assert os.path.exists(f"{temp_dir}/{func.name}_kernel.c")
-        assert os.path.exists(f"{temp_dir}/{func.name}_kernel.h")
-        assert os.path.exists(f"{temp_dir}/{func.name}.c")
-        assert os.path.exists(f"{temp_dir}/{func.name}.h")
 
         # Check that the kernel header includes a proper function signature
         check_in_file(f"{temp_dir}/{func.name}_kernel.h", "int func")
@@ -93,10 +100,6 @@ class TestCodegen:
         # Check that the API header includes correct functions
         check_in_file(f"{temp_dir}/{func.name}.h", "int func_init")
         check_in_file(f"{temp_dir}/{func.name}.h", "int func_step")
-
-        # Compare to expected output
-        compare_files(f"{func.name}.h", f"{temp_dir}/{func.name}.h")
-        compare_files(f"{func.name}.c", f"{temp_dir}/{func.name}.c")
 
         c_file = f"{func.name}.c"
         h_file = f"{func.name}.h"
@@ -172,16 +175,39 @@ class TestCodegen:
         # Fix the error and generate code
         args[2][1].points.append(Point(6.0, 7.0))  # Fix by adding a point
         arc.codegen(func, args, **kwargs)
-    
-        # Check that the files were created
-        assert os.path.exists(f"{temp_dir}/{func.name}_kernel.c")
-        assert os.path.exists(f"{temp_dir}/{func.name}_kernel.h")
-        assert os.path.exists(f"{temp_dir}/{func.name}.c")
-        assert os.path.exists(f"{temp_dir}/{func.name}.h")
+        self._check_files(temp_dir, func.name)
 
-        # Compare to expected output
-        compare_files(f"{func.name}.h", f"{temp_dir}/{func.name}.h")
-        compare_files(f"{func.name}.c", f"{temp_dir}/{func.name}.c")
+    def test_dict_codegen(self, temp_dir):
+        kwargs = {
+            "float_type": np.float32,
+            "output_dir": temp_dir,
+        }
+
+        def dict_func(
+            config: dict[str, float],      # {"lr": 0.01, "momentum": 0.9}
+            bounds: tuple[float, float],   # (0.0, 1.0)  
+            empty_dict: dict[str, float],  # {} - empty
+            single_tuple: tuple[float],    # (42.0,) - single element
+            none_arg: None,                # empty
+        ) -> dict[str, float | None]:
+            return {"result": config["lr"] + bounds[0], "none_res": None}
+
+        # Pre-compile the function
+        func = arc.compile(
+            dict_func, name=dict_func.__name__, return_names=("output",)
+        )
+
+        args = (
+            {"lr": 0.01, "momentum": 0.9},
+            (0.0, 1.0),
+            {},
+            (42.0,),
+            None
+        )
+
+        arc.codegen(func, args, **kwargs)
+        self._check_files(temp_dir, func.name)
+
 
     def test_error_handling(self, scalar_func):
         # Test with unknown return names.  By design choice, this raises an error
@@ -383,3 +409,10 @@ class TestRender:
         # Function name should be updated
         assert "func2" in final_content
         assert "func1" not in final_content
+
+
+if __name__ == "__main__":
+    tmp_dir = "tmp"
+    os.makedirs(tmp_dir, exist_ok=True)
+    # TestCodegen().test_dict_codegen(tmp_dir)
+    TestCodegen().test_basic_codegen(tmp_dir, scalar_func)

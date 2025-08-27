@@ -11,7 +11,7 @@ int func_init(func_arg_t* arg, func_res_t* res, func_work_t* work) {
     memset(arg, 0, sizeof(func_arg_t));
 
     /* Initialize outputs */
-    memset(res, 0, sizeof(*res));
+    memset(res, 0, sizeof(func_res_t));
 
     /* Nonzero assignments */
     arg->x[0] = 1.000000f;

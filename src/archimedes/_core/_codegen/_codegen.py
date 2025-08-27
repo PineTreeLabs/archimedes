@@ -267,7 +267,11 @@ def codegen(
 
     context["unique_types"] = _unique_types(context["inputs"])
 
-    print(context["inputs"])
+    print("inputs")
+    for ctx in context["inputs"]:
+        print("\t", ctx)
+
+    print("\nflat inputs")
     flat_ctx = tree.leaves(context["inputs"], is_leaf=lambda x: isinstance(x, LeafContext))
     for ctx in flat_ctx:
         print("\t", ctx)
@@ -326,6 +330,14 @@ class Context(Protocol):
 
 
 @tree.struct.pytree_node
+class NoneContext(Context):
+    type_: str = None
+    name: str = None
+    description: str | None = None
+    ctx_type: str = tree.struct.field(default="none")
+
+
+@tree.struct.pytree_node
 class LeafContext(Context):
     type_: str
     name: str
@@ -340,7 +352,7 @@ class LeafContext(Context):
 class NodeContext(Context):
     type_: str = tree.struct.field(static=True)
     name: str = tree.struct.field(static=True)
-    children: list[NodeContext | LeafContext]
+    children: list[Context]
     description: str | None = tree.struct.field(static=True, default=None)
     ctx_type: str = tree.struct.field(default="node", static=True)
 
@@ -350,7 +362,7 @@ class ListContext(Context):
     type_: str = tree.struct.field(static=True)  # Type name of the list elements
     name: str = tree.struct.field(static=True)
     length: int = tree.struct.field(static=True)
-    elements: list[NodeContext | LeafContext]
+    elements: list[Context]
     description: str | None = tree.struct.field(static=True, default=None)
     ctx_type: str = tree.struct.field(static=True, default="list")
 
@@ -361,11 +373,21 @@ class ContextHelper:
     int_type: str
     descriptions: dict[str, str]
 
+    def _process_none(self, name: str) -> NoneContext:
+        print(f"\tProcessing None '{name}' for codegen...")
+        return NoneContext(name=name, description=self.descriptions.get(name, None))
+
     def _process_leaf(self, arg: Any, name: str) -> LeafContext:
         """Process a 'leaf' value (scalar or array)."""
         print(f"\tProcessing leaf '{name}' ({arg}) for codegen...")
 
+        if arg is None:
+            arg = np.array([])
+
         arg = np.asarray(arg)
+        if arg is np.array([]):
+            return self._process_none(name)
+
         if np.issubdtype(arg.dtype, np.floating):
             dtype = self.float_type
         else:
@@ -393,6 +415,10 @@ class ContextHelper:
 
     def _process_list(self, arg: list | tuple, name: str) -> NodeContext:
         print(f"\tProcessing list '{name}' ({arg}) for codegen...")
+        # Empty lists are treated as None
+        if not arg:
+            return self._process_none(name)
+
         # Items can be any valid PyTree, but they all must have an identical structure
         treedef0 = tree.structure(arg[0])
         elements: list[Context] = []
@@ -426,8 +452,12 @@ class ContextHelper:
             child_name = field.name
             child_context = self._process_arg(getattr(arg, child_name), child_name)
             children.append(child_context)
+
+        if len(children) == 0:
+            return self._process_none(name)
+
         return NodeContext(
-            type_=_to_snake_case(arg.__class__.__name__),
+            type_=f"{_to_snake_case(arg.__class__.__name__)}_t",
             name=name,
             children=children,
             description=self.descriptions.get(name, None),
@@ -437,15 +467,20 @@ class ContextHelper:
         self, arg: dict[str, Any], name: str, type_: str = None
     ) -> NodeContext:
         print(f"\tProcessing dict '{name}' ({arg}) for codegen...")
+
         # A dict is treated as a struct since it has named fields
         children = []
         for key, value in arg.items():
             child_context = self._process_arg(value, key)
             children.append(child_context)
+
+        if len(children) == 0:
+            return self._process_none(name)
+
         if type_ is None:
-            type_ = _to_snake_case(name)
+            type_ = name
         return NodeContext(
-            type_=type_,
+            type_=f"{_to_snake_case(type_)}_t",
             name=name,
             children=children,
             description=self.descriptions.get(name, None),
@@ -463,6 +498,8 @@ class ContextHelper:
 
         print(f"Processing arg {name} ({arg}) with type {type(arg)}")
 
+        if arg is None:
+            return self._process_none(name)
         if tree.is_leaf(arg):
             return self._process_leaf(arg, name)
         elif tree.struct.is_pytree_node(arg):

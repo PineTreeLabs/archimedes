@@ -8,13 +8,11 @@
 extern "C" {
 #endif
 
-// Type definition for point
 typedef struct {
     float x;
     float y;
 } point_t;
 
-// Type definition for cluster
 typedef struct {
     point_t center;
     point_t points[3];

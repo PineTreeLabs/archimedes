@@ -8,50 +8,65 @@
 extern "C" {
 #endif
 
+{# Reusable macro for empty field handling #}
+{%- macro render_empty_field(field) -%}
+{%- if field.description -%}
+// {{ field.description }}  {# Allow users to write their own explanations #}
+{%- else -%}
+// {{ field.name }} was empty, no fields generated
+{%- endif -%}
+{%- endmacro -%}
+
 {# Generate unique type definitions #}
 {% for type_name, type_ctx in unique_types.items() %}
-// {{ type_ctx.description or ("Type definition for " + type_name) }}
+{% if type_ctx.description %}// {{ type_ctx.description }}{% endif %}
 typedef struct {
-{% for child in type_ctx.children -%}
-{% if child.ctx_type == "node" %}
-    {{ child.type_ }}_t {{ child.name }};{% if child.description %}  // {{ child.description }}{% endif %}
-{% elif child.ctx_type == "list" %}
-    {{ child.type_ }}_t {{ child.name }}[{{ child.length }}];{% if child.description %}  // {{ child.description }}{% endif %}
-{% elif child.ctx_type == "leaf" %}
+{% for child in type_ctx.children %}
+{%- if child.ctx_type == "node" %}
+    {{ child.type_ }} {{ child.name }};{% if child.description %}  // {{ child.description }}{% endif %}
+{%- elif child.ctx_type == "list" %}
+    {{ child.type_ }} {{ child.name }}[{{ child.length }}];{% if child.description %}  // {{ child.description }}{% endif %}
+{%- elif child.ctx_type == "leaf" %}
     {{ child.type_ }} {{ child.name }}{% if child.dims %}[{{ child.dims }}]{% endif %};{% if child.description %}  // {{ child.description }}{% endif %}
-{% endif %}
+{%- elif child.ctx_type == "none" %}
+    {{ render_empty_field(child) }}
+{%- endif %}
 
 {% endfor -%}
-} {{ type_name }}_t;
+} {{ type_name }};
 
 {% endfor -%}
 
 // Input arguments struct
 typedef struct {
-    {% for input in inputs %}
-    {% if input.ctx_type == "node" %}
-    {{ input.type_ }}_t {{ input.name }};{% if input.description %}  // {{ input.description }}{% endif %}
-    {% elif input.ctx_type == "list" %}
-    {{ input.type_ }}_t {{ input.name }}[{{ input.length }}];{% if input.description %}  // {{ input.description }}{% endif %}
-    {% elif input.ctx_type == "leaf" %}
+{% for input in inputs %}
+{%- if input.ctx_type == "node" %}
+    {{ input.type_ }} {{ input.name }};{% if input.description %}  // {{ input.description }}{% endif %}
+{%- elif input.ctx_type == "list" %}
+    {{ input.type_ }} {{ input.name }}[{{ input.length }}];{% if input.description %}  // {{ input.description }}{% endif %}
+{%- elif input.ctx_type == "leaf" %}
     {{ input.type_ }} {{ input.name }}{% if input.dims %}[{{ input.dims }}]{% endif %};{% if input.description %}  // {{ input.description }}{% endif %}
-    {% endif %}
+{%- elif input.ctx_type == "none" %}
+    {{ render_empty_field(input) }}
+{%- endif %}
 
-    {% endfor -%}
+{% endfor -%}
 } {{ function_name }}_arg_t;
 
 // Output results struct
 typedef struct {
-    {% for output in outputs %}
-    {% if output.ctx_type == "node" %}
-    {{ output.type_ }}_t {{ output.name }};{% if output.description %}  // {{ output.description }}{% endif %}
-    {% elif output.ctx_type == "list" %}
-    {{ output.type_ }}_t {{ output.name }}[{{ output.length }}];{% if output.description %}  // {{ output.description }}{% endif %}
-    {% elif output.ctx_type == "leaf" %}
+{% for output in outputs %}
+{%- if output.ctx_type == "node" %}
+    {{ output.type_ }} {{ output.name }};{% if output.description %}  // {{ output.description }}{% endif %}
+{%- elif output.ctx_type == "list" %}
+    {{ output.type_ }} {{ output.name }}[{{ output.length }}];{% if output.description %}  // {{ output.description }}{% endif %}
+{%- elif output.ctx_type == "leaf" %}
     {{ output.type_ }} {{ output.name }}{% if output.dims %}[{{ output.dims }}]{% endif %};{% if output.description %}  // {{ output.description }}{% endif %}
-    {% endif %}
+{%- elif output.ctx_type == "none" %}
+    {{ render_empty_field(output) }}
+{%- endif %}
 
-    {% endfor -%}
+{% endfor -%}
 } {{ function_name }}_res_t;
 
 // Workspace struct
