@@ -49,6 +49,10 @@ DEFAULT_OPTIONS = {
 }
 
 
+class CodegenError(ValueError):
+    pass
+
+
 def _to_snake_case(name: str) -> str:
     return re.sub(r'(?<!^)(?=[A-Z])', '_', name).lower()
 
@@ -209,7 +213,7 @@ def codegen(
     # have to autogenerate names like y0, y1, etc.
     # This results in hard-to-read code, so we require names.
     if return_names is None and func.default_return_names:
-        raise ValueError(
+        raise CodegenError(
             "Return names must be provided, either as an argument to `codegen` "
             "or `compile`."
         )
@@ -425,7 +429,7 @@ class ContextHelper:
         for i, item in enumerate(arg):
             treedef = tree.structure(item)
             if treedef != treedef0:
-                raise ValueError(
+                raise CodegenError(
                     f"All items in list '{name}' must have the same structure. "
                     f"Found {treedef0.tree_str} and {treedef.tree_str}.  To return "
                     "heterogeneous data, use a structured data type (e.g. dict, "
@@ -492,7 +496,7 @@ class ContextHelper:
         # Check that the name doesn't end with `_t`, which could be
         # confused with the typedef
         if name.endswith("_t"):
-            raise ValueError(
+            raise CodegenError(
                 f"Argument name '{name}' cannot end with '_t', since this suffix is "
                 "reserved for struct typedefs."
             )
@@ -516,7 +520,9 @@ class ContextHelper:
         elif isinstance(arg, dict):
             # Dicts have named fields, so can be used to generate a C struct
             return self._process_dict(arg, name)
-        raise ValueError(f"Unsupported type for \"{name}\": {type(arg)}")
+
+        # Unsupported arguments will raise a TypeError during specialization
+        # raise CodegenError(f"Unsupported type for \"{name}\": {type(arg)}")
 
     def __call__(self, arg: Any, name: str) -> Context:
         return self._process_arg(arg, name)
@@ -554,7 +560,7 @@ class Assignment:
 
 
 def _generate_assignments(
-    contexts: list[NodeContext | LeafContext | ListContext], 
+    contexts: list[Context],
     prefix: str = "arg"
 ) -> list[Assignment]:
     """Generate flat list of all non-zero assignments."""
@@ -604,7 +610,7 @@ def _generate_assignments(
 
 
 def _generate_marshalling(
-    contexts: list[NodeContext | LeafContext | ListContext],
+    contexts: list[Context],
     prefix: str,
 ) -> list[Assignment]:
     """Generate flat list of all marshalling assignments (leaf context only)."""

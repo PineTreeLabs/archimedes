@@ -112,11 +112,12 @@ class TestCodegen:
         check_in_file(f"{temp_dir}/{h_file}", "float y;")
         check_in_file(f"{temp_dir}/{c_file}", "arg->y = 3.000000f;")
 
-        # Run with a specified kwarg
+        # Run with a specified kwarg, also test for double support
         kwargs["kwargs"] = {"y": 5.0}
+        kwargs["float_type"] = np.float64
         arc.codegen(func, (x_type,), **kwargs)
-        check_in_file(f"{temp_dir}/{h_file}", "float y;")
-        check_in_file(f"{temp_dir}/{c_file}", "arg->y = 5.000000f;")
+        check_in_file(f"{temp_dir}/{h_file}", "double y;")
+        check_in_file(f"{temp_dir}/{c_file}", "arg->y = 5.0;")
 
     def test_nested_codegen(self, temp_dir):
         kwargs = {
@@ -127,6 +128,7 @@ class TestCodegen:
         @arc.struct.pytree_node
         class EmptyStruct:
             arr: np.ndarray  # Empty array
+            static_field: str = arc.struct.field(static=True, default="static")
 
         class Point(NamedTuple):
             x: float
@@ -263,9 +265,10 @@ class TestCodegen:
         self._check_files(temp_dir, func.name)
 
     def test_error_handling(self, scalar_func):
+
         # Test with unknown return names.  By design choice, this raises an error
         # in order to help generate more readable code.
-        with pytest.raises(ValueError, match=r"Return names must be provided"):
+        with pytest.raises(arc.CodegenError, match=r"Return names must be provided"):
             arc.codegen(scalar_func, (x_type, y_type))
 
         func = arc.compile(scalar_func, name="func", return_names=("x_new", "z"))
@@ -280,6 +283,15 @@ class TestCodegen:
         specialized_func, _ = func._specialize(x_type, y_type)
         with pytest.raises(RuntimeError):
             specialized_func.codegen("invalid/func.c", {})
+
+        # Invalid arg name (collision with `_t`)
+        def invalid_arg_func(x_t):
+            return x_t
+
+        with pytest.raises(
+            arc.CodegenError, match=r"Argument name 'x_t' cannot end with '_t'"
+        ):
+            arc.codegen(invalid_arg_func, (x_type,), return_names=("y",))
 
 
 class TestExtractProtectedRegions:
