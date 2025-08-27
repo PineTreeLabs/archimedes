@@ -208,6 +208,45 @@ class TestCodegen:
         arc.codegen(func, args, **kwargs)
         self._check_files(temp_dir, func.name)
 
+    def test_array_codegen(self, temp_dir):
+        kwargs = {
+            "float_type": np.float32,
+            "output_dir": temp_dir,
+        }
+        @arc.struct.pytree_node
+        class EdgeCase:
+            empty: np.ndarray     # []
+            single: np.ndarray    # [1] 
+
+        def array_func(
+            zero_d: float,        # 0D array that becomes scalar
+            one_d_single: np.ndarray,  # [1] array
+            one_d_normal: np.ndarray,  # [5] array
+            two_d_normal: np.ndarray,  # [[1,2],[3,4]] array
+            edge_case: EdgeCase
+        ) -> float:
+            return np.sum(two_d_normal), zero_d + one_d_single[0], edge_case
+
+        # Pre-compile the function
+        func = arc.compile(
+            array_func,
+            name=array_func.__name__,
+            return_names=("sum", "z", "edge_out"),
+        )
+
+        args = (
+            1.0,
+            np.array([1.0]),
+            np.arange(5),
+            np.array([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]]),
+            EdgeCase(
+                empty=np.array([]),
+                single=np.array([1.0]),
+            )
+        )
+
+        arc.codegen(func, args, **kwargs)
+        self._check_files(temp_dir, func.name)
 
     def test_error_handling(self, scalar_func):
         # Test with unknown return names.  By design choice, this raises an error
@@ -415,4 +454,5 @@ if __name__ == "__main__":
     tmp_dir = "tmp"
     os.makedirs(tmp_dir, exist_ok=True)
     # TestCodegen().test_dict_codegen(tmp_dir)
-    TestCodegen().test_basic_codegen(tmp_dir, scalar_func)
+    # TestCodegen().test_basic_codegen(tmp_dir, scalar_func)
+    TestCodegen().test_array_codegen(tmp_dir)

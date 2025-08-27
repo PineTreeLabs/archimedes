@@ -385,7 +385,7 @@ class ContextHelper:
             arg = np.array([])
 
         arg = np.asarray(arg)
-        if arg is np.array([]):
+        if arg.size == 0:
             return self._process_none(name)
 
         if np.issubdtype(arg.dtype, np.floating):
@@ -570,7 +570,10 @@ def _generate_assignments(
             if not np.all(ctx.initial_data == 0):
                 if ctx.dims:  # Array
                     # Handle array initialization from initial data
-                    for i, val in enumerate(ctx.initial_data):
+                    # Note that CasADi uses column-major (Fortran-style, b/c of MATLAB)
+                    # ordering (unusual for C), so we have to flatten with "F" style.
+                    # This will then generate assignments in the correct order.
+                    for i, val in enumerate(ctx.initial_data.flatten("F")):
                         if val != 0:
                             assignments.append(Assignment(
                                 path=f"{current_path}[{i}]",
