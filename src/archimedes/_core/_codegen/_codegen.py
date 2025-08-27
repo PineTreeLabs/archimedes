@@ -363,7 +363,7 @@ class ContextHelper:
 
     def _process_leaf(self, arg: Any, name: str) -> LeafContext:
         """Process a 'leaf' value (scalar or array)."""
-        print(f"Processing leaf '{name}' ({arg}) for codegen...")
+        print(f"\tProcessing leaf '{name}' ({arg}) for codegen...")
 
         arg = np.asarray(arg)
         if np.issubdtype(arg.dtype, np.floating):
@@ -392,7 +392,7 @@ class ContextHelper:
         )
 
     def _process_list(self, arg: list | tuple, name: str) -> NodeContext:
-        print(f"Processing list '{name}' ({arg}) for codegen...")
+        print(f"\tProcessing list '{name}' ({arg}) for codegen...")
         # Items can be any valid PyTree, but they all must have an identical structure
         treedef0 = tree.structure(arg[0])
         elements: list[Context] = []
@@ -416,7 +416,7 @@ class ContextHelper:
         )
 
     def _process_struct(self, arg: Any, name: str) -> NodeContext:
-        print(f"Processing struct '{name}' ({arg}) for codegen...")
+        print(f"\tProcessing struct '{name}' ({arg}) for codegen...")
         # Note that all "static" data will be embedded in the computational
         # graph, so here we just need to process the child nodes and leaves
         children = []
@@ -433,15 +433,19 @@ class ContextHelper:
             description=self.descriptions.get(name, None),
         )
 
-    def _process_dict(self, arg: dict[str, Any], name: str) -> NodeContext:
-        print(f"Processing dict '{name}' ({arg}) for codegen...")
+    def _process_dict(
+        self, arg: dict[str, Any], name: str, type_: str = None
+    ) -> NodeContext:
+        print(f"\tProcessing dict '{name}' ({arg}) for codegen...")
         # A dict is treated as a struct since it has named fields
         children = []
         for key, value in arg.items():
             child_context = self._process_arg(value, key)
             children.append(child_context)
+        if type_ is None:
+            type_ = _to_snake_case(name)
         return NodeContext(
-            type_=name,
+            type_=type_,
             name=name,
             children=children,
             description=self.descriptions.get(name, None),
@@ -457,6 +461,8 @@ class ContextHelper:
                 "reserved for struct typedefs."
             )
 
+        print(f"Processing arg {name} ({arg}) with type {type(arg)}")
+
         if tree.is_leaf(arg):
             return self._process_leaf(arg, name)
         elif tree.struct.is_pytree_node(arg):
@@ -464,7 +470,8 @@ class ContextHelper:
         elif isinstance(arg, tuple) and hasattr(arg, "_fields"):
             # Special case for named tuples: convert to dict
             arg = cast(NamedTuple, arg)
-            return self._process_dict(arg._asdict(), name)
+            type_ = _to_snake_case(arg.__class__.__name__)
+            return self._process_dict(arg._asdict(), name, type_)
         elif isinstance(arg, (list, tuple)):
             # If it's a homogeneous container, it can be turned into a C array
             return self._process_list(arg, name)

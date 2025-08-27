@@ -8,7 +8,7 @@
 extern "C" {
 #endif
 
-// Type definition for points[0]
+// Type definition for point
 typedef struct {
     float x;
     float y;

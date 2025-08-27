@@ -1,4 +1,3 @@
-
 #ifndef FUNC_H
 #define FUNC_H
 
@@ -7,7 +6,6 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-
 
 // Input arguments struct
 typedef struct {
