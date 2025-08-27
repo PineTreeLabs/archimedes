@@ -1,4 +1,5 @@
 from ._core import (
+    CodegenError,
     array,
     callback,
     codegen,
@@ -39,6 +40,7 @@ __all__ = [
     "array",
     "callback",
     "codegen",
+    "CodegenError",
     "discretize",
     "sym",
     "sym_like",

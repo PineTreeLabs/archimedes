@@ -232,4 +232,9 @@ The following limitations will be resolved with further development:
 - **Performance**: PyTree flattening/unflattening does reshaping at the tracing stage, meaning that it has minimal runtime overhead compared to typical numerical operations
 - **Type Support**: PyTrees work with both NumPy arrays and Archimedes symbolic arrays
 
-For more advanced PyTree operations, explore the `archimedes.tree` module.
+
+## Further Reading
+
+For more advanced PyTree operations, explore the [`archimedes.tree`](#archimedes.tree) module and the [`struct`](#archimedes.tree.struct) submodule.
+
+For more on working with PyTrees, also see [Hierarchical Design Patterns](generated/notebooks/modular-design.md) and the section of the [Hardware Deployment](generated/notebooks/deployment/deployment03.md) tutorial dealing with auto-generating C structs.

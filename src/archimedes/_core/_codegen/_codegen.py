@@ -4,9 +4,20 @@ from __future__ import annotations
 
 import dataclasses
 import os
-from typing import Any, Callable, Sequence
+import re
+from typing import (
+    Any,
+    Callable,
+    NamedTuple,
+    OrderedDict,
+    Protocol,
+    Sequence,
+    cast,
+)
 
 import numpy as np
+
+from archimedes import tree
 
 from .._function import FunctionCache
 from ._renderer import _render_template
@@ -39,6 +50,14 @@ DEFAULT_OPTIONS = {
 }
 
 
+class CodegenError(ValueError):
+    pass
+
+
+def _to_snake_case(name: str) -> str:
+    return re.sub(r"(?<!^)(?=[A-Z])", "_", name).lower()
+
+
 def codegen(
     func: Callable | FunctionCache,
     args: Sequence[Any],
@@ -52,6 +71,7 @@ def codegen(
     output_descriptions: dict[str, str] | None = None,
     output_dir: str | None = None,
     options: dict[str, Any] | None = None,
+    debug: bool = False,
 ) -> None:
     """Generate C/C++ code from a compiled function.
 
@@ -100,6 +120,9 @@ def codegen(
         - verbose: If True, include additional comments in the generated code.
         - with_mem: If True, generate a simplified C API with memory helpers.
         - indent: The number of spaces to use for indentation in the generated code.
+    debug: bool, default=False
+        If True, print debugging information about the codegen process. Useful for
+        development purposes only and subject to removal in future versions.
 
     Returns
     -------
@@ -172,11 +195,6 @@ def codegen(
     """
     # TODO: Automatic type inference if not specified
 
-    # Check that all arguments are arrays
-    for arg in args:
-        if not np.all(np.isreal(arg)):
-            raise TypeError(f"Argument {arg} is not numeric or a NumPy array.")
-
     if not isinstance(func, FunctionCache):
         func = FunctionCache(
             func,
@@ -196,7 +214,7 @@ def codegen(
     # have to autogenerate names like y0, y1, etc.
     # This results in hard-to-read code, so we require names.
     if return_names is None and func.default_return_names:
-        raise ValueError(
+        raise CodegenError(
             "Return names must be provided, either as an argument to `codegen` "
             "or `compile`."
         )
@@ -243,7 +261,7 @@ def codegen(
         "outputs": [],
     }
 
-    input_helper = ContextHelper(float_type, int_type, input_descriptions)
+    input_helper = ContextHelper(float_type, int_type, input_descriptions, debug=debug)
     for name, arg in zip(func.arg_names, args):
         input_context = input_helper(arg, name)
         context["inputs"].append(input_context)
@@ -252,10 +270,54 @@ def codegen(
         input_context = input_helper(val, name)
         context["inputs"].append(input_context)
 
-    output_helper = ContextHelper(float_type, int_type, output_descriptions)
+    output_helper = ContextHelper(
+        float_type, int_type, output_descriptions, debug=debug
+    )
+    if not isinstance(results, (tuple, list)) and not hasattr(results, "_fields"):
+        results = (results,)
+
     for name, ret in zip(return_names, results):
         output_context = output_helper(ret, name)
         context["outputs"].append(output_context)
+
+    context["unique_types"] = _unique_types(context["inputs"])
+    context["unique_types"].update(_unique_types(context["outputs"]))
+    context["assignments"] = _generate_assignments(context["inputs"], prefix="arg")
+    context["marshalled_inputs"] = _generate_marshalling(
+        context["inputs"], prefix="arg"
+    )
+    context["marshalled_outputs"] = _generate_marshalling(
+        context["outputs"], prefix="res"
+    )
+
+    if debug:
+        print("inputs")
+        for ctx in context["inputs"]:
+            print("\t", ctx)
+
+        print("\nflat inputs")
+        flat_ctx = tree.leaves(
+            context["inputs"], is_leaf=lambda x: isinstance(x, LeafContext)
+        )
+        for ctx in flat_ctx:
+            print("\t", ctx)
+
+        print("\nassignments")
+        for assn in context["assignments"]:
+            print("\t", assn)
+        print("types", context["unique_types"])
+
+        print("\nmarshalled inputs")
+        for marshalling in context["marshalled_inputs"]:
+            print("\t", marshalling)
+
+        print("\noutputs")
+        for ctx in context["outputs"]:
+            print("\t", ctx)
+
+        print("\nmarshalled outputs")
+        for marshalling in context["marshalled_outputs"]:
+            print("\t", marshalling)
 
     _render_template("api", context, output_path=f"{file_base}.c")
     _render_template("api_header", context, output_path=f"{file_base}.h")
@@ -272,25 +334,80 @@ def codegen(
                 os.rename(src_file, dst_file)
 
 
+class Context(Protocol):
+    type_: str
+    name: str
+    description: str | None
+    ctx_type: str
+
+
+@tree.struct.pytree_node
+class NoneContext(Context):
+    type_: str = None
+    name: str = None
+    description: str | None = None
+    ctx_type: str = tree.struct.field(default="none")
+
+
+@tree.struct.pytree_node
+class LeafContext(Context):
+    type_: str
+    name: str
+    is_addr: bool
+    dims: int
+    initial_data: np.ndarray
+    description: str | None
+    ctx_type: str = tree.struct.field(default="leaf")
+
+
+@tree.struct.pytree_node
+class NodeContext(Context):
+    type_: str = tree.struct.field(static=True)
+    name: str = tree.struct.field(static=True)
+    children: list[Context]
+    description: str | None = tree.struct.field(static=True, default=None)
+    ctx_type: str = tree.struct.field(default="node", static=True)
+
+
+@tree.struct.pytree_node
+class ListContext(Context):
+    type_: str = tree.struct.field(static=True)  # Type name of the list elements
+    name: str = tree.struct.field(static=True)
+    length: int = tree.struct.field(static=True)
+    elements: list[Context]
+    description: str | None = tree.struct.field(static=True, default=None)
+    ctx_type: str = tree.struct.field(static=True, default="list")
+
+
 @dataclasses.dataclass
 class ContextHelper:
     float_type: str
     int_type: str
     descriptions: dict[str, str]
+    debug: bool
 
-    def __call__(self, arg, name):
+    def _process_none(self, name: str) -> NoneContext:
+        if self.debug:
+            print(f"\tProcessing None '{name}' for codegen...")
+        return NoneContext(name=name, description=self.descriptions.get(name, None))
+
+    def _process_leaf(self, arg: Any, name: str) -> LeafContext:
+        """Process a 'leaf' value (scalar or array)."""
+        if self.debug:
+            print(f"\tProcessing leaf '{name}' ({arg}) for codegen...")
+
         arg = np.asarray(arg)
+        if arg.size == 0:
+            return self._process_none(name)
+
         if np.issubdtype(arg.dtype, np.floating):
             dtype = self.float_type
         else:
             dtype = self.int_type
         if np.isscalar(arg) or arg.shape == ():
-            initial_value = str(arg)
             dims = None
             is_addr = True
         else:
-            initial_value = "{" + ", ".join(map(str, arg.flatten())) + "}"
-            # dims = str(arg.size)
             dims = arg.size
             is_addr = False
 
@@ -299,12 +416,237 @@ class ContextHelper:
         # and just use the float_type for all arguments and returns.
         dtype = self.float_type
 
-        return {
-            "type": dtype_to_c[dtype],
-            "name": name,
-            "dims": dims,
-            "initial_value": initial_value,
-            "initial_data": arg,
-            "description": self.descriptions.get(name, None),
-            "is_addr": is_addr,
-        }
+        return LeafContext(
+            type_=dtype_to_c[dtype],
+            name=name,
+            is_addr=is_addr,
+            dims=dims,
+            initial_data=arg,
+            description=self.descriptions.get(name, None),
+        )
+
+    def _process_list(self, arg: list | tuple, name: str) -> NodeContext:
+        if self.debug:
+            print(f"\tProcessing list '{name}' ({arg}) for codegen...")
+        # Empty lists are treated as None
+        if not arg:
+            return self._process_none(name)
+
+        # Items can be any valid PyTree, but they all must have an identical structure
+        treedef0 = tree.structure(arg[0])
+        elements: list[Context] = []
+        for i, item in enumerate(arg):
+            treedef = tree.structure(item)
+            if treedef != treedef0:
+                raise CodegenError(
+                    f"All items in list '{name}' must have the same structure. "
+                    f"Found {treedef0.tree_str} and {treedef.tree_str}.  To return "
+                    "heterogeneous data, use a structured data type (e.g. dict, "
+                    "NamedTuple, or pytree_node)."
+                )
+            elements.append(self._process_arg(item, f"{name}[{i}]"))
+
+        return ListContext(
+            type_=elements[0].type_,
+            name=name,
+            elements=elements,
+            description=self.descriptions.get(name, None),
+            length=len(elements),
+        )
+
+    def _process_struct(self, arg: Any, name: str) -> NodeContext:
+        if self.debug:
+            print(f"\tProcessing struct '{name}' ({arg}) for codegen...")
+        # Note that all "static" data will be embedded in the computational
+        # graph, so here we just need to process the child nodes and leaves
+        children = []
+        for field in tree.struct.fields(arg):
+            if field.metadata.get("static", False):
+                continue
+            child_name = field.name
+            child_context = self._process_arg(getattr(arg, child_name), child_name)
+            children.append(child_context)
+
+        if len(children) == 0 or all(isinstance(c, NoneContext) for c in children):
+            return self._process_none(name)
+
+        return NodeContext(
+            type_=f"{_to_snake_case(arg.__class__.__name__)}_t",
+            name=name,
+            children=children,
+            description=self.descriptions.get(name, None),
+        )
+
+    def _process_dict(
+        self, arg: dict[str, Any], name: str, type_: str = None
+    ) -> NodeContext:
+        if self.debug:
+            print(f"\tProcessing dict '{name}' ({arg}) for codegen...")
+
+        # A dict is treated as a struct since it has named fields
+        children = []
+        for key, value in arg.items():
+            child_context = self._process_arg(value, key)
+            children.append(child_context)
+
+        if len(children) == 0 or all(isinstance(c, NoneContext) for c in children):
+            return self._process_none(name)
+
+        if type_ is None:
+            type_ = name
+        return NodeContext(
+            type_=f"{_to_snake_case(type_)}_t",
+            name=name,
+            children=children,
+            description=self.descriptions.get(name, None),
+        )
+
+    def _process_arg(self, arg: Any, name: str) -> Context:
+        """Process a generic arg, which may be a leaf or a node"""
+        # Check that the name doesn't end with `_t`, which could be
+        # confused with the typedef
+        if name.endswith("_t"):
+            raise CodegenError(
+                f"Argument name '{name}' cannot end with '_t', since this suffix is "
+                "reserved for struct typedefs."
+            )
+
+        if self.debug:
+            print(f"Processing arg {name} ({arg}) with type {type(arg)}")
+
+        if arg is None:
+            return self._process_none(name)
+        if tree.is_leaf(arg):
+            return self._process_leaf(arg, name)
+        elif tree.struct.is_pytree_node(arg):
+            return self._process_struct(arg, name)
+        elif isinstance(arg, tuple) and hasattr(arg, "_fields"):
+            # Special case for named tuples: convert to dict
+            arg = cast(NamedTuple, arg)
+            type_ = _to_snake_case(arg.__class__.__name__)
+            return self._process_dict(arg._asdict(), name, type_)
+        elif isinstance(arg, (list, tuple)):
+            # If it's a homogeneous container, it can be turned into a C array
+            return self._process_list(arg, name)
+        elif isinstance(arg, dict):
+            # Dicts have named fields, so can be used to generate a C struct
+            return self._process_dict(arg, name)
+
+        # Unsupported arguments will raise a TypeError during specialization
+        # raise CodegenError(f"Unsupported type for \"{name}\": {type(arg)}")
+
+    def __call__(self, arg: Any, name: str) -> Context:
+        return self._process_arg(arg, name)
+
+
+def _unique_types(contexts: list[NodeContext | LeafContext]) -> dict[str, NodeContext]:
+    """Collect all unique NodeContext types, keyed by type_ field."""
+    unique_types = OrderedDict()
+
+    def _traverse(ctx):
+        if isinstance(ctx, NodeContext) and ctx.type_ not in unique_types:
+            unique_types[ctx.type_] = ctx
+            # Recursively traverse children to find nested types
+            for child in ctx.children:
+                _traverse(child)
+
+        elif isinstance(ctx, ListContext):
+            if ctx.type_ not in unique_types:
+                # All elements share a type, so we only need to recursively
+                # traverse the first element's context for subtypes
+                _traverse(ctx.elements[0])
+
+    for ctx in contexts:
+        _traverse(ctx)
+
+    # Since the children are added last but need to be defined first,
+    # reverse the order of the unique_types dictionary.
+    return OrderedDict(reversed(list(unique_types.items())))
+
+
+@tree.struct.pytree_node
+class Assignment:
+    path: str  # "arg->clusters[0].points[1].x"
+    value: str | None = None  # "2.5f"
+
+
+def _generate_assignments(
+    contexts: list[Context], prefix: str = "arg"
+) -> list[Assignment]:
+    """Generate flat list of all non-zero assignments."""
+    assignments = []
+
+    def _format_value(value: Any, type_: str) -> str:
+        if type_ == "float":
+            return f"{value:f}f"
+        return str(value)
+
+    def _traverse(ctx: Context, current_path: str):
+        if isinstance(ctx, LeafContext):
+            if not np.all(ctx.initial_data == 0):
+                if ctx.dims:  # Array
+                    # Handle array initialization from initial data
+                    # Note that CasADi uses column-major (Fortran-style, b/c of MATLAB)
+                    # ordering (unusual for C), so we have to flatten with "F" style.
+                    # This will then generate assignments in the correct order.
+                    for i, val in enumerate(ctx.initial_data.flatten("F")):
+                        if val != 0:
+                            assignments.append(
+                                Assignment(
+                                    path=f"{current_path}[{i}]",
+                                    value=_format_value(val, ctx.type_),
+                                )
+                            )
+                else:  # Scalar
+                    assignments.append(
+                        Assignment(
+                            path=current_path,
+                            value=_format_value(ctx.initial_data, ctx.type_),
+                        )
+                    )
+
+        elif isinstance(ctx, ListContext):
+            for i, child in enumerate(ctx.elements):
+                child_path = f"{current_path}[{i}]"
+                _traverse(child, child_path)
+
+        elif isinstance(ctx, NodeContext):
+            for child in ctx.children:
+                child_path = f"{current_path}.{child.name}"
+                _traverse(child, child_path)
+
+    for ctx in contexts:
+        base_path = f"{prefix}->{ctx.name}" if ctx.name else prefix
+        _traverse(ctx, base_path)
+
+    return assignments
+
+
+def _generate_marshalling(
+    contexts: list[Context],
+    prefix: str,
+) -> list[Assignment]:
+    """Generate flat list of all marshalling assignments (leaf context only)."""
+    assignments = []
+
+    def _traverse(ctx: Context, current_path: str):
+        if isinstance(ctx, LeafContext):
+            if ctx.is_addr:  # Scalar (add '&' to pass pointer)
+                current_path = f"&{current_path}"
+            assignments.append(Assignment(path=current_path))
+
+        elif isinstance(ctx, ListContext):
+            for i, child in enumerate(ctx.elements):
+                child_path = f"{current_path}[{i}]"
+                _traverse(child, child_path)
+
+        elif isinstance(ctx, NodeContext):
+            for child in ctx.children:
+                child_path = f"{current_path}.{child.name}"
+                _traverse(child, child_path)
+
+    for ctx in contexts:
+        base_path = f"{prefix}->{ctx.name}"
+        _traverse(ctx, base_path)
+
+    return assignments

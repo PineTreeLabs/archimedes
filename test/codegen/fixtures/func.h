@@ -1,4 +1,3 @@
-
 #ifndef FUNC_H
 #define FUNC_H
 
@@ -10,8 +9,8 @@ extern "C" {
 
 // Input arguments struct
 typedef struct {
-    float x[2];    
-    float y;    
+    float x[2];
+    float y;
 } func_arg_t;
 
 // Output results struct
