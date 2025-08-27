@@ -195,11 +195,6 @@ def codegen(
     """
     # TODO: Automatic type inference if not specified
 
-    # # Check that all arguments are arrays
-    # for arg in args:
-    #     if not np.all(np.isreal(arg)):
-    #         raise TypeError(f"Argument {arg} is not numeric or a NumPy array.")
-
     if not isinstance(func, FunctionCache):
         func = FunctionCache(
             func,

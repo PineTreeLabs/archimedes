@@ -194,7 +194,7 @@ class TestCodegen:
 
         # Fix the error and generate code
         args[2][1].points.append(Point(6.0, 7.0))  # Fix by adding a point
-        arc.codegen(func, args, **kwargs)
+        arc.codegen(func, args, **kwargs, debug=True)
         self._check_files(temp_dir, func.name)
 
     def test_dict_codegen(self, temp_dir):
@@ -218,7 +218,7 @@ class TestCodegen:
 
         args = ({"lr": 0.01, "momentum": 0.9}, (0.0, 1.0), {}, [], (42.0,), None)
 
-        arc.codegen(func, args, **kwargs)
+        arc.codegen(func, args, **kwargs, debug=True)
         self._check_files(temp_dir, func.name)
 
     def test_array_codegen(self, temp_dir):
@@ -259,7 +259,7 @@ class TestCodegen:
             ),
         )
 
-        arc.codegen(func, args, **kwargs)
+        arc.codegen(func, args, **kwargs, debug=True)
         self._check_files(temp_dir, func.name)
 
     def test_error_handling(self, scalar_func):
