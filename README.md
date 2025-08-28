@@ -103,23 +103,22 @@ For more details, see the tutorial on [deploying to hardware](https://pinetreela
 ### Extended examples
 
 - [Multirotor vehicle dynamics](https://pinetreelabs.github.io/archimedes/notebooks/multirotor/multirotor00.html)
-- [Code generation for Arduino](https://pinetreelabs.github.io/archimedes/notebooks/deployment/deployment00.html)
+- [Embedded code generation](https://pinetreelabs.github.io/archimedes/notebooks/deployment/deployment00.html)
+- [Nonlinear system identification](https://https://pinetreelabs.github.io/archimedes/generated/notebooks/sysid/parameter-estimation.html)
 <!-- - [Pressure-fed rocket engine](examples/draco/draco-model.ipynb) -->
 <!-- - [Adaptive optimal control with pseudospectral collocation](examples/coco/) -->
-- [Subsonic F-16 benchmark](examples/f16/f16_plant.py) (Work in progress)
-- [CartPole control](examples/cartpole/finite-horizon.ipynb) (Work in progress)
+<!-- - [Subsonic F-16 benchmark](examples/f16/f16_plant.py) (Work in progress) -->
+<!-- - [CartPole control](examples/cartpole/finite-horizon.ipynb) (Work in progress) -->
 
 
 # Installation
 
 ### Basic setup
 
-Archimedes is currently not available on PyPI (pending resolution of an existing defunct project on PyPI also named Archimedes), but can be installed from source:
+The easiest way to install is from PyPI:
 
 ```bash
-git clone https://github.com/pinetreelabs/archimedes.git
-cd archimedes
-pip install .
+pip install archimedes
 ```
 
 ### Recommended setup
