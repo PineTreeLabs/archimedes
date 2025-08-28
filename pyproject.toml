@@ -1,7 +1,7 @@
 [project]
 name = "archimedes"
 version = "0.1.0"
-description = "Python framework for symbolic/numeric modeling and simulation"
+description = "Python framework for modeling, simulation, and controls development"
 readme = "README.md"
 authors = [
     { name = "Jared Callaham", email = "jared.callaham@gmail.com" }
@@ -15,6 +15,13 @@ dependencies = [
     "scipy>=1.15.2",
     "typing-extensions>=4.12.2",
 ]
+license = "GPL-3.0-or-later"
+license-files = ["LICEN[CS]E*"]
+
+[project.urls]
+Source = "https://github.com/pinetreelabs/archimedes/"
+Documentation = "https://pinetreelabs.github.io/archimedes/"
+Issues = "https://github.com/pinetreelabs/archimedes/issues"
 
 [project.optional-dependencies]
 all = [
