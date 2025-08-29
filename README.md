@@ -104,7 +104,7 @@ For more details, see the tutorial on [deploying to hardware](https://pinetreela
 
 - [Multirotor vehicle dynamics](https://pinetreelabs.github.io/archimedes/notebooks/multirotor/multirotor00.html)
 - [Embedded code generation](https://pinetreelabs.github.io/archimedes/notebooks/deployment/deployment00.html)
-- [Nonlinear system identification](https://https://pinetreelabs.github.io/archimedes/generated/notebooks/sysid/parameter-estimation.html)
+- [Nonlinear system identification](https://pinetreelabs.github.io/archimedes/generated/notebooks/sysid/parameter-estimation.html)
 <!-- - [Pressure-fed rocket engine](examples/draco/draco-model.ipynb) -->
 <!-- - [Adaptive optimal control with pseudospectral collocation](examples/coco/) -->
 <!-- - [Subsonic F-16 benchmark](examples/f16/f16_plant.py) (Work in progress) -->

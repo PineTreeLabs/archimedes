@@ -159,7 +159,7 @@ def codegen(
 
     **Generated API**
 
-    The :doc:`codegen guide <../notebooks/deployment/deployment03>`. has a detailed
+    The :doc:`codegen guide <../notebooks/deployment/deployment03>` has a detailed
     description of how to use the generated API.  In short, a Python function named
     ``func`` will generate three top-level C structs:
 
