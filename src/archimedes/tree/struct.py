@@ -303,7 +303,7 @@ def is_pytree_node(obj: Any) -> bool:
     Check if an object is a registered pytree node.
 
     This function determines whether an object was created using the
-    :py:func:``pytree_node`` decorator, which indicates it has special handling
+    :py:func:`pytree_node` decorator, which indicates it has special handling
     for pytree operations.
 
     Parameters

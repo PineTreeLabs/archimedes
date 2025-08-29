@@ -10,13 +10,13 @@ iir_filter_arg_t arg;
 iir_filter_res_t res;
 iir_filter_work_t work;
 
+volatile bool ctrl_flag = false;
 int n = sizeof(arg.b) / sizeof(arg.b[0]) - 1;  // Filter order
 float y;  // Output, to be fed to actuator, control algorithm, etc.
 
-// Timer interrupt handler
-void timerInterrupt() {
-    arg.u = 1.0;  // Or read from sensor, other algorithm output, etc.
-    iir_filter_step(&arg, &res, &work);  // Call IIR filter
+void controller_callback(void) {
+    arg.u = 1.0f;  // Or read from sensor, other algorithm output, etc.
+    iir_filter_step(&arg, &res, &work);
     y = res.y_hist[0];  // Output, to be fed to actuator, control algorithm, etc.
 
     // Copy output arrays back to inputs
@@ -25,6 +25,13 @@ void timerInterrupt() {
         arg.y_prev[j] = res.y_hist[j];
     }
     arg.u_prev[n] = res.u_hist[n];
+
+    ctrl_flag = false;
+}
+
+// Timer interrupt handler
+void timerInterrupt() {
+    ctrl_flag = true;
 }
 
 void setup(){
@@ -40,5 +47,6 @@ void setup(){
 
 void loop() {
     // ...non-time-critical tasks
-    delay(10);
+    
+    if (ctrl_flag) controller_callback();
 }

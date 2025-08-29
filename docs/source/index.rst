@@ -37,7 +37,7 @@ Quick Example
 
    # Automatically generate C code
    template_args = (0.0,)  # Data type for C function
-   arc.codegen(df, "grad_f.c", template_args)
+   arc.codegen(df, "grad_f.c", template_args, return_names=("z",))
 
 Documentation
 -------------
