@@ -138,7 +138,7 @@ def codegen(
 
     Notes
     -----
-    
+
     **Use this for:**
 
     - Deploying models on embedded systems or hardware without Python
