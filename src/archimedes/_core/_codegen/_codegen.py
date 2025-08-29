@@ -80,6 +80,10 @@ def codegen(
     embedded systems, integrated into C/C++ codebases, or compiled to native
     executables for maximum performance.
 
+    For a detailed description of the codegen functionality, see the
+    :doc:`guide to code
+    generation and hardware deployment <../../notebooks/deployment/deployment00>`.
+
     Parameters
     ----------
     func : Callable | FunctionCache
@@ -87,9 +91,12 @@ def codegen(
         it will be compiled automatically.
     args : tuple
         Arguments to the function that specify shapes and dtypes. These can be:
+
         - SymbolicArray objects
         - NumPy arrays with the same shape and dtype as expected inputs
+        - [PyTree](../../pytrees.md)-structured data types matching expected inputs
         - The actual values for static arguments
+
         Note: For dynamic arguments, the numeric values are ignored.
     static_argnums : tuple, optional
         The indices of the static arguments to the function. Will be ignored if
@@ -131,26 +138,119 @@ def codegen(
 
     Notes
     -----
-    When to use this function:
-    - For deploying models on embedded systems or hardware without Python
-    - For integrating Archimedes algorithms into C/C++ applications
-    - For maximum runtime performance by removing Python interpretation overhead
-    - For creating standalone, portable implementations of your algorithm
 
-    This function specializes your computational graph to specific input shapes
-    and types, then uses CasADi's code generation capabilities to produce C code
+    **Use this for:**
+
+    - Deploying models on embedded systems or hardware without Python
+    - Integrating Archimedes algorithms into C/C++ applications
+    - Maximum runtime performance by removing Python interpreter overhead
+    - Creating standalone, portable implementations of your algorithm
+
+    This function specializes the computational graph of ``func`` to specific input
+    shapes and types, then uses CasADi's code generation capabilities to produce C code
     that implements the same computation. The generated code has no dependencies
     on Archimedes, CasADi, or Python.
 
     Currently, this function uses CasADi's code generation directly, so the
-    generated code will contain CASADI_* prefixes and follow CasADi's conventions.
+    generated code will contain ``CASADI_*`` prefixes and follow CasADi's conventions.
     The function will also generate an "interface" API layer with struct definitions
     for inputs and outputs, along with convenience functions for initialization and
     function calls.
 
+    **Generated API**
+
+    The :doc:`codegen guide <../notebooks/deployment/deployment03>` has a detailed
+    description of how to use the generated API.  In short, a Python function named
+    ``func`` will generate three top-level C structs:
+
+    1. ``func_arg_t``: Arguments to ``func``
+    2. ``func_res_t``: Return values of ``func``
+    3. ``func_work_t``: Pre-allocated temporary workspace variables
+
+    There will also be two generated functions:
+
+    1. ``func_init``: Initializes the argument and workspace structs
+    2. ``func_step``: Calls the main computation function
+
+    The basic pattern for using this API is:
+
+    .. code-block:: c
+
+        // Allocate all structs on the stack
+        func_arg_t arg;
+        func_res_t res;
+        func_work_t work;
+
+        func_init(&arg, &res, &work);  // Initialize using the template values
+        func_step(&arg, &res, &work);  // Numerically evaluate the function
+
+    If the function is "stateful", meaning some outputs are recursively looped back
+    to the inputs, manual copying of the state will be required. See below for details.
+
+    **Numerical constants**
+
     To store numerical constants in the generated code, either:
-    1. "Close over" the values in your function definition, or
-    2. Pass them as hashable static arguments
+
+    1. "Close over" the values in your function definition
+    2. Pass them as hashable static arguments (same effect as a closure)
+    3. Pass as "dynamic" arguments that could be edited in the generated code
+
+    **PyTree support**
+
+    The code generation system supports structured data types, either as homogeneous
+    arrays (lists or tuples with all elements of the same type) or as heterogeneous
+    containers (e.g. dictionaries, named tuples, or :py:func:`pytree_node` classes.
+    The former will be represented as C arrays, while the latter will be represented
+    as C structs.
+
+    For example, a PyTree argument defined with
+
+    .. code-block:: python3
+
+        @struct.pytree_node
+        class Point:
+            x: float
+            y: float
+
+    will autogenerate a C struct:
+
+    .. code-block:: c
+
+        typedef struct {
+            float x;
+            float y;
+        } point_t;
+
+    **Stateful functions**
+
+    A common pattern for dynamics models or control algorithms is to have functions
+    that implement a generic discrete-time state-space model of the form
+
+    .. math::
+
+       x_{k+1} = f(x_k, u_k)
+
+       y_k = g(x_k, u_k)
+
+    This can be combined into a single function with the signature
+    ``func(x[k], u[k]) -> (x[k+1], y[k])``.  When working with functions of this form
+    (or any similar stateful functions), the generated code will still be "functionally
+    pure", meaning that the result data will store ``x[k+1]`` and the argument data
+    will store ``x[k]``, but the updated state will *not* automatically be copied back
+    to the input.
+
+    If the state is implemented as a PyTree, it will correspond to a C struct and the
+    copy operation can be implemented simply using direct copy semantics.  For example,
+    a function with the signature ``func(state, inputs) -> (state_new, outputs)`` for
+    which the state is a PyTree (or dict, or named tuple) will generate a C struct
+    named ``state_t``.  The ``arg`` structure will include a field ``state``, and the
+    ``res`` structure will include a field ``state_new``, both of which have type
+    ``state_t``.  With direct assignment copying, the updated state can be copied back
+    to the input with
+
+    .. code-block:: c
+
+        arg.state = res.state_new;
 
     Examples
     --------

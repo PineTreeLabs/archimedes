@@ -234,6 +234,8 @@ class FunctionCache:
             sym_ret = (sym_ret,)
 
         # Ravel all return types to flattened arrays before creating the CasADi function
+        # This list will still have the same length as the original returns (so same
+        # number of return_names), but each _element_ will be individually flattened.
         sym_ret_flat = []
         results_unravel = []
         for x in sym_ret:
