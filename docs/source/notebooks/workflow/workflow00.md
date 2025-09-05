@@ -2,9 +2,10 @@
 
 Controller development can be a messy process involving a patchwork of software tools, hardware configurations, and algorithm parameters - but it doesn't need to be.
 Pure software development often follows a highly structured process designed to ensure both reliability of the output _and_ engineering efficiency.
-While hardware development by its nature will always be a harder beast than pure software, we can take inspiration from these workflows to imagine a process with much less friction.
+While hardware development by its nature will always be a different beast than pure software, we can take inspiration from workflows incorporating continuous integration, automated testing, and version control to imagine a process with much less friction.
 
 In this tutorial we will go through one such workflow to see how Python and Archimedes can act as a unifying high-level layer enabling a logical development progression.
+The result is a straightforward development cycle with the potential for faster iteration, improved validation, and reduced hardware risks.
 
 ```{image} _static/dev_workflow.png
 :class: only-light
@@ -23,22 +24,10 @@ As mapped out in the figure above, we will start by constructing a first-princip
 We can then apply parameter estimation to calibrate the physics model using the test data, resulting in a "plant" model.
 We will design a controller based on the plant model and simulate its performance - all in Python.
 
-Following a more traditional or simplified development cycle, we can then simply generate C code corresponding to the Python control algorithm, deploy to hardware, and evaluate performance on a test system.
-Here we will explore incorporating an additional stage of the controller development: hardware-in-the-loop (HIL) testing.
-Using the same code generation mechanisms, we can construct a real-time simulation of the plant model and connect this to the controller board.
-As far as the controller knows, it is sensing and actuating the real system, making this a valuable testing stage that can catch costly or difficult-to-debug errors before deploying to the real hardware.
-
-## Prerequisites
-
-This is an advanced tutorial that will integrate a number of the key features of Archimedes, including [PyTrees](../../pytrees.md), [C code generation](#archimedes.codegen), and [system identification](#archimedes.sysid).
-As a result, it will be much easier to follow if you are already comfortable with these concepts - the following documentation pages are a good place to start:
-
-* [**Working with PyTrees**](../../pytrees.md)
-* [**Hierarchical Design Patterns**](../../generated/notebooks/modular-design.md)
-* [**Parameter Estimation**](../../generated/notebooks/sysid/parameter-estimation.md)
-* [**Deploying to Hardware**](../deployment/deployment00.md)
-
-Beyond Archimedes specifics, the tutorial only assumes basic physics and control systems knowledge (an RL circuit and proportional-integral control), though familiarity with the [Python Control System Library](https://python-control.readthedocs.io/) may be helpful in the controller design section.
+In principle, we could then simply generate C code corresponding to the Python control algorithm, deploy to hardware, and evaluate performance on a test system.
+However, here we will explore incorporating an additional stage of the controller development: hardware-in-the-loop (HIL) testing.
+Using the same code generation mechanisms, we can construct a real-time simulation of the plant model and connect this to the controller board - as far as the controller knows, it is sensing and actuating the real system.
+While HIL testing is often relegated to late-stage validation for compliance requirements, it can also be a valuable testing stage to catch costly or difficult-to-debug errors before deploying to the real hardware.
 
 ## Outline
 
@@ -75,11 +64,18 @@ Beyond Archimedes specifics, the tutorial only assumes basic physics and control
     - Overview of the workflow
     - Key takeaways
 
-<!--
-Lessons:
-- Complex controller failed
-- Missing volatile flat
--->
+
+## Prerequisites
+
+This tutorial integrates several Archimedes concepts, including [PyTrees](../../pytrees.md), [C code generation](#archimedes.codegen), and [system identification](#archimedes.sysid).
+We'll introduce them as needed, but it will be easier to follow if you are already comfortable with these concepts - the following documentation pages are a good place to start:
+
+* [**Working with PyTrees**](../../pytrees.md)
+* [**Hierarchical Design Patterns**](../../generated/notebooks/modular-design.md)
+* [**Parameter Estimation**](../../generated/notebooks/sysid/parameter-estimation.md)
+* [**Deploying to Hardware**](../deployment/deployment00.md)
+
+Beyond Archimedes specifics, the tutorial only assumes basic physics and control systems knowledge (an RL circuit and proportional-integral control), though familiarity with the [Python Control System Library](https://python-control.readthedocs.io/) may be helpful in the controller design section.
 
 ```{toctree}
 :maxdepth: 1
