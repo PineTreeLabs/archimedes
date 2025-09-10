@@ -15,6 +15,8 @@ The result is a straightforward development cycle with the potential for faster 
 :class: only-dark
 ```
 
+This workflow assumes that the hardware itself is fixed, though of course the controls development could be embedded in a broader design loop for hardware iteration.
+
 ## Tutorial overview
 
 Our example application and control algorithm will be as simple as possible: a brushed DC motor controlled by PI feedback.
@@ -27,11 +29,23 @@ We will design a controller based on the plant model and simulate its performanc
 In principle, we could then simply generate C code corresponding to the Python control algorithm, deploy to hardware, and evaluate performance on a test system.
 However, here we will explore incorporating an additional stage of the controller development: hardware-in-the-loop (HIL) testing.
 Using the same code generation mechanisms, we can construct a real-time simulation of the plant model and connect this to the controller board - as far as the controller knows, it is sensing and actuating the real system.
+
+```{image} _static/hil_diagram.png
+:class: only-light
+```
+
+```{image} _static/hil_diagram_dark.png
+:class: only-dark
+```
+
 While HIL testing is often relegated to late-stage validation for compliance requirements, it can also be a valuable testing stage to catch costly or difficult-to-debug errors before deploying to the real hardware.
+
+This end-to-end workflow tutorial provides an example of how Archimedes can be used as the backbone of a modern, structured approach to rapid development iteration.
+While simplified (and applied to a simple physical system), every aspect of the process can scale naturally to more complex workflows and systems.
 
 ## Outline
 
-1. [**Physical System**](../../generated/notebooks/workflow/workflow01.md)
+1. [**Physical System**](workflow01.md)
     - Brushed DC motor and physics model
     - Motor driver circuit
     - The STM32 controller board
@@ -40,27 +54,25 @@ While HIL testing is often relegated to late-stage validation for compliance req
 2. [**Characterization**](../../generated/notebooks/workflow/workflow02.md)
     - Configuring the STM32
     - Collecting step response data
-
-3. [**Parameter Estimation**](../../generated/notebooks/workflow/workflow03.md)
     - Implementing the physics model
-    - Calibrating with test data
+    - Calibration via parameter estimation
 
-4. [**Controller Design**](../../generated/notebooks/workflow/workflow04.md)
+4. [**Controller Design**](../../generated/notebooks/workflow/workflow03.md)
     - Implementing a simple PI controller
     - Classical control systems analysis
     - C code generation
 
-5. [**HIL Testing**](../../generated/notebooks/workflow/workflow05.md)
+5. [**HIL Testing**](../../generated/notebooks/workflow/workflow04.md)
     - Setting up a real-time simulator
     - The analog communication circuit
     - Generating code for the real-time model
     - Evaluating the controller
 
-6. [**Deployment**](../../generated/notebooks/workflow/workflow06.md)
+6. [**Deployment**](../../generated/notebooks/workflow/workflow05.md)
     - Running the same controller on the physical system
     - Comparing to HIL testing results
 
-7. [**Conclusions**](workflow07.md)
+7. [**Conclusions**](workflow06.md)
     - Overview of the workflow
     - Key takeaways
 
@@ -79,12 +91,11 @@ Beyond Archimedes specifics, the tutorial only assumes basic physics and control
 
 ```{toctree}
 :maxdepth: 1
-../../generated/notebooks/workflow/workflow01
+workflow01
 ../../generated/notebooks/workflow/workflow02
 ../../generated/notebooks/workflow/workflow03
 ../../generated/notebooks/workflow/workflow04
 ../../generated/notebooks/workflow/workflow05
-../../generated/notebooks/workflow/workflow06
-workflow07
+workflow06
    
 ```
