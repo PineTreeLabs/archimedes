@@ -59,10 +59,10 @@ void Error_Handler(void);
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/
+#define Onboard_Button_Pin GPIO_PIN_13
+#define Onboard_Button_GPIO_Port GPIOC
 #define Motor_ENA_Pin GPIO_PIN_15
 #define Motor_ENA_GPIO_Port GPIOF
-#define Trigger_Pin GPIO_PIN_11
-#define Trigger_GPIO_Port GPIOE
 #define Motor_ENB_Pin GPIO_PIN_13
 #define Motor_ENB_GPIO_Port GPIOE
 #define Motor_INA_Pin GPIO_PIN_9

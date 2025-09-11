@@ -71,8 +71,8 @@ TIM_HandleTypeDef htim3;
 UART_HandleTypeDef huart3;
 
 /* USER CODE BEGIN PV */
-volatile uint32_t adc1_dma_buffer[2];  // DMA target for ADC data
-volatile uint32_t adc3_dma_buffer[2];  // DMA target for ADC data
+volatile uint32_t adc1_dma_buffer[ADC1_CHANNELS];  // DMA target for ADC data
+volatile uint32_t adc3_dma_buffer[ADC3_CHANNELS];  // DMA target for ADC data
 
 // uint32_t pot_raw = 0;  // UNUSED
 uint32_t cs_raw = 0;
@@ -82,8 +82,6 @@ uint16_t pwm_duty = 0;
 static int32_t enc_count = ENC_COUNT / 2;
 float pos_deg = 0.0f;
 
-char uart3_buffer[200];
-
 // Data collection
 uint32_t loop_count = 0;  // How many times have we sampled at 10 kHz?
 uint32_t sample_idx = 0;  // Index for sampling
@@ -91,7 +89,7 @@ uint16_t sample_rate = 1;  // Sample at (sample_idx % sample_rate == 0)
 uint16_t pwm_duty_data[SAMPLE_COUNT];
 int32_t v_motor_mv[SAMPLE_COUNT];
 uint16_t i_motor_ma[SAMPLE_COUNT];
-int32_t pos_mdeg_int[SAMPLE_COUNT];
+int32_t pos_mdeg[SAMPLE_COUNT];
 
 /* USER CODE END PV */
 
@@ -190,12 +188,12 @@ int main(void)
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   
-  HAL_Delay(100);  // Wait 100 ms for everything to come online
+  HAL_Delay(1000);  // Wait 100 ms for everything to come online
 
   // Wait for the trigger signal
   while (1)
   {
-    if (!HAL_GPIO_ReadPin(Trigger_GPIO_Port, Trigger_Pin)) {
+    if (!HAL_GPIO_ReadPin(Onboard_Button_GPIO_Port, Onboard_Button_Pin)) {
         // Button is pressed (active low)
         HAL_GPIO_WritePin(Onboard_LED_GPIO_Port, Onboard_LED_Pin, GPIO_PIN_SET);
 
@@ -653,9 +651,9 @@ static void MX_GPIO_Init(void)
   /* USER CODE END MX_GPIO_Init_1 */
 
   /* GPIO Ports Clock Enable */
+  __HAL_RCC_GPIOC_CLK_ENABLE();
   __HAL_RCC_GPIOF_CLK_ENABLE();
   __HAL_RCC_GPIOH_CLK_ENABLE();
-  __HAL_RCC_GPIOC_CLK_ENABLE();
   __HAL_RCC_GPIOA_CLK_ENABLE();
   __HAL_RCC_GPIOE_CLK_ENABLE();
   __HAL_RCC_GPIOD_CLK_ENABLE();
@@ -674,18 +672,18 @@ static void MX_GPIO_Init(void)
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(Onboard_LED_GPIO_Port, Onboard_LED_Pin, GPIO_PIN_RESET);
 
+  /*Configure GPIO pin : Onboard_Button_Pin */
+  GPIO_InitStruct.Pin = Onboard_Button_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStruct.Pull = GPIO_PULLUP;
+  HAL_GPIO_Init(Onboard_Button_GPIO_Port, &GPIO_InitStruct);
+
   /*Configure GPIO pin : Motor_ENA_Pin */
   GPIO_InitStruct.Pin = Motor_ENA_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_OD;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(Motor_ENA_GPIO_Port, &GPIO_InitStruct);
-
-  /*Configure GPIO pin : Trigger_Pin */
-  GPIO_InitStruct.Pin = Trigger_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
-  GPIO_InitStruct.Pull = GPIO_PULLUP;
-  HAL_GPIO_Init(Trigger_GPIO_Port, &GPIO_InitStruct);
 
   /*Configure GPIO pin : Motor_ENB_Pin */
   GPIO_InitStruct.Pin = Motor_ENB_Pin;
@@ -717,7 +715,6 @@ static void MX_GPIO_Init(void)
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
     if (htim->Instance == TIM3) {
         // Read ADC values from DMA buffer
-        // pot_raw = adc1_dma_buffer[0];  // ADC1_IN3 (Rank 1)  UNUSED HERE
         cs_raw = adc1_dma_buffer[1];  // ADC1_IN10 (Rank 2)
         vout_a_raw = adc3_dma_buffer[0];  // ADC3_IN13 (Rank 1)
         vout_b_raw = adc3_dma_buffer[1];  // ADC3_IN9 (Rank 2)
@@ -734,14 +731,13 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
 
         // Store for next iteration
         enc_count = cur_count;
-      
+
         if ((loop_count % sample_rate == 0) && (sample_idx < SAMPLE_COUNT)){
           pwm_duty_data[sample_idx] = pwm_duty;
           v_motor_mv[sample_idx] = (int32_t)(
             ((float)vout_a_raw - (float)vout_b_raw) * ENC_VOUT_SCALE * 1000);  // millivolts
-          // v_motor_mv[sample_idx] = ((int32_t)(vout_a_raw) * ENC_VOUT_SCALE * 1000);  // millivolts
           i_motor_ma[sample_idx] = (uint16_t)(cs_raw * CS_SCALE * 1000);  // milliamps
-          pos_mdeg_int[sample_idx] = (int32_t)(pos_deg * 1000);      // millidegrees
+          pos_mdeg[sample_idx] = (int32_t)(pos_deg * 1000);      // millidegrees
           sample_idx++;
         }
 
@@ -778,18 +774,17 @@ void send_data(void) {
     char header[100];
     char buffer[200];
 
-    // FAST DATA
     snprintf(header, sizeof(header), "START,%lu,%d,%u,%u\n",
             (uint32_t)SAMPLE_COUNT, 4, PWM_COUNT, sample_rate);
     HAL_UART_Transmit(&huart3, (uint8_t*)header, strlen(header), HAL_MAX_DELAY);
-    
+
     // Send data in chunks to avoid USB buffer overflow
     for (uint32_t i = 0; i < SAMPLE_COUNT; i++) {
         snprintf(buffer, sizeof(buffer), "%lu,%u,%ld,%u,%ld\n", 
-                i, pwm_duty_data[i], v_motor_mv[i], i_motor_ma[i], pos_mdeg_int[i]);
+                i, pwm_duty_data[i], v_motor_mv[i], i_motor_ma[i], pos_mdeg[i]);
         HAL_UART_Transmit(&huart3, (uint8_t*)buffer, strlen(buffer), HAL_MAX_DELAY);
-        
-        // Small delay to prevent USB buffer overflow
+
+        // Small delay to allow USB buffer to clear
         HAL_Delay(1);
     }
     
