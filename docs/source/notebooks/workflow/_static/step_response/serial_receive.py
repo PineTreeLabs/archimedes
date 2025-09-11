@@ -1,24 +1,36 @@
 import serial
+import serial.tools.list_ports
 import csv
 import numpy as np
 import matplotlib.pyplot as plt
 
 dt = 1e-4
 
-def _recieve_single_stream(ser):
-    # Wait for START message
+
+def _get_usb_device():
+    ports = serial.tools.list_ports.comports()
+    
+    for port in ports:
+        # Filter by USB vendor/product ID or description
+        if port.vid is not None:  # Has USB vendor ID (indicates USB device)
+            print(f"Found USB device: {port.device} - {port.description}")
+            return port.device
+    
+    raise FileNotFoundError("No USB device found")
+
+
+def _wait_for_start_message(ser):
+    """Wait for and parse the START message."""
     while True:
         line = ser.readline().decode().strip()
         if line.startswith('START'):
-            parts = line.split(',')
-            sample_count = int(parts[1])
-            num_channels = int(parts[2])
-            pwm_count = int(parts[3])
-            sample_rate = int(parts[4])
-            print(f"Receiving {sample_count} samples, {num_channels} channels, sample rate {sample_rate}")
-            break
-    
-    # Collect data
+            _, sample_count, pwm_count, sample_rate = map(int, line.split(','))
+            print(f"Receiving {sample_count} samples at sample rate {sample_rate}")
+            return sample_count, pwm_count, sample_rate
+
+
+def _collect_raw_samples(ser, sample_count):
+    """Collect raw data samples from serial connection."""
     data = []
     samples_received = 0
     
@@ -26,7 +38,7 @@ def _recieve_single_stream(ser):
         line = ser.readline().decode().strip()
         if line == 'END':
             break
-        
+            
         try:
             values = [int(x) for x in line.split(',')]
             data.append(values)
@@ -37,19 +49,40 @@ def _recieve_single_stream(ser):
                 
         except ValueError:
             continue
+    
+    return data
 
-    data = np.array(data, dtype=float)
 
+def _receive_single_stream(ser):
+    """Receive and parse a single data stream from serial connection."""
+    
+    # Parse START message
+    start_info = _wait_for_start_message(ser)
+    sample_count, pwm_count, sample_rate = start_info
+
+    # Collect raw data
+    raw_data = _collect_raw_samples(ser, sample_count)
+    
+    # Convert to numpy array and apply unit conversions
+    return _process_raw_data(raw_data, sample_rate, pwm_count)
+
+
+
+def _process_raw_data(raw_data, sample_rate, pwm_count):
+    """Convert raw data to proper units and format."""
+    data = np.array(raw_data, dtype=float)
+    
     # Convert sample count to timesteps
     data[:, 0] = sample_rate * dt * data[:, 0]
-
-    # pwm_duty -> [0-1]
+    
+    # PWM duty cycle to [0-1]
     data[:, 1] /= pwm_count
-
-    # mV -> volts, mA -> A, mdeg -> deg
+    
+    # Unit conversions: mV -> V, mA -> A, mdeg -> deg
     data[:, 2:] *= 1e-3
-
+    
     return data
+
 
 def receive_data(port='/dev/tty.usbmodem141303', baudrate=115200):
     """Receive and parse data from STM32"""
@@ -57,14 +90,12 @@ def receive_data(port='/dev/tty.usbmodem141303', baudrate=115200):
     # Step response data (200 ms)
     with serial.Serial(port, baudrate, timeout=5) as ser:
         print("Waiting for experiment data...")
-        step_data = _recieve_single_stream(ser)
+        step_data = _receive_single_stream(ser)
 
     # Ramp response (2s)
     with serial.Serial(port, baudrate, timeout=5) as ser:
         print("Waiting for experiment data...")
-        ramp_data = _recieve_single_stream(ser)
-
-    # ramp_data = None
+        ramp_data = _receive_single_stream(ser)
     
     return step_data, ramp_data
 
@@ -103,14 +134,14 @@ def save_data(data, filename):
 
 
 if __name__ == "__main__":
-    step_data, ramp_data = receive_data()
+    # Determine the USB port by looking for /dev/tty.usbmodem.*
+    port = _get_usb_device()
 
-    driver_id = 3
+    step_data, ramp_data = receive_data(port=port)
 
     # Save to CSV
-    # timestamp = time.strftime("%Y%m%d_%H%M%S")
-    # save_data(step_data, f"../data/step_data_{driver_id:02d}.csv")
-    # save_data(ramp_data, f"../data/ramp_data_{driver_id:02d}.csv")
+    save_data(step_data, f"../data/step_data.csv")
+    save_data(ramp_data, f"../data/ramp_data.csv")
 
     plot_response(step_data)
     plot_response(ramp_data)

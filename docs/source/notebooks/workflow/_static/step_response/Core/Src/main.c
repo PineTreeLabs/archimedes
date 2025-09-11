@@ -47,7 +47,7 @@ typedef struct
 
 typedef union
 {
-    uint32_t buffer[ADC1_CHANNELS]; // For DMA
+    uint32_t buffer[ADC1_CHANNELS];
     struct
     {
         uint32_t cs_raw;
@@ -56,7 +56,7 @@ typedef union
 
 typedef union
 {
-    uint32_t buffer[ADC3_CHANNELS]; // For DMA
+    uint32_t buffer[ADC3_CHANNELS];
     struct
     {
         uint32_t vout_a_raw;
@@ -791,8 +791,8 @@ void send_data(void)
     char header[100];
     char buffer[200];
 
-    snprintf(header, sizeof(header), "START,%lu,%d,%u,%u\n",
-             (uint32_t)SAMPLE_COUNT, 4, PWM_COUNT, log_data.sample_rate);
+    snprintf(header, sizeof(header), "START,%lu,%u,%u\n",
+             (uint32_t)SAMPLE_COUNT, PWM_COUNT, log_data.sample_rate);
     HAL_UART_Transmit(&huart3, (uint8_t *)header, strlen(header), HAL_MAX_DELAY);
 
     // Send data in chunks to avoid USB buffer overflow
