@@ -33,8 +33,8 @@ For inductance $L$, resistance $R$, back EMF constant $k_\mathcal{E}$, gear rati
 $$
 \begin{align*}
 L \frac{di}{dt} &= V - iR - k_\mathcal{E} \omega \\
-J \frac{d\omega}{dt} &= G k_\mathcal{E} i - b \omega
-\end{align*}.
+J \frac{d\omega}{dt} &= G k_\mathcal{E} i - b \omega.
+\end{align*}
 $$
 
 Of course, the output shaft position $\theta(t)$ is simply the integrated angular velocity: $\dot{\theta} = \omega$.

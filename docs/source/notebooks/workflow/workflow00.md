@@ -72,7 +72,7 @@ While simplified (and applied to a simple physical system), every aspect of the 
     - Running the same controller on the physical system
     - Comparing to HIL testing results
 
-7. [**Conclusions**](workflow06.md)
+7. [**Conclusion**](workflow06.md)
     - Overview of the workflow
     - Key takeaways
 
