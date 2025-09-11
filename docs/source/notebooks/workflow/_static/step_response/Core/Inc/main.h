@@ -61,6 +61,12 @@ void Error_Handler(void);
 /* Private defines -----------------------------------------------------------*/
 #define Onboard_Button_Pin GPIO_PIN_13
 #define Onboard_Button_GPIO_Port GPIOC
+#define VOUTB_Pin GPIO_PIN_3
+#define VOUTB_GPIO_Port GPIOF
+#define V_CS_Pin GPIO_PIN_0
+#define V_CS_GPIO_Port GPIOC
+#define VOUTA_Pin GPIO_PIN_3
+#define VOUTA_GPIO_Port GPIOC
 #define Motor_ENA_Pin GPIO_PIN_15
 #define Motor_ENA_GPIO_Port GPIOF
 #define Motor_ENB_Pin GPIO_PIN_13
@@ -73,7 +79,9 @@ void Error_Handler(void);
 #define Onboard_LED_GPIO_Port GPIOB
 
 /* USER CODE BEGIN Private defines */
+void sample_callback(void);
 void send_data(void);
+void motor_set(void);
 void motor_fwd(void);
 void motor_rev(void);
 /* USER CODE END Private defines */
