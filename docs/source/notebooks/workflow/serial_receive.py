@@ -99,8 +99,9 @@ def main(port=None, save=None):
 
     # Save to CSV
     if save:
+        filename = f"_static/data/{save}"
         header = 't [s]\t\tu [-]\t\tv [V]\t\ti [A]\t\tpos [deg]'
-        np.savetxt(save, data, delimiter='\t', fmt='%.6f', header=header, comments='')
+        np.savetxt(filename, data, delimiter='\t', fmt='%.6f', header=header, comments='')
 
     _fig, ax = plt.subplots(4, 1, figsize=(7, 6), sharex=True)
     ax[0].plot(data[:, 0], 100 * data[:, 1])

@@ -7,8 +7,7 @@ import archimedes as arc
 from archimedes import struct
 
 GEAR_RATIO = 46.8512  # 47:1 nominal
-
-MOTOR_VOLTAGE = 12.0
+SUPPLY_VOLTAGE = 12.0  # Power supply nominal voltage [V]
 
 ENC_PPR = 48
 RAD_PER_COUNT = (2 * np.pi) / (ENC_PPR * GEAR_RATIO)
@@ -28,36 +27,26 @@ ny = 2  # Output dimension (position, current)
 
 @struct.pytree_node
 class MotorParams:
-    m: float  # Effective mass/inertia
+    J: float  # Effective inertia
     b: float  # Viscous friction
     L: float  # Motor inductance [H]
     R: float  # Motor resistance [Ohm]
-    Kt: float  # Current -> torque scale [N-m/A]
-
-    def asdict(self):
-        return dataclasses.asdict(self)
+    k_t: float  # Current -> torque scale [N-m/A]
 
 
 def motor_ode(
     t: float, x: np.ndarray, u: np.ndarray, params: MotorParams
 ) -> np.ndarray:
-    params = params.asdict()
 
     i, _pos, vel = x
     (V,) = u
-    m = params["m"]  # Effective mass/inertia
-    b = params["b"]  # Viscous friction
-    L = params["L"]  # Motor inductance
-    Kt = params["Kt"]  # Current -> torque scale
-    R = params["R"]
 
-    Ke = Kt / GEAR_RATIO  # Velocity -> Back EMF scale
+    k_e = params.k_t / GEAR_RATIO  # Velocity -> Back EMF scale
 
-    i_t = (1 / L) * (V - (i * R) - Ke * vel)
-    pos_t = vel
-    vel_t = (1 / m) * (Kt * i - b * vel)
+    i_t = (1 / params.L) * (V - (i * params.R) - k_e * vel)
+    vel_t = (1 / params.J) * (params.k_t * i - params.b * vel)
 
-    return np.hstack([i_t, pos_t, vel_t])
+    return np.hstack([i_t, vel, vel_t])
 
 
 hil_dt = 1e-4  # Control loop time step
@@ -65,8 +54,9 @@ motor_dyn = arc.discretize(motor_ode, dt=hil_dt, method="euler")
 
 
 # Observation model (used for system ID)
-def motor_obs(t, x, u, p):
-    p = p.asdict()
+def motor_obs(
+    t: float, x: np.ndarray, u: np.ndarray, params: MotorParams
+) -> np.ndarray:
     return np.hstack(
         [
             abs(x[0]),  # Current
@@ -137,7 +127,7 @@ def plant_step(
     d = motor_dir(inputs.INA, inputs.INB, inputs.ENA, inputs.ENB)
     pwm_duty = np.clip(inputs.pwm_duty, 0.0, 1.0)
     # V_motor = d * np.interp(pwm_duty, pwm_table[:, 0], pwm_table[:, 1])
-    V_motor = d * pwm_duty * MOTOR_VOLTAGE
+    V_motor = d * pwm_duty * SUPPLY_VOLTAGE
 
     # Motor dynamics model
     u = (V_motor,)
@@ -147,7 +137,6 @@ def plant_step(
 
     # Encoder emulation
     PPR = ENC_PPR * GEAR_RATIO
-
     ENCA, ENCB = encoder(pos, PPR)
 
     outputs = MotorOutputs(

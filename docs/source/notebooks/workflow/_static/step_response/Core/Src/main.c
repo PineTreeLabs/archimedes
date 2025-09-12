@@ -25,6 +25,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
+#include <math.h>
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -116,8 +117,8 @@ TIM_HandleTypeDef htim3;
 UART_HandleTypeDef huart3;
 
 /* USER CODE BEGIN PV */
-enum ExptType expt_type = STEP_RESPONSE;
-// enum ExptType expt_type = RAMP_RESPONSE;
+// enum ExptType expt_type = STEP_RESPONSE;
+enum ExptType expt_type = RAMP_RESPONSE;
 
 volatile bool sample_flag = false;
 volatile adc1_data_t adc1_data;
@@ -264,11 +265,16 @@ int main(void)
         switch (expt_type)
         {
         case RAMP_RESPONSE:
-            // Increase PWM duty cycle by 5% every 1000 ms
+            // Increase PWM duty cycle by 5% every 500 ms up to 100%, then
+            // ramp back down
             if (log_data.loop_count >= next_incr)
             {
-                pwm_duty += PWM_COUNT / 20;
-                next_incr += log_data.sample_rate * (SAMPLE_COUNT / 20);
+                if (log_data.sample_idx < SAMPLE_COUNT / 2)
+                    pwm_duty += PWM_COUNT / 20;
+                else
+                    pwm_duty -= PWM_COUNT / 20;
+
+                next_incr += log_data.sample_rate * (SAMPLE_COUNT / 40);
                 motor_set();
             }
             break;
@@ -772,6 +778,7 @@ void sample_callback(void)
     // Read encoder and update position
     enc_data.cur_count = (int32_t)__HAL_TIM_GET_COUNTER(&htim2);
     enc_data.pos_deg += (float)(enc_data.cur_count - enc_data.prev_count) * DEG_PER_COUNT;
+    enc_data.pos_deg = fmodf(enc_data.pos_deg + 360.0f, 360.0f);
 
     // Store for next iteration
     enc_data.prev_count = enc_data.cur_count;
