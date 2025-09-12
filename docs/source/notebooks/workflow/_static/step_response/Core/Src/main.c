@@ -117,8 +117,8 @@ TIM_HandleTypeDef htim3;
 UART_HandleTypeDef huart3;
 
 /* USER CODE BEGIN PV */
-// enum ExptType expt_type = STEP_RESPONSE;
-enum ExptType expt_type = RAMP_RESPONSE;
+enum ExptType expt_type = STEP_RESPONSE;
+// enum ExptType expt_type = RAMP_RESPONSE;
 
 volatile bool sample_flag = false;
 volatile adc1_data_t adc1_data;
