@@ -57,12 +57,8 @@ motor_dyn = arc.discretize(motor_ode, dt=hil_dt, method="euler")
 def motor_obs(
     t: float, x: np.ndarray, u: np.ndarray, params: MotorParams
 ) -> np.ndarray:
-    return np.hstack(
-        [
-            abs(x[0]),  # Current
-            x[1],  # Position
-        ]
-    )
+    # Measure absolute current and position
+    return np.hstack([abs(x[0]), x[1]])
 
 
 @struct.pytree_node
