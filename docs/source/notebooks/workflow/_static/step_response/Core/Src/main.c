@@ -777,7 +777,16 @@ void sample_callback(void)
 {
     // Read encoder and update position
     enc_data.cur_count = (int32_t)__HAL_TIM_GET_COUNTER(&htim2);
-    enc_data.pos_deg += (float)(enc_data.cur_count - enc_data.prev_count) * DEG_PER_COUNT;
+    
+    // Handle encoder counter overflow/underflow by calculating the shortest path
+    int32_t delta = enc_data.cur_count - enc_data.prev_count;
+    if (delta > (ENC_COUNT / 2)) {
+        delta -= ENC_COUNT;  // Wrapped backwards
+    } else if (delta < -(ENC_COUNT / 2)) {
+        delta += ENC_COUNT;  // Wrapped forwards
+    }
+
+    enc_data.pos_deg += (float)delta * DEG_PER_COUNT;
     enc_data.pos_deg = fmodf(enc_data.pos_deg + 360.0f, 360.0f);
 
     // Store for next iteration
