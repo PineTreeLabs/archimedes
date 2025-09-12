@@ -34,11 +34,17 @@
 #define ADC3_CHANNELS 2
 #define SAMPLE_COUNT 2000 // How many samples to collect
 
+enum ExptType
+{
+    STEP_RESPONSE,
+    RAMP_RESPONSE
+};
+
 typedef struct
 {
-    uint32_t sample_idx; // Sample index into logger arrays
-    uint32_t loop_count; // How many times we've actually sampled at 10 kHz
-    uint16_t sample_rate;  // loop_counts per sample_idx
+    uint32_t sample_idx;  // Sample index into logger arrays
+    uint32_t loop_count;  // How many times we've actually sampled at 10 kHz
+    uint16_t sample_rate; // loop_counts per sample_idx
     uint16_t pwm_duty[SAMPLE_COUNT];
     int32_t v_motor_mv[SAMPLE_COUNT];
     uint16_t i_motor_ma[SAMPLE_COUNT];
@@ -67,8 +73,8 @@ typedef union
 typedef struct
 {
     int32_t cur_count;  // Current encoder position count
-    int32_t prev_count;  // Temporary value used to calculate updates
-    float pos_deg;  // Integrated position [deg]
+    int32_t prev_count; // Temporary value used to calculate updates
+    float pos_deg;      // Integrated position [deg]
 } enc_data_t;
 
 /* USER CODE END PTD */
@@ -110,6 +116,9 @@ TIM_HandleTypeDef htim3;
 UART_HandleTypeDef huart3;
 
 /* USER CODE BEGIN PV */
+enum ExptType expt_type = STEP_RESPONSE;
+// enum ExptType expt_type = RAMP_RESPONSE;
+
 volatile bool sample_flag = false;
 volatile adc1_data_t adc1_data;
 volatile adc3_data_t adc3_data;
@@ -209,80 +218,74 @@ int main(void)
     /* Infinite loop */
     /* USER CODE BEGIN WHILE */
 
+    HAL_GPIO_WritePin(Onboard_LED_GPIO_Port, Onboard_LED_Pin, GPIO_PIN_SET);
     HAL_Delay(1000); // Wait 1 s for everything to come online
+    HAL_GPIO_WritePin(Onboard_LED_GPIO_Port, Onboard_LED_Pin, GPIO_PIN_RESET);
 
-    // Wait for the trigger signal
+    // Wait for the USER button to be pressed
     while (1)
     {
-        if (!HAL_GPIO_ReadPin(Onboard_Button_GPIO_Port, Onboard_Button_Pin))
-        {
-            // Button is pressed (active low)
-            HAL_GPIO_WritePin(Onboard_LED_GPIO_Port, Onboard_LED_Pin, GPIO_PIN_SET);
-
+        if (HAL_GPIO_ReadPin(Onboard_Button_GPIO_Port, Onboard_Button_Pin))
             break; // Continue on to main control loop
-        }
         HAL_Delay(1);
     }
+    // Turn on blue LED to indicate start of test
+    HAL_GPIO_WritePin(Onboard_LED_GPIO_Port, Onboard_LED_Pin, GPIO_PIN_SET);
 
     /* STEP RESPONSE */
+    uint32_t next_incr = 0; // Loop count to increment duty cycle
+
+    switch (expt_type)
+    {
+    case STEP_RESPONSE:
+        log_data.sample_rate = 1; // Sample at 10 kHz (200 ms total)
+        pwm_duty = PWM_COUNT / 2; // 50% duty cycle
+        break;
+    case RAMP_RESPONSE:
+        log_data.sample_rate = 100; // Sample at 100 Hz (20s total)
+        pwm_duty = 0;               // Start at 0% duty cycle
+        break;
+    }
 
     // Reset indices
     log_data.sample_idx = 0;
-    log_data.sample_rate = 1;
-
-    // Motor to ON for step response
-    pwm_duty = PWM_COUNT / 2;
+    log_data.loop_count = 0; // Number of 10 kHz updates per sample
+    sample_flag = false;
     motor_set();
+
     while (1)
     {
+        if (log_data.sample_idx >= SAMPLE_COUNT)
+            break;
         /* USER CODE END WHILE */
 
         /* USER CODE BEGIN 3 */
 
-        if (sample_flag)
-            sample_callback();
-
-        if (log_data.sample_idx >= SAMPLE_COUNT)
-            break;
-    }
-
-    pwm_duty = 0; // Turn OFF motor
-    motor_set();
-    send_data();
-
-    /* RAMP RESPONSE */
-
-    // Reset indices (will overwrite the same buffers)
-    log_data.sample_idx = 0;
-    log_data.loop_count = 0;  // Number of 10 kHz updates per sample
-    log_data.sample_rate = 100;  // Sample at 100 Hz (20s total)
-    pwm_duty = 0; // Start at 0% duty cycle
-    motor_set();
-    sample_flag = false;
-    uint32_t next_incr = 0;  // Loop count to increment duty cycle
-
-    while (1)
-    {
-        // Increase PWM duty cycle by 5% every 1000 ms
-        if (log_data.loop_count >= next_incr)
+        switch (expt_type)
         {
-            pwm_duty += PWM_COUNT / 20;
-            next_incr += log_data.sample_rate;
-            motor_set();
+        case RAMP_RESPONSE:
+            // Increase PWM duty cycle by 5% every 1000 ms
+            if (log_data.loop_count >= next_incr)
+            {
+                pwm_duty += PWM_COUNT / 20;
+                next_incr += log_data.sample_rate * (SAMPLE_COUNT / 20);
+                motor_set();
+            }
+            break;
+        default:
+            break;
         }
 
         if (sample_flag)
             sample_callback();
-
-        if (log_data.sample_idx >= SAMPLE_COUNT)
-            break;
     }
 
     pwm_duty = 0; // Turn OFF motor
     motor_set();
     send_data();
-
     HAL_GPIO_WritePin(Onboard_LED_GPIO_Port, Onboard_LED_Pin, GPIO_PIN_RESET);
+
+    return 0;
 
     /* USER CODE END 3 */
 }
@@ -692,7 +695,7 @@ static void MX_GPIO_Init(void)
     /*Configure GPIO pin : Onboard_Button_Pin */
     GPIO_InitStruct.Pin = Onboard_Button_Pin;
     GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
-    GPIO_InitStruct.Pull = GPIO_PULLUP;
+    GPIO_InitStruct.Pull = GPIO_NOPULL;
     HAL_GPIO_Init(Onboard_Button_GPIO_Port, &GPIO_InitStruct);
 
     /*Configure GPIO pin : Motor_ENA_Pin */
@@ -732,12 +735,13 @@ static void MX_GPIO_Init(void)
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 {
     if (htim->Instance == TIM3)
-    { 
+    {
         sample_flag = true;
     }
 }
 
-void motor_set(void){
+void motor_set(void)
+{
     __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1, pwm_duty);
 }
 
@@ -763,7 +767,8 @@ void motor_fwd(void)
     HAL_GPIO_WritePin(Motor_INB_GPIO_Port, Motor_INB_Pin, GPIO_PIN_SET);   // INB = HIGH
 }
 
-void sample_callback(void) {
+void sample_callback(void)
+{
     // Read encoder and update position
     enc_data.cur_count = (int32_t)__HAL_TIM_GET_COUNTER(&htim2);
     enc_data.pos_deg += (float)(enc_data.cur_count - enc_data.prev_count) * DEG_PER_COUNT;
@@ -774,11 +779,9 @@ void sample_callback(void) {
     if ((log_data.loop_count % log_data.sample_rate == 0) && (log_data.sample_idx < SAMPLE_COUNT))
     {
         log_data.pwm_duty[log_data.sample_idx] = pwm_duty;
-        log_data.v_motor_mv[log_data.sample_idx] = (int32_t)(
-            ((float)adc3_data.channels.vout_a_raw - (float)adc3_data.channels.vout_b_raw) * ENC_VOUT_SCALE * 1000); // millivolts
-        log_data.i_motor_ma[log_data.sample_idx] = (uint16_t)(
-            adc1_data.channels.cs_raw * CS_SCALE * 1000);                                       // milliamps
-        log_data.pos_mdeg[log_data.sample_idx] = (int32_t)(enc_data.pos_deg * 1000);                                                    // millidegrees
+        log_data.v_motor_mv[log_data.sample_idx] = (int32_t)(((float)adc3_data.channels.vout_a_raw - (float)adc3_data.channels.vout_b_raw) * ENC_VOUT_SCALE * 1000); // millivolts
+        log_data.i_motor_ma[log_data.sample_idx] = (uint16_t)(adc1_data.channels.cs_raw * CS_SCALE * 1000);                                                          // milliamps
+        log_data.pos_mdeg[log_data.sample_idx] = (int32_t)(enc_data.pos_deg * 1000);                                                                                 // millidegrees
         log_data.sample_idx++;
     }
 

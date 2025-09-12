@@ -1,6 +1,7 @@
 import serial
 import serial.tools.list_ports
-import csv
+import click
+
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -24,7 +25,7 @@ def _wait_for_start_message(ser):
     while True:
         line = ser.readline().decode().strip()
         if line.startswith('START'):
-            _, sample_count, pwm_count, sample_rate = map(int, line.split(','))
+            sample_count, pwm_count, sample_rate = map(int, line.split(',')[1:])
             print(f"Receiving {sample_count} samples at sample rate {sample_rate}")
             return sample_count, pwm_count, sample_rate
 
@@ -84,24 +85,24 @@ def _process_raw_data(raw_data, sample_rate, pwm_count):
     return data
 
 
-def receive_data(port='/dev/tty.usbmodem141303', baudrate=115200):
-    """Receive and parse data from STM32"""
-    
-    # Step response data (200 ms)
-    with serial.Serial(port, baudrate, timeout=5) as ser:
+@click.command()
+@click.option('--port', default=None, help='Serial port (e.g., /dev/tty.usbmodem141303)')
+@click.option('--save', default=None, help='Filename to save data as CSV')
+def main(port=None, save=None):
+    if port is None:
+        # Determine the USB port by looking for /dev/tty.usbmodem.*
+        port = _get_usb_device()
+
+    with serial.Serial(port, baudrate=115200, timeout=5) as ser:
         print("Waiting for experiment data...")
-        step_data = _receive_single_stream(ser)
+        data = _receive_single_stream(ser)
 
-    # Ramp response (2s)
-    with serial.Serial(port, baudrate, timeout=5) as ser:
-        print("Waiting for experiment data...")
-        ramp_data = _receive_single_stream(ser)
-    
-    return step_data, ramp_data
+    # Save to CSV
+    if save:
+        header = 't [s]\t\tu [-]\t\tv [V]\t\ti [A]\t\tpos [deg]'
+        np.savetxt(save, data, delimiter='\t', fmt='%.6f', header=header, comments='')
 
-
-def plot_response(data):
-    fig, ax = plt.subplots(4, 1, figsize=(7, 6), sharex=True)
+    _fig, ax = plt.subplots(4, 1, figsize=(7, 6), sharex=True)
     ax[0].plot(data[:, 0], 100 * data[:, 1])
     ax[0].grid()
     ax[0].set_ylabel(r"PWM duty [%]")
@@ -126,24 +127,5 @@ def plot_response(data):
     plt.show()
 
 
-def save_data(data, filename):
-    with open(filename, 'w', newline='') as csvfile:
-        writer = csv.writer(csvfile)
-        writer.writerow(['t (s)', 'v (mV)', 'i (mA)', 'pos (mdeg)'])
-        writer.writerows(data)
-
-
 if __name__ == "__main__":
-    # Determine the USB port by looking for /dev/tty.usbmodem.*
-    port = _get_usb_device()
-
-    step_data, ramp_data = receive_data(port=port)
-
-    # Save to CSV
-    save_data(step_data, f"../data/step_data.csv")
-    save_data(ramp_data, f"../data/ramp_data.csv")
-
-    plot_response(step_data)
-    plot_response(ramp_data)
-    
-    
+    main()
