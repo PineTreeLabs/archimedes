@@ -71,10 +71,6 @@ class MotorInputs:
 
 
 class MotorOutputs(NamedTuple):
-    I_motor: float
-    V_motor: float
-    pos: float
-    vel: float
     ENCA: int
     ENCB: int
     V_CS: float
@@ -111,21 +107,36 @@ def encoder(pos: float, PPR: int) -> tuple[int, int]:
     return ENCA, ENCB
 
 
-@arc.compile(static_argnames=("pwm_table",))
+@arc.compile
+def quad_count(A, B, count, prev_A, prev_B):
+    rising_A = np.logical_and(A, np.logical_not(prev_A))
+    count += rising_A * np.where(B, -1, 1)  # CCW
+
+    falling_A = np.logical_and(np.logical_not(A), prev_A)
+    count += falling_A * np.where(B, 1, -1)  # CW
+
+    rising_B = np.logical_and(B, np.logical_not(prev_B))
+    count += rising_B * np.where(A, 1, -1)  # CW
+
+    falling_B = np.logical_and(np.logical_not(B), prev_B)
+    count += falling_B * np.where(A, -1, 1)  # CCW
+
+    return count
+
+
+@arc.compile
 def plant_step(
     t,
     state: np.ndarray,
     inputs: MotorInputs,
     params: MotorParams,
-    pwm_table: np.ndarray,
 ) -> tuple[np.ndarray, MotorOutputs]:
     # Determine motor direction
     d = motor_dir(inputs.INA, inputs.INB, inputs.ENA, inputs.ENB)
     pwm_duty = np.clip(inputs.pwm_duty, 0.0, 1.0)
-    # V_motor = d * np.interp(pwm_duty, pwm_table[:, 0], pwm_table[:, 1])
     V_motor = d * pwm_duty * SUPPLY_VOLTAGE
 
-    # Motor dynamics model
+    # Motor dynamics model (discretized)
     u = (V_motor,)
     state = motor_dyn(t, state, u, params)
 
@@ -135,14 +146,17 @@ def plant_step(
     PPR = ENC_PPR * GEAR_RATIO
     ENCA, ENCB = encoder(pos, PPR)
 
+    # H-bridge output voltages
+    VOUTA = np.where(d >= 0, V_motor * VOUT_SCALE, 0.0)
+    VOUTB = np.where(d < 0, -V_motor * VOUT_SCALE, 0.0)
+
+    # Current sense voltage
+    V_CS = abs(I_motor) * CS_V_PER_AMP
+
     outputs = MotorOutputs(
-        V_motor=V_motor,
-        I_motor=I_motor,
-        pos=pos,
-        vel=vel,
-        VOUTA=V_motor * VOUT_SCALE,
-        VOUTB=0.0,
-        V_CS=abs(I_motor) * CS_V_PER_AMP,
+        VOUTA=VOUTA,
+        VOUTB=VOUTB,
+        V_CS=V_CS,
         ENCA=ENCA,
         ENCB=ENCB,
     )
