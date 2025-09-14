@@ -99,7 +99,7 @@ def main(port=None, save=None):
 
     # Save to CSV
     if save:
-        filename = f"_static/data/{save}"
+        filename = f"data/{save}"
         header = 't [s]\t\tu [-]\t\tv [V]\t\ti [A]\t\tpos [deg]'
         np.savetxt(filename, data, delimiter='\t', fmt='%.6f', header=header, comments='')
 
