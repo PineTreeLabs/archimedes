@@ -31,7 +31,7 @@ class MotorParams:
     b: float  # Viscous friction
     L: float  # Motor inductance [H]
     R: float  # Motor resistance [Ohm]
-    k_t: float  # Current -> torque scale [N-m/A]
+    kt: float  # Current -> torque scale [N-m/A]
 
 
 def motor_ode(
@@ -41,10 +41,10 @@ def motor_ode(
     i, _pos, vel = x
     (V,) = u
 
-    k_e = params.k_t / GEAR_RATIO  # Velocity -> Back EMF scale
+    ke = params.kt / GEAR_RATIO  # Velocity -> Back EMF scale
 
-    i_t = (1 / params.L) * (V - (i * params.R) - k_e * vel)
-    vel_t = (1 / params.J) * (params.k_t * i - params.b * vel)
+    i_t = (1 / params.L) * (V - (i * params.R) - ke * vel)
+    vel_t = (1 / params.J) * (params.kt * i - params.b * vel)
 
     return np.hstack([i_t, vel, vel_t])
 
@@ -124,7 +124,7 @@ def quad_count(A, B, count, prev_A, prev_B):
     return count
 
 
-@arc.compile
+@arc.compile(name="plant", return_names=("state_new", "outputs"))
 def plant_step(
     t,
     state: np.ndarray,
