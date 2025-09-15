@@ -89,9 +89,12 @@ typedef struct
 #define ADC_TO_VOLTS (3.3f / 4095.0f)          // Convert ADC counts to voltage
 #define CS_V_PER_AMP (0.14f)                   // VNH5019 spec: 0.14 V/A
 #define CS_SCALE (ADC_TO_VOLTS / CS_V_PER_AMP) // ADC counts to amperage
-#define ENC_CPR 48                             // Counts per motor revolution (datasheet)
-#define GEAR_RATIO 46.8512f                    // 47:1 gearbox
-#define DEG_PER_COUNT (360.0f / (ENC_CPR * GEAR_RATIO))
+
+#define ENC_CPR        48      // Counts per motor revolution (datasheet)
+#define GEAR_RATIO     46.8512f      // 47:1 gearbox
+#define RAD_PER_COUNT  (2.0f * M_PI / (ENC_CPR * GEAR_RATIO))
+#define RAD_TO_DEG     (180.0f / M_PI)
+#define DEG_PER_COUNT  (360.0f / (ENC_CPR * GEAR_RATIO))  // DEBUG: Shouldn't need this
 
 #define ENC_VOUT_R1 (47.0f) // First leg of voltage divider
 #define ENC_VOUT_R2 (15.0f) // Second leg of voltage divider
@@ -220,7 +223,7 @@ int main(void)
     /* USER CODE BEGIN WHILE */
 
     HAL_GPIO_WritePin(Onboard_LED_GPIO_Port, Onboard_LED_Pin, GPIO_PIN_SET);
-    HAL_Delay(1000); // Wait 1 s for everything to come online
+    HAL_Delay(1000); // Wait 1 sec for everything to come online
     HAL_GPIO_WritePin(Onboard_LED_GPIO_Port, Onboard_LED_Pin, GPIO_PIN_RESET);
 
     // Wait for the USER button to be pressed
@@ -741,9 +744,7 @@ static void MX_GPIO_Init(void)
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 {
     if (htim->Instance == TIM3)
-    {
         sample_flag = true;
-    }
 }
 
 void motor_set(void)
@@ -810,8 +811,8 @@ void send_data(void)
     char header[100];
     char buffer[200];
 
-    snprintf(header, sizeof(header), "START,%lu,%u,%u\n",
-             (uint32_t)SAMPLE_COUNT, PWM_COUNT, log_data.sample_rate);
+    snprintf(header, sizeof(header), "START,%lu,%u,%u,%lu\n",
+             (uint32_t)SAMPLE_COUNT, PWM_COUNT, log_data.sample_rate, 0);
     HAL_UART_Transmit(&huart3, (uint8_t *)header, strlen(header), HAL_MAX_DELAY);
 
     // Send data in chunks to avoid USB buffer overflow

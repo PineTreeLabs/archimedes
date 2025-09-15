@@ -55,8 +55,11 @@ void HAL_TIM_MspPostInit(TIM_HandleTypeDef *htim);
 void Error_Handler(void);
 
 /* USER CODE BEGIN EFP */
-void controller_callback(void);
+void sample_callback(void);
 void send_data(void);
+void motor_set(void);
+void motor_fwd(void);
+void motor_rev(void);
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/
