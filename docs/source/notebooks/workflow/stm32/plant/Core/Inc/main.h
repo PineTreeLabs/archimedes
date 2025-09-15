@@ -53,18 +53,14 @@ extern "C" {
 void Error_Handler(void);
 
 /* USER CODE BEGIN EFP */
-
+void sample_callback(void);
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/
-#define Onboard_Button_Pin GPIO_PIN_13
-#define Onboard_Button_GPIO_Port GPIOC
 #define ENC_OUTB_Pin GPIO_PIN_7
 #define ENC_OUTB_GPIO_Port GPIOA
 #define Driver_ENB_Pin GPIO_PIN_15
 #define Driver_ENB_GPIO_Port GPIOF
-#define Trigger_Pin GPIO_PIN_11
-#define Trigger_GPIO_Port GPIOE
 #define Driver_ENA_Pin GPIO_PIN_13
 #define Driver_ENA_GPIO_Port GPIOE
 #define ENC_OUTA_Pin GPIO_PIN_14
