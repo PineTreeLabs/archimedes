@@ -360,6 +360,12 @@ class TestSymbolicArrayFunctions:
         assert result.shape == (6,)
         assert cs.is_equal(result._sym, x._sym.reshape((6, 1)), 1)
 
+        # Check scalar case
+        x = sym("x", shape=(), dtype=np.int32)
+        result = x.flatten()
+        assert result.shape == ()
+        assert cs.is_equal(result._sym, x._sym, 1)
+
     def test_reshape(self):
         def sym_reshape(x, shape, order="C"):
             return np.reshape(x, shape, order=order)
@@ -415,6 +421,52 @@ class TestSymbolicArrayFunctions:
         assert isinstance(y, SymbolicArray)
         assert cs.is_equal(x._sym, y._sym.T)
         assert y.shape == (3,)
+
+    def test_roll(self):
+        # Test scalar
+        x = sym("x", shape=(), dtype=np.int32)
+        result = np.roll(x, 1)
+        assert isinstance(result, SymbolicArray)
+        assert result.dtype == np.int32
+        assert result.shape == ()
+        assert cs.is_equal(result._sym, x._sym, 1)
+
+        # Test 1D array
+        x = sym("x", shape=(5,), dtype=np.int32)
+        result = np.roll(x, 2)
+        assert isinstance(result, SymbolicArray)
+        assert result.dtype == np.int32
+        assert result.shape == (5,)
+        expected = cs.vertcat(x._sym[-2:], x._sym[:-2])
+        assert cs.is_equal(result._sym, expected, 1)
+
+        # Test negative shift
+        result = np.roll(x, -1)
+        expected = cs.vertcat(x._sym[1:], x._sym[:1])
+        assert cs.is_equal(result._sym, expected, 1)
+
+        # Test large shift
+        result = np.roll(x, 7)  # Equivalent to shift of 2
+        expected = cs.vertcat(x._sym[-2:], x._sym[:-2])
+        assert cs.is_equal(result._sym, expected, 1)
+
+        # Test zero shift
+        result = np.roll(x, 0)
+        assert cs.is_equal(result._sym, x._sym, 1)
+
+        # Test 2D array, axis=0
+        x = sym("x", shape=(2, 3), dtype=np.int32)
+        result = np.roll(x, 1, axis=0)
+        assert isinstance(result, SymbolicArray)
+        assert result.dtype == np.int32
+        assert result.shape == (2, 3)
+        expected = cs.vertcat(x._sym[-1, :], x._sym[:-1, :])
+        assert cs.is_equal(result._sym, expected, 1)
+
+        # Test 2D array, axis=1
+        result = np.roll(x, -1, axis=1)
+        expected = cs.horzcat(x._sym[:, 1:], x._sym[:, :1])
+        assert cs.is_equal(result._sym, expected, 1)
 
     def test_append(self):
         x = sym("x", shape=(2, 3), dtype=np.int32)
