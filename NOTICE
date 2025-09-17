@@ -28,6 +28,11 @@ This document lists third-party software components used by or incorporated into
 - **Files**: `_core/_array_ops/_array_function.py`, `_core/_array_ops/_array_ops.py`, `_core/_array_ops/_array_ufunc.py`
 - **Description**: Some array API implementations
 
+### SciPy
+- **Source**: https://github.com/scipy/scipy
+- **License**: BSD-3 Clause License
+- **Files**: `experimental/signal/tf2ss.py`, `experimental/spatial/_rotation.py`
+
 ## Key Dependencies
 
 ### CasADi

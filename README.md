@@ -220,7 +220,7 @@ The open-source code is licensed under the [GNU General Public License v3.0](LIC
 For organizations that would like more flexible licensing contact [info@archimedes.sh](mailto:info@archimedes.sh) for details.
 
 ## Third-Party Components
-Archimedes incorporates code from several open source projects, including JAX (Apache 2.0), Flax (Apache 2.0), and NumPy (NumPy license). See [NOTICE.md](NOTICE.md) for a complete list of attributions, including licenses for key dependencies (CasADi and NumPy).
+Archimedes incorporates code from several open source projects, including JAX (Apache 2.0), Flax (Apache 2.0), SciPy (BSD-3), and NumPy (NumPy license). See [NOTICE.md](NOTICE.md) for a complete list of attributions, including licenses for key dependencies (CasADi and NumPy).
 
 # Getting involved
 
