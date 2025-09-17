@@ -25,8 +25,11 @@ def _wait_for_start_message(ser):
     while True:
         line = ser.readline().decode().strip()
         if line.startswith('START'):
-            sample_count, pwm_count, sample_rate = map(int, line.split(',')[1:])
+            sample_count, pwm_count, sample_rate, loop_cycles = map(int, line.split(',')[1:])
             print(f"Receiving {sample_count} samples at sample rate {sample_rate}")
+            if loop_cycles > 0:
+                # Divide by 180 MHz to get execution time in µs
+                print(f"Control loop time: {loop_cycles/180:.4f} µs")
             return sample_count, pwm_count, sample_rate
 
 

@@ -34,7 +34,7 @@
 
 #define ADC1_CHANNELS 1
 #define ADC3_CHANNELS 2
-#define SAMPLE_COUNT 5000 // How many samples to collect
+#define SAMPLE_COUNT 2000 // How many samples to collect
 
 typedef struct
 {
@@ -87,11 +87,11 @@ typedef struct
 #define CS_V_PER_AMP (0.14f)                   // VNH5019 spec: 0.14 V/A
 #define CS_SCALE (ADC_TO_VOLTS / CS_V_PER_AMP) // ADC counts to amperage
 
-#define ENC_CPR 48          // Counts per motor revolution (datasheet)
-#define GEAR_RATIO 46.8512f // 47:1 gearbox
-#define RAD_PER_COUNT (2.0f * M_PI / (ENC_CPR * GEAR_RATIO))
-#define RAD_TO_DEG (180.0f / M_PI)
-#define DEG_PER_COUNT (360.0f / (ENC_CPR * GEAR_RATIO)) // DEBUG: Shouldn't need this
+#define ENC_CPR        48      // Counts per motor revolution (datasheet)
+#define GEAR_RATIO     46.8512f      // 47:1 gearbox
+#define RAD_PER_COUNT  (2.0f * M_PI / (ENC_CPR * GEAR_RATIO))
+#define RAD_TO_DEG     (180.0f / M_PI)
+#define DEG_PER_COUNT  (360.0f / (ENC_CPR * GEAR_RATIO))  // DEBUG: Shouldn't need this
 
 #define VOUT_R1 (47.0f) // First leg of voltage divider
 #define VOUT_R2 (15.0f) // Second leg of voltage divider
@@ -125,9 +125,9 @@ uint16_t pwm_duty = 0;
 enc_data_t enc_data = {ENC_COUNT / 2, ENC_COUNT / 2, 0.0f};
 
 // Data structures for controller
-controller_arg_t controller_arg;  // Inputs
-controller_res_t controller_res;  // Outputs
-controller_work_t controller_work; // Workspace
+controller_arg_t ctrl_arg;  // Inputs
+controller_res_t ctrl_res;  // Outputs
+controller_work_t ctrl_work; // Workspace
 
 // Data collection
 log_data_t log_data = {0};
@@ -200,7 +200,7 @@ int main(void)
     DWT->CTRL |= DWT_CTRL_CYCCNTENA_Msk; // Enable counter
 
     // Set up controller data structures
-    controller_init(&controller_arg, &controller_res, &controller_work);
+    controller_init(&ctrl_arg, &ctrl_res, &ctrl_work);
 
     // Start PWM output
     if (HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1) != HAL_OK)
@@ -257,6 +257,7 @@ int main(void)
 
     // Reset indices
     log_data.sample_idx = 0;
+    log_data.sample_rate = 1;
     log_data.loop_count = 0;
     sample_flag = false;
     pwm_duty = 0;
@@ -271,7 +272,7 @@ int main(void)
     /* USER CODE BEGIN 3 */
 
         // Pulse train test sequence
-        controller_arg.pos_ref = (log_data.sample_idx < SAMPLE_COUNT / 2) ? 1.0 : 0.0;
+        ctrl_arg.pos_ref = (log_data.sample_idx < SAMPLE_COUNT / 2) ? 1.0 : 0.0;
 
         if (sample_flag)
         {
@@ -797,34 +798,37 @@ void sample_callback(void)
     enc_data.pos_deg = fmodf(enc_data.pos_deg + 360.0f, 360.0f);
 
     // Update inputs to the controller loop
-    controller_arg.pos = enc_data.pos_deg / RAD_TO_DEG;
+    ctrl_arg.pos = enc_data.pos_deg / RAD_TO_DEG;
 
     /* CONTROLLER LOGIC */
-    controller_step(&controller_arg, &controller_res, &controller_work);
+    controller_step(&ctrl_arg, &ctrl_res, &ctrl_work);
 
     // Copy state from output struct back to inputs for next step
-    controller_arg.state = controller_res.state_new;
+    ctrl_arg.state = ctrl_res.state_new;
 
     /* OUTPUTS */
     // Update PWM duty cycle
-    pwm_duty = (uint16_t)(PWM_COUNT * controller_res.pwm_duty);
+    pwm_duty = (uint16_t)(PWM_COUNT * ctrl_res.pwm_duty);
     motor_set();
 
     // Set motor driver logic for direction
-    // TODO: HAL_GPIO_WritePin(Motor_INA_GPIO_Port, Motor_INA_Pin, (uint16_t)controller_res.INA);
-    if (controller_res.INA == 0)
+    // TODO: HAL_GPIO_WritePin(Motor_INA_GPIO_Port, Motor_INA_Pin, (uint16_t)ctrl_res.INA);
+    if (ctrl_res.INA == 0)
         HAL_GPIO_WritePin(Motor_INA_GPIO_Port, Motor_INA_Pin, GPIO_PIN_RESET);
     else
         HAL_GPIO_WritePin(Motor_INA_GPIO_Port, Motor_INA_Pin, GPIO_PIN_SET);
-    if (controller_res.INB == 0)
+    if (ctrl_res.INB == 0)
         HAL_GPIO_WritePin(Motor_INB_GPIO_Port, Motor_INB_Pin, GPIO_PIN_RESET);
     else
         HAL_GPIO_WritePin(Motor_INB_GPIO_Port, Motor_INB_Pin, GPIO_PIN_SET);
 
+    pwm_duty = PWM_COUNT / 2;
+    motor_set();
+
     if ((log_data.loop_count % log_data.sample_rate == 0) && (log_data.sample_idx < SAMPLE_COUNT))
     {
         log_data.pwm_duty[log_data.sample_idx] = pwm_duty;
-        log_data.v_motor_mv[log_data.sample_idx] = (int32_t)(((float)adc3_data.channels.vout_a_raw - (float)adc3_data.channels.vout_b_raw) * ENC_VOUT_SCALE * 1000); // millivolts
+        log_data.v_motor_mv[log_data.sample_idx] = (int32_t)(((float)adc3_data.channels.vout_a_raw - (float)adc3_data.channels.vout_b_raw) * VOUT_SCALE * 1000); // millivolts
         log_data.i_motor_ma[log_data.sample_idx] = (uint16_t)(adc1_data.channels.cs_raw * CS_SCALE * 1000);                                                          // milliamps
         log_data.pos_mdeg[log_data.sample_idx] = (int32_t)(enc_data.pos_deg * 1000);                                                                                 // millidegrees
         log_data.sample_idx++;

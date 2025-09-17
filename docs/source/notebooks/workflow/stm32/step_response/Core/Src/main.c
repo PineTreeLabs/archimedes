@@ -812,7 +812,7 @@ void send_data(void)
     char buffer[200];
 
     snprintf(header, sizeof(header), "START,%lu,%u,%u,%lu\n",
-             (uint32_t)SAMPLE_COUNT, PWM_COUNT, log_data.sample_rate, 0);
+             (uint32_t)SAMPLE_COUNT, PWM_COUNT, log_data.sample_rate, (uint32_t)0);
     HAL_UART_Transmit(&huart3, (uint8_t *)header, strlen(header), HAL_MAX_DELAY);
 
     // Send data in chunks to avoid USB buffer overflow
