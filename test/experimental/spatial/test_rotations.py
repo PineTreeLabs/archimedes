@@ -9,6 +9,7 @@ from archimedes.experimental.spatial import Rotation
 
 np.random.seed(0)
 
+
 def random_rotation():
     """Generate a random rotation"""
     rand_quat = np.random.randn(4)
@@ -68,39 +69,44 @@ class TestRotation:
 
         assert np.allclose(euler2, euler_orig)
 
-    @pytest.mark.parametrize("seq", [
-        "xyz",  # Standard roll-pitch-yaw
-        "zxz",  # Symmetric sequence
-        "ZYX",  # Intrinsic sequence
-        "XZX",  # Symmetric intrinsic sequence
-    ])
+    @pytest.mark.parametrize(
+        "seq",
+        [
+            "xyz",  # Standard roll-pitch-yaw
+            "zxz",  # Symmetric sequence
+            "ZYX",  # Intrinsic sequence
+            "XZX",  # Symmetric intrinsic sequence
+        ],
+    )
     def test_roundtrip(self, seq):
         euler_orig = np.array([0.1, 0.2, 0.3])
         self._quat_roundtrip(euler_orig, seq)
         self._mixed_roundtrip(euler_orig, seq)
 
-    @pytest.mark.parametrize("angles", [
-        [0, 0, 0],           # Identity
-        [np.pi/2, 0, 0],     # 90° roll
-        [0.1, 0.2, 0.3],     # Small angles
-        [np.pi-0.1, 0.1, 0.1],  # Near-singularity
-    ])
+    @pytest.mark.parametrize(
+        "angles",
+        [
+            [0, 0, 0],  # Identity
+            [np.pi / 2, 0, 0],  # 90° roll
+            [0.1, 0.2, 0.3],  # Small angles
+            [np.pi - 0.1, 0.1, 0.1],  # Near-singularity
+        ],
+    )
     def test_with_scipy(self, angles):
-            seq = 'xyz'
-    
-            # Both libraries should give same results
-            R_scipy = ScipyRotation.from_euler(seq, angles)
-            R = Rotation.from_euler(seq, angles)
-    
-            test_vector = np.array([1, 2, 3])
-            assert np.allclose(R.apply(test_vector), 
-                            R_scipy.apply(test_vector))
-            
+        seq = "xyz"
+
+        # Both libraries should give same results
+        R_scipy = ScipyRotation.from_euler(seq, angles)
+        R = Rotation.from_euler(seq, angles)
+
+        test_vector = np.array([1, 2, 3])
+        assert np.allclose(R.apply(test_vector), R_scipy.apply(test_vector))
+
     def test_compile(self):
         @arc.compile
         def rotate_vector(R, v):
             return R.apply(v)
-        
+
         R = Rotation.from_euler("xyz", [0.1, 0.2, 0.3])
         v = np.array([1, 2, 3])
 
@@ -112,8 +118,7 @@ class TestRotation:
         R = Rotation.from_euler("xyz", [0.1, 0.2, 0.3])
         flat, unflatten = arc.tree.ravel(R)
         R_restored = unflatten(flat)
-    
+
         # Should preserve rotation behavior
         v = np.array([1, 2, 3])
         assert np.allclose(R.apply(v), R_restored.apply(v))
-

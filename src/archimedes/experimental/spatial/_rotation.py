@@ -27,24 +27,29 @@ def compose_quat(q1, q2):
         like=q1,
     )
 
+
 def _check_seq(seq: str) -> bool:
     # The following checks are verbatim from:
     # https://github.com/scipy/scipy/blob/3ead2b543df7c7c78619e20f0cb6139e344a8866/scipy/spatial/transform/_rotation_cy.pyx#L461-L476  ruff: noqa: E501
-    intrinsic = (re.match(r'^[XYZ]{1,3}$', seq) is not None)
-    extrinsic = (re.match(r'^[xyz]{1,3}$', seq) is not None)
+    intrinsic = re.match(r"^[XYZ]{1,3}$", seq) is not None
+    extrinsic = re.match(r"^[xyz]{1,3}$", seq) is not None
     if not (intrinsic or extrinsic):
-        raise ValueError("Expected axes from `seq` to be from ['x', 'y', "
-                            "'z'] or ['X', 'Y', 'Z'], got {}".format(seq))
+        raise ValueError(
+            "Expected axes from `seq` to be from ['x', 'y', "
+            "'z'] or ['X', 'Y', 'Z'], got {}".format(seq)
+        )
 
-    if any(seq[i] == seq[i+1] for i in range(len(seq) - 1)):
-        raise ValueError("Expected consecutive axes to be different, "
-                            "got {}".format(seq))
-    
+    if any(seq[i] == seq[i + 1] for i in range(len(seq) - 1)):
+        raise ValueError(
+            "Expected consecutive axes to be different, got {}".format(seq)
+        )
+
     return intrinsic
-    
+
 
 def _elementary_basis_index(axis: str) -> int:
     return {"x": 1, "y": 2, "z": 3}[axis.lower()]
+
 
 # See https://github.com/scipy/scipy/blob/3ead2b543df7c7c78619e20f0cb6139e344a8866/scipy/spatial/transform/_rotation_cy.pyx#L358-L372  ruff: noqa: E501
 def _make_elementary_quat(axis: str, angle: float) -> np.ndarray:
@@ -56,15 +61,21 @@ def _make_elementary_quat(axis: str, angle: float) -> np.ndarray:
 
     return quat
 
+
 # See https://github.com/scipy/scipy/blob/3ead2b543df7c7c78619e20f0cb6139e344a8866/scipy/spatial/transform/_rotation_cy.pyx#L320-L328  ruff: noqa: E501
 def _compose_quat(q1: np.ndarray, q2: np.ndarray) -> np.ndarray:
-    return np.hstack([
-        q1[3] * q2[:3] + q2[3] * q1[:3] + np.cross(q1[:3], q2[:3]),
-        q1[3] * q2[3] - np.dot(q1[:3], q2[:3]),
-    ])
+    return np.hstack(
+        [
+            q1[3] * q2[:3] + q2[3] * q1[:3] + np.cross(q1[:3], q2[:3]),
+            q1[3] * q2[3] - np.dot(q1[:3], q2[:3]),
+        ]
+    )
+
 
 # See https://github.com/scipy/scipy/blob/3ead2b543df7c7c78619e20f0cb6139e344a8866/scipy/spatial/transform/_rotation_cy.pyx#L376-L391  ruff: noqa: E501
-def _elementary_quat_compose(seq: str, angles: np.ndarray, intrinsic: bool) -> np.ndarray:
+def _elementary_quat_compose(
+    seq: str, angles: np.ndarray, intrinsic: bool
+) -> np.ndarray:
     """Create a quaternion from a sequence of elementary rotations."""
     q = _make_elementary_quat(seq[0], angles[0])
 
@@ -100,7 +111,7 @@ class Rotation:
     @classmethod
     def from_matrix(cls, matrix: np.ndarray) -> Rotation:
         """Create a Rotation from a rotation matrix.
-        
+
         Note that for the sake of symbolic computation, this method assumes that
         the input is a valid rotation matrix (orthogonal and determinant +1).
 
@@ -116,36 +127,44 @@ class Rotation:
         t = np.linalg.trace(matrix)
 
         # If matrix[0, 0] is the largest diagonal element
-        q0 = np.hstack([
-            1 - t + 2 * matrix[0, 0],
-            matrix[0, 1] + matrix[1, 0],
-            matrix[0, 2] + matrix[2, 0],
-            matrix[2, 1] - matrix[1, 2],
-        ])
+        q0 = np.hstack(
+            [
+                1 - t + 2 * matrix[0, 0],
+                matrix[0, 1] + matrix[1, 0],
+                matrix[0, 2] + matrix[2, 0],
+                matrix[2, 1] - matrix[1, 2],
+            ]
+        )
 
         # If matrix[1, 1] is the largest diagonal element
-        q1 = np.hstack([
-            1 - t + 2 * matrix[1, 1],
-            matrix[2, 1] + matrix[1, 2],
-            matrix[0, 1] + matrix[1, 0],
-            matrix[0, 2] - matrix[2, 0],
-        ])
+        q1 = np.hstack(
+            [
+                1 - t + 2 * matrix[1, 1],
+                matrix[2, 1] + matrix[1, 2],
+                matrix[0, 1] + matrix[1, 0],
+                matrix[0, 2] - matrix[2, 0],
+            ]
+        )
 
         # If matrix[2, 2] is the largest diagonal element
-        q2 = np.hstack([
-            1 - t + 2 * matrix[2, 2],
-            matrix[0, 2] + matrix[2, 0],
-            matrix[2, 1] + matrix[1, 2],
-            matrix[1, 0] - matrix[0, 1],
-        ])
+        q2 = np.hstack(
+            [
+                1 - t + 2 * matrix[2, 2],
+                matrix[0, 2] + matrix[2, 0],
+                matrix[2, 1] + matrix[1, 2],
+                matrix[1, 0] - matrix[0, 1],
+            ]
+        )
 
         # If t is the largest diagonal element
-        q3 = np.hstack([
-            matrix[2, 1] - matrix[1, 2],
-            matrix[0, 2] - matrix[2, 0],
-            matrix[1, 0] - matrix[0, 1],
-            1 + t,
-        ])
+        q3 = np.hstack(
+            [
+                matrix[2, 1] - matrix[1, 2],
+                matrix[0, 2] - matrix[2, 0],
+                matrix[1, 0] - matrix[0, 1],
+                1 + t,
+            ]
+        )
 
         quat = q0
         max_val = matrix[0, 0]
@@ -162,20 +181,25 @@ class Rotation:
         return cls(quat=quat, scalar_first=True)
 
     @classmethod
-    def from_euler(cls, seq: str, angles: np.ndarray, degrees: bool = False) -> Rotation:
+    def from_euler(
+        cls, seq: str, angles: np.ndarray, degrees: bool = False
+    ) -> Rotation:
         """Create a Rotation from Euler angles."""
         num_axes = len(seq)
         if num_axes < 1 or num_axes > 3:
-            raise ValueError("Expected axis specification to be a non-empty "
-                                "string of upto 3 characters, got {}".format(seq))
-        
+            raise ValueError(
+                "Expected axis specification to be a non-empty "
+                "string of upto 3 characters, got {}".format(seq)
+            )
+
         intrinsic = _check_seq(seq)
 
         angles = np.atleast_1d(array(angles))
         if angles.shape not in [(num_axes,), (1, num_axes), (num_axes, 1)]:
             raise ValueError(
                 f"For {seq} sequence with {num_axes} axes, `angles` must have shape "
-                f"({num_axes},), (1, {num_axes}), or ({num_axes}, 1)")
+                f"({num_axes},), (1, {num_axes}), or ({num_axes}, 1)"
+            )
 
         seq = seq.lower()
         angles = angles.flatten()
@@ -205,16 +229,19 @@ class Rotation:
         yw = y * w
         zw = z * w
 
-        return np.array([
-            [w2 + x2 - y2 - z2, 2 * (xy - zw), 2 * (xz + yw)],
-            [2 * (xy + zw), w2 - x2 + y2 - z2, 2 * (yz - xw)],
-            [2 * (xz - yw), 2 * (yz + xw), w2 - x2 - y2 + z2],
-        ], like=self.quat)
-    
+        return np.array(
+            [
+                [w2 + x2 - y2 - z2, 2 * (xy - zw), 2 * (xz + yw)],
+                [2 * (xy + zw), w2 - x2 + y2 - z2, 2 * (yz - xw)],
+                [2 * (xz - yw), 2 * (yz + xw), w2 - x2 - y2 + z2],
+            ],
+            like=self.quat,
+        )
+
     # See: https://github.com/scipy/scipy/blob/3ead2b543df7c7c78619e20f0cb6139e344a8866/scipy/spatial/transform/_rotation_cy.pyx#L774-L851  ruff: noqa: E501
     def as_euler(self, seq: str, degrees: bool = False) -> np.ndarray:
         """Return the Euler angles from the rotation
-        
+
         References
         ----------
         .. [1] Bernardes E, Viollet S (2022) Quaternion to Euler angles
@@ -249,7 +276,10 @@ class Rotation:
             a, b, c, d = (q[0], q[i], q[j], q[k] * sign)
         else:
             a, b, c, d = (
-                q[0] - q[j], q[i] + q[k] * sign, q[j] + q[0], q[k] - q[i] * sign
+                q[0] - q[j],
+                q[i] + q[k] * sign,
+                q[j] + q[0],
+                q[k] - q[i] * sign,
             )
 
         # 2. Compute second angle
@@ -287,7 +317,7 @@ class Rotation:
             angles = np.rad2deg(angles)
 
         return angles
-    
+
     @classmethod
     def identity(cls) -> Rotation:
         """Return the identity rotation"""
@@ -329,7 +359,7 @@ class Rotation:
         q = self.as_quat(scalar_first=False)
         omega = np.array([*w, 0], like=q)
         q_dot = 0.5 * _compose_quat(q, omega)
-        
+
         # Baungarte stabilization to enforce unit norm constraint
         if baumgarte > 0:
             q_dot -= baumgarte * (np.dot(q, q) - 1) * q

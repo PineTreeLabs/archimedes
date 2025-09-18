@@ -127,8 +127,10 @@ def _xor(a, b):
         cs.logic_and(a, cs.logic_not(b)), cs.logic_and(cs.logic_not(a), b)
     )
 
+
 def _radians(x):
     return x * (np.pi / 180.0)
+
 
 def _degrees(x):
     return x * (180.0 / np.pi)
