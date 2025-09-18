@@ -86,8 +86,6 @@ def _reshape(x, shape, order="C"):
 
 
 def _ravel(x, order="C"):
-    if x.shape == ():
-        return x
     return np.reshape(x, (x.size,), order=order)
 
 

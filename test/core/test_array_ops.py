@@ -80,6 +80,29 @@ class TestSymbolicArrayUFuncs:
         assert result.shape == (3,)
         assert cs.is_equal(result._sym, cs.atan2(x._sym, y._sym), 1)
 
+    def test_hypot(self):
+        x = sym("x", (3,), dtype=np.float64)
+        y = sym("y", (3,), dtype=np.float64)
+        result = np.hypot(x, y)
+        assert isinstance(result, SymbolicArray)
+        assert result.dtype == np.float64
+        assert result.shape == (3,)
+        assert cs.is_equal(result._sym, cs.sqrt(x._sym**2 + y._sym**2), 3)
+
+    def test_angle_conversions(self):
+        x = sym("x", (3,), dtype=np.float64)
+        result = np.radians(x)
+        assert isinstance(result, SymbolicArray)
+        assert result.dtype == np.float64
+        assert result.shape == (3,)
+        assert cs.is_equal(result._sym, x._sym * (np.pi / 180.0), 1)
+
+        result = np.degrees(x)
+        assert isinstance(result, SymbolicArray)
+        assert result.dtype == np.float64
+        assert result.shape == (3,)
+        assert cs.is_equal(result._sym, x._sym * (180.0 / np.pi), 1)
+
 
 class TestSymbolicArrayFunctions:
     def test_broadcast_to(self):
@@ -360,10 +383,10 @@ class TestSymbolicArrayFunctions:
         assert result.shape == (6,)
         assert cs.is_equal(result._sym, x._sym.reshape((6, 1)), 1)
 
-        # Check scalar case
+        # Check scalar case (note NumPy does convert to a 1D array)
         x = sym("x", shape=(), dtype=np.int32)
         result = x.flatten()
-        assert result.shape == ()
+        assert result.shape == (1,)
         assert cs.is_equal(result._sym, x._sym, 1)
 
     def test_reshape(self):
