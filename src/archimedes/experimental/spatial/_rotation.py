@@ -65,22 +65,21 @@ def _elementary_quat_compose(seq: str, angles: np.ndarray, intrinsic: bool) -> n
 @struct.pytree_node
 class Rotation:
     quat: np.ndarray
+    scalar_first: bool = struct.field(default=True, static=True)
 
     def __len__(self):
         return len(self.quat)
 
     @classmethod
-    def from_quat(cls, quat: np.ndarray, scalar_first: bool = False) -> Rotation:
+    def from_quat(cls, quat: np.ndarray, scalar_first: bool = True) -> Rotation:
         """Create a Rotation from a quaternion."""
         quat = array(quat)
         if quat.ndim == 0:
             raise ValueError("Quaternion must be at least 1D array")
         if quat.shape not in [(4,), (1, 4), (4, 1)]:
             raise ValueError("Quaternion must have shape (4,), (1, 4), or (4, 1)")
-        quat = quat.flatten()
-        if not scalar_first:
-            quat = np.roll(quat, 1)
-        return cls(quat=quat)
+        quat = normalize(quat.flatten())
+        return cls(quat=quat, scalar_first=scalar_first)
 
     @classmethod
     def from_matrix(cls, matrix: np.ndarray) -> Rotation:
@@ -142,9 +141,9 @@ class Rotation:
         max_val = np.where(matrix[2, 2] >= max_val, matrix[2, 2], max_val)
 
         quat = np.where(t >= max_val, q3, quat)
-        quat = normalize(quat)
 
-        return cls.from_quat(quat, scalar_first=False)
+        quat = np.roll(quat, 1)  # Convert to scalar-first format
+        return cls(quat=quat, scalar_first=True)
 
     def from_euler(cls, seq: str, angles: np.ndarray, degrees: bool = False) -> Rotation:
         """Create a Rotation from Euler angles."""
@@ -167,16 +166,18 @@ class Rotation:
         if degrees:
             angles = np.deg2rad(angles)
 
-        return cls(quat=_elementary_quat_compose(seq, angles, intrinsic=intrinsic))
+        quat = _elementary_quat_compose(seq, angles, intrinsic=intrinsic)
+        quat = np.roll(quat, 1)  # Convert to scalar-first format
+        return cls(quat=quat, scalar_first=True)
 
-    def as_quat(self, scalar_first: bool = False) -> np.ndarray:
+    def as_quat(self, scalar_first: bool = True) -> np.ndarray:
         """Return the quaternion as a numpy array."""
         if scalar_first:
-            return np.roll(self.quat, 1)
-        return self.quat
-    
+            return self.quat
+        return np.roll(self.quat, 1)
+
     def as_matrix(self) -> np.ndarray:
-        x, y, z, w = self.quat
+        w, x, y, z = self.quat
         x2 = x * x
         y2 = y * y
         z2 = z * z
@@ -227,7 +228,7 @@ class Rotation:
         sign = (i - j) * (j - k) * (k - i) // 2
 
         # 1. Permute quaternion components
-        q = self.quat
+        q = self.as_quat(scalar_first=False)
         if symmetric:
             a, b, c, d = (q[3], q[i], q[j], q[k] * sign)
         else:
@@ -268,14 +269,52 @@ class Rotation:
 
         return angles
     
-    def apply(self, vectors: np.ndarray) -> np.ndarray:
+    @classmethod
+    def identity(cls) -> Rotation:
+        """Return the identity rotation"""
+        return cls.from_quat(np.array([1.0, 0.0, 0.0, 0.0]), scalar_first=True)
+
+    def apply(self, vectors: np.ndarray, inverse: bool = False) -> np.ndarray:
         """Apply the rotation to a set of vectors"""
-        raise NotImplementedError("Rotation.apply is not implemented yet")
-    
+
+        matrix = self.as_matrix()
+        if inverse:
+            matrix = matrix.T
+
+        vectors = array(vectors)
+        if vectors.ndim == 1:
+            if vectors.shape != (3,):
+                raise ValueError("For 1D input, `vectors` must have shape (3,)")
+            return matrix @ vectors
+
+        elif vectors.ndim == 2:
+            if vectors.shape[1] != 3:
+                raise ValueError("For 2D input, `vectors` must have shape (N, 3)")
+            return vectors @ matrix.T
+
     def inv(self) -> Rotation:
         """Return the inverse rotation"""
-        raise NotImplementedError("Rotation.inv is not implemented yet")
-    
+        q = self.as_quat(scalar_first=True)
+        q_inv = np.array([q[0], -q[1], -q[2], -q[3]], like=q)
+        return Rotation.from_quat(q_inv, scalar_first=True)
+
     def __mul__(self, other: Rotation) -> Rotation:
         """Compose this rotation with another rotation"""
-        raise NotImplementedError("Rotation.__mul__ is not implemented yet")
+        q1 = self.as_quat(scalar_first=False)
+        q2 = other.as_quat(scalar_first=False)
+        q = _compose_quat(q1, q2)
+        q = np.roll(q, 1)  # Convert to scalar-first format
+        return Rotation.from_quat(q, scalar_first=True)
+
+    def derivative(self, w: np.ndarray, baumgarte: float = 0.0) -> Rotation:
+        """Return the time derivative of the rotation given angular velocity w"""
+        q = self.as_quat(scalar_first=False)
+        omega = np.array([*w, 0], like=q)
+        q_dot = 0.5 * _compose_quat(q, omega)
+        
+        # Baungarte stabilization to enforce unit norm constraint
+        if baumgarte > 0:
+            q_dot -= baumgarte * (np.dot(q, q) - 1) * q
+
+        q_dot = np.roll(q_dot, 1)  # Convert to scalar-first format
+        return Rotation.from_quat(q_dot, scalar_first=True)
