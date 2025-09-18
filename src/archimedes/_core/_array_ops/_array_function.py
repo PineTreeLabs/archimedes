@@ -671,6 +671,33 @@ def _clip(a, a_min=None, a_max=None):
     return a
 
 
+def _roll(a, shift, axis=None):
+    a = array(a)
+    axis = normalize_axis_index(axis, a.ndim, "axis") if axis is not None else axis
+
+    if a.shape == ():
+        return a
+
+    if axis is None:
+        a = a.flatten()
+        axis = 0
+
+    n = a.shape[axis]
+    shift = shift % n  # Handle large or negative shifts
+    if shift == 0:
+        return a
+
+    if axis == 0:
+        top = a[-shift:]
+        bottom = a[:-shift]
+        return np.concatenate((top, bottom), axis=0)
+
+    elif axis == 1:
+        left = a[:, -shift:]
+        right = a[:, :-shift]
+        return np.concatenate((left, right), axis=1)
+
+
 # List from numpy.testing.overrides.get_overridable_numpy_array_functions()
 SUPPORTED_FUNCTIONS = {
     "array": _dispatch_array,
@@ -984,9 +1011,9 @@ SUPPORTED_FUNCTIONS = {
     "packbits": NotImplemented,
     "slogdet": NotImplemented,
     "stack_arrays": NotImplemented,
-    "roll": NotImplemented,
+    "roll": _roll,
     "nanquantile": NotImplemented,
-    "det": NotImplemented,
+    "det": unary_op(cs.det, shape_inference="unary_to_scalar"),
     "splitlines": NotImplemented,
     "extract": NotImplemented,
     "rollaxis": NotImplemented,
