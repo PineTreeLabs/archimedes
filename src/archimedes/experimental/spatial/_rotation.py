@@ -1,15 +1,31 @@
 from __future__ import annotations
 import re
 import numpy as np
-from archimedes import struct, array, compile
+from archimedes import struct, array
 
 __all__ = ["Rotation"]
 
 
-@compile
 def normalize(q):
     return q / np.linalg.norm(q)
 
+
+def compose_quat(q1, q2):
+    """
+    Multiply two quaternions q1 = [w1, x1, y1, z1] and q2 = [w2, x2, y2, z2]
+    """
+    w1, x1, y1, z1 = q1
+    w2, x2, y2, z2 = q2
+
+    return np.array(
+        [
+            w1 * w2 - x1 * x2 - y1 * y2 - z1 * z2,
+            w1 * x2 + x1 * w2 + y1 * z2 - z1 * y2,
+            w1 * y2 - x1 * z2 + y1 * w2 + z1 * x2,
+            w1 * z2 + x1 * y2 - y1 * x2 + z1 * w2,
+        ],
+        like=q1,
+    )
 
 def _check_seq(seq: str) -> bool:
     # The following checks are verbatim from:
@@ -28,13 +44,13 @@ def _check_seq(seq: str) -> bool:
     
 
 def _elementary_basis_index(axis: str) -> int:
-    return {"x": 0, "y": 1, "z": 2}[axis.lower()]
+    return {"x": 1, "y": 2, "z": 3}[axis.lower()]
 
 # See https://github.com/scipy/scipy/blob/3ead2b543df7c7c78619e20f0cb6139e344a8866/scipy/spatial/transform/_rotation_cy.pyx#L358-L372  ruff: noqa: E501
 def _make_elementary_quat(axis: str, angle: float) -> np.ndarray:
     """Create a quaternion representing a rotation about a principal axis."""
 
-    quat = np.hstack([np.zeros(3), np.cos(angle / 2)])
+    quat = np.hstack([np.cos(angle / 2), np.zeros(3)])
     axis_idx = _elementary_basis_index(axis)
     quat[axis_idx] = np.sin(angle / 2)
 
@@ -55,9 +71,9 @@ def _elementary_quat_compose(seq: str, angles: np.ndarray, intrinsic: bool) -> n
     for idx in range(1, len(seq)):
         qi = _make_elementary_quat(seq[idx], angles[idx])
         if intrinsic:
-            q = _compose_quat(q, qi)
+            q = compose_quat(q, qi)
         else:
-            q = _compose_quat(qi, q)
+            q = compose_quat(qi, q)
 
     return q
 
@@ -145,6 +161,7 @@ class Rotation:
         quat = np.roll(quat, 1)  # Convert to scalar-first format
         return cls(quat=quat, scalar_first=True)
 
+    @classmethod
     def from_euler(cls, seq: str, angles: np.ndarray, degrees: bool = False) -> Rotation:
         """Create a Rotation from Euler angles."""
         num_axes = len(seq)
@@ -167,14 +184,13 @@ class Rotation:
             angles = np.deg2rad(angles)
 
         quat = _elementary_quat_compose(seq, angles, intrinsic=intrinsic)
-        quat = np.roll(quat, 1)  # Convert to scalar-first format
         return cls(quat=quat, scalar_first=True)
 
     def as_quat(self, scalar_first: bool = True) -> np.ndarray:
         """Return the quaternion as a numpy array."""
         if scalar_first:
             return self.quat
-        return np.roll(self.quat, 1)
+        return np.roll(self.quat, -1)
 
     def as_matrix(self) -> np.ndarray:
         w, x, y, z = self.quat
@@ -219,23 +235,23 @@ class Rotation:
         # meaning that the indices are known at "compile-time" and all logic on indices
         # will be evaluated in standard Python.
         i, j, k = (_elementary_basis_index(axis) for axis in seq)
-        symmetric = i == k
 
+        symmetric = i == k
         if symmetric:
-            k = 3 - i - j
-        
+            k = 6 - i - j
+
         # 0. Check if permutation is odd or even
         sign = (i - j) * (j - k) * (k - i) // 2
 
         # 1. Permute quaternion components
-        q = self.as_quat(scalar_first=False)
+        q = self.as_quat(scalar_first=True)
         if symmetric:
-            a, b, c, d = (q[3], q[i], q[j], q[k] * sign)
+            a, b, c, d = (q[0], q[i], q[j], q[k] * sign)
         else:
             a, b, c, d = (
-                q[3] - q[j], q[i] + q[k] * sign, q[j] + q[3], q[k] - q[i] * sign
+                q[0] - q[j], q[i] + q[k] * sign, q[j] + q[0], q[k] - q[i] * sign
             )
-        
+
         # 2. Compute second angle
         angles = np.zeros(3, like=q)
         angles[1] = 2 * np.arctan2(np.hypot(c, d), np.hypot(a, b))
@@ -261,6 +277,9 @@ class Rotation:
         if not symmetric:
             angles[2] *= sign
             angles[1] -= np.pi / 2
+
+        if intrinsic:
+            angles = angles[::-1]
 
         angles = (angles + np.pi) % (2 * np.pi) - np.pi
 
@@ -300,10 +319,9 @@ class Rotation:
 
     def __mul__(self, other: Rotation) -> Rotation:
         """Compose this rotation with another rotation"""
-        q1 = self.as_quat(scalar_first=False)
-        q2 = other.as_quat(scalar_first=False)
-        q = _compose_quat(q1, q2)
-        q = np.roll(q, 1)  # Convert to scalar-first format
+        q1 = self.as_quat(scalar_first=True)
+        q2 = other.as_quat(scalar_first=True)
+        q = compose_quat(q1, q2)
         return Rotation.from_quat(q, scalar_first=True)
 
     def derivative(self, w: np.ndarray, baumgarte: float = 0.0) -> Rotation:
