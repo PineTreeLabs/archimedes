@@ -10,7 +10,7 @@ def normalize(q):
     return q / np.linalg.norm(q)
 
 
-def compose_quat(q1, q2):
+def _compose_quat(q1, q2):
     """
     Multiply two quaternions q1 = [w1, x1, y1, z1] and q2 = [w2, x2, y2, z2]
     """
@@ -62,16 +62,6 @@ def _make_elementary_quat(axis: str, angle: float) -> np.ndarray:
     return quat
 
 
-# See https://github.com/scipy/scipy/blob/3ead2b543df7c7c78619e20f0cb6139e344a8866/scipy/spatial/transform/_rotation_cy.pyx#L320-L328  ruff: noqa: E501
-def _compose_quat(q1: np.ndarray, q2: np.ndarray) -> np.ndarray:
-    return np.hstack(
-        [
-            q1[3] * q2[:3] + q2[3] * q1[:3] + np.cross(q1[:3], q2[:3]),
-            q1[3] * q2[3] - np.dot(q1[:3], q2[:3]),
-        ]
-    )
-
-
 # See https://github.com/scipy/scipy/blob/3ead2b543df7c7c78619e20f0cb6139e344a8866/scipy/spatial/transform/_rotation_cy.pyx#L376-L391  ruff: noqa: E501
 def _elementary_quat_compose(
     seq: str, angles: np.ndarray, intrinsic: bool
@@ -82,9 +72,9 @@ def _elementary_quat_compose(
     for idx in range(1, len(seq)):
         qi = _make_elementary_quat(seq[idx], angles[idx])
         if intrinsic:
-            q = compose_quat(q, qi)
+            q = _compose_quat(q, qi)
         else:
-            q = compose_quat(qi, q)
+            q = _compose_quat(qi, q)
 
     return q
 
@@ -351,18 +341,17 @@ class Rotation:
         """Compose this rotation with another rotation"""
         q1 = self.as_quat(scalar_first=True)
         q2 = other.as_quat(scalar_first=True)
-        q = compose_quat(q1, q2)
+        q = _compose_quat(q1, q2)
         return Rotation.from_quat(q, scalar_first=True)
 
     def derivative(self, w: np.ndarray, baumgarte: float = 0.0) -> Rotation:
         """Return the time derivative of the rotation given angular velocity w"""
-        q = self.as_quat(scalar_first=False)
-        omega = np.array([*w, 0], like=q)
+        q = self.as_quat(scalar_first=True)
+        omega = np.array([0, *w], like=q)
         q_dot = 0.5 * _compose_quat(q, omega)
 
-        # Baungarte stabilization to enforce unit norm constraint
+        # Baumgarte stabilization to enforce unit norm constraint
         if baumgarte > 0:
             q_dot -= baumgarte * (np.dot(q, q) - 1) * q
 
-        q_dot = np.roll(q_dot, 1)  # Convert to scalar-first format
         return Rotation.from_quat(q_dot, scalar_first=True)
