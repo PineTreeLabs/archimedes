@@ -466,3 +466,57 @@ def test_register_struct():
     # Check that re-applying the pytree_node does nothing
     # because of the `_arc_dataclass` class attribute.
     assert struct.pytree_node(Point) is Point
+
+
+@struct.module(kw_only=True)  # Add keyword arg to test passing with cls=None
+class VariantA:
+    param: float  # m/s^2
+
+    def __call__(self):
+        return self.param
+
+
+@struct.module(kw_only=True)
+class VariantB:
+    param: float  # m/s^2
+
+    def __call__(self):
+        return -self.param
+
+class VariantAConfig(struct.ModuleConfig, type="positive"):
+    param: float
+
+    def build(self):
+        return VariantA(param=self.param)
+    
+
+class VariantBConfig(struct.ModuleConfig, type="negative"):
+    param: float
+
+    def build(self):
+        return VariantB(param=self.param)
+
+
+
+def test_variant_config():
+    VariantConfig = struct.UnionConfig[VariantAConfig, VariantBConfig]
+
+    with pytest.raises(TypeError, match=r".*must be a subclass of ModuleConfig.*"):
+        struct.UnionConfig[VariantA, VariantB]
+
+    # Single-variant config
+    VariantConfig = struct.UnionConfig[VariantAConfig]
+
+
+def test_module():
+    assert struct.module(VariantA) is VariantA
+    assert struct.module(VariantB) is VariantB
+
+
+def test_module_config():
+    param = 42
+    config = VariantAConfig(param=param)
+
+    model = config.build()
+    y = model()
+    assert np.allclose(y, param)
