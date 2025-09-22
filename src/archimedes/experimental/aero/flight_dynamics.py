@@ -156,10 +156,12 @@ class FlightVehicle(metaclass=abc.ABCMeta):
         )
 
 
-class FlightVehicleConfig(struct.ModuleConfig):
+class FlightVehicleConfig(struct.ModuleConfig, metaclass=abc.ABCMeta):
     m: float = 1.0  # mass [kg]
     J_B: np.ndarray = struct.field(default_factory=lambda: np.eye(3))  # inertia matrix
     attitude: str = "quaternion"
 
+    @abc.abstractmethod
     def build(self) -> FlightVehicle:
-        return FlightVehicle(m=self.m, J_B=self.J_B, attitude=self.attitude)
+        """Build and return a concrete FlightVehicle instance."""
+        raise NotImplementedError("Subclasses must implement build() to return a concrete FlightVehicle.")

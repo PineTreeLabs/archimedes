@@ -50,7 +50,7 @@ class ConstantGravityConfig(struct.ModuleConfig, type="constant"):
 
 def lla2eci(
     lat: float, lon: float, alt: float = 0.0, RE: float = 6.3781e6
-) -> np.ndarray:
+) -> tuple[np.ndarray, np.ndarray]:
     """Convert latitude/longitude/altitude to Cartesian ECI coordinates.
 
     Args:

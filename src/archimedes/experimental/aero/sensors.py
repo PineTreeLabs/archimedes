@@ -57,7 +57,7 @@ class AccelerometerConfig(struct.ModuleConfig, type="basic"):
     noise: float = 0.0  # Noise standard deviation [m/s^2]
 
     def build(self) -> Accelerometer:
-        return Accelerometer(gravity=self.gravity, noise=self.noise)
+        return Accelerometer(gravity=self.gravity.build(), noise=self.noise)
 
 
 @struct.module
