@@ -3,12 +3,13 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
-import archimedes as arc
 from archimedes import struct
 from archimedes.experimental.aero import (
     dcm_from_quaternion,
     GravityModel,
+    GravityConfig,
     ConstantGravity,
+    ConstantGravityConfig,
     FlightVehicle,
 )
 
@@ -17,11 +18,15 @@ if TYPE_CHECKING:
 
 __all__ = [
     "Accelerometer",
+    "AccelerometerConfig",
     "Gyroscope",
+    "GyroscopeConfig",
+    "LineOfSight",
+    "LineOfSightConfig",
 ]
 
 
-@struct.pytree_node
+@struct.module
 class Accelerometer:
     """Basic three-axis accelerometer model
 
@@ -47,7 +52,15 @@ class Accelerometer:
         return a_meas_B + self.noise * w
 
 
-@struct.pytree_node
+class AccelerometerConfig(struct.ModuleConfig, type="basic"):
+    gravity: GravityConfig = struct.field(default_factory=ConstantGravityConfig)
+    noise: float = 0.0  # Noise standard deviation [m/s^2]
+
+    def build(self) -> Accelerometer:
+        return Accelerometer(gravity=self.gravity, noise=self.noise)
+
+
+@struct.module
 class Gyroscope:
     """Basic three-axis gyroscope model
 
@@ -65,7 +78,14 @@ class Gyroscope:
         return x.w_B + self.noise * w
 
 
-@struct.pytree_node
+class GyroscopeConfig(struct.ModuleConfig, type="basic"):
+    noise: float = 0.0  # Noise standard deviation [rad/s]
+
+    def build(self) -> Gyroscope:
+        return Gyroscope(noise=self.noise)
+
+
+@struct.module
 class LineOfSight:
     """Basic line-of-sight sensor model"""
 
@@ -85,3 +105,10 @@ class LineOfSight:
         el = np.arctan2(r_B[2], np.sqrt(r_B[0] ** 2 + r_B[1] ** 2))  # Elevation angle
 
         return np.hstack([az, el]) + self.noise * w
+
+
+class LineOfSightConfig(struct.ModuleConfig, type="basic"):
+    noise: float = 0.0  # Noise standard deviation [rad]
+
+    def build(self) -> LineOfSight:
+        return LineOfSight(noise=self.noise)

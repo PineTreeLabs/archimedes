@@ -60,14 +60,14 @@ In short, we will create a set of callable classes that implement well-defined i
 
 In the lingo of object-oriented programming, a "functor" is an object that can be called like a function.
 In Python this can be accomplished by implementing the `__call__` method for a class, which allows it to be called with function syntax.
-Combining this with the [`pytree_node`](#archimedes.tree.struct.pytree_node) concept gives us a simple and powerful pattern for organizing our parameters and functional behavior.
+Combining this with the [`module`](#archimedes.tree.struct.module) concept (essentially a dataclass) gives us a simple and powerful pattern for organizing our parameters and functional behavior.
 For instance, we can rewrite the 6-dof dynamics function above as follows:
 
 ```python
 import numpy as np
 from archimedes import struct
 
-@struct.pytree_node
+@struct.module
 class FlightVehicle:
     """Callable dataclass implementation"""
     m: float  # Vehicle mass
@@ -92,7 +92,7 @@ import abc
 import numpy as np
 from archimedes import struct
 
-@struct.pytree_node
+@struct.module
 class FlightVehicle(metaclass=abc.ABCMeta):
     """Callable dataclass implementation"""
     m: float  # Vehicle mass
@@ -112,7 +112,7 @@ This will throw an error if we try to instantiate a `FlightVehicle` as is, since
 We still have to specialize this to the multirotor by summing contributions from gravity, drag, and each of the rotors:
 
 ```python
-@struct.pytree_node
+@struct.module
 class MultiRotorVehicle(FlightVehicle):
 
     def net_forces(self, t, x, u, C_BN):
@@ -141,9 +141,9 @@ In the general case the acceleration due to gravity depends on the position of t
 With that in mind, we can define a generic callable interface for gravity, with specific implementations for each of our models:
 
 ```python
-@struct.pytree_node
-class GravityModel(metaclass=abc.ABCMeta):
-    @abc.abstractmethod
+from typing import Protocol
+
+class GravityModel(Protocol):
     def __call__(self, p_N):
         """Gravitational acceleration at the body CM in the inertial frame N
 
@@ -155,16 +155,16 @@ class GravityModel(metaclass=abc.ABCMeta):
         """
 
 
-@struct.pytree_node
-class ConstantGravity(GravityModel):
+@struct.module
+class ConstantGravity:
     g0: float = 9.81
 
     def __call__(self, p_N):
         return np.array([0, 0, self.g0], like=p_N)
 
 
-@struct.pytree_node
-class PointGravity(GravityModel):
+@struct.module
+class PointGravity:
     r_EN: np.ndarray  # Position vector from Earth's CM to the origin of the N frame [m]
     G: float = 6.6743e-11  # Gravitational constant [N-m²/kg²]
 
@@ -177,7 +177,7 @@ We could also include an oblate-Earth model, lookup tables based on measured gra
 With this clearly-defined interface, we can add a gravity model to the `MultiRotorVehicle` and reliably access it as follows:
 
 ```python
-@struct.pytree_node
+@struct.module
 class MultiRotorVehicle(FlightVehicle):
     gravity_model: GravityModel
 
@@ -212,7 +212,7 @@ import numpy as np
 from archimedes import struct
 
 
-@struct.pytree_node
+@struct.module
 class FlightVehicle(metaclass=abc.ABCMeta):
     """Callable dataclass implementation"""
     m: float  # Vehicle mass
@@ -228,7 +228,7 @@ class FlightVehicle(metaclass=abc.ABCMeta):
         # ...
 
 
-@struct.pytree_node
+@struct.module
 class RotorGeometry:
     offset: np.ndarray = struct.field(default_factory=lambda: np.zeros(3))  # Location of the rotor hub in the body frame B [m]
     ccw: bool = True  # True if rotor spins counter-clockwise when viewed from above
@@ -250,8 +250,7 @@ class RotorGeometry:
         return hash((str(self.offset), self.ccw, self.torsional_cant, self.flapwise_cant))
 
 
-class VehicleDragModel(metaclass=abc.ABCMeta):
-    @abc.abstractmethod
+class VehicleDragModel(Protocol):
     def __call__(self, t, x):
         """Drag forces and moments in body frame B
 
@@ -265,8 +264,7 @@ class VehicleDragModel(metaclass=abc.ABCMeta):
         """
 
 
-class GravityModel(metaclass=abc.ABCMeta):
-    @abc.abstractmethod
+class GravityModel(Protocol):
     def __call__(self, p_N):
         """Gravitational acceleration at the body CM in the inertial frame N
 
@@ -304,7 +302,7 @@ class RotorModel(metaclass=abc.ABCMeta):
         """Aerodynamic forces and moments in wind frame W"""
 
 
-@struct.pytree_node
+@struct.module
 class MultiRotorVehicle(FlightVehicle):
     rotors: list[RotorGeometry]
     rotor_model: RotorModel
@@ -320,8 +318,8 @@ See the source code for the specific implementations of the code snipped with el
 For the basic dynamics model described above, we will also have concrete implementations of `VehicleDragModel`, `GravityModel`, and `RotorModel`:
 
 ```python
-@struct.pytree_node
-class QuadraticDragModel(VehicleDragModel):
+@struct.module
+class QuadraticDragModel:
     """Simple velocity-squared drag model for the main vehicle body"""
     rho: float = 1.225  # air density [kg/m^3]
     Cd: float = 0.0  # drag coefficient
@@ -344,8 +342,8 @@ class QuadraticDragModel(VehicleDragModel):
         return D_B, M_B
 
 
-@struct.pytree_node
-class ConstantGravity(GravityModel):
+@struct.module
+class ConstantGravity:
     """Uniform gravitational field (flat-Earth approximation)"""
     g0: float = 9.81
 
@@ -353,7 +351,7 @@ class ConstantGravity(GravityModel):
         return np.array([0, 0, self.g0], like=p_N)
 
 
-@struct.pytree_node
+@struct.module
 class QuadraticRotorModel(RotorModel):
     """Velocity-squared model for rotor aerodynamics"""
     kF: float = 1.0  # aerodynamic force constant [N/rad^2]
@@ -420,7 +418,7 @@ In general, if you start by writing the mathematical equations and then implemen
 Specifically, we don't want to use preallocated "work" variables to store intermediate results:
 
 ```python
-@struct.pytree_node
+@struct.module
 class PureCallable:
     a: float = 1.0
 
@@ -429,7 +427,7 @@ class PureCallable:
         y = np.sin(a * x)
         return np.exp(y)
 
-@struct.pytree_node
+@struct.module
 class ImpureCallable:
     a: float = 1.0
     y: float = 0.0  # Try to save allocations with pre-allocated variable
