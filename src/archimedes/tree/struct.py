@@ -54,7 +54,7 @@ import dataclasses
 import functools
 from collections.abc import Callable
 from dataclasses import InitVar, fields, replace
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from typing import Any, TypeVar, Annotated, Union, Literal, Type
 
 from typing_extensions import dataclass_transform
@@ -546,16 +546,21 @@ class ModuleConfig(BaseModel):
     UnionConfig : Create discriminated unions of ModuleConfig subclasses
     module : Decorator for creating modular dataclass components
     """
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
-    def __init_subclass__(cls, type: str, **kwargs):
+    def __init_subclass__(cls, type: str | None = None, **kwargs):
         super().__init_subclass__(**kwargs)
-        cls.__annotations__ = {'type': Literal[type], **cls.__annotations__}
-        cls.type = type
+        if type is not None:
+            cls.__annotations__ = {'type': Literal[type], **cls.__annotations__}
+            cls.type = type
 
     # When printing the config, show the class name and fields only but
     # not the type field
     def __repr__(self):
-        return super().__repr__().replace(f"type='{self.type}', ", "")
+        rep = super().__repr__()
+        if hasattr(self, "type"):
+            return rep.replace(f"type='{self.type}', ", "")
+        return rep
 
     def build(self):
         raise NotImplementedError("Subclasses must implement the build() method.")
@@ -587,11 +592,14 @@ class UnionConfig:
         
         # Validate that all types inherit from ModuleConfig
         for config_type in item:
-            if not (isinstance(config_type, type) and issubclass(config_type, ModuleConfig)):
+            if not (
+                isinstance(config_type, type) and issubclass(config_type, ModuleConfig)
+            ):
                 raise TypeError(
                     f"{config_type} must be a subclass of ModuleConfig. "
                     f"UnionConfig is only for ModuleConfig discriminated unions."
                 )
-        
+
         # Create the discriminated union
         return Annotated[Union[item], Field(discriminator="type")]
+    

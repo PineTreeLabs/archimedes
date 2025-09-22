@@ -468,8 +468,14 @@ def test_register_struct():
     assert struct.pytree_node(Point) is Point
 
 
+@struct.module
+class VariantBase:
+    pass
+
+
+
 @struct.module(kw_only=True)  # Add keyword arg to test passing with cls=None
-class VariantA:
+class VariantA(VariantBase):
     param: float  # m/s^2
 
     def __call__(self):
@@ -477,26 +483,27 @@ class VariantA:
 
 
 @struct.module(kw_only=True)
-class VariantB:
+class VariantB(VariantBase):
     param: float  # m/s^2
 
     def __call__(self):
         return -self.param
+    
 
-class VariantAConfig(struct.ModuleConfig, type="positive"):
+# Test that we can create a base class with a shared config
+class VariantConfigBase(struct.ModuleConfig):
     param: float
+
+class VariantAConfig(VariantConfigBase, type="positive"):
 
     def build(self):
         return VariantA(param=self.param)
     
 
-class VariantBConfig(struct.ModuleConfig, type="negative"):
-    param: float
+class VariantBConfig(VariantConfigBase, type="negative"):
 
     def build(self):
         return VariantB(param=self.param)
-
-
 
 def test_variant_config():
     VariantConfig = struct.UnionConfig[VariantAConfig, VariantBConfig]
