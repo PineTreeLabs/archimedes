@@ -262,7 +262,7 @@ class TestCodegen:
         arc.codegen(func, args, **kwargs, debug=True)
         self._check_files(temp_dir, func.name)
 
-    def test_error_handling(self, scalar_func):
+    def test_error_handling(self, scalar_func, temp_dir):
         # Test with unknown return names.  By design choice, this raises an error
         # in order to help generate more readable code.
         with pytest.raises(arc.CodegenError, match=r"Return names must be provided"):
@@ -288,7 +288,9 @@ class TestCodegen:
         with pytest.raises(
             arc.CodegenError, match=r"Argument name 'x_t' cannot end with '_t'"
         ):
-            arc.codegen(invalid_arg_func, (x_type,), return_names=("y",))
+            arc.codegen(
+                invalid_arg_func, (x_type,), return_names=("y",), output_dir=temp_dir
+            )
 
 
 class TestExtractProtectedRegions:
