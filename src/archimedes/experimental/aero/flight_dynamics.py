@@ -164,4 +164,6 @@ class FlightVehicleConfig(struct.ModuleConfig, metaclass=abc.ABCMeta):
     @abc.abstractmethod
     def build(self) -> FlightVehicle:
         """Build and return a concrete FlightVehicle instance."""
-        raise NotImplementedError("Subclasses must implement build() to return a concrete FlightVehicle.")
+        raise NotImplementedError(
+            "Subclasses must implement build() to return a concrete FlightVehicle."
+        )
