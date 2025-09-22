@@ -534,12 +534,6 @@ class ModuleConfig(BaseModel):
     >>>
     >>> # Create a discriminated union of configuration types
     >>> GravityConfig = struct.UnionConfig[ConstantGravityConfig, PointGravityConfig]
-    >>>
-    >>> # Parse a configuration dictionary
-    >>> config_dict = {"type": "constant", "g0": 9.81}
-    >>> gravity_config = GravityConfig.parse_obj(config_dict)
-    >>> print(gravity_config)
-    ConstantGravityConfig(g0=9.81)
 
     See Also
     --------
