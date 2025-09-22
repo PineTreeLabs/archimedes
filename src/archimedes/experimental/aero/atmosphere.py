@@ -88,6 +88,7 @@ L_USSA1976 = np.array([-0.0065, 0, 0.001, 0.0028, 0, 0.0028, 0, 0])
 @struct.module
 class StandardAtmosphere1976(AtmosphereModel):
     """U.S. Standard Atmosphere, 1976"""
+
     g0: float = 9.80665  # Gravity constant m/s^2
 
     def calc_p(self, alt: float) -> float:
@@ -116,6 +117,7 @@ class StandardAtmosphere1976Config(AtmosphereConfigBase, type="ussa1976"):
             Rs=self.Rs,
             gamma=self.gamma,
         )
+
 
 AtmosphereConfig = struct.UnionConfig[
     ConstantAtmosphereConfig,

@@ -473,7 +473,6 @@ class VariantBase:
     pass
 
 
-
 @struct.module(kw_only=True)  # Add keyword arg to test passing with cls=None
 class VariantA(VariantBase):
     param: float  # m/s^2
@@ -488,31 +487,31 @@ class VariantB(VariantBase):
 
     def __call__(self):
         return -self.param
-    
+
 
 # Test that we can create a base class with a shared config
 class VariantConfigBase(struct.ModuleConfig):
     param: float
 
-class VariantAConfig(VariantConfigBase, type="positive"):
 
+class VariantAConfig(VariantConfigBase, type="positive"):
     def build(self):
         return VariantA(param=self.param)
-    
+
 
 class VariantBConfig(VariantConfigBase, type="negative"):
-
     def build(self):
         return VariantB(param=self.param)
 
+
 def test_variant_config():
-    VariantConfig = struct.UnionConfig[VariantAConfig, VariantBConfig]
+    struct.UnionConfig[VariantAConfig, VariantBConfig]
 
     with pytest.raises(TypeError, match=r".*must be a subclass of ModuleConfig.*"):
         struct.UnionConfig[VariantA, VariantB]
 
     # Single-variant config
-    VariantConfig = struct.UnionConfig[VariantAConfig]
+    struct.UnionConfig[VariantAConfig]
 
 
 def test_module():

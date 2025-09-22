@@ -34,6 +34,7 @@ class ConstantGravity:
     This model assumes a constant gravitational acceleration vector
     in the +z direction (e.g. for a NED frame with "flat Earth" approximation)
     """
+
     g0: float = 9.81  # m/s^2
 
     def __call__(self, p_N: np.ndarray) -> np.ndarray:

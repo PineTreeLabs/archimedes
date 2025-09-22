@@ -54,9 +54,9 @@ import dataclasses
 import functools
 from collections.abc import Callable
 from dataclasses import InitVar, fields, replace
-from pydantic import BaseModel, Field, ConfigDict
-from typing import Any, TypeVar, Annotated, Union, Literal, Type
+from typing import Annotated, Any, Literal, Type, TypeVar, Union
 
+from pydantic import BaseModel, ConfigDict, Field
 from typing_extensions import dataclass_transform
 
 from ._registry import register_dataclass
@@ -465,7 +465,7 @@ def module(cls: T | None = None, **kwargs) -> T | Callable:
 
 class ModuleConfig(BaseModel):
     """
-    Base class for creating typed configuration objects with automatic type discrimination.
+    Base class for creating configuration objects with automatic type discrimination.
 
     This class extends Pydantic's BaseModel to automatically add a ``type`` field
     based on the class name, enabling type-safe configuration systems with
@@ -546,12 +546,13 @@ class ModuleConfig(BaseModel):
     UnionConfig : Create discriminated unions of ModuleConfig subclasses
     module : Decorator for creating modular dataclass components
     """
+
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     def __init_subclass__(cls, type: str | None = None, **kwargs):
         super().__init_subclass__(**kwargs)
         if type is not None:
-            cls.__annotations__ = {'type': Literal[type], **cls.__annotations__}
+            cls.__annotations__ = {"type": Literal[type], **cls.__annotations__}
             cls.type = type
 
     # When printing the config, show the class name and fields only but
@@ -589,7 +590,7 @@ class UnionConfig:
         # Handle single type (UnionConfig[OneType])
         if not isinstance(item, tuple):
             item = (item,)
-        
+
         # Validate that all types inherit from ModuleConfig
         for config_type in item:
             if not (
@@ -602,4 +603,3 @@ class UnionConfig:
 
         # Create the discriminated union
         return Annotated[Union[item], Field(discriminator="type")]
-    
