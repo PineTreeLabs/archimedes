@@ -2,13 +2,16 @@
 
 import numpy as np
 
-from archimedes.experimental.aero.gravity import PointGravity
+from archimedes.experimental.aero.gravity import (
+    PointGravity,
+    lla2eci,
+)
 
 
 def test_gravity_at_origin():
     """Test gravity vector at NED origin points exactly downward."""
-    # Create model for any lat/lon
-    gravity_model = PointGravity.from_lat_lon(45.0, -120.0)
+    p_EN, R_EN = lla2eci(45.0, -120.0)
+    gravity_model = PointGravity(p_EN, R_EN)
 
     # At origin (0,0,0) in NED frame, gravity should point exactly down
     g_N = gravity_model(np.zeros(3))
@@ -24,7 +27,8 @@ def test_gravity_at_origin():
 
 def test_gravity_at_altitude():
     """Test gravity decreases with altitude according to inverse square law."""
-    gravity_model = PointGravity.from_lat_lon(0.0, 0.0)  # Equator
+    p_EN, R_EN = lla2eci(0.0, 0.0)
+    gravity_model = PointGravity(p_EN, R_EN)
 
     # Gravity at origin
     g0 = gravity_model(np.zeros(3))
@@ -47,7 +51,8 @@ def test_gravity_at_altitude():
 
 def test_gravity_direction_at_north():
     """Test gravity points toward Earth center when displaced northward."""
-    gravity_model = PointGravity.from_lat_lon(0.0, 0.0)  # Equator
+    p_EN, R_EN = lla2eci(0.0, 0.0)
+    gravity_model = PointGravity(p_EN, R_EN)
 
     # Move 1000 km north
     north_displacement = 1_000_000  # meters
@@ -63,7 +68,8 @@ def test_gravity_direction_at_north():
 
 def test_gravity_direction_at_east():
     """Test gravity points toward Earth center when displaced eastward."""
-    gravity_model = PointGravity.from_lat_lon(0.0, 0.0)  # Equator
+    p_EN, R_EN = lla2eci(0.0, 0.0)
+    gravity_model = PointGravity(p_EN, R_EN)
 
     # Move 1000 km east
     east_displacement = 1_000_000  # meters
@@ -79,7 +85,9 @@ def test_gravity_direction_at_east():
 
 def test_gravity_magnitude():
     """Test the gravity magnitude is approximately 9.81 m/s^2 at surface."""
-    gravity_model = PointGravity.from_lat_lon(0.0, 0.0)
+    p_EN, R_EN = lla2eci(0.0, 0.0)
+    gravity_model = PointGravity(p_EN, R_EN)
+
     g_N = gravity_model(np.zeros(3))
     g_magnitude = np.linalg.norm(g_N)
 
@@ -89,8 +97,10 @@ def test_gravity_magnitude():
 def test_different_latitudes():
     """Test gravity at different latitudes."""
     # Create models at different latitudes
-    equator_model = PointGravity.from_lat_lon(0.0, 0.0)
-    pole_model = PointGravity.from_lat_lon(90.0, 0.0)
+    p_EN, R_EN = lla2eci(0.0, 0.0)
+    equator_model = PointGravity(p_EN, R_EN)
+    p_EN, R_EN = lla2eci(90.0, 0.0)
+    pole_model = PointGravity(p_EN, R_EN)
 
     # Get gravity at origin for both
     g_equator = equator_model(np.zeros(3))
@@ -108,7 +118,8 @@ def test_different_latitudes():
 
 def test_rotation_matrix_properties():
     """Test that R_EN has proper orthogonal properties."""
-    gravity_model = PointGravity.from_lat_lon(37.7749, -122.4194)  # San Francisco
+    p_EN, R_EN = lla2eci(37.7749, -122.4194)  # San Francisco
+    gravity_model = PointGravity(p_EN, R_EN)
 
     # Check orthogonality
     R = gravity_model.R_EN

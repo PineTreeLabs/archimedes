@@ -1,7 +1,7 @@
 # ruff: noqa: N802, N803, N806, N815, N816
 import abc
 from functools import cached_property
-from typing import Callable, ClassVar
+from typing import Callable, ClassVar, Protocol
 
 import numpy as np
 from scipy.special import roots_legendre
@@ -110,7 +110,7 @@ NACA_0012 = np.array(
 )
 
 
-@struct.pytree_node
+@struct.module
 class RotorGeometry:
     offset: np.ndarray = struct.field(
         default_factory=lambda: np.zeros(3)
@@ -157,8 +157,7 @@ class RotorGeometry:
         )
 
 
-class GravityModel(metaclass=abc.ABCMeta):
-    @abc.abstractmethod
+class GravityModel(Protocol):
     def __call__(self, p_N):
         """Gravitational acceleration at the body CM in the inertial frame N
 
@@ -170,16 +169,16 @@ class GravityModel(metaclass=abc.ABCMeta):
         """
 
 
-@struct.pytree_node
-class ConstantGravity(GravityModel):
+@struct.module
+class ConstantGravity:
     g0: float = 9.81
 
     def __call__(self, p_N):
         return np.array([0, 0, self.g0], like=p_N)
 
 
-@struct.pytree_node
-class PointGravity(GravityModel):
+@struct.module
+class PointGravity:
     G: float = 6.6743e-11  # Gravitational constant [N-m²/kg²]
     R_e: float = 6.371e6  # Radius of earth [m]
 
@@ -187,8 +186,7 @@ class PointGravity(GravityModel):
         raise NotImplementedError("Illustrative purposes only")
 
 
-class VehicleDragModel(metaclass=abc.ABCMeta):
-    @abc.abstractmethod
+class VehicleDragModel(Protocol):
     def __call__(self, t, x):
         """Drag forces and moments in body frame B
 
@@ -202,8 +200,8 @@ class VehicleDragModel(metaclass=abc.ABCMeta):
         """
 
 
-@struct.pytree_node
-class QuadraticDragModel(VehicleDragModel):
+@struct.module
+class QuadraticDragModel:
     """Simple velocity-squared drag model for the main vehicle body"""
 
     rho: float = 1.225  # air density [kg/m^3]
@@ -282,7 +280,7 @@ class RotorModel(metaclass=abc.ABCMeta):
         """Aerodynamic forces and moments in wind frame W"""
 
 
-@struct.pytree_node
+@struct.module
 class QuadraticRotorModel(RotorModel):
     """Simple velocity-squared model for rotor aerodynamics"""
 
@@ -306,7 +304,7 @@ class QuadraticRotorModel(RotorModel):
         return F_W, M_W, aux_state_derivs
 
 
-@struct.pytree_node
+@struct.module
 class MultiRotorVehicle(FlightVehicle):
     rotors: list[RotorGeometry] = struct.field(default_factory=list)
     rotor_model: RotorModel = struct.field(default_factory=QuadraticRotorModel)
@@ -387,7 +385,7 @@ class AirfoilModel(metaclass=abc.ABCMeta):
         pass
 
 
-@struct.pytree_node
+@struct.module
 class ThinAirfoil(AirfoilModel):
     """Airfoil model based on thin airfoil theory.
 
@@ -414,7 +412,7 @@ class ThinAirfoil(AirfoilModel):
         return Cl, Cd, Cm
 
 
-@struct.pytree_node(frozen=False)  # Non-frozen to allow for initializing node data
+@struct.module
 class TabulatedAirfoil(AirfoilModel):
     """Airfoil model based on tabulated data"""
 
@@ -501,7 +499,7 @@ class TabulatedAirfoil(AirfoilModel):
         return Cl, Cd, Cm
 
 
-@struct.pytree_node(frozen=False)  # Non-frozen to allow for initializing weights
+@struct.module
 class BladeElementModel(RotorModel):
     """Blade element model for rotor aerodynamics
 

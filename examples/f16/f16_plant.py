@@ -16,8 +16,8 @@ from f16_engine import F16Engine
 from f16_aero import F16Aerodynamics
 
 
-@struct.pytree_node
-class ConstantGravity(GravityModel):
+@struct.module
+class ConstantGravity:
     """Constant gravitational acceleration model
 
     This model assumes a constant gravitational acceleration vector
@@ -30,7 +30,7 @@ class ConstantGravity(GravityModel):
         return np.hstack([0, 0, self.g0])
 
 
-@struct.pytree_node
+@struct.module
 class AtmosphereModel:
     R0: float = 2.377e-3  # Density scale [slug/ft^3]
     gamma: float = 1.4  # Adiabatic index for air [-]
@@ -52,7 +52,7 @@ class AtmosphereModel:
         return amach, qbar
 
 
-@struct.pytree_node
+@struct.module
 class SubsonicF16(FlightVehicle):
     gravity: GravityModel = struct.field(default_factory=ConstantGravity)
     atmos: AtmosphereModel = struct.field(default_factory=AtmosphereModel)

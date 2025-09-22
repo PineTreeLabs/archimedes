@@ -12,6 +12,7 @@ dependencies = [
     "jinja2>=3.1.6",
     "numpy>=2.2.4",
     "osqp>=1.0.4",
+    "pydantic>=2.11.9",
     "scipy>=1.15.2",
     "typing-extensions>=4.12.2",
 ]

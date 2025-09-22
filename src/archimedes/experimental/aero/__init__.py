@@ -1,12 +1,19 @@
 from .gravity import (
     GravityModel,
     ConstantGravity,
+    ConstantGravityConfig,
     PointGravity,
+    PointGravityCartesianConfig,
+    PointGravityLatLonConfig,
+    GravityConfig,
 )
 from .atmosphere import (
     AtmosphereModel,
     ConstantAtmosphere,
+    ConstantAtmosphereConfig,
     StandardAtmosphere1976,
+    StandardAtmosphere1976Config,
+    AtmosphereConfig,
 )
 from .rotations import (
     dcm_from_euler,
@@ -27,8 +34,11 @@ from .flight_dynamics import (
 )
 from .sensors import (
     Accelerometer,
+    AccelerometerConfig,
     Gyroscope,
+    GyroscopeConfig,
     LineOfSight,
+    LineOfSightConfig,
 )
 
 __all__ = [
@@ -47,11 +57,21 @@ __all__ = [
     "euler_kinematics",
     "GravityModel",
     "ConstantGravity",
+    "ConstantGravityConfig",
     "PointGravity",
+    "PointGravityCartesianConfig",
+    "PointGravityLatLonConfig",
+    "GravityConfig",
     "AtmosphereModel",
     "ConstantAtmosphere",
+    "ConstantAtmosphereConfig",
     "StandardAtmosphere1976",
+    "StandardAtmosphere1976Config",
+    "AtmosphereConfig",
     "Accelerometer",
+    "AccelerometerConfig",
     "Gyroscope",
+    "GyroscopeConfig",
     "LineOfSight",
+    "LineOfSightConfig",
 ]

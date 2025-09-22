@@ -11,7 +11,6 @@ from .rotations import (
     dcm_from_quaternion,
     euler_kinematics,
     quaternion_derivative,
-    quaternion_to_euler,
 )
 
 if TYPE_CHECKING:
@@ -36,11 +35,11 @@ def wind_frame(v_rel_B):
     return vt, alpha, beta
 
 
-@struct.pytree_node
+@struct.module
 class FlightVehicle(metaclass=abc.ABCMeta):
     m: float = 1.0  # mass [kg]
     J_B: np.ndarray = struct.field(default_factory=lambda: np.eye(3))  # inertia matrix
-    attitude: str = struct.field(default="quaternion", static=True)
+    attitude: str = "quaternion"  # "euler" or "quaternion"
 
     @struct.pytree_node
     class State:
@@ -154,4 +153,17 @@ class FlightVehicle(metaclass=abc.ABCMeta):
             v_B=dv_B,
             w_B=dw_B,
             aux=aux_state_derivs,
+        )
+
+
+class FlightVehicleConfig(struct.ModuleConfig, metaclass=abc.ABCMeta):
+    m: float = 1.0  # mass [kg]
+    J_B: np.ndarray = struct.field(default_factory=lambda: np.eye(3))  # inertia matrix
+    attitude: str = "quaternion"
+
+    @abc.abstractmethod
+    def build(self) -> FlightVehicle:
+        """Build and return a concrete FlightVehicle instance."""
+        raise NotImplementedError(
+            "Subclasses must implement build() to return a concrete FlightVehicle."
         )
