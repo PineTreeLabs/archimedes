@@ -8,13 +8,26 @@ from scipy.special import roots_legendre
 
 import archimedes as arc
 from archimedes import struct
+from archimedes.experimental import aero
 from archimedes.experimental.aero import (
-    FlightVehicle,
+    RigidBody,
+    dcm_from_euler,
     z_dcm,
 )
-from archimedes.experimental.aero import (
-    dcm_from_euler as dcm,  # noqa: F401
-)
+
+__all__ = [
+    "dcm_from_euler",
+    "RigidBody",
+    "RotorGeometry",
+    "ConstantGravity",
+    "PointGravity",
+    "QuadraticDragModel",
+    "RotorModel",
+    "QuadraticRotorModel",
+    "MultiRotorVehicle",
+    "VehicleDragModel",
+    "GravityModel",
+]
 
 # (AoA, Cl, Cd, Cm) data for NACA 0012 airfoil
 # NOTE: This data was generated using the incompressible flow solver in
@@ -305,13 +318,44 @@ class QuadraticRotorModel(RotorModel):
 
 
 @struct.module
-class MultiRotorVehicle(FlightVehicle):
+class MultiRotorVehicle:
+    rigid_body: RigidBody = struct.field(default_factory=RigidBody)
     rotors: list[RotorGeometry] = struct.field(default_factory=list)
     rotor_model: RotorModel = struct.field(default_factory=QuadraticRotorModel)
     drag_model: VehicleDragModel = struct.field(default_factory=QuadraticDragModel)
     gravity_model: GravityModel = struct.field(default_factory=ConstantGravity)
 
-    def net_forces(self, t, x, u, C_BN):
+    m: float = 1.0  # mass [kg]
+    J_B: np.ndarray = struct.field(
+        default_factory=lambda: np.eye(3)
+    )  # inertia matrix [kg·m²]
+
+    @struct.pytree_node
+    class State:
+        rigid_body: RigidBody.State
+        aux: np.ndarray = None  # auxiliary state variables for rotors
+
+        @property
+        def p_N(self):
+            return self.rigid_body.p_N
+
+        @property
+        def att(self):
+            return self.rigid_body.att
+
+        @property
+        def v_B(self):
+            return self.rigid_body.v_B
+
+        @property
+        def w_B(self):
+            return self.rigid_body.w_B
+
+    def state(self, p_N, att, v_B, w_B, aux=None) -> State:
+        rb_state = self.rigid_body.State(p_N, att, v_B, w_B)
+        return self.State(rb_state, aux)
+
+    def net_forces(self, t, x: State, u):
         p_N = x.p_N  # Position of the center of mass in inertial frame N
         v_B = x.v_B  # Velocity of the center of mass in body frame B
         w_B = x.w_B  # Roll-pitch-yaw rates in body frame (ω_B)
@@ -351,12 +395,44 @@ class MultiRotorVehicle(FlightVehicle):
         Fdrag_B, Mdrag_B = self.drag_model(t, x)
 
         # Net force in body frame
+        if self.rigid_body.attitude == "euler":
+            C_BN = aero.dcm_from_euler(x.att)
+        elif self.rigid_body.attitude == "quaternion":
+            C_BN = aero.dcm_from_quaternion(x.att)
+
         F_B = Frotor_B + Fdrag_B + C_BN @ Fgravity_N
 
         # Net moment in body frame
         M_B = Mrotor_B + Mdrag_B
 
         return F_B, M_B, aux_state_derivs
+
+    def dynamics(self, t, x: State, u: np.ndarray) -> State:
+        """Compute time derivative of the state
+
+        Args:
+            t: time
+            x: state: (p_N, att, v_B, w_B, rotor aux states)
+            u: control inputs
+
+        Returns:
+            x_dot: time derivative of the state
+        """
+        # Compute the net forces
+        F_B, M_B, aux_state_derivs = self.net_forces(t, x, u)
+
+        rb_input = RigidBody.Input(
+            F_B=F_B,
+            M_B=M_B,
+            m=self.m,
+            J_B=self.J_B,
+        )
+        rb_derivs = self.rigid_body.dynamics(t, x.rigid_body, rb_input)
+
+        return self.State(
+            rigid_body=rb_derivs,
+            aux=aux_state_derivs,
+        )
 
 
 class AirfoilModel(metaclass=abc.ABCMeta):

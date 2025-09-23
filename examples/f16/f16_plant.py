@@ -9,11 +9,33 @@ from archimedes import struct
 from archimedes.experimental import aero
 from archimedes.experimental.aero import (
     GravityModel,
-    FlightVehicle,
+    RigidBody,
 )
 
 from f16_engine import F16Engine
 from f16_aero import F16Aerodynamics
+
+
+GRAV_FTS2 = 32.17  # ft/s^2
+
+# NOTE: The weight in the textbook is 25,000 lbs, but this
+# does not give consistent values - the default value here
+# matches the values given in the tables
+weight = 20490.4459
+
+Axx = 9496.0
+Ayy = 55814.0
+Azz = 63100.0
+Axz = -982.0
+default_mass = weight / GRAV_FTS2
+
+default_J_B = np.array(
+    [
+        [Axx, 0.0, Axz],
+        [0.0, Ayy, 0.0],
+        [Axz, 0.0, Azz],
+    ]
+)
 
 
 @struct.module
@@ -24,7 +46,7 @@ class ConstantGravity:
     in the +z direction (e.g. for a NED frame with "flat Earth" approximation)
     """
 
-    g0: float = 32.17  # ft/s^2
+    g0: float = GRAV_FTS2  # ft/s^2
 
     def __call__(self, p_E):
         return np.hstack([0, 0, self.g0])
@@ -53,11 +75,19 @@ class AtmosphereModel:
 
 
 @struct.module
-class SubsonicF16(FlightVehicle):
+class SubsonicF16:
+    rigid_body: RigidBody = struct.field(default_factory=RigidBody)
     gravity: GravityModel = struct.field(default_factory=ConstantGravity)
     atmos: AtmosphereModel = struct.field(default_factory=AtmosphereModel)
     engine: F16Engine = struct.field(default_factory=F16Engine)
     aero: F16Aerodynamics = struct.field(default_factory=F16Aerodynamics)
+
+    # NOTE: The weight in the textbook is 25,000 lbs, but this
+    # does not give consistent values - the default value here
+    # matches the values given in the tables
+    m: float = default_mass  # Vehicle mass [slug]
+    # Vehicle inertia matrix [slug·ft²]
+    J_B: np.ndarray = struct.field(default_factory=lambda: default_J_B)
 
     xcg: float = 0.35  # CG location (% of cbar)
 
@@ -67,14 +97,34 @@ class SubsonicF16(FlightVehicle):
     xcgr: float = 0.35  # Reference CG location (% of cbar)
     hx: float = 160.0  # Engine angular momentum (assumed constant)
 
-    def net_forces(self, t, x, u, C_BN):
+    @struct.pytree_node
+    class State:
+        rigid_body: RigidBody.State
+        engine_power: np.ndarray  # Engine power state (0 to 1)
+
+        @property
+        def p_N(self):
+            return self.rigid_body.p_N
+        
+        @property
+        def att(self):
+            return self.rigid_body.att
+        
+        @property
+        def v_B(self):
+            return self.rigid_body.v_B  
+        
+        @property
+        def w_B(self):
+            return self.rigid_body.w_B
+
+    def net_forces(self, t, x: State, u):
         """Net forces and moments in body frame B, plus any extra state derivatives
 
         Args:
             t: time
             x: state: (p_N, att, v_B, w_B, aux)
             u: (throttle, elevator, aileron, rudder) control inputs
-            C_BN: rotation matrix from inertial (N) to body (B) frame
 
         Returns:
             F_B: net forces in body frame B
@@ -92,7 +142,7 @@ class SubsonicF16(FlightVehicle):
         amach, qbar = self.atmos(vt, alt)
 
         # Engine thrust model
-        pow = x.aux
+        pow = x.engine_power
         Feng_B = self.engine.calc_thrust(pow, alt, amach)
 
         force_coeffs, moment_coeffs = self.aero(
@@ -103,6 +153,12 @@ class SubsonicF16(FlightVehicle):
 
         Fgrav_N = self.m * self.gravity(x.p_N)
         Faero_B = qbar * self.S * np.stack([cxt, cyt, czt])
+
+        if self.rigid_body.attitude == "euler":
+            C_BN = aero.dcm_from_euler(x.att)
+        elif self.rigid_body.attitude == "quaternion":
+            C_BN = aero.dcm_from_quaternion(x.att)
+
         F_B = Faero_B + Feng_B + C_BN @ Fgrav_N
 
         # Moments
@@ -116,5 +172,32 @@ class SubsonicF16(FlightVehicle):
         # Dynamic component of engine state (auxiliary state)
         pow_t = self.engine.dynamics(t, pow, thtl)
 
-        aux_state_derivs = np.atleast_1d(pow_t)
-        return F_B, M_B, aux_state_derivs
+        pow_t = np.atleast_1d(pow_t)
+        return F_B, M_B, pow_t
+    
+    def dynamics(self, t, x: State, u: np.ndarray) -> State:
+        """Compute time derivative of the state
+
+        Args:
+            t: time
+            x: state: (p_N, att, v_B, w_B, engine_power)
+            u: (throttle, elevator, aileron, rudder) control inputs
+
+        Returns:
+            x_dot: time derivative of the state
+        """
+        # Compute the net forces
+        F_B, M_B, engine_deriv = self.net_forces(t, x, u)
+
+        rb_input = RigidBody.Input(
+            F_B=F_B,
+            M_B=M_B,
+            m=self.m,
+            J_B=self.J_B,
+        )
+        rb_derivs = self.rigid_body.dynamics(t, x.rigid_body, rb_input)
+
+        return self.State(
+            rigid_body=rb_derivs,
+            engine_power=engine_deriv,
+        )

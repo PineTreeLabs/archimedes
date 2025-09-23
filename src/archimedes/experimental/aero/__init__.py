@@ -29,7 +29,7 @@ from .rotations import (
     quaternion_to_euler,
 )
 from .flight_dynamics import (
-    FlightVehicle,
+    RigidBody,
     wind_frame,
 )
 from .sensors import (
@@ -42,7 +42,7 @@ from .sensors import (
 )
 
 __all__ = [
-    "FlightVehicle",
+    "RigidBody",
     "quaternion_inverse",
     "quaternion_multiply",
     "dcm_from_quaternion",
