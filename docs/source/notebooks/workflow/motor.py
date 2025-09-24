@@ -89,7 +89,7 @@ class MotorOutputs(NamedTuple):
 # Motor enable/disable/direction logic
 @arc.compile
 def motor_dir(INA, INB, ENA, ENB):
-    d = (INA + (1 - INB)) - (INB + (1 - INA))
+    d = (INB + (1 - INA)) - (INA + (1 - INB))
 
     # Disable if either of ENA or ENB are low
     return ENA * ENB * (d / 2)

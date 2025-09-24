@@ -34,7 +34,7 @@
 
 #define ADC1_CHANNELS 1
 #define ADC3_CHANNELS 2
-#define SAMPLE_COUNT 2000 // How many samples to collect
+#define SAMPLE_COUNT 5000 // How many samples to collect
 
 typedef struct
 {
@@ -274,15 +274,13 @@ int main(void)
         // Pulse train test sequence
         ctrl_arg.pos_ref = (log_data.sample_idx < SAMPLE_COUNT / 2) ? 1.0 : 0.0;
 
-        // sample_callback();
-
         if (sample_flag)
         {
-            // uint32_t start_cycles = DWT->CYCCNT; // Start cycle counter
+            uint32_t start_cycles = DWT->CYCCNT; // Start cycle counter
             sample_callback();
 
-            // uint32_t end_cycles = DWT->CYCCNT;          // End cycle counter
-            // loop_cycles += (end_cycles - start_cycles); // Count cycles
+            uint32_t end_cycles = DWT->CYCCNT;          // End cycle counter
+            loop_cycles += (end_cycles - start_cycles); // Count cycles
         }
     }
 
@@ -787,8 +785,11 @@ void sample_callback(void)
     
     // Read encoder and update position
     enc_data.cur_count = (int32_t)__HAL_TIM_GET_COUNTER(&htim2);
-    
+
     // Handle encoder counter overflow/underflow by calculating the shortest path
+    // Note this is different from wrapping the angle - this is for handling the
+    // over/underflow in the encoder counter itself to determine the delta from
+    // the previous count.
     int32_t delta = enc_data.cur_count - enc_data.prev_count;
     if (delta > (ENC_COUNT / 2)) {
         delta -= ENC_COUNT;  // Wrapped backwards
@@ -797,8 +798,11 @@ void sample_callback(void)
     }
 
     enc_data.pos_deg += (float)delta * DEG_PER_COUNT;
-    enc_data.pos_deg = fmodf(enc_data.pos_deg + 360.0f, 360.0f);
-    
+
+    // If the controller can handle unwrapping the angle, we could wrap to [0, 360]
+    // Otherwise leave as is for continuous rotation
+    // enc_data.pos_deg = fmodf(enc_data.pos_deg + 360.0f, 360.0f);
+  
     // Store for next iteration
     enc_data.prev_count = enc_data.cur_count;
 
@@ -809,9 +813,7 @@ void sample_callback(void)
     controller_step(&ctrl_arg, &ctrl_res, &ctrl_work);
 
     // Copy state from output struct back to inputs for next step
-    // ctrl_arg.state = ctrl_res.state_new;
-    for (int i = 0; i < 3; i++)
-        ctrl_arg.state[i] = ctrl_res.state_new[i];
+    ctrl_arg.state = ctrl_res.state_new;
 
     /* OUTPUTS */
     // Update PWM duty cycle
@@ -819,19 +821,10 @@ void sample_callback(void)
     motor_set();
 
     // Set motor driver logic for direction
-    // TODO: HAL_GPIO_WritePin(Motor_INA_GPIO_Port, Motor_INA_Pin, (uint16_t)ctrl_res.INA);
-    if (ctrl_res.INA == 0)
-        HAL_GPIO_WritePin(Motor_INA_GPIO_Port, Motor_INA_Pin, GPIO_PIN_RESET);
-    else
-        HAL_GPIO_WritePin(Motor_INA_GPIO_Port, Motor_INA_Pin, GPIO_PIN_SET);
-    if (ctrl_res.INB == 0)
-        HAL_GPIO_WritePin(Motor_INB_GPIO_Port, Motor_INB_Pin, GPIO_PIN_RESET);
-    else
-        HAL_GPIO_WritePin(Motor_INB_GPIO_Port, Motor_INB_Pin, GPIO_PIN_SET);
+    HAL_GPIO_WritePin(Motor_INA_GPIO_Port, Motor_INA_Pin, (uint16_t)ctrl_res.INA);
+    HAL_GPIO_WritePin(Motor_INB_GPIO_Port, Motor_INB_Pin, (uint16_t)ctrl_res.INB);
 
-    // pwm_duty = PWM_COUNT / 2;
-    // motor_set();
-
+    /* DATA ACQUISITION */
     if ((log_data.loop_count % log_data.sample_rate == 0) && (log_data.sample_idx < SAMPLE_COUNT))
     {
         log_data.pwm_duty[log_data.sample_idx] = pwm_duty;
