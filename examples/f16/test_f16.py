@@ -19,6 +19,7 @@ def f16():
 
 g0 = GRAV_FTS2  # ft/s^2
 
+
 def test_352(f16: SubsonicF16):
     """Compare to Table 3.5-2 in Lewis, Johnson, Stevens"""
 

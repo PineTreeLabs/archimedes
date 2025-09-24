@@ -105,15 +105,15 @@ class SubsonicF16:
         @property
         def p_N(self):
             return self.rigid_body.p_N
-        
+
         @property
         def att(self):
             return self.rigid_body.att
-        
+
         @property
         def v_B(self):
-            return self.rigid_body.v_B  
-        
+            return self.rigid_body.v_B
+
         @property
         def w_B(self):
             return self.rigid_body.w_B
@@ -174,7 +174,7 @@ class SubsonicF16:
 
         pow_t = np.atleast_1d(pow_t)
         return F_B, M_B, pow_t
-    
+
     def dynamics(self, t, x: State, u: np.ndarray) -> State:
         """Compute time derivative of the state
 
