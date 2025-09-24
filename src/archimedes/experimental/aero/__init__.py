@@ -1,12 +1,19 @@
 from .gravity import (
     GravityModel,
     ConstantGravity,
+    ConstantGravityConfig,
     PointGravity,
+    PointGravityCartesianConfig,
+    PointGravityLatLonConfig,
+    GravityConfig,
 )
 from .atmosphere import (
     AtmosphereModel,
     ConstantAtmosphere,
+    ConstantAtmosphereConfig,
     StandardAtmosphere1976,
+    StandardAtmosphere1976Config,
+    AtmosphereConfig,
 )
 from .rotations import (
     dcm_from_euler,
@@ -22,17 +29,20 @@ from .rotations import (
     quaternion_to_euler,
 )
 from .flight_dynamics import (
-    FlightVehicle,
+    RigidBody,
     wind_frame,
 )
 from .sensors import (
     Accelerometer,
+    AccelerometerConfig,
     Gyroscope,
+    GyroscopeConfig,
     LineOfSight,
+    LineOfSightConfig,
 )
 
 __all__ = [
-    "FlightVehicle",
+    "RigidBody",
     "quaternion_inverse",
     "quaternion_multiply",
     "dcm_from_quaternion",
@@ -47,11 +57,21 @@ __all__ = [
     "euler_kinematics",
     "GravityModel",
     "ConstantGravity",
+    "ConstantGravityConfig",
     "PointGravity",
+    "PointGravityCartesianConfig",
+    "PointGravityLatLonConfig",
+    "GravityConfig",
     "AtmosphereModel",
     "ConstantAtmosphere",
+    "ConstantAtmosphereConfig",
     "StandardAtmosphere1976",
+    "StandardAtmosphere1976Config",
+    "AtmosphereConfig",
     "Accelerometer",
+    "AccelerometerConfig",
     "Gyroscope",
+    "GyroscopeConfig",
     "LineOfSight",
+    "LineOfSightConfig",
 ]

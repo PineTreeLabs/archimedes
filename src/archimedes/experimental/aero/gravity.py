@@ -1,4 +1,4 @@
-import abc
+from typing import Protocol
 
 import numpy as np
 
@@ -6,13 +6,17 @@ from archimedes import struct
 
 __all__ = [
     "GravityModel",
-    "ConstantGravityModel",
+    "ConstantGravity",
+    "ConstantGravityConfig",
+    "PointGravity",
+    "PointGravityCartesianConfig",
+    "PointGravityLatLonConfig",
+    "GravityConfig",
 ]
 
 
-class GravityModel(metaclass=abc.ABCMeta):
-    @abc.abstractmethod
-    def __call__(self, p_E):
+class GravityModel(Protocol):
+    def __call__(self, p_E: np.ndarray) -> np.ndarray:
         """Gravitational acceleration at the body CM in the inertial frame E
 
         Args:
@@ -23,8 +27,8 @@ class GravityModel(metaclass=abc.ABCMeta):
         """
 
 
-@struct.pytree_node
-class ConstantGravity(GravityModel):
+@struct.module
+class ConstantGravity:
     """Constant gravitational acceleration model
 
     This model assumes a constant gravitational acceleration vector
@@ -33,12 +37,58 @@ class ConstantGravity(GravityModel):
 
     g0: float = 9.81  # m/s^2
 
-    def __call__(self, p_N):
+    def __call__(self, p_N: np.ndarray) -> np.ndarray:
         return np.hstack([0, 0, self.g0])
 
 
-@struct.pytree_node
-class PointGravity(GravityModel):
+class ConstantGravityConfig(struct.ModuleConfig, type="constant"):
+    g0: float = 9.81  # m/s^2
+
+    def build(self) -> ConstantGravity:
+        return ConstantGravity(g0=self.g0)
+
+
+def lla2eci(
+    lat: float, lon: float, alt: float = 0.0, RE: float = 6.3781e6
+) -> tuple[np.ndarray, np.ndarray]:
+    """Convert latitude/longitude/altitude to Cartesian ECI coordinates.
+
+    Args:
+        lat: Latitude in degrees.
+        lon: Longitude in degrees.
+        alt: Altitude above the surface in meters.
+        RE: Earth radius in meters.
+
+    Returns:
+        p_EN: Cartesian coordinates [m]
+        R_EN: Rotation matrix from NED to E
+    """
+    r = RE + alt  # Radius from Earth center [m]
+    lat = np.deg2rad(lat)
+    lon = np.deg2rad(lon)
+
+    p_EN = r * np.array(
+        [
+            np.cos(lat) * np.cos(lon),
+            np.cos(lat) * np.sin(lon),
+            np.sin(lat),
+        ]
+    )
+
+    # TODO: Use a built-in DCM function
+    R_EN = np.array(
+        [
+            [-np.sin(lat) * np.cos(lon), -np.sin(lon), -np.cos(lat) * np.cos(lon)],
+            [-np.sin(lat) * np.sin(lon), np.cos(lon), -np.cos(lat) * np.sin(lon)],
+            [np.cos(lat), 0, -np.sin(lat)],
+        ]
+    )
+
+    return p_EN, R_EN
+
+
+@struct.module
+class PointGravity:
     """Point mass gravitational acceleration model
 
     This model assumes a point mass at the origin of the inertial frame E
@@ -54,27 +104,33 @@ class PointGravity(GravityModel):
         g_E = -self.mu * r_E / r**3
         return self.R_EN.T @ g_E
 
-    @classmethod
-    def from_lat_lon(cls, lat: float, lon: float):
-        RE = 6.3781e6  # Earth radius [m]
-        lat = np.deg2rad(lat)
-        lon = np.deg2rad(lon)
 
-        p_EN = np.array(
-            [
-                RE * np.cos(lat) * np.cos(lon),
-                RE * np.cos(lat) * np.sin(lon),
-                RE * np.sin(lat),
-            ]
-        )
+# Example of a base class config to demonstrate inheritance.
+# Note that the "type" field is not specified here.
+class PointGravityConfig(struct.ModuleConfig):
+    mu: float = 3.986e14  # m^3/s^2
 
-        # TODO: Use a built-in DCM function
-        R_EN = np.array(
-            [
-                [-np.sin(lat) * np.cos(lon), -np.sin(lon), -np.cos(lat) * np.cos(lon)],
-                [-np.sin(lat) * np.sin(lon), np.cos(lon), -np.cos(lat) * np.sin(lon)],
-                [np.cos(lat), 0, -np.sin(lat)],
-            ]
-        )
 
-        return cls(p_EN, R_EN)
+class PointGravityCartesianConfig(PointGravityConfig, type="point_cartesian"):
+    p_EN: np.ndarray  # Relative position of N with respect to E (measured in E) [m]
+    R_EN: np.ndarray  # Rotation from N to E
+
+    def build(self) -> PointGravity:
+        return PointGravity(self.p_EN, self.R_EN, mu=self.mu)
+
+
+class PointGravityLatLonConfig(PointGravityConfig, type="point_latlon"):
+    lat: float  # Latitude [deg]
+    lon: float  # Longitude [deg]
+    RE: float = 6.3781e6  # Earth radius [m]
+
+    def build(self) -> PointGravity:
+        p_EN, R_EN = lla2eci(self.lat, self.lon, RE=self.RE)
+        return PointGravity(p_EN, R_EN, mu=self.mu)
+
+
+GravityConfig = struct.UnionConfig[
+    ConstantGravityConfig,
+    PointGravityCartesianConfig,
+    PointGravityLatLonConfig,
+]

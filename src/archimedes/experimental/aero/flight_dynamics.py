@@ -1,6 +1,5 @@
 from __future__ import annotations
-from typing import TYPE_CHECKING
-import abc
+from typing import TYPE_CHECKING, Protocol
 
 import numpy as np
 
@@ -11,7 +10,6 @@ from .rotations import (
     dcm_from_quaternion,
     euler_kinematics,
     quaternion_derivative,
-    quaternion_to_euler,
 )
 
 if TYPE_CHECKING:
@@ -36,11 +34,9 @@ def wind_frame(v_rel_B):
     return vt, alpha, beta
 
 
-@struct.pytree_node
-class FlightVehicle(metaclass=abc.ABCMeta):
-    m: float = 1.0  # mass [kg]
-    J_B: np.ndarray = struct.field(default_factory=lambda: np.eye(3))  # inertia matrix
-    attitude: str = struct.field(default="quaternion", static=True)
+@struct.module
+class RigidBody:
+    attitude: str = "quaternion"  # "euler" or "quaternion"
 
     @struct.pytree_node
     class State:
@@ -48,25 +44,18 @@ class FlightVehicle(metaclass=abc.ABCMeta):
         att: np.ndarray  # Attitude (orientation) of the vehicle
         v_B: np.ndarray  # Velocity of the center of mass in body frame B
         w_B: np.ndarray  # Angular velocity in body frame (ω_B)
-        aux: PyTree = struct.field(default=None)  # Auxiliary state variables
 
-    @abc.abstractmethod
-    def net_forces(self, t, x, u, C_BN):
-        """Net forces and moments in body frame B, plus any extra state derivatives
+    @struct.pytree_node
+    class Input:
+        F_B: np.ndarray  # Net forces in body frame B
+        M_B: np.ndarray  # Net moments in body frame B
+        m: float  # mass [kg]
+        J_B: np.ndarray  # inertia matrix [kg·m²]
+        dm_dt: float = 0.0  # mass rate of change [kg/s]
+        # inertia rate of change [kg·m²/s]
+        dJ_dt: np.ndarray = struct.field(default_factory=lambda: np.zeros((3, 3)))
 
-        Args:
-            t: time
-            x: state vector
-            u: rotor speeds
-            C_BN: rotation matrix from inertial (N) to body (B) frame
-
-        Returns:
-            F_B: net forces in body frame B
-            M_B: net moments in body frame B
-            aux_state_derivs: time derivatives of auxiliary state variables
-        """
-
-    def calc_kinematics(self, x):
+    def calc_kinematics(self, x: State):
         # Unpack the state
         v_B = x.v_B  # Velocity of the center of mass in body frame B
         w_B = x.w_B  # Angular velocity in body frame (ω_B)
@@ -100,52 +89,40 @@ class FlightVehicle(metaclass=abc.ABCMeta):
         # Velocity in the Newtonian frame
         dp_N = C_BN.T @ v_B
 
-        return dp_N, att_deriv, C_BN
+        return dp_N, att_deriv
 
-    def calc_inertia(self, t, x):
-        """
-        Calculate the mass and inertia matrix of the vehicle at time t and state x.
-        This can be overridden in subclasses if the mass is not constant.
-        """
-        return self.m, self.J_B
-
-    def calc_dynamics(self, t, x, F_B, M_B):
-        m, J_B = self.calc_inertia(t, x)
-
+    def calc_dynamics(self, t, x: State, u: Input):
         # Unpack the state
         v_B = x.v_B  # Velocity of the center of mass in body frame B
         w_B = x.w_B  # Angular velocity in body frame (ω_B)
 
         # Acceleration in body frame
-        dv_B = (F_B / m) - np.cross(w_B, v_B)
+        dv_B = ((u.F_B - u.dm_dt * v_B) / u.m) - np.cross(w_B, v_B)
 
         # Angular acceleration in body frame
         # solve Euler dynamics equation 𝛕 = I α + ω × (I ω)  for α
-        # dw_B = np.linalg.inv(self.J_B) @ (M_B - np.cross(w_B, self.J_B @ w_B))
-        dw_B = np.linalg.solve(J_B, M_B - np.cross(w_B, J_B @ w_B))
+        dw_B = np.linalg.solve(
+            u.J_B, u.M_B - u.dJ_dt @ w_B - np.cross(w_B, u.J_B @ w_B)
+        )
 
         return dv_B, dw_B
 
-    def dynamics(self, t, x, u):
+    def dynamics(self, t, x: State, u: Input) -> State:
         """
-        Flat-earth 6-dof dynamics for a multirotor vehicle
+        Flat-earth 6-dof dynamics
 
         Based on equations 1.7-18 from Lewis, Johnson, Stevens
-
-        The input should be a function of time and state: u(t, x) -> u
 
         Args:
             t: time
             x: state vector
-            u: rotor speeds
+            u: input vector containing net forces and moments
 
         Returns:
             xdot: time derivative of the state vector
         """
-
-        dp_N, att_deriv, C_BN = self.calc_kinematics(x)
-        F_B, M_B, aux_state_derivs = self.net_forces(t, x, u, C_BN)
-        dv_B, dw_B = self.calc_dynamics(t, x, F_B, M_B)
+        dp_N, att_deriv = self.calc_kinematics(x)
+        dv_B, dw_B = self.calc_dynamics(t, x, u)
 
         # Pack the state derivatives
         return self.State(
@@ -153,5 +130,12 @@ class FlightVehicle(metaclass=abc.ABCMeta):
             att=att_deriv,
             v_B=dv_B,
             w_B=dw_B,
-            aux=aux_state_derivs,
         )
+
+
+class RigidBodyConfig(struct.ModuleConfig):
+    attitude: str = "quaternion"  # "euler" or "quaternion"
+
+    def build(self) -> RigidBody:
+        """Build and return a RigidBody instance."""
+        return RigidBody(attitude=self.attitude)

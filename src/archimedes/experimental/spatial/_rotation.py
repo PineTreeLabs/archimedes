@@ -6,7 +6,7 @@ from archimedes import struct, array
 __all__ = ["Rotation"]
 
 
-def normalize(q):
+def _normalize(q):
     return q / np.linalg.norm(q)
 
 
@@ -88,14 +88,18 @@ class Rotation:
         return len(self.quat)
 
     @classmethod
-    def from_quat(cls, quat: np.ndarray, scalar_first: bool = True) -> Rotation:
+    def from_quat(
+        cls, quat: np.ndarray, scalar_first: bool = True, normalize: bool = True
+    ) -> Rotation:
         """Create a Rotation from a quaternion."""
         quat = array(quat)
         if quat.ndim == 0:
             raise ValueError("Quaternion must be at least 1D array")
         if quat.shape not in [(4,), (1, 4), (4, 1)]:
             raise ValueError("Quaternion must have shape (4,), (1, 4), or (4, 1)")
-        quat = normalize(quat.flatten())
+        quat = quat.flatten()
+        if normalize:
+            quat = _normalize(quat)
         return cls(quat=quat, scalar_first=scalar_first)
 
     @classmethod
@@ -354,4 +358,4 @@ class Rotation:
         if baumgarte > 0:
             q_dot -= baumgarte * (np.dot(q, q) - 1) * q
 
-        return Rotation.from_quat(q_dot, scalar_first=True)
+        return Rotation.from_quat(q_dot, scalar_first=True, normalize=False)
