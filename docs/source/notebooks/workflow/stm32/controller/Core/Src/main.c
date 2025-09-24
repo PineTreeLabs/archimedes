@@ -274,13 +274,15 @@ int main(void)
         // Pulse train test sequence
         ctrl_arg.pos_ref = (log_data.sample_idx < SAMPLE_COUNT / 2) ? 1.0 : 0.0;
 
+        // sample_callback();
+
         if (sample_flag)
         {
-            uint32_t start_cycles = DWT->CYCCNT; // Start cycle counter
+            // uint32_t start_cycles = DWT->CYCCNT; // Start cycle counter
             sample_callback();
 
-            uint32_t end_cycles = DWT->CYCCNT;          // End cycle counter
-            loop_cycles += (end_cycles - start_cycles); // Count cycles
+            // uint32_t end_cycles = DWT->CYCCNT;          // End cycle counter
+            // loop_cycles += (end_cycles - start_cycles); // Count cycles
         }
     }
 
@@ -796,6 +798,9 @@ void sample_callback(void)
 
     enc_data.pos_deg += (float)delta * DEG_PER_COUNT;
     enc_data.pos_deg = fmodf(enc_data.pos_deg + 360.0f, 360.0f);
+    
+    // Store for next iteration
+    enc_data.prev_count = enc_data.cur_count;
 
     // Update inputs to the controller loop
     ctrl_arg.pos = enc_data.pos_deg / RAD_TO_DEG;
@@ -804,7 +809,9 @@ void sample_callback(void)
     controller_step(&ctrl_arg, &ctrl_res, &ctrl_work);
 
     // Copy state from output struct back to inputs for next step
-    ctrl_arg.state = ctrl_res.state_new;
+    // ctrl_arg.state = ctrl_res.state_new;
+    for (int i = 0; i < 3; i++)
+        ctrl_arg.state[i] = ctrl_res.state_new[i];
 
     /* OUTPUTS */
     // Update PWM duty cycle
@@ -822,8 +829,8 @@ void sample_callback(void)
     else
         HAL_GPIO_WritePin(Motor_INB_GPIO_Port, Motor_INB_Pin, GPIO_PIN_SET);
 
-    pwm_duty = PWM_COUNT / 2;
-    motor_set();
+    // pwm_duty = PWM_COUNT / 2;
+    // motor_set();
 
     if ((log_data.loop_count % log_data.sample_rate == 0) && (log_data.sample_idx < SAMPLE_COUNT))
     {

@@ -358,7 +358,9 @@ def codegen(
         "float_type": dtype_to_c[float_type],
         "int_type": dtype_to_c[int_type],
         "inputs": [],
+        "input_size": tree.ravel(sym_args)[0].size,
         "outputs": [],
+        "output_size": tree.ravel(results)[0].size,
     }
 
     input_helper = ContextHelper(float_type, int_type, input_descriptions, debug=debug)
@@ -383,15 +385,9 @@ def codegen(
     context["unique_types"] = _unique_types(context["inputs"])
     context["unique_types"].update(_unique_types(context["outputs"]))
     context["assignments"] = _generate_assignments(context["inputs"], prefix="arg")
-    context["marshalled_inputs"] = _generate_marshalling(
-        context["inputs"], prefix="arg"
-    )
-    context["marshalled_outputs"] = _generate_marshalling(
-        context["outputs"], prefix="res"
-    )
 
     if debug:
-        print("inputs")
+        print("\ninputs")
         for ctx in context["inputs"]:
             print("\t", ctx)
 
@@ -407,17 +403,9 @@ def codegen(
             print("\t", assn)
         print("types", context["unique_types"])
 
-        print("\nmarshalled inputs")
-        for marshalling in context["marshalled_inputs"]:
-            print("\t", marshalling)
-
         print("\noutputs")
         for ctx in context["outputs"]:
             print("\t", ctx)
-
-        print("\nmarshalled outputs")
-        for marshalling in context["marshalled_outputs"]:
-            print("\t", marshalling)
 
     _render_template("api", context, output_path=f"{file_base}.c")
     _render_template("api_header", context, output_path=f"{file_base}.h")
@@ -664,7 +652,7 @@ def _unique_types(contexts: list[NodeContext | LeafContext]) -> dict[str, NodeCo
     return OrderedDict(reversed(list(unique_types.items())))
 
 
-@tree.struct.pytree_node
+@dataclasses.dataclass
 class Assignment:
     path: str  # "arg->clusters[0].points[1].x"
     value: str | None = None  # "2.5f"
@@ -717,36 +705,6 @@ def _generate_assignments(
 
     for ctx in contexts:
         base_path = f"{prefix}->{ctx.name}" if ctx.name else prefix
-        _traverse(ctx, base_path)
-
-    return assignments
-
-
-def _generate_marshalling(
-    contexts: list[Context],
-    prefix: str,
-) -> list[Assignment]:
-    """Generate flat list of all marshalling assignments (leaf context only)."""
-    assignments = []
-
-    def _traverse(ctx: Context, current_path: str):
-        if isinstance(ctx, LeafContext):
-            if ctx.is_addr:  # Scalar (add '&' to pass pointer)
-                current_path = f"&{current_path}"
-            assignments.append(Assignment(path=current_path))
-
-        elif isinstance(ctx, ListContext):
-            for i, child in enumerate(ctx.elements):
-                child_path = f"{current_path}[{i}]"
-                _traverse(child, child_path)
-
-        elif isinstance(ctx, NodeContext):
-            for child in ctx.children:
-                child_path = f"{current_path}.{child.name}"
-                _traverse(child, child_path)
-
-    for ctx in contexts:
-        base_path = f"{prefix}->{ctx.name}"
         _traverse(ctx, base_path)
 
     return assignments

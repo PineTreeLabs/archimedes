@@ -28,11 +28,12 @@ def temp_dir():
     shutil.rmtree(temp_dir)
 
 
+def func(x, y):
+    return x, np.sin(y) * x
+
+
 @pytest.fixture()
 def scalar_func():
-    def func(x, y):
-        return x, np.sin(y) * x
-
     return func
 
 
@@ -479,5 +480,6 @@ if __name__ == "__main__":
     tmp_dir = "tmp"
     os.makedirs(tmp_dir, exist_ok=True)
     # TestCodegen().test_dict_codegen(tmp_dir)
-    # TestCodegen().test_basic_codegen(tmp_dir, scalar_func)
-    TestCodegen().test_array_codegen(tmp_dir)
+    # TestCodegen().test_basic_codegen(tmp_dir, func)
+    # TestCodegen().test_array_codegen(tmp_dir)
+    TestCodegen().test_nested_codegen(tmp_dir)
