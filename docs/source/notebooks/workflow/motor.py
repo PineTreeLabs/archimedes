@@ -80,10 +80,10 @@ class MotorOutputs(NamedTuple):
 
 # Motor logic table:
 #   |--INA--|--INB--|--STATE--|
-#   | HIGH  |  LOW  | FORWARD | (CW)
+#   |  LOW  | HIGH  | FORWARD | (CCW)
+#   | HIGH  |  LOW  | REVERSE | (CW)
 #   | HIGH  | HIGH  |  BRAKE  |
 #   |  LOW  |  LOW  |  COAST  |
-#   |  LOW  | HIGH  | REVERSE | (CCW)
 
 
 # Motor enable/disable/direction logic

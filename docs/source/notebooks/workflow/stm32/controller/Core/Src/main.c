@@ -204,26 +204,17 @@ int main(void)
 
     // Start PWM output
     if (HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1) != HAL_OK)
-    {
         Error_Handler();
-    }
 
     // Start ADC with DMA in circular mode
     if (HAL_ADC_Start_DMA(&hadc1, (uint32_t *)adc1_data.buffer, ADC1_CHANNELS) != HAL_OK)
-    {
         Error_Handler();
-    }
     if (HAL_ADC_Start_DMA(&hadc3, (uint32_t *)adc3_data.buffer, ADC3_CHANNELS) != HAL_OK)
-    {
         Error_Handler();
-    }
 
     // Enable motor driver
     HAL_GPIO_WritePin(Motor_ENA_GPIO_Port, Motor_ENA_Pin, GPIO_PIN_SET); // ENA/DIAGA = HIGH (enable)
     HAL_GPIO_WritePin(Motor_ENB_GPIO_Port, Motor_ENB_Pin, GPIO_PIN_SET); // ENB/DIAGB = HIGH (enable)
-
-    // Configure motor direction forward (ccw)
-    motor_fwd();
 
     // Start encoder timer
     if (HAL_TIM_Encoder_Start(&htim2, TIM_CHANNEL_ALL) != HAL_OK)

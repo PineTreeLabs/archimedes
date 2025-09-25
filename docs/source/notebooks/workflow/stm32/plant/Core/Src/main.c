@@ -89,6 +89,8 @@ DMA_HandleTypeDef hdma_dac2;
 TIM_HandleTypeDef htim3;
 TIM_HandleTypeDef htim6;
 
+UART_HandleTypeDef huart3;
+
 /* USER CODE BEGIN PV */
 volatile bool sample_flag = false;
 
@@ -97,9 +99,9 @@ volatile dac1_data_t dac1_data;
 volatile dac2_data_t dac2_data;
 
 // Archimedes-generated structs
-plant_arg_t plant_arg;   // Inputs
-plant_res_t plant_res;   // Outputs
-plant_work_t plant_work; // Workspace
+plant_arg_t plant_arg; // Inputs
+plant_res_t plant_res; // Outputs
+plant_work_t plant_w;  // Workspace
 
 /* USER CODE END PV */
 
@@ -111,6 +113,7 @@ static void MX_ADC1_Init(void);
 static void MX_DAC_Init(void);
 static void MX_TIM6_Init(void);
 static void MX_TIM3_Init(void);
+static void MX_USART3_UART_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -154,20 +157,21 @@ int main(void)
     MX_DAC_Init();
     MX_TIM6_Init();
     MX_TIM3_Init();
+    MX_USART3_UART_Init();
     /* USER CODE BEGIN 2 */
 
     // Set up plant model
-    plant_init(&plant_arg, &plant_res, &plant_work);
+    plant_init(&plant_arg, &plant_res, &plant_w);
 
     // Start ADC with DMA in circular mode
-    if (HAL_ADC_Start_DMA(&hadc1, (uint32_t *)adc1_dma_buffer, ADC1_CHANNELS) != HAL_OK)
+    if (HAL_ADC_Start_DMA(&hadc1, (uint32_t *)adc1_data.buffer, ADC1_CHANNELS) != HAL_OK)
         Error_Handler();
 
     // Start DAC with DMA in circular mode
-    if (HAL_DAC_Start_DMA(&hdac, DAC_CHANNEL_1, (uint32_t *)dac1_dma_buffer, DAC1_CHANNELS, DAC_ALIGN_12B_R) != HAL_OK)
+    if (HAL_DAC_Start_DMA(&hdac, DAC_CHANNEL_1, (uint32_t *)dac1_data.buffer, DAC1_CHANNELS, DAC_ALIGN_12B_R) != HAL_OK)
         Error_Handler();
 
-    if (HAL_DAC_Start_DMA(&hdac, DAC_CHANNEL_2, (uint32_t *)dac2_dma_buffer, DAC2_CHANNELS, DAC_ALIGN_12B_R) != HAL_OK)
+    if (HAL_DAC_Start_DMA(&hdac, DAC_CHANNEL_2, (uint32_t *)dac2_data.buffer, DAC2_CHANNELS, DAC_ALIGN_12B_R) != HAL_OK)
         Error_Handler();
 
     // Start ADC timer
@@ -187,6 +191,7 @@ int main(void)
     HAL_Delay(1000); // Wait 1 sec for everything to come online
     HAL_GPIO_WritePin(Onboard_LED_GPIO_Port, Onboard_LED_Pin, GPIO_PIN_RESET);
 
+    sample_flag = false;
     while (1)
     {
         /* USER CODE END WHILE */
@@ -196,6 +201,7 @@ int main(void)
         if (sample_flag)
             sample_callback();
     }
+    // send_data();
     /* USER CODE END 3 */
 }
 
@@ -429,6 +435,38 @@ static void MX_TIM6_Init(void)
 }
 
 /**
+ * @brief USART3 Initialization Function
+ * @param None
+ * @retval None
+ */
+static void MX_USART3_UART_Init(void)
+{
+
+    /* USER CODE BEGIN USART3_Init 0 */
+
+    /* USER CODE END USART3_Init 0 */
+
+    /* USER CODE BEGIN USART3_Init 1 */
+
+    /* USER CODE END USART3_Init 1 */
+    huart3.Instance = USART3;
+    huart3.Init.BaudRate = 115200;
+    huart3.Init.WordLength = UART_WORDLENGTH_8B;
+    huart3.Init.StopBits = UART_STOPBITS_1;
+    huart3.Init.Parity = UART_PARITY_NONE;
+    huart3.Init.Mode = UART_MODE_TX_RX;
+    huart3.Init.HwFlowCtl = UART_HWCONTROL_NONE;
+    huart3.Init.OverSampling = UART_OVERSAMPLING_16;
+    if (HAL_UART_Init(&huart3) != HAL_OK)
+    {
+        Error_Handler();
+    }
+    /* USER CODE BEGIN USART3_Init 2 */
+
+    /* USER CODE END USART3_Init 2 */
+}
+
+/**
  * Enable DMA controller clock
  */
 static void MX_DMA_Init(void)
@@ -549,7 +587,7 @@ void sample_callback(void)
     /* SIMULATION */
 
     // Step the plant model forward
-    plant_step(&plant_arg, &plant_res, &plant_work);
+    plant_step(&plant_arg, &plant_res, &plant_w);
 
     // Copy state from output struct back to inputs for next step
     for (int i = 0; i < sizeof(plant_arg.state) / sizeof(plant_arg.state[0]); i++)
@@ -562,15 +600,12 @@ void sample_callback(void)
     dac2_data.channels.VOUTA = (uint16_t)(plant_res.outputs.VOUTA / ADC_TO_VOLTS);
 
     // Update the encoder output pins
-    if (plant_res.outputs.ENCA == 1)
-        HAL_GPIO_WritePin(ENC_OUTB_GPIO_Port, ENC_OUTB_Pin, GPIO_PIN_SET);
-    else
-        HAL_GPIO_WritePin(ENC_OUTB_GPIO_Port, ENC_OUTB_Pin, GPIO_PIN_RESET);
-    if (plant_res.outputs.ENCB == 1)
-        HAL_GPIO_WritePin(ENC_OUTA_GPIO_Port, ENC_OUTA_Pin, GPIO_PIN_SET);
-    else
-        HAL_GPIO_WritePin(ENC_OUTA_GPIO_Port, ENC_OUTA_Pin, GPIO_PIN_RESET);
+    HAL_GPIO_WritePin(ENC_OUTA_GPIO_Port, ENC_OUTA_Pin, plant_res.outputs.ENCA);
+    HAL_GPIO_WritePin(ENC_OUTB_GPIO_Port, ENC_OUTB_Pin, plant_res.outputs.ENCB);
+
+    sample_flag = false;
 }
+
 
 /* USER CODE END 4 */
 
