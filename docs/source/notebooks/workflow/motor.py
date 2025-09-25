@@ -1,7 +1,7 @@
-import numpy as np
-
-import dataclasses
+# ruff: noqa: N803, N806
 from typing import NamedTuple
+
+import numpy as np
 
 import archimedes as arc
 from archimedes import struct
@@ -37,7 +37,6 @@ class MotorParams:
 def motor_ode(
     t: float, x: np.ndarray, u: np.ndarray, params: MotorParams
 ) -> np.ndarray:
-
     i, _pos, vel = x
     (V,) = u
 

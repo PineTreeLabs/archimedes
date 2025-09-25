@@ -4,9 +4,10 @@ from archimedes import struct
 
 __all__ = ["iir_step", "IIRFilter"]
 
+
 def iir_step(
     u: float, u_prev: np.ndarray, y_prev: np.ndarray, b: np.ndarray, a: np.ndarray
-) -> tuple[np.ndarray, np.ndarray, float]: 
+) -> tuple[np.ndarray, np.ndarray, float]:
     """Perform one step of IIR filtering
 
     Applies an IIR filter using the difference equation:
@@ -92,6 +93,7 @@ class IIRFilter:
     a : ndarray
         Coefficients for the denominator, in order of descending degree.
     """
+
     b: np.ndarray  # Coefficients for the numerator
     a: np.ndarray  # Coefficients for the denominator
 
@@ -104,7 +106,7 @@ class IIRFilter:
         u_prev, y_prev, y = iir_step(u, state.u_prev, state.y_prev, self.b, self.a)
         state = IIRFilter.State(u_prev=u_prev, y_prev=y_prev)
         return state, y
-    
+
     @property
     def x0(self) -> State:
         """Create a new state with zeroed input and output history."""

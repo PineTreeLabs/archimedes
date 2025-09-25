@@ -1,5 +1,5 @@
-import re
 import ast
+import re
 
 try:
     from IPython.display import Markdown, display
