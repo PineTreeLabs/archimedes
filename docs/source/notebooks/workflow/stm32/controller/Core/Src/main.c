@@ -95,7 +95,7 @@ typedef struct
 
 #define VOUT_R1 (47.0f) // First leg of voltage divider
 #define VOUT_R2 (15.0f) // Second leg of voltage divider
-#define VOUT_SCALE ((VCC / 4095.0f) * (VOUT_R1 + VOUT_R2) / VOUT_R2)
+#define VOUT_SCALE (ADC_TO_VOLTS * (VOUT_R1 + VOUT_R2) / VOUT_R2)
 
 /* USER CODE END PD */
 
@@ -820,6 +820,7 @@ void sample_callback(void)
     {
         log_data.pwm_duty[log_data.sample_idx] = pwm_duty;
         log_data.v_motor_mv[log_data.sample_idx] = (int32_t)(((float)adc3_data.channels.vout_a_raw - (float)adc3_data.channels.vout_b_raw) * VOUT_SCALE * 1000); // millivolts
+        log_data.v_motor_mv[log_data.sample_idx] = (int32_t)(((float)adc3_data.channels.vout_a_raw) * VOUT_SCALE * 1000); // millivolts
         log_data.i_motor_ma[log_data.sample_idx] = (uint16_t)(adc1_data.channels.cs_raw * CS_SCALE * 1000);                                                          // milliamps
         log_data.pos_mdeg[log_data.sample_idx] = (int32_t)(enc_data.pos_deg * 1000);                                                                                 // millidegrees
         log_data.sample_idx++;

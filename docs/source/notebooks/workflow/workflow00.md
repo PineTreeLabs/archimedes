@@ -57,23 +57,20 @@ While simplified (and applied to a simple physical system), every aspect of the 
     - Implementing the physics model
     - Calibration via parameter estimation
 
-4. [**Controller Design**](../../generated/notebooks/workflow/workflow03.md)
+3. [**Controller Design**](../../generated/notebooks/workflow/workflow03.md)
     - Implementing a simple PI controller
     - Classical control systems analysis
     - C code generation
 
-5. [**HIL Testing**](../../generated/notebooks/workflow/workflow04.md)
+4. [**HIL Testing**](../../generated/notebooks/workflow/workflow04.md)
     - Setting up a real-time simulator
     - The analog communication circuit
     - Generating code for the real-time model
     - Evaluating the controller
 
-6. [**Deployment**](../../generated/notebooks/workflow/workflow05.md)
+5. [**Deployment**](../../generated/notebooks/workflow/workflow05.md)
     - Running the same controller on the physical system
     - Comparing to HIL testing results
-
-7. [**Conclusion**](workflow06.md)
-    - Overview of the workflow
     - Key takeaways
 
 
@@ -96,6 +93,5 @@ workflow01
 ../../generated/notebooks/workflow/workflow03
 ../../generated/notebooks/workflow/workflow04
 ../../generated/notebooks/workflow/workflow05
-workflow06
    
 ```
