@@ -11,7 +11,7 @@ from archimedes.sysid import Timeseries, pem
 np.random.seed(0)
 
 
-@struct.pytree_node
+@struct
 class CartPole:
     """CartPole model for testing system identification."""
 

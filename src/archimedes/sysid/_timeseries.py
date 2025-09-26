@@ -1,11 +1,11 @@
 import numpy as np
 
-from archimedes import struct
+from archimedes import tree
 
 __all__ = ["Timeseries"]
 
 
-@struct.pytree_node
+@tree.struct
 class Timeseries:
     """Container for synchronized input-output time series data.
 

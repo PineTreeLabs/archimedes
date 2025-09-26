@@ -451,7 +451,7 @@ def minimize(
             x0 = {"mass": 1.0, "damping": {"c1": 0.1, "c2": 0.2}}
 
             # Dataclass-like nested structure
-            @archimedes.struct.pytree_node
+            @archimedes.struct
             class Params:
                 mass: float
                 stiffness: float

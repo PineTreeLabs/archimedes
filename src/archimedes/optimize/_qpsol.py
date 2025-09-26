@@ -24,7 +24,7 @@ __all__ = [
 ]
 
 
-@tree.struct.pytree_node
+@tree.struct
 class QPSolution:
     x: ArrayLike
     lam_a: ArrayLike

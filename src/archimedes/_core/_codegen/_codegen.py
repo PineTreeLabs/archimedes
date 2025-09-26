@@ -18,6 +18,7 @@ from typing import (
 import numpy as np
 
 from archimedes import tree
+from archimedes.tree._struct import struct
 
 from .._function import FunctionCache
 from ._renderer import _render_template
@@ -199,7 +200,7 @@ def codegen(
 
     The code generation system supports structured data types, either as homogeneous
     arrays (lists or tuples with all elements of the same type) or as heterogeneous
-    containers (e.g. dictionaries, named tuples, or :py:func:`pytree_node` classes.
+    containers (e.g. dictionaries, named tuples, or :py:func:`struct` classes.
     The former will be represented as C arrays, while the latter will be represented
     as C structs.
 
@@ -207,7 +208,7 @@ def codegen(
 
     .. code-block:: python3
 
-        @struct.pytree_node
+        @struct
         class Point:
             x: float
             y: float
@@ -429,15 +430,15 @@ class Context(Protocol):
     ctx_type: str
 
 
-@tree.struct.pytree_node
+@tree.struct
 class NoneContext(Context):
     type_: str = None
     name: str = None
     description: str | None = None
-    ctx_type: str = tree.struct.field(default="none")
+    ctx_type: str = tree.field(default="none")
 
 
-@tree.struct.pytree_node
+@tree.struct
 class LeafContext(Context):
     type_: str
     name: str
@@ -445,26 +446,26 @@ class LeafContext(Context):
     dims: int
     initial_data: np.ndarray
     description: str | None
-    ctx_type: str = tree.struct.field(default="leaf")
+    ctx_type: str = tree.field(default="leaf")
 
 
-@tree.struct.pytree_node
+@tree.struct
 class NodeContext(Context):
-    type_: str = tree.struct.field(static=True)
-    name: str = tree.struct.field(static=True)
+    type_: str = tree.field(static=True)
+    name: str = tree.field(static=True)
     children: list[Context]
-    description: str | None = tree.struct.field(static=True, default=None)
-    ctx_type: str = tree.struct.field(default="node", static=True)
+    description: str | None = tree.field(static=True, default=None)
+    ctx_type: str = tree.field(default="node", static=True)
 
 
-@tree.struct.pytree_node
+@tree.struct
 class ListContext(Context):
-    type_: str = tree.struct.field(static=True)  # Type name of the list elements
-    name: str = tree.struct.field(static=True)
-    length: int = tree.struct.field(static=True)
+    type_: str = tree.field(static=True)  # Type name of the list elements
+    name: str = tree.field(static=True)
+    length: int = tree.field(static=True)
     elements: list[Context]
-    description: str | None = tree.struct.field(static=True, default=None)
-    ctx_type: str = tree.struct.field(static=True, default="list")
+    description: str | None = tree.field(static=True, default=None)
+    ctx_type: str = tree.field(static=True, default="list")
 
 
 @dataclasses.dataclass
@@ -530,7 +531,7 @@ class ContextHelper:
                     f"All items in list '{name}' must have the same structure. "
                     f"Found {treedef0.tree_str} and {treedef.tree_str}.  To return "
                     "heterogeneous data, use a structured data type (e.g. dict, "
-                    "NamedTuple, or pytree_node)."
+                    "NamedTuple, or @struct)."
                 )
             elements.append(self._process_arg(item, f"{name}[{i}]"))
 
@@ -548,7 +549,7 @@ class ContextHelper:
         # Note that all "static" data will be embedded in the computational
         # graph, so here we just need to process the child nodes and leaves
         children = []
-        for field in tree.struct.fields(arg):
+        for field in tree.fields(arg):
             if field.metadata.get("static", False):
                 continue
             child_name = field.name
@@ -606,7 +607,7 @@ class ContextHelper:
             return self._process_none(name)
         if tree.is_leaf(arg):
             return self._process_leaf(arg, name)
-        elif tree.struct.is_pytree_node(arg):
+        elif tree.is_struct(arg):
             return self._process_struct(arg, name)
         elif isinstance(arg, tuple) and hasattr(arg, "_fields"):
             # Special case for named tuples: convert to dict

@@ -69,7 +69,7 @@ def iir_step(
     return u_prev, y_prev, y
 
 
-@struct.pytree_node
+@struct
 class IIRFilter:
     """Infinite Impulse Response (IIR) filter.
 
@@ -97,7 +97,7 @@ class IIRFilter:
     b: np.ndarray  # Coefficients for the numerator
     a: np.ndarray  # Coefficients for the denominator
 
-    @struct.pytree_node
+    @struct
     class State:
         u_prev: np.ndarray
         y_prev: np.ndarray

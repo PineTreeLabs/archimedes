@@ -1,7 +1,7 @@
 from __future__ import annotations
 import re
 import numpy as np
-from archimedes import struct, array
+from archimedes import struct, array, field
 
 __all__ = ["Rotation"]
 
@@ -79,10 +79,10 @@ def _elementary_quat_compose(
     return q
 
 
-@struct.pytree_node
+@struct
 class Rotation:
     quat: np.ndarray
-    scalar_first: bool = struct.field(default=True, static=True)
+    scalar_first: bool = field(default=True, static=True)
 
     def __len__(self):
         return len(self.quat)

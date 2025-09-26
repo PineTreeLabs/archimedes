@@ -556,7 +556,7 @@ def vmap(
 
     >>> from archimedes import struct
     >>>
-    >>> @struct.pytree_node
+    >>> @struct
     >>> class Particle:
     ...     x: np.ndarray
     ...     v: np.ndarray

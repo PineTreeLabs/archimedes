@@ -127,16 +127,16 @@ class TestCodegen:
             "output_dir": temp_dir,
         }
 
-        @arc.struct.pytree_node
+        @arc.struct
         class EmptyStruct:
             arr: np.ndarray  # Empty array
-            static_field: str = arc.struct.field(static=True, default="static")
+            static_field: str = arc.field(static=True, default="static")
 
         class Point(NamedTuple):
             x: float
             y: float
 
-        @arc.struct.pytree_node
+        @arc.struct
         class Cluster:
             center: Point
             points: list[Point]  # Array of structs
@@ -228,7 +228,7 @@ class TestCodegen:
             "output_dir": temp_dir,
         }
 
-        @arc.struct.pytree_node
+        @arc.struct
         class EdgeCase:
             empty: np.ndarray  # []
             single: np.ndarray  # [1]

@@ -9,7 +9,7 @@ from scipy.optimize import OptimizeResult
 from scipy.optimize import minimize as scipy_minimize
 
 import archimedes as arc
-from archimedes import compile, scan, struct, tree
+from archimedes import compile, scan, tree
 from archimedes.optimize import lm_solve
 
 if TYPE_CHECKING:
@@ -25,7 +25,7 @@ if TYPE_CHECKING:
 __all__ = ["pem"]
 
 
-@struct.pytree_node
+@tree.struct
 class PEMObjective:
     """Prediction Error Minimization objective function for system identification.
 
@@ -68,7 +68,7 @@ class PEMObjective:
     predictor: KalmanFilterBase
     data: Timeseries
     P0: np.ndarray
-    x0: np.ndarray = struct.field(static=True, default=None)
+    x0: np.ndarray = tree.field(static=True, default=None)
 
     def forward(self, x0: np.ndarray, params: PyTree) -> dict:
         """Run Kalman filter forward pass and compute prediction errors.
@@ -189,7 +189,7 @@ class PEMObjective:
         return results["V"]
 
 
-@struct.pytree_node
+@tree.struct
 class CompoundPEMObjective:
     """Compound PEM objective function for multiple sub-objectives.
 
@@ -309,7 +309,7 @@ def _pem_solve_bfgs(
         options=options,
     )
 
-    # Replace the flat parameters with the original PyTree structure
+    # Replace the flat parameters with the original tree structure
     result.x = unravel(result.x)
     return result
 
@@ -489,7 +489,7 @@ def pem(
     -------
     result : scipy.optimize.OptimizeResult
         Optimization result with estimated parameters in ``result.x``
-        preserving the original PyTree structure. Additional fields include:
+        preserving the original tree structure. Additional fields include:
 
         - ``success`` : Whether estimation succeeded
         - ``fun`` : Final prediction error objective value

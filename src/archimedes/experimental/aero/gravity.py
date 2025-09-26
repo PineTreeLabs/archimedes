@@ -2,7 +2,7 @@ from typing import Protocol
 
 import numpy as np
 
-from archimedes import struct
+from archimedes import module, ModuleConfig, UnionConfig
 
 __all__ = [
     "GravityModel",
@@ -27,7 +27,7 @@ class GravityModel(Protocol):
         """
 
 
-@struct.module
+@module
 class ConstantGravity:
     """Constant gravitational acceleration model
 
@@ -41,7 +41,7 @@ class ConstantGravity:
         return np.hstack([0, 0, self.g0])
 
 
-class ConstantGravityConfig(struct.ModuleConfig, type="constant"):
+class ConstantGravityConfig(ModuleConfig, type="constant"):
     g0: float = 9.81  # m/s^2
 
     def build(self) -> ConstantGravity:
@@ -87,7 +87,7 @@ def lla2eci(
     return p_EN, R_EN
 
 
-@struct.module
+@module
 class PointGravity:
     """Point mass gravitational acceleration model
 
@@ -107,7 +107,7 @@ class PointGravity:
 
 # Example of a base class config to demonstrate inheritance.
 # Note that the "type" field is not specified here.
-class PointGravityConfig(struct.ModuleConfig):
+class PointGravityConfig(ModuleConfig):
     mu: float = 3.986e14  # m^3/s^2
 
 
@@ -129,7 +129,7 @@ class PointGravityLatLonConfig(PointGravityConfig, type="point_latlon"):
         return PointGravity(p_EN, R_EN, mu=self.mu)
 
 
-GravityConfig = struct.UnionConfig[
+GravityConfig = UnionConfig[
     ConstantGravityConfig,
     PointGravityCartesianConfig,
     PointGravityLatLonConfig,

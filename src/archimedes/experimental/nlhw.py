@@ -1,3 +1,4 @@
+from __future__ import annotations
 from typing import ClassVar, NewType
 
 import numpy as np
@@ -11,7 +12,7 @@ def sigmoid(x):
     return 1 / (1 + np.exp(-x))
 
 
-@struct.pytree_node
+@struct
 class SigmoidNonlinearity:
     c: float  # translation
     b: float  # dilation
@@ -22,7 +23,7 @@ class SigmoidNonlinearity:
         return self.y0 + self.s * sigmoid(self.b * u + self.c)
 
 
-@struct.pytree_node
+@struct
 class StateSpace:
     A: np.ndarray
     B: np.ndarray
@@ -47,7 +48,7 @@ class StateSpace:
         return np.zeros(self.A.shape[0])
 
 
-@struct.pytree_node
+@struct
 class HammersteinWienerSystem:
     sys: StateSpace
     f: SigmoidNonlinearity = None

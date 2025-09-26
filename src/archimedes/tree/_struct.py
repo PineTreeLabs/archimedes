@@ -29,11 +29,11 @@
 # limitations under the License.
 
 """
-Utilities for defining custom classes that can be used with pytree transformations.
+Utilities for defining custom classes that can be used with tree transformations.
 
 This module provides tools for creating structured data types that work seamlessly
-with Archimedes' pytree functions. These tools are built on Python's dataclasses
-with extensions for pytree-specific behavior.
+with Archimedes' tree functions. These tools are built on Python's dataclasses
+with extensions for tree-specific behavior.
 
 The module re-exports several names from the dataclasses module:
 
@@ -45,7 +45,7 @@ fields : Function to retrieve fields of a dataclass
     This is useful for introspection and validation of dataclass instances.
 
 replace : Function to create a new dataclass instance with updated fields
-    For pytree nodes created with @struct, use the .replace() method instead.
+    For tree nodes created with @struct, use the .replace() method instead.
 """
 
 from __future__ import annotations
@@ -119,7 +119,6 @@ def field(
     Examples
     --------
     >>> import archimedes as arc
-    >>> from archimedes import struct
     >>> import numpy as np
     >>>
     >>> @arc.struct
@@ -129,11 +128,11 @@ def field(
     ...     velocity: np.ndarray
     ...
     ...     # Static configuration parameters (excluded from flattening)
-    ...     mass: float = struct.field(static=True, default=1000.0)
-    ...     drag_coef: float = struct.field(static=True, default=0.3)
+    ...     mass: float = arc.field(static=True, default=1000.0)
+    ...     drag_coef: float = arc.field(static=True, default=0.3)
     ...
     ...     # With additional metadata
-    ...     name: str = struct.field(
+    ...     name: str = arc.field(
     ...         static=True,
     ...         default="vehicle",
     ...         metadata={"description": "Vehicle identifier"}
@@ -152,8 +151,8 @@ def field(
 
     See Also
     --------
-    struct : Decorator for creating pytree-compatible classes
-    register_dataclass : Register a dataclass as a pytree node
+    struct : Decorator for creating tree-compatible dataclasses
+    register_dataclass : Register a dataclass as compatible with tree operations
     """
     f: dataclasses.Field = dataclasses.field(
         metadata=(metadata or {}) | {"static": static},
@@ -165,17 +164,17 @@ def field(
 @dataclass_transform(field_specifiers=(field,))  # type: ignore[literal-required]
 def struct(cls: T | None = None, **kwargs) -> T | Callable:
     """
-    Decorator to convert a class into a frozen dataclass registered as a pytree node.
+    Decorator to convert a class into a tree-compatible frozen dataclass.
 
-    This decorator creates a dataclass that can be seamlessly used with Archimedes'
-    pytree functions. The class will be registered with the pytree system, allowing
-    its instances to be flattened, mapped over, and transformed while preserving
-    its structure.
+    This decorator creates a structured data class that can be seamlessly used
+    with Archimedes' tree functions. The class will be registered with the tree
+    system, allowing its instances to be flattened, mapped over, and transformed 
+    while preserving its structure.
 
     Parameters
     ----------
     cls : type, optional
-        The class to convert into a pytree
+        The class to convert into a tree-compatible dataclass.
     **kwargs : dict
         Additional keyword arguments passed to dataclasses.dataclass().
         By default, ``frozen=True`` is set unless explicitly overridden.
@@ -183,16 +182,10 @@ def struct(cls: T | None = None, **kwargs) -> T | Callable:
     Returns
     -------
     decorated_class : type
-        The decorated class, now a frozen dataclass registered as a pytree node.
+        The decorated class, now a frozen dataclass registered as tree-compatible.
 
     Notes
     -----
-    When to use:
-
-    - To create structured data objects for use in Archimedes models and simulations
-    - To define state containers that work with pytree-based transformations
-    - To create modular, composable model components with clear interfaces
-    - To define parameter structures for optimization problems
 
     The "frozen" attribute makes the class immutable, meaning that once an instance
     is created, its fields cannot be modified. This is useful for ensuring that
@@ -209,23 +202,22 @@ def struct(cls: T | None = None, **kwargs) -> T | Callable:
     - Is frozen (immutable) by default
     - Has a ``replace()`` method for creating modified copies
     - Will be properly handled by ``tree.flatten()``, ``tree.map()``, etc.
-    - Can be nested within other pytree nodes
+    - Can be nested within other tree nodes (structs, dicts, tuples, etc.)
 
     Examples
     --------
     >>> import archimedes as arc
-    >>> from archimedes.tree import struct, field
     >>> import numpy as np
     >>>
-    >>> @struct
+    >>> @arc.struct
     >>> class Vehicle:
     ...     # Dynamic state variables (included in transformations)
     ...     position: np.ndarray
     ...     velocity: np.ndarray
     ...
     ...     # Static configuration parameters (preserved during transformations)
-    ...     mass: float = field(static=True, default=1000.0)
-    ...     drag_coef: float = field(static=True, default=0.3)
+    ...     mass: float = arc.field(static=True, default=1000.0)
+    ...     drag_coef: float = arc.field(static=True, default=0.3)
     ...
     ...     def kinetic_energy(self):
     ...         return 0.5 * self.mass * np.sum(self.velocity**2)
@@ -245,8 +237,8 @@ def struct(cls: T | None = None, **kwargs) -> T | Callable:
     >>> print(scaled.velocity)    # [10. 0.] -> [20. 0.]
     >>> print(scaled.mass)        # 1000.0 (unchanged)
     >>>
-    >>> # Nested pytree nodes
-    >>> @struct
+    >>> # Nested structs
+    >>> @arc.struct
     >>> class System:
     ...     vehicle1: Vehicle
     ...     vehicle2: Vehicle
@@ -260,15 +252,15 @@ def struct(cls: T | None = None, **kwargs) -> T | Callable:
 
     See Also
     --------
-    field : Define fields with pytree-specific metadata
+    field : Define fields with tree-specific metadata
     module: Decorator for creating functional modules
     """
     # Support passing arguments to the decorator (e.g. @struct(kw_only=True))
     if cls is None:
         return functools.partial(struct, **kwargs)
 
-    # check if already recognized as a pytree node
-    if "_arc_dataclass" in cls.__dict__:
+    # check if already recognized as a tree node
+    if "_arc_struct" in cls.__dict__:
         return cls
 
     if "frozen" not in kwargs.keys():
@@ -302,11 +294,11 @@ def struct(cls: T | None = None, **kwargs) -> T | Callable:
 
 def is_struct(obj: Any) -> bool:
     """
-    Check if an object is a registered pytree node.
+    Check if an object is a registered struct class.
 
     This function determines whether an object was created using the
     :py:func:`struct` decorator, which indicates it has special handling
-    for pytree operations.
+    for tree operations.
 
     Parameters
     ----------
@@ -316,19 +308,19 @@ def is_struct(obj: Any) -> bool:
     Returns
     -------
     is_node : bool
-        ``True`` if the object is a pytree node created with the decorator,
+        ``True`` if the object is a struct created with the decorator,
         ``False`` otherwise.
 
     Notes
     -----
     When to use:
 
-    - To check if an object will be handled specially by pytree operations
-    - For conditional logic based on whether an object is a custom pytree node
-    - For debugging pytree-related functionality
+    - To check if an object will be handled specially by tree operations
+    - For conditional logic based on whether an object is a custom struct
+    - For debugging tree-related functionality
 
     This function specifically checks for objects created with the
-    :py:func:`struct` decorator, not built-in pytree containers like lists,
+    :py:func:`struct` decorator, not built-in structured data types like lists,
     tuples, and dictionaries.
 
     Examples
@@ -345,7 +337,7 @@ def is_struct(obj: Any) -> bool:
     >>> print(arc.tree.is_struct(state))
     True
     >>>
-    >>> # Regular dataclass is not a pytree node
+    >>> # Regular dataclass is not a struct
     >>> from dataclasses import dataclass
     >>>
     >>> @dataclass
@@ -357,12 +349,12 @@ def is_struct(obj: Any) -> bool:
     >>> print(arc.tree.is_struct(regular_state))
     False
     >>>
-    >>> # Built-in containers aren't custom pytree nodes
+    >>> # Built-in containers aren't custom structs
     >>> print(arc.tree.is_struct({"x": np.zeros(3)}))
     False
 
     See Also
     --------
-    struct : Decorator for creating tree-compatible classes
+    struct : Decorator for creating tree-compatible dataclasses
     """
     return hasattr(obj, "_arc_struct")

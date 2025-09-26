@@ -466,7 +466,7 @@ class TestVmap:
         assert np.allclose(z, np.array([np.dot(x[i], y[i]) for i in range(3)]))
 
     def test_vmap_unravel(self):
-        @struct.pytree_node
+        @struct
         class PointMass:
             pos: np.ndarray
             vel: np.ndarray
@@ -485,7 +485,7 @@ class TestVmap:
         assert np.allclose(ps.vel, ps_flat[:, 2:])
 
     def test_vmap_with_arg(self):
-        @struct.pytree_node
+        @struct
         class PointMass:
             pos: np.ndarray
             vel: np.ndarray

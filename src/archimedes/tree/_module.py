@@ -25,8 +25,8 @@ def module(cls: T | None = None, **kwargs) -> T | Callable:
     Decorator to convert a class into a dataclass suitable for modular system design.
 
     This decorator creates a dataclass that can be used to build modular, composable
-    systems. Unlike :py:func:`pytree_node`, classes decorated with ``@module`` are not
-    automatically registered with the pytree system, making them suitable for
+    systems. Unlike :py:func:`struct`, classes decorated with ``@module`` are not
+    automatically registered with the tree system, making them suitable for
     organizational and structural components that don't need to participate in
     tree transformations.  Common use cases include physics models and modular
     control systems.
@@ -37,7 +37,7 @@ def module(cls: T | None = None, **kwargs) -> T | Callable:
         The class to convert into a module dataclass
     **kwargs : dict
         Additional keyword arguments passed to dataclasses.dataclass().
-        Unlike :py:func:`pytree_node`, ``frozen`` is not set by default.
+        Unlike :py:func:`struct`, ``frozen`` is not set by default.
 
     Returns
     -------
@@ -46,14 +46,14 @@ def module(cls: T | None = None, **kwargs) -> T | Callable:
 
     Notes
     -----
-    The key difference from :py:func:`pytree_node` is that ``@module`` classes:
+    The key difference from :py:func:`struct` is that ``@module`` classes:
 
-    - Are not automatically registered with the pytree system
+    - Are not automatically registered with the tree system
     - Are not frozen by default (mutable unless explicitly frozen)
     - Are intended for structural organization rather than data transformation
 
-    Use ``@module`` when you want dataclass convenience without pytree behavior,
-    and ``@pytree_node`` when you need the object to participate in tree operations
+    Use ``@module`` when you want dataclass convenience without tree behavior,
+    and ``@struct`` when you need the object to participate in tree operations
     like mapping, flattening, and transformations.
 
     Modules are designed to work well with ModuleConfig classes for managing
@@ -64,7 +64,6 @@ def module(cls: T | None = None, **kwargs) -> T | Callable:
     Examples
     --------
     >>> import archimedes as arc
-    >>> from archimedes import struct
     >>> from typing import Protocol
     >>> import numpy as np
     >>>
@@ -72,21 +71,21 @@ def module(cls: T | None = None, **kwargs) -> T | Callable:
     ...     def __call__(self, x: np.ndarray) -> np.ndarray:
     ...         ...
     >>>
-    >>> @struct.module
+    >>> @arc.module
     >>> class ComponentA:
     ...     a: float = 1.0
     ...
     ...     def __call__(self, x: np.ndarray) -> np.ndarray:
     ...         return x * self.a
     >>>
-    >>> @struct.module
+    >>> @arc.module
     >>> class ComponentB:
     ...     b: float = 2.0
     ...
     ...     def __call__(self, x: np.ndarray) -> np.ndarray:
     ...         return x + self.b
     >>>
-    >>> @struct.module
+    >>> @arc.module
     >>> class System:
     ...     component: ComponentModel
     ...
@@ -94,7 +93,7 @@ def module(cls: T | None = None, **kwargs) -> T | Callable:
 
     See Also
     --------
-    pytree_node : Decorator for creating pytree-compatible classes
+    struct : Decorator for creating tree-compatible dataclasses
     field : Define fields with specific metadata
     ModuleConfig : Base class for module configuration management
     """
@@ -147,20 +146,19 @@ class ModuleConfig(BaseModel):
     --------
     >>> from typing import Protocol
     >>> import archimedes as arc
-    >>> from archimedes import struct
     >>>
     >>> class GravityModel(Protocol):
     ...     def __call__(self, position: np.ndarray) -> np.ndarray:
     ...         ...
     >>>
-    >>> @struct.module
+    >>> @arc.module
     >>> class ConstantGravity:
     ...     g0: float
     ...
     ...     def __call__(self, position: np.ndarray) -> np.ndarray:
     ...         return np.array([0, 0, self.g0])
     >>>
-    >>> class ConstantGravityConfig(struct.ModuleConfig, type="constant"):
+    >>> class ConstantGravityConfig(arc.ModuleConfig, type="constant"):
     ...     g0: float = 9.81
     ...
     ...     def build(self) -> ConstantGravity:
@@ -170,7 +168,7 @@ class ModuleConfig(BaseModel):
     ConstantGravity(g0=9.81)
     >>>
     >>> # Another configuration type
-    >>> class PointGravityConfig(struct.ModuleConfig, type="point"):
+    >>> class PointGravityConfig(arc.ModuleConfig, type="point"):
     ...     mu: float = 3.986e14  # m^3/s^2
     ...     RE: float = 6.3781e6  # m
     ...     lat: float = 0.0  # deg
@@ -181,7 +179,7 @@ class ModuleConfig(BaseModel):
     ...         pass
     >>>
     >>> # Create a discriminated union of configuration types
-    >>> GravityConfig = struct.UnionConfig[ConstantGravityConfig, PointGravityConfig]
+    >>> GravityConfig = arc.UnionConfig[ConstantGravityConfig, PointGravityConfig]
 
     See Also
     --------

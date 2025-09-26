@@ -8,7 +8,7 @@ from typing import Callable
 import numpy as np
 from scipy.linalg import cholesky  # For Cholesky decomposition
 
-from archimedes import jac, struct
+from archimedes import jac, tree
 
 __all__ = [
     "KalmanFilterBase",
@@ -32,7 +32,7 @@ def _default_missing(y):
     return False
 
 
-@struct.pytree_node
+@tree.struct
 class KalmanFilterBase(metaclass=abc.ABCMeta):
     """Abstract base class for Kalman filter implementations.
 
@@ -81,7 +81,7 @@ class KalmanFilterBase(metaclass=abc.ABCMeta):
 
     Notes
     -----
-    This class is decorated with ``@struct.pytree_node``, making it compatible
+    This class is decorated with ``@struct``, making it compatible
     with function transformations and enabling efficient automatic differentiation
     through the filter operations. The filter parameters can be modified using
     standard PyTree operations.
@@ -125,12 +125,12 @@ class KalmanFilterBase(metaclass=abc.ABCMeta):
 
     """
 
-    dyn: Callable = struct.field(static=True)
-    obs: Callable = struct.field(static=True)
+    dyn: Callable = tree.field(static=True)
+    obs: Callable = tree.field(static=True)
     Q: np.ndarray
     R: np.ndarray
 
-    missing: Callable[[np.ndarray], bool] = struct.field(
+    missing: Callable[[np.ndarray], bool] = tree.field(
         default=_default_missing, static=True
     )
 
@@ -186,7 +186,7 @@ class KalmanFilterBase(metaclass=abc.ABCMeta):
         return self.R.shape[0]
 
 
-@struct.pytree_node
+@tree.struct
 class ExtendedKalmanFilter(KalmanFilterBase):
     """Extended Kalman Filter for nonlinear state estimation.
 
@@ -454,7 +454,7 @@ def _julier_weights(n, kappa):
     return Wm, Wc
 
 
-@struct.pytree_node
+@tree.struct
 class UnscentedKalmanFilter(KalmanFilterBase):
     """Unscented Kalman Filter for highly nonlinear state estimation.
 
