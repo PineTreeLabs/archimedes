@@ -56,7 +56,7 @@ def unzip2(pairs):
     return lst1, lst2
 
 
-def register_pytree_node(ty: Any, to_iter: Callable, from_iter: Callable) -> None:
+def register_struct(ty: Any, to_iter: Callable, from_iter: Callable) -> None:
     """
     Register a custom type as a pytree node.
 
@@ -130,7 +130,7 @@ def register_pytree_node(ty: Any, to_iter: Callable, from_iter: Callable) -> Non
     ...     return Point3D(x, y, z)
     >>>
     >>> # Register the class as a pytree node
-    >>> arc.tree.register_pytree_node(Point3D, point_to_iter, point_from_iter)
+    >>> arc.tree.register_struct(Point3D, point_to_iter, point_from_iter)
     >>>
     >>> # Now Point3D works with pytree operations
     >>> p = Point3D(np.array([1.0]), np.array([2.0]), np.array([3.0]))
@@ -146,9 +146,9 @@ def register_pytree_node(ty: Any, to_iter: Callable, from_iter: Callable) -> Non
     _registry[ty] = _RegistryEntry(to_iter, from_iter)
 
 
-register_pytree_node(None, lambda x: (None, None), lambda _, xs: None)
-register_pytree_node(tuple, lambda t: (t, None), lambda _, xs: tuple(xs))
-register_pytree_node(list, lambda lst: (lst, None), lambda _, xs: list(xs))
+register_struct(None, lambda x: (None, None), lambda _, xs: None)
+register_struct(tuple, lambda t: (t, None), lambda _, xs: tuple(xs))
+register_struct(list, lambda lst: (lst, None), lambda _, xs: list(xs))
 
 
 # dict
@@ -161,7 +161,7 @@ def _dict_from_iter(keys, vals):
     return dict(zip(keys, vals))
 
 
-register_pytree_node(dict, _dict_to_iter, _dict_from_iter)
+register_struct(dict, _dict_to_iter, _dict_from_iter)
 
 
 # OrderedDict
@@ -169,7 +169,7 @@ def _od_from_iter(keys, vals):
     return OrderedDict(zip(keys, vals))
 
 
-register_pytree_node(OrderedDict, _dict_to_iter, _od_from_iter)
+register_struct(OrderedDict, _dict_to_iter, _od_from_iter)
 
 
 def register_dataclass(
@@ -273,7 +273,7 @@ def register_dataclass(
     --------
     struct.pytree_node : Decorator for creating pytree-compatible classes
     struct.field : Function to create fields with metadata for pytree behavior
-    register_pytree_node : Register any custom type as a pytree node
+    register_struct : Register any custom type as a pytree node
     """
     if data_fields is None or meta_fields is None:
         if (data_fields is None) != (meta_fields is None):
@@ -332,5 +332,5 @@ def register_dataclass(
         data = tuple(getattr(x, name) for name in data_fields)
         return data, meta
 
-    register_pytree_node(nodetype, flatten_func, unflatten_func)
+    register_struct(nodetype, flatten_func, unflatten_func)
     return nodetype
