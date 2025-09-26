@@ -52,7 +52,7 @@ def iir_step(
     ...     u_prev, y_prev, y = iir_step(u, u_prev, y_prev, b, a)
     ...     outputs.append(y)
     >>> outputs
-    [np.float64(1.0), np.float64(1.3333), np.float64(1.6666), np.float64(2.0), np.float64(2.0)]
+    [1.0, 1.3333, 1.6666, 2.0, 2.0]
     """
 
     # Update input history

@@ -59,7 +59,7 @@ int nested_func_step(nested_func_arg_t* arg, nested_func_res_t* res, nested_func
     const float* kernel_arg[nested_func_SZ_ARG];
     kernel_arg[0] = &arg->scalar;
     kernel_arg[1] = arg->arr;
-    kernel_arg[2] = (float*)arg->clusters;  
+    kernel_arg[2] = (float*)arg->clusters;
 
     // Marshal outputs to CasADi format
     float* kernel_res[nested_func_SZ_RES];
