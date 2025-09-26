@@ -17,9 +17,9 @@ from archimedes import tree
 from ._common import _ravel_args
 
 if TYPE_CHECKING:
-    from archimedes.typing import PyTree
+    from archimedes.typing import Tree
 
-    T = TypeVar("T", bound=PyTree)
+    T = TypeVar("T", bound=Tree)
 
 
 __all__ = [
@@ -196,7 +196,7 @@ class LMResult(OptimizeResult):
 
     Attributes
     ----------
-    x : ndarray or PyTree
+    x : ndarray or Tree
         Solution parameters with the same structure as the initial guess.
         For system identification, this preserves the nested parameter
         organization (e.g., ``{"mass": 1.0, "damping": {"c1": 0.1}}``).
@@ -531,12 +531,12 @@ def lm_solve(
     func : callable
         Objective function with signature ``func(x, *args) -> r``, where ``r`` is
         a vector of residuals.
-    x0 : PyTree
+    x0 : Tree
         Initial parameter guess. Can be a flat array or a tree structure which
         will be preserved in the solution.
     args : tuple, optional
         Extra arguments passed to the objective function.
-    bounds : tuple of (PyTree, PyTree), optional
+    bounds : tuple of (Tree, Tree), optional
         Box constraints specified as ``(lower_bounds, upper_bounds)``.
         Each bound array must have the same tree structure as ``x0``. Use
         ``-np.inf`` and ``np.inf`` for unbounded variables. Enables physical
@@ -554,7 +554,7 @@ def lm_solve(
         falls below this threshold.
     max_nfev : int, default=100
         Maximum number of function evaluations.
-    diag : PyTree, optional
+    diag : Tree, optional
         Diagonal scaling factors for variables, in the form of a tree matching
         the structure of ``x0``. If None, automatic scaling is used based on the
         Hessian diagonal. Custom scaling can improve convergence for ill-conditioned

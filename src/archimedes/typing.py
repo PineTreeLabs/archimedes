@@ -9,7 +9,7 @@ if TYPE_CHECKING:
     ArrayLike: TypeAlias = NDArray | SymbolicArray
 
 
-PyTree: TypeAlias = Any
+Tree: TypeAlias = Any
 
 # Type aliases for common types
 CasadiMatrix: TypeAlias = cs.SX | cs.MX | cs.DM
@@ -18,7 +18,7 @@ ShapeLike: TypeAlias = Tuple[int, ...]
 __all__ = [
     "NDArray",
     "ArrayLike",
-    "PyTree",
+    "Tree",
     "DTypeLike",
     "CasadiMatrix",
     "ShapeLike",

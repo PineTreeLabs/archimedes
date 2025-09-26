@@ -42,7 +42,7 @@ from archimedes.tree._registry import unzip2
 from archimedes.tree._tree_util import tree_flatten, tree_unflatten
 
 if TYPE_CHECKING:
-    from archimedes.typing import ArrayLike, PyTree
+    from archimedes.typing import ArrayLike, Tree
 
 
 # Original: jax._src.util.HashablePartial
@@ -93,7 +93,7 @@ class HashablePartial:
         return self.f(*self.args, *args, **self.kwargs, **kwargs)
 
 
-def ravel_tree(tree: PyTree) -> tuple[ArrayLike, HashablePartial]:
+def ravel_tree(tree: Tree) -> tuple[ArrayLike, HashablePartial]:
     """
     Flatten a tree to a single 1D array.
 

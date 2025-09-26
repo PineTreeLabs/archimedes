@@ -48,15 +48,15 @@ import numpy as np
 from ._registry import _registry, unzip2
 
 if TYPE_CHECKING:
-    from ..typing import ArrayLike, PyTree
+    from ..typing import ArrayLike, Tree
 
-    T = TypeVar("T", bound=PyTree)
+    T = TypeVar("T", bound=Tree)
     V = TypeVar("V")
 
 
-class PyTreeDef(NamedTuple):
+class TreeDef(NamedTuple):
     node_data: None | tuple[type, Hashable]
-    children: tuple[PyTreeDef, ...]
+    children: tuple[TreeDef, ...]
     num_leaves: int
 
     def unflatten(self, xs: list[Any]) -> Any:
@@ -68,7 +68,7 @@ class PyTreeDef(NamedTuple):
         return self.unflatten(stars)
 
     def __repr__(self) -> str:
-        return (f"PyTreeDef({self.tree_str})").replace("'*'", "*")
+        return (f"TreeDef({self.tree_str})").replace("'*'", "*")
 
     def __eq__(self, other: object) -> bool:
         return (
@@ -78,16 +78,16 @@ class PyTreeDef(NamedTuple):
         )
 
 
-LEAF = PyTreeDef(None, (), 1)
-NONE_DEF = PyTreeDef(None, (), 0)
+LEAF = TreeDef(None, (), 1)
+NONE_DEF = TreeDef(None, (), 0)
 
 
 #
 # Flatten/unflatten functions
 #
 def tree_flatten(
-    x: PyTree, is_leaf: Callable[[Any], bool] | None = None
-) -> tuple[list[ArrayLike], PyTreeDef]:
+    x: Tree, is_leaf: Callable[[Any], bool] | None = None
+) -> tuple[list[ArrayLike], TreeDef]:
     """
     Flatten a tree into a list of leaves and a treedef.
 
@@ -97,7 +97,7 @@ def tree_flatten(
 
     Parameters
     ----------
-    x : PyTree
+    x : Tree
         A tree to be flattened. Here, a tree is a nested structure of containers
         (lists, tuples, dicts, etc) and leaves (arrays, scalars, objects not registered
         as trees).
@@ -110,7 +110,7 @@ def tree_flatten(
     -------
     leaves : list
         A list of all leaf values from the tree.
-    treedef : PyTreeDef
+    treedef : TreeDef
         A structure definition that can be used to reconstruct the original
         tree using `unflatten`.
 
@@ -159,8 +159,8 @@ def tree_flatten(
 
 
 def _tree_flatten(
-    x: PyTree, is_leaf: Callable[[Any], bool] | None
-) -> tuple[Iterable, PyTreeDef]:
+    x: Tree, is_leaf: Callable[[Any], bool] | None
+) -> tuple[Iterable, TreeDef]:
     if x is None:
         return [], NONE_DEF
 
@@ -178,7 +178,7 @@ def _tree_flatten(
     flattened = list(it.chain.from_iterable(children_flat))
 
     node_data = (type(x), node_metadata)
-    treedef = PyTreeDef(
+    treedef = TreeDef(
         node_data=node_data,
         children=tuple(child_trees),
         num_leaves=len(flattened),
@@ -186,7 +186,7 @@ def _tree_flatten(
     return flattened, treedef
 
 
-def tree_unflatten(treedef: PyTreeDef, xs: list[ArrayLike]) -> PyTree:
+def tree_unflatten(treedef: TreeDef, xs: list[ArrayLike]) -> Tree:
     """
     Reconstruct a tree from a list of leaves and a treedef.
 
@@ -195,7 +195,7 @@ def tree_unflatten(treedef: PyTreeDef, xs: list[ArrayLike]) -> PyTree:
 
     Parameters
     ----------
-    treedef : PyTreeDef
+    treedef : TreeDef
         A tree definition, typically produced by :py:func:`flatten` or
         :py:func:`structure`.
     xs : list[ArrayLike]
@@ -204,7 +204,7 @@ def tree_unflatten(treedef: PyTreeDef, xs: list[ArrayLike]) -> PyTree:
 
     Returns
     -------
-    tree : PyTree
+    tree : Tree
         The reconstructed tree with the same structure as defined by treedef
         and with leaf values from ``xs``.
 
@@ -247,7 +247,7 @@ def tree_unflatten(treedef: PyTreeDef, xs: list[ArrayLike]) -> PyTree:
     return _tree_unflatten(treedef, iter(xs))
 
 
-def _tree_unflatten(treedef: PyTreeDef, xs: Iterator) -> PyTree:
+def _tree_unflatten(treedef: TreeDef, xs: Iterator) -> Tree:
     if treedef is NONE_DEF:
         return None  # Special case for None
     if treedef.node_data is None:
@@ -276,18 +276,18 @@ def _tree_unflatten(treedef: PyTreeDef, xs: Iterator) -> PyTree:
 
 
 def tree_structure(
-    tree: PyTree, is_leaf: Callable[[Any], bool] | None = None
-) -> PyTreeDef:
+    tree: Tree, is_leaf: Callable[[Any], bool] | None = None
+) -> TreeDef:
     """
     Extract the structure of a tree without the leaf values.
 
-    This function returns a :py:class:PyTreeDef that describes the structure of the
+    This function returns a :py:class:TreeDef that describes the structure of the
     tree, which can be used with :py:func:`unflatten` to reconstruct a tree with
     new leaf values.
 
     Parameters
     ----------
-    tree : PyTree
+    tree : Tree
         A tree whose structure is to be determined.
     is_leaf : callable, optional
         A function that takes a tree node as input and returns a boolean
@@ -296,7 +296,7 @@ def tree_structure(
 
     Returns
     -------
-    treedef : :py:class:`PyTreeDef`
+    treedef : :py:class:`TreeDef`
         A tree definition that describes the structure of the input tree.
 
     Notes
@@ -319,7 +319,7 @@ def tree_structure(
     >>> # Extract the structure
     >>> treedef = arc.tree.structure(state)
     >>> print(treedef)
-    PyTreeDef({'pos': *, 'vel': *})
+    TreeDef({'pos': *, 'vel': *})
     >>>
     >>> # Create a new state with the same structure but different values
     >>> zeros = [np.zeros_like(leaf) for leaf in arc.tree.leaves(state)]
@@ -338,7 +338,7 @@ def tree_structure(
 
 
 def tree_leaves(
-    tree: PyTree, is_leaf: Callable[[Any], bool] | None = None
+    tree: Tree, is_leaf: Callable[[Any], bool] | None = None
 ) -> list[ArrayLike]:
     """
     Extract all leaf values from a tree.
@@ -348,7 +348,7 @@ def tree_leaves(
 
     Parameters
     ----------
-    tree : PyTree
+    tree : Tree
         A tree from which to extract leaves. Here, a tree is a nested structure of
         containers (lists, tuples, dicts, etc) and leaves (arrays, scalars, objects
         not registered as trees).
@@ -386,7 +386,7 @@ def tree_leaves(
     return flat
 
 
-def tree_all(tree: PyTree, is_leaf: Callable[[Any], bool] | None = None) -> bool:
+def tree_all(tree: Tree, is_leaf: Callable[[Any], bool] | None = None) -> bool:
     """
     Check if all leaves in the tree evaluate to True.
 
@@ -396,7 +396,7 @@ def tree_all(tree: PyTree, is_leaf: Callable[[Any], bool] | None = None) -> bool
 
     Parameters
     ----------
-    tree : PyTree
+    tree : Tree
         A tree to check. A tree is a nested structure of containers
         (lists, tuples, dicts) and leaves (arrays, scalars, objects
         not registered as trees).
@@ -539,7 +539,7 @@ def tree_map(
 
 def tree_reduce(
     function: Callable[[V, ArrayLike], V],
-    tree: PyTree,
+    tree: Tree,
     initializer: V,
     is_leaf: Callable[[Any], bool] | None = None,
 ) -> V:
@@ -556,7 +556,7 @@ def tree_reduce(
         A function of two arguments: (accumulated_result, leaf_value) that
         returns a new accumulated result. The function should be commutative
         and associative to ensure results are independent of traversal order.
-    tree : PyTree
+    tree : Tree
         A tree to reduce. Here, a tree is a nested structure of containers
         (lists, tuples, dicts) and leaves (arrays or scalars).
     initializer : Any

@@ -49,9 +49,9 @@ from .._array_ops._array_ops import normalize_axis_index
 from ._compile import FunctionCache, compile
 
 if TYPE_CHECKING:
-    from ...typing import ArrayLike, PyTree
+    from ...typing import ArrayLike, Tree
 
-    T = TypeVar("T", bound=PyTree)
+    T = TypeVar("T", bound=Tree)
 
 __all__ = [
     "scan",
@@ -87,7 +87,7 @@ def scan(
 
         - Return a carry with the same structure as the input carry
 
-    init_carry : array_like or PyTree
+    init_carry : array_like or Tree
         The initial value of the carry state. Can be a scalar, array, or structured data.
         The structure of this value defines what ``func`` must return as its first
         output.
@@ -267,10 +267,10 @@ def scan(
 def switch(
     index: int,
     branches: tuple[Callable, ...],
-    *args: PyTree,
+    *args: Tree,
     name: str | None = None,
     kind: str = DEFAULT_SYM_NAME,
-) -> PyTree:
+) -> Tree:
     """
     Selectively apply one of several functions based on an index.
 
@@ -295,7 +295,7 @@ def switch(
     branches : tuple of callables
         A tuple of functions to choose from. Each function must accept the same
         arguments and return compatible structures.
-    *args : PyTree
+    *args : Tree
         Arguments to pass to the selected branch function. All branches must
         accept these arguments.
     name : str, optional
@@ -306,7 +306,7 @@ def switch(
 
     Returns
     -------
-    PyTree
+    Tree
         The result of applying the selected branch function to the provided arguments.
         All branches must return the same structure.
 

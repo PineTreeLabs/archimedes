@@ -13,9 +13,9 @@ from ._common import _ravel_args
 from ._lm import lm_solve
 
 if TYPE_CHECKING:
-    from ..typing import PyTree
+    from ..typing import Tree
 
-    T = TypeVar("T", bound=PyTree)
+    T = TypeVar("T", bound=Tree)
 
 
 __all__ = ["least_squares"]
@@ -54,7 +54,7 @@ def least_squares(
         Residual function with signature ``func(x, *args) -> residuals``, where
         ``residuals`` is an array-like object. The parameter ``x`` can be any
         tree structure matching ``x0``.
-    x0 : PyTree
+    x0 : Tree
         Initial parameter guess. Can be a flat array, nested dictionary, dataclass,
         or any tree structure. The solution preserves this exact structure.
 
@@ -83,7 +83,7 @@ def least_squares(
             - ``"dogbox"``: Dog-leg method in rectangular trust regions
             - ``"lm"``: Standard SciPy Levenberg-Marquardt (unconstrained only)
 
-    bounds : tuple of (PyTree, PyTree), optional
+    bounds : tuple of (Tree, Tree), optional
         Box constraints specified as ``(lower_bounds, upper_bounds)`` with the same
         tree structure as ``x0``. Use ``-np.inf`` and ``np.inf`` for unbounded
         variables.

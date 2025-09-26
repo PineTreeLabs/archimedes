@@ -436,9 +436,9 @@ def minimize(
     ----------
     obj : callable
         Objective function to minimize, with signature ``obj(x, *args)``.
-        Must return a scalar value. The function ``x`` parameter can be a PyTree
+        Must return a scalar value. The function ``x`` parameter can be a Tree
         matching the structure of ``x0``.
-    x0 : PyTree
+    x0 : Tree
         Initial guess for the optimization. Can be a flat array, nested dictionary,
         dataclass, or any tree structure. The solution will preserve this structure.
 
