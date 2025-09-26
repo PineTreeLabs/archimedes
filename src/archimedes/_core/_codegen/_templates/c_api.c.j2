@@ -38,9 +38,11 @@ int {{ function_name }}_step({{ function_name }}_arg_t* arg, {{ function_name }}
 {%- if input.ctx_type == "leaf" %}
     kernel_arg[{{ loop.index0 }}] = {% if input.is_addr %}&{% endif %}arg->{{ input.name }};
 {%- elif input.ctx_type == "list" %}
-    kernel_arg[{{ loop.index0 }}] = (float*)arg->{{ input.name }};  {# Pointer casting - array decays to pointer #}
+{# Pointer casting - array decays to pointer #}
+    kernel_arg[{{ loop.index0 }}] = (float*)arg->{{ input.name }};
 {%- elif input.ctx_type == "node" %}
-    kernel_arg[{{ loop.index0 }}] = (float*)&arg->{{ input.name }};  {# Pointer casting #}
+{# Pointer casting #}
+    kernel_arg[{{ loop.index0 }}] = (float*)&arg->{{ input.name }};
 {%- endif %}
 
 {% endfor %}
@@ -51,9 +53,11 @@ int {{ function_name }}_step({{ function_name }}_arg_t* arg, {{ function_name }}
 {%- if output.ctx_type == "leaf" %}
     kernel_res[{{ loop.index0 }}] = {% if output.is_addr %}&{% endif %}res->{{ output.name }};
 {%- elif output.ctx_type == "list" %}
-    kernel_res[{{ loop.index0 }}] = (float*)res->{{ output.name }};  {# Pointer casting - array decays to pointer #}
+    {# Pointer casting - array decays to pointer #}
+    kernel_res[{{ loop.index0 }}] = (float*)res->{{ output.name }};
 {%- elif output.ctx_type == "node" %}
-    kernel_res[{{ loop.index0 }}] = (float*)&res->{{ output.name }};  {# Pointer casting #}
+    {# Pointer casting #}
+    kernel_res[{{ loop.index0 }}] = (float*)&res->{{ output.name }};
 {%- endif %}
 
 {% endfor %}

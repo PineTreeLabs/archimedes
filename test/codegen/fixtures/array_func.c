@@ -48,13 +48,13 @@ int array_func_step(array_func_arg_t* arg, array_func_res_t* res, array_func_wor
     kernel_arg[1] = arg->one_d_single;
     kernel_arg[2] = arg->one_d_normal;
     kernel_arg[3] = arg->two_d_normal;
-    kernel_arg[4] = (float*)&arg->edge_case;  
+    kernel_arg[4] = (float*)&arg->edge_case;
 
     // Marshal outputs to CasADi format
     float* kernel_res[array_func_SZ_RES];
     kernel_res[0] = &res->sum;
     kernel_res[1] = &res->z;
-    kernel_res[2] = (float*)&res->edge_out;  
+    kernel_res[2] = (float*)&res->edge_out;
 
     // Call kernel function
     return array_func(kernel_arg, kernel_res, work->iw, work->w, 0);
