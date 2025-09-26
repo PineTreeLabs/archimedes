@@ -74,7 +74,7 @@ You can even build up an integrated workflow for system identification → contr
 The best way to continue learning is by working through the system identification process on your own with real data.
 For some widely used benchmark data sets to get started, see [Nonlinear Benchmarks](https://www.nonlinearbenchmark.org) and the [DaISy](https://homes.esat.kuleuven.be/~smc/daisy/daisydata.html) database.
 
-If you haven't already, be sure to read the documentation pages on [Working with PyTrees](../../pytrees.md) and [Hierarchical Design Patterns](../../generated/notebooks/modular-design.md) to get a feel for some approaches to modeling complex systems.
+If you haven't already, be sure to read the documentation pages on [Working with PyTrees](../../trees.md) and [Hierarchical Design Patterns](../../generated/notebooks/modular-design.md) to get a feel for some approaches to modeling complex systems.
 You may also want to check out the [Multirotor Dynamics](../../notebooks/multirotor/multirotor00.md) series to see these patterns in action.
 
 To explore Archimedes further, check out:

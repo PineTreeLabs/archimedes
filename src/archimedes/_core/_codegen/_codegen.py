@@ -95,7 +95,7 @@ def codegen(
 
         - SymbolicArray objects
         - NumPy arrays with the same shape and dtype as expected inputs
-        - [tree-structured data types](../../pytrees.md) matching expected inputs
+        - [tree-structured data types](../../trees.md) matching expected inputs
         - The actual values for static arguments
 
         Note: For dynamic arguments, the numeric values are ignored.

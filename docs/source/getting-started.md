@@ -273,7 +273,7 @@ x0 = np.array([1.0, 1.0])
 print(model(t0, x0))  # Call like a function
 ```
 
-For more information, see ["Working with PyTrees"](pytrees.md).
+For more information, see ["Working with PyTrees"](trees.md).
 
 (interpolation)=
 ## Interpolation
