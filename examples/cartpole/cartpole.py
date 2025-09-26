@@ -2,7 +2,7 @@ import numpy as np
 from archimedes import struct
 
 
-@struct.pytree_node
+@struct
 class CartPole:
     m1: float = 1.0
     m2: float = 0.3

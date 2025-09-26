@@ -1,6 +1,6 @@
-"""Utilities for working with hierarchical "pytree" data structures."""
+"""Utilities for working with hierarchical tree-structured data."""
 
-from ._flatten_util import ravel_pytree as ravel
+from ._flatten_util import ravel_tree as ravel
 from ._registry import (
     register_dataclass,
     register_struct,

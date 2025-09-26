@@ -51,12 +51,12 @@ This pattern is essential when working with:
 
 ## Custom PyTree Types
 
-For more complex models, create custom classes that work as PyTrees using the `struct.pytree_node` decorator:
+For more complex models, create custom classes that work as PyTrees using the `struct` decorator:
 
 ```python
 from archimedes.tree import struct
 
-@struct.pytree_node
+@struct
 class VehicleState:
     position: np.ndarray      # [x, y, z]
     velocity: np.ndarray      # [vx, vy, vz]
@@ -86,7 +86,7 @@ def dynamics(state, control, dt=0.1):
     )
 ```
 
-The `struct.pytree_node` decorator automatically registers your class with Archimedes' PyTree system, combining the benefits of Python [dataclasses](https://docs.python.org/3/library/dataclasses.html) with PyTree functionality.
+The `struct` decorator automatically registers your class with Archimedes' PyTree system, combining the benefits of Python [dataclasses](https://docs.python.org/3/library/dataclasses.html) with PyTree functionality.
 
 ### Custom nodes: advanced usage
 
@@ -104,9 +104,8 @@ Here is an expanded example with some advanced features:
 ```python
 import numpy as np
 import archimedes as arc
-from archimedes import struct
 
-@struct.pytree_node
+@arc.struct
 class Rocket:
     # Dynamic variables (included in flattening)
     h: float  # height in meters
@@ -114,8 +113,8 @@ class Rocket:
     m: float  # Current mass in kg
     
     # Static parameters (excluded from flattening)
-    thrust: float = struct.field(static=True, default=10000.0)  # Thrust in Newtons
-    isp: float = struct.field(static=True, default=300.0)       # Specific impulse in seconds
+    thrust: float = arc.field(static=True, default=10000.0)  # Thrust in Newtons
+    isp: float = arc.field(static=True, default=300.0)       # Specific impulse in seconds
     
     def __post_init__(self):
         # Validate inputs
@@ -174,7 +173,7 @@ import numpy as np
 import archimedes as arc
 
 # Define a custom PyTree node with dynamics method
-@arc.struct.pytree_node
+@arc.struct
 class PendulumState:
     theta: float      # angle
     omega: float      # angular velocity

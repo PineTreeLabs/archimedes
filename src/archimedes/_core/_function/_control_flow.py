@@ -88,7 +88,7 @@ def scan(
         - Return a carry with the same structure as the input carry
 
     init_carry : array_like or PyTree
-        The initial value of the carry state. Can be a scalar, array, or nested PyTree.
+        The initial value of the carry state. Can be a scalar, array, or structured data.
         The structure of this value defines what ``func`` must return as its first
         output.
     xs : array_like, optional
@@ -322,7 +322,7 @@ def switch(
     Behavior notes:
 
     - If `index` is out of bounds, it will be clamped to the valid range.
-    - All branches must return the same PyTree structure, or a ValueError will be
+    - All branches must return the same tree structure, or a ValueError will be
       raised.
     - At least two branches must be provided, or a ValueError will be raised.
     - Functions are traced at compilation time, meaning any side effects will occur
@@ -356,7 +356,7 @@ def switch(
     >>> apply_operation(x, 1)  # Returns sin(x)
     >>> apply_operation(x, 2)  # Returns -x
 
-    # Example with a PyTree
+    # Example with tree-structured data
     >>> def multiply(data, factor):
     ...     return {k: v * factor for k, v in data.items()}
     ...
@@ -422,7 +422,7 @@ def switch(
                     )
                 if results_treedef != results_treedef_i:
                     raise ValueError(
-                        "All branches of a switch must return the same PyTree "
+                        "All branches of a switch must return the same tree "
                         f"structure, but got {results_treedef} for branch 0 and "
                         f"{results_treedef_i} for branch {branch.name}."
                     )
@@ -457,7 +457,7 @@ def normalize_vmap_index(axis, data, insert=False):
     if isinstance(axis, int):
         axis = tree.map(lambda x: axis, data)
 
-    # Create a PyTree of normalized axis indices
+    # Create a tree of normalized axis indices
     def _normalize_leaf_index(axis, leaf):
         ndim = leaf.ndim
         if insert:
@@ -485,7 +485,7 @@ def vmap(
     ----------
     func : callable
         Function to be vectorized. The function can accept ordinary NumPy arrays
-        or PyTree-structured data.
+        or tree-structured data.
     in_axes : int, None, or tuple of ints/None, optional
         Specifies which axis of each input argument should be mapped over.
 
@@ -552,7 +552,7 @@ def vmap(
     >>> batched_dot(x, y)
     array([ 23,  67, 127])
 
-    Working with structured data (PyTrees):
+    Working with tree-structured data:
 
     >>> from archimedes import struct
     >>>
@@ -628,17 +628,17 @@ def vmap(
         #    as it has the right number of leaves.  Basically, this "puts the leaves
         #    back in the container".  However, this isn't compatible with `scan`.
         # 2. ravel/unravel: this requires that the data has exactly the same number of
-        #    elements, so we can't flexibly pack/unpack the PyTree containers. However,
+        #    elements, so we can't flexibly pack/unpack the tree containers. However,
         #    when the arrays are "raveled" we can scan over inputs/outputs efficiently
         #
-        # The "outer" step therefore flattens the PyTree to leaves (a list of arrays),
+        # The "outer" step therefore flattens the tree to leaves (a list of arrays),
         # and the "inner" steps stack the arguments and then splits the outputs.
 
-        # Outer step: PyTree -> leaves
+        # Outer step: tree -> leaves
         args_flat, in_tree = tree.flatten(mapped_args)
 
-        # Wrap to (0, ndim) and construct PyTrees of the mapped indices
-        # This will be a tuple of one PyTree for each argument, with each
+        # Wrap to (0, ndim) and construct trees of the mapped indices
+        # This will be a tuple of one tree for each argument, with each
         # leaf corresponding to the normalized index for that leaf
         in_axes_normalized = tuple(
             normalize_vmap_index(a, arg)
@@ -716,7 +716,7 @@ def vmap(
             for leaf, template in zip(out_leaves, out_template_leaves)
         ]
 
-        # Outer step: recreate the PyTree structure with the output leaves
+        # Outer step: recreate the tree structure with the output leaves
         out = out_tree.unflatten(out_leaves)
 
         # Swap axes again according to out_axes

@@ -14,9 +14,8 @@ class Timeseries:
     output measurements, and time vectors are consistently sized and properly
     formatted for use with Kalman filters and parameter estimation algorithms.
 
-    The class is implemented as a PyTree node, making it compatible with
-    automatic differentiation and functional transformations throughout the
-    Archimedes framework.
+    The class is implemented as a `@struct`, making it compatible with tree
+    operations throughout the Archimedes framework.
 
     Parameters
     ----------
@@ -56,12 +55,12 @@ class Timeseries:
         - All time dimensions are consistent (same N)
         - Data types are compatible with numerical operations
 
-    **PyTree Compatibility**:
-        As a PyTree node, ``Timeseries`` objects can be:
+    **Tree Compatibility**:
+        As a `@struct`, ``Timeseries`` objects can be:
 
-        - Flattened, reconstructed, and manipulated using PyTree utilities
+        - Flattened, reconstructed, and manipulated using tree utilities
         - Stored and manipulated as structured data
-        - Used in optimization algorithms that expect PyTree parameters
+        - Used in optimization algorithms that expect tree parameters
 
     **Immutability**:
         Instances are frozen (immutable) after creation, preventing accidental

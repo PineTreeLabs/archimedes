@@ -218,7 +218,7 @@ If you want to go beyond built-in Python containers, Archimedes provides a `stru
 ```python
 from archimedes.tree import struct
 
-@struct.pytree_node
+@struct
 class VehicleState:
     position: np.ndarray  # [x, y, z]
     velocity: np.ndarray  # [vx, vy, vz]
@@ -253,7 +253,7 @@ For example, you can create a callable class with some parameters using the spec
 
 ```python
 
-@struct.pytree_node
+@struct
 class PredatorPrey:
     a: float
     b: float

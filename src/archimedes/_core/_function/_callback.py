@@ -33,7 +33,7 @@ def callback(func: Callable, result_shape_dtypes, *args) -> Any:
         arguments as provided in ``*args`` and should return values that can be
         converted to NumPy arrays.
     result_shape_dtypes : PyTree
-        A PyTree structure that defines the expected shape and data types of the
+        A tree structure that defines the expected shape and data types of the
         function's output. This is used to determine the output shape of the
         callback wrapper without calling the function itself.
     *args : Any
@@ -43,7 +43,7 @@ def callback(func: Callable, result_shape_dtypes, *args) -> Any:
     Returns
     -------
     Any
-        The result of calling ``func(*args)``, structured as a PyTree if applicable.
+        The result of calling ``func(*args)``, structured as a tree if applicable.
 
     Notes
     -----

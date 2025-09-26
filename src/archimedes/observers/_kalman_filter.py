@@ -84,7 +84,7 @@ class KalmanFilterBase(metaclass=abc.ABCMeta):
     This class is decorated with ``@struct``, making it compatible
     with function transformations and enabling efficient automatic differentiation
     through the filter operations. The filter parameters can be modified using
-    standard PyTree operations.
+    standard tree operations.
 
     Subclasses must implement the abstract ``step`` method that performs one
     complete filtering step (prediction + update). The implementation details

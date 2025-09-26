@@ -44,7 +44,7 @@ def least_squares(
         subject to  lb <= x <= ub
 
     This function provides access to both custom least-squares algorithms and standard
-    SciPy methods, with full PyTree parameter structure support and automatic
+    SciPy methods, with full tree parameter structure support and automatic
     differentiation. The custom ``"hess-lm"`` method can provide superior performance
     for system identification and parameter estimation problems.
 
@@ -53,10 +53,10 @@ def least_squares(
     func : callable
         Residual function with signature ``func(x, *args) -> residuals``, where
         ``residuals`` is an array-like object. The parameter ``x`` can be any
-        PyTree structure matching ``x0``.
+        tree structure matching ``x0``.
     x0 : PyTree
         Initial parameter guess. Can be a flat array, nested dictionary, dataclass,
-        or any PyTree structure. The solution preserves this exact structure.
+        or any tree structure. The solution preserves this exact structure.
 
         Examples::
 
@@ -85,12 +85,12 @@ def least_squares(
 
     bounds : tuple of (PyTree, PyTree), optional
         Box constraints specified as ``(lower_bounds, upper_bounds)`` with the same
-        PyTree structure as ``x0``. Use ``-np.inf`` and ``np.inf`` for unbounded
+        tree structure as ``x0``. Use ``-np.inf`` and ``np.inf`` for unbounded
         variables.
 
         Examples::
 
-            # PyTree bounds for physical constraints
+            # tree bounds for physical constraints
             bounds = (
                 {"dynamics": {"mass": 0.1, "damping": 0.0}},  # Lower bounds
                 {"dynamics": {"mass": 10.0, "damping": 1.0}}   # Upper bounds
@@ -107,9 +107,9 @@ def least_squares(
     Returns
     -------
     result : OptimizeResult
-        Optimization result with preserved PyTree structure:
+        Optimization result with preserved tree structure:
 
-        - ``x`` : Solution parameters (same PyTree structure as ``x0``)
+        - ``x`` : Solution parameters (same tree structure as ``x0``)
         - ``success`` : Whether optimization converged successfully
         - ``status`` : Termination status (LMStatus for "hess-lm")
         - ``message`` : Descriptive termination message
@@ -121,9 +121,9 @@ def least_squares(
 
     Notes
     -----
-    **PyTree Parameter Organization:**
+    **Tree Parameter Organization:**
 
-    PyTree support enables natural organization of complex parameter structures::
+    Tree support enables natural organization of complex parameter structures::
 
         # Organized system parameters
         params = {

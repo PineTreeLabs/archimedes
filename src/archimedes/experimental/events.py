@@ -33,7 +33,7 @@ class PeriodicEvent:
 
 @dataclasses.dataclass
 class EventScheduler:
-    """PyTree-compatible event scheduler for multirate events"""
+    """tree-compatible event scheduler for multirate events"""
 
     events: List[PeriodicEvent]
     eps: float = 1e-10  # Tolerance for floating-point comparisons

@@ -194,7 +194,7 @@ def _make_nlp_solver(
     if name is None:
         name = f"{obj.name}_nlp"
 
-    # Wrap for PyTree compatibility
+    # Wrap for tree compatibility
     def _wrapped_solve(x0, *args):
         if constrain_x:
             bounds = args[:2]
@@ -412,7 +412,7 @@ def minimize(
     options: dict | None = None,
 ) -> OptimizeResult:
     """
-    Minimize a scalar function with optional constraints and PyTree support.
+    Minimize a scalar function with optional constraints and tree support.
 
     Solve a nonlinear programming problem of the form:
 
@@ -424,11 +424,11 @@ def minimize(
 
     This function provides a unified interface to multiple optimization methods,
     including CasADi-based solvers (IPOPT, SQP) and SciPy optimizers (BFGS, L-BFGS-B),
-    with automatic differentiation and native PyTree parameter structure support.
+    with automatic differentiation and native tree parameter structure support.
 
     **Key Features:**
-        - **PyTree Support**: Parameters can be nested dictionaries, dataclasses, or
-            any PyTree structure
+        - **Tree Support**: Parameters can be nested dictionaries, dataclasses, or
+            any tree structure
         - **Automatic Differentiation**: Exact gradients and Hessians (as needed)
             computed efficiently and automatically
 
@@ -440,7 +440,7 @@ def minimize(
         matching the structure of ``x0``.
     x0 : PyTree
         Initial guess for the optimization. Can be a flat array, nested dictionary,
-        dataclass, or any PyTree structure. The solution will preserve this structure.
+        dataclass, or any tree structure. The solution will preserve this structure.
 
         Examples::
 
@@ -471,7 +471,7 @@ def minimize(
         Note: SciPy methods (BFGS, L-BFGS-B) do not support general constraints.
     bounds : tuple, optional
         Bounds on the decision variables, given as a tuple ``(lb, ub)``.
-        Each bound must have the same PyTree structure as ``x0``. Use ``-np.inf``
+        Each bound must have the same tree structure as ``x0``. Use ``-np.inf``
         and ``np.inf`` for unbounded variables.
 
         Examples::
@@ -479,7 +479,7 @@ def minimize(
             # Array bounds
             bounds = (np.array([0.0, -1.0]), np.array([10.0, 1.0]))
 
-            # PyTree bounds (matching x0 structure)
+            # tree bounds (matching x0 structure)
             bounds = (
                 {"mass": 0.1, "damping": {"c1": 0.0, "c2": 0.0}},  # lower bounds
                 {"mass": 10.0, "damping": {"c1": 1.0, "c2": 1.0}}  # upper bounds
@@ -508,9 +508,9 @@ def minimize(
     Returns
     -------
     result : OptimizeResult
-        Optimization result with PyTree structure preserved:
+        Optimization result with tree structure preserved:
 
-        - ``x`` : Solution parameters (same PyTree structure as ``x0``)
+        - ``x`` : Solution parameters (same tree structure as ``x0``)
         - ``success`` : Whether optimization succeeded
         - ``message`` : Descriptive termination message
         - ``fun`` : Final objective value
@@ -533,7 +533,7 @@ def minimize(
     For CasADi methods, both gradients and Hessians are computed exactly.
     For SciPy methods, gradients are exact and Hessians are approximated using BFGS.
 
-    **PyTree Structure Preservation:**
+    **Tree Structure Preservation:**
 
     The solution ``result.x`` maintains the exact same nested structure as the
     initial guess ``x0``. This enables natural parameter organization for
@@ -590,17 +590,17 @@ def minimize(
     >>> import numpy as np
     >>> import archimedes as arc
     >>>
-    >>> # Rosenbrock function with PyTree parameters
+    >>> # Rosenbrock function with structured parameters
     >>> def rosenbrock(params):
     ...     x, y = params["x"], params["y"]
     ...     return 100 * (y - x ** 2) ** 2 + (1 - x) ** 2
     >>>
-    >>> # PyTree initial guess
+    >>> # Initial guess
     >>> x0 = {"x": 2.0, "y": 1.0}
     >>>
     >>> # Unconstrained optimization
     >>> result = arc.optimize.minimize(rosenbrock, x0, method="BFGS")
-    >>> print(result.x)  # Preserves PyTree structure
+    >>> print(result.x)  # Preserves tree structure
     {'x': 0.9999999999999994, 'y': 0.9999999999999989}
 
     **Constrained Optimization:**
@@ -618,9 +618,9 @@ def minimize(
     ...     method="ipopt"
     ... )
 
-    **Box Constraints with PyTree:**
+    **Box Constraints with structured data:**
 
-    >>> # PyTree bounds matching x0 structure
+    >>> # Tree bounds matching x0 structure
     >>> bounds = (
     ...     {"x": 0.0, "y": 0.0},      # Lower bounds
     ...     {"x": 2.0, "y": 2.0}       # Upper bounds

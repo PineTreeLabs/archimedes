@@ -95,7 +95,7 @@ def codegen(
 
         - SymbolicArray objects
         - NumPy arrays with the same shape and dtype as expected inputs
-        - [PyTree](../../pytrees.md)-structured data types matching expected inputs
+        - [tree-structured data types](../../pytrees.md) matching expected inputs
         - The actual values for static arguments
 
         Note: For dynamic arguments, the numeric values are ignored.
@@ -196,7 +196,7 @@ def codegen(
     2. Pass them as hashable static arguments (same effect as a closure)
     3. Pass as "dynamic" arguments that could be edited in the generated code
 
-    **PyTree support**
+    **Tree support**
 
     The code generation system supports structured data types, either as homogeneous
     arrays (lists or tuples with all elements of the same type) or as heterogeneous
@@ -204,7 +204,7 @@ def codegen(
     The former will be represented as C arrays, while the latter will be represented
     as C structs.
 
-    For example, a PyTree argument defined with
+    For example, a struct argument defined with
 
     .. code-block:: python3
 
@@ -240,10 +240,10 @@ def codegen(
     will store ``x[k]``, but the updated state will *not* automatically be copied back
     to the input.
 
-    If the state is implemented as a PyTree, it will correspond to a C struct and the
+    If the state is implemented as a `@struct`, it will correspond to a C struct and the
     copy operation can be implemented simply using direct copy semantics.  For example,
     a function with the signature ``func(state, inputs) -> (state_new, outputs)`` for
-    which the state is a PyTree (or dict, or named tuple) will generate a C struct
+    which the state is a `@struct` (or dict, or named tuple) will generate a C struct
     named ``state_t``.  The ``arg`` structure will include a field ``state``, and the
     ``res`` structure will include a field ``state_new``, both of which have type
     ``state_t``.  With direct assignment copying, the updated state can be copied back
@@ -521,7 +521,7 @@ class ContextHelper:
         if not arg:
             return self._process_none(name)
 
-        # Items can be any valid PyTree, but they all must have an identical structure
+        # Items can be any valid tree, but they all must have an identical structure
         treedef0 = tree.structure(arg[0])
         elements: list[Context] = []
         for i, item in enumerate(arg):

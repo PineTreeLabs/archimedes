@@ -23,13 +23,13 @@ class TransferFunctionBase:
         return C @ x + D @ u
 
 
-@struct.pytree_node
+@struct
 class TransferFunction(TransferFunctionBase):
     num: np.ndarray
     den: np.ndarray
 
 
-@struct.pytree_node
+@struct
 class FirstOrderLag(TransferFunctionBase):
     gain: float
     tau: float
@@ -51,7 +51,7 @@ class StaticNonlinearity:
         raise NotImplementedError("StaticNonlinearity must implement __call__ method.")
 
 
-@struct.pytree_node
+@struct
 class HammersteinWiener:
     input: StaticNonlinearity
     lin_sys: TransferFunction
@@ -68,7 +68,7 @@ class HammersteinWiener:
         return self.output(self.lin_sys.observation(t, x, u))
 
 
-@struct.pytree_node
+@struct
 class TanhNonlinearity(StaticNonlinearity):
     saturation: float
 
@@ -77,7 +77,7 @@ class TanhNonlinearity(StaticNonlinearity):
         return self.saturation * np.tanh(x / self.saturation)
 
 
-@struct.pytree_node
+@struct
 class CubicNonlinearity(StaticNonlinearity):
     coeff: np.ndarray
 

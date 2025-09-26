@@ -532,13 +532,13 @@ def lm_solve(
         Objective function with signature ``func(x, *args) -> r``, where ``r`` is
         a vector of residuals.
     x0 : PyTree
-        Initial parameter guess. Can be a flat array or a PyTree structure which
+        Initial parameter guess. Can be a flat array or a tree structure which
         will be preserved in the solution.
     args : tuple, optional
         Extra arguments passed to the objective function.
     bounds : tuple of (PyTree, PyTree), optional
         Box constraints specified as ``(lower_bounds, upper_bounds)``.
-        Each bound array must have the same PyTree structure as ``x0``. Use
+        Each bound array must have the same tree structure as ``x0``. Use
         ``-np.inf`` and ``np.inf`` for unbounded variables. Enables physical
         constraints like mass > 0, damping > 0, etc.
     ftol : float, default=1e-6
@@ -555,7 +555,7 @@ def lm_solve(
     max_nfev : int, default=100
         Maximum number of function evaluations.
     diag : PyTree, optional
-        Diagonal scaling factors for variables, in the form of a PyTree matching
+        Diagonal scaling factors for variables, in the form of a tree matching
         the structure of ``x0``. If None, automatic scaling is used based on the
         Hessian diagonal. Custom scaling can improve convergence for ill-conditioned
         problems.

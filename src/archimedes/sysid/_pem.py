@@ -441,7 +441,7 @@ def pem(
         Whether to estimate the initial state ``x0`` along with parameters.
     bounds : tuple of (PyTree, PyTree), optional
         Parameter bounds as ``(lower_bounds, upper_bounds)`` with the
-        same PyTree structure as ``p_guess``. Enables physical
+        same tree structure as ``p_guess``. Enables physical
         constraints such as:
 
         - Positive masses, stiffnesses, damping coefficients
