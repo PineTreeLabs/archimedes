@@ -27,9 +27,10 @@ from .simulate import integrator, odeint
 from .theme import set_theme
 from .tree import struct
 
-from . import error, observers, sysid, theme, tree  # isort: skip
+from . import docs, error, observers, sysid, theme, tree  # isort: skip
 
 __all__ = [
+    "docs",
     "error",
     "theme",
     "set_theme",

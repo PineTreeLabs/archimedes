@@ -41,6 +41,12 @@ int nested_func_init(nested_func_arg_t* arg, nested_func_res_t* res, nested_func
     arg->clusters[1].weights[1] = 0.500000f;
     arg->clusters[1].weights[2] = 0.600000f;
 
+    _Static_assert(sizeof(nested_func_arg_t) == 26 * sizeof(float),
+        "Non-contiguous arg struct; please enable -fpack-struct or equivalent.");
+
+    _Static_assert(sizeof(nested_func_res_t) == 1 * sizeof(float),
+        "Non-contiguous res struct; please enable -fpack-struct or equivalent.");
+
     return 0;
 }
 
@@ -53,29 +59,12 @@ int nested_func_step(nested_func_arg_t* arg, nested_func_res_t* res, nested_func
     const float* kernel_arg[nested_func_SZ_ARG];
     kernel_arg[0] = &arg->scalar;
     kernel_arg[1] = arg->arr;
-    kernel_arg[2] = &arg->clusters[0].center.x;
-    kernel_arg[3] = &arg->clusters[0].center.y;
-    kernel_arg[4] = &arg->clusters[0].points[0].x;
-    kernel_arg[5] = &arg->clusters[0].points[0].y;
-    kernel_arg[6] = &arg->clusters[0].points[1].x;
-    kernel_arg[7] = &arg->clusters[0].points[1].y;
-    kernel_arg[8] = &arg->clusters[0].points[2].x;
-    kernel_arg[9] = &arg->clusters[0].points[2].y;
-    kernel_arg[10] = arg->clusters[0].weights;
-    kernel_arg[11] = &arg->clusters[1].center.x;
-    kernel_arg[12] = &arg->clusters[1].center.y;
-    kernel_arg[13] = &arg->clusters[1].points[0].x;
-    kernel_arg[14] = &arg->clusters[1].points[0].y;
-    kernel_arg[15] = &arg->clusters[1].points[1].x;
-    kernel_arg[16] = &arg->clusters[1].points[1].y;
-    kernel_arg[17] = &arg->clusters[1].points[2].x;
-    kernel_arg[18] = &arg->clusters[1].points[2].y;
-    kernel_arg[19] = arg->clusters[1].weights;
-    
+    kernel_arg[2] = (float*)arg->clusters;
+
     // Marshal outputs to CasADi format
     float* kernel_res[nested_func_SZ_RES];
     kernel_res[0] = &res->z;
-    
+
     // Call kernel function
     return nested_func(kernel_arg, kernel_res, work->iw, work->w, 0);
 }

@@ -65,6 +65,7 @@ Documentation
 
    notebooks/deployment/deployment00
    generated/notebooks/sysid/parameter-estimation
+   notebooks/workflow/workflow00
    notebooks/multirotor/multirotor00
 
 .. toctree::
