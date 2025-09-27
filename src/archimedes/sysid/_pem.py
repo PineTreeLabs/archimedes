@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, TypeVar
+from typing import TYPE_CHECKING, TypeVar, Optional
 
 import numpy as np
 from scipy.optimize import OptimizeResult
@@ -67,8 +67,8 @@ class PEMObjective:
 
     predictor: KalmanFilterBase
     data: Timeseries
-    P0: np.ndarray
-    x0: np.ndarray = tree.field(static=True, default=None)
+    P0: np.ndarray | None
+    x0: Optional[np.ndarray] = tree.field(static=True, default=None)  # type: ignore
 
     def forward(self, x0: np.ndarray, params: Tree) -> dict:
         """Run Kalman filter forward pass and compute prediction errors.
@@ -157,9 +157,10 @@ class PEMObjective:
             x0, params = decision_variables
 
         results = self.forward(x0, params)
-        return results["e"].flatten()
+        e: np.ndarray = results["e"].flatten()
+        return e
 
-    def __call__(self, decision_variables: Tree | tuple[np.ndarray, Tree]) -> tuple:
+    def __call__(self, decision_variables: Tree | tuple[np.ndarray, Tree]) -> float:
         """Evaluate cost function for general optimization methods.
 
         Parameters
@@ -186,7 +187,8 @@ class PEMObjective:
             x0, params = decision_variables
 
         results = self.forward(x0, params)
-        return results["V"]
+        V: float = results["V"]
+        return V
 
 
 @tree.struct
@@ -200,11 +202,11 @@ class CompoundPEMObjective:
     sub_objectives: list[PEMObjective]
 
     def _make_sub_dvs(
-        self, decision_variables: tuple[np.ndarray | None, Tree]
+        self, decision_variables: tuple[np.ndarray, Tree]
     ) -> list[tuple[np.ndarray | None, Tree]]:
         """Prepare sub-decision variables for each sub-objective."""
         sub_x0, params = decision_variables
-        sub_dvs = []
+        sub_dvs: list[tuple[np.ndarray | None, Tree]] = []
 
         for x0, pem_obj in zip(sub_x0, self.sub_objectives):
             if pem_obj.x0 is not None:
@@ -217,7 +219,7 @@ class CompoundPEMObjective:
 
         return sub_dvs
 
-    def __call__(self, decision_variables: tuple[np.ndarray | None, Tree]) -> tuple:
+    def __call__(self, decision_variables: tuple[np.ndarray, Tree]) -> float:
         """Evaluate cost function for compound PEM objective."""
         sub_dvs = self._make_sub_dvs(decision_variables)
         total_cost = 0.0
@@ -244,11 +246,11 @@ class CompoundPEMObjective:
 
 
 def _pem_solve_lm(
-    pem_obj: PEMObjective,
+    pem_obj: CompoundPEMObjective,
     p_guess: T,
     bounds: tuple[T, T] | None = None,
     options: dict | None = None,
-) -> LMResult:
+) -> OptimizeResult:
     """Solve the PEM problem using Levenberg-Marquardt optimization."""
     if options is None:
         options = {}
@@ -261,11 +263,11 @@ def _pem_solve_lm(
         "max_nfev": 200,
     }
     options = {**default_options, **options}
-    return lm_solve(pem_obj.residuals, p_guess, bounds=bounds, **options)
+    result: OptimizeResult = lm_solve(pem_obj.residuals, p_guess, bounds=bounds, **options)
 
 
 def _pem_solve_bfgs(
-    pem_obj: PEMObjective,
+    pem_obj: CompoundPEMObjective,
     p_guess: T,
     bounds: tuple[T, T] | None = None,
     options: dict | None = None,
@@ -282,7 +284,7 @@ def _pem_solve_bfgs(
         lb_flat, _ = arc.tree.ravel(lb)
         ub_flat, _ = arc.tree.ravel(ub)
         # Zip bounds into (lb, ub) for each parameter
-        bounds = list(zip(lb_flat, ub_flat))
+        bounds = list(zip(lb_flat, ub_flat))  # type: ignore
 
     # Define an objective and gradient function for BFGS
     @arc.compile
@@ -300,7 +302,7 @@ def _pem_solve_bfgs(
 
     options = {**default_options, **options}
 
-    result = scipy_minimize(
+    result: OptimizeResult = scipy_minimize(
         func,
         p_guess_flat,
         method=method,
@@ -315,7 +317,7 @@ def _pem_solve_bfgs(
 
 
 def _pem_solve_ipopt(
-    pem_obj: PEMObjective,
+    pem_obj: CompoundPEMObjective,
     p_guess: T,
     bounds: tuple[T, T] | None = None,
     options: dict | None = None,
@@ -329,7 +331,7 @@ def _pem_solve_ipopt(
         "max_iter": 200,
         "hessian_approximation": "limited-memory",
     }
-    default_options = {}
+    default_options: dict[str, str | float | int] = {}
 
     options["ipopt"] = {**ipopt_default_options, **options.get("ipopt", {})}
     options = {**default_options, **options}
@@ -339,14 +341,14 @@ def _pem_solve_ipopt(
         lb, ub = bounds
         lb_flat, _ = arc.tree.ravel(lb)
         ub_flat, _ = arc.tree.ravel(ub)
-        bounds = (lb_flat, ub_flat)
+        bounds = (lb_flat, ub_flat)  # type: ignore
 
     # Define an objective and gradient function for BFGS
     @arc.compile
     def func(params_flat):
         return pem_obj(unravel(params_flat))
 
-    result = arc.minimize(
+    result: OptimizeResult = arc.minimize(
         func,
         p_guess_flat,
         bounds=bounds,
@@ -372,12 +374,12 @@ def pem(
     data: Timeseries | tuple[Timeseries, ...],
     p_guess: T,
     x0: np.ndarray | tuple[np.ndarray, ...],
-    estimate_x0: bool | tuple[bool] = False,
+    estimate_x0: bool | tuple[bool, ...] = False,
     bounds: tuple[T, T] | None = None,
-    P0: np.ndarray | tuple[np.ndarray] = None,
+    P0: np.ndarray | None | tuple[np.ndarray | None, ...] = None,
     method: str = "lm",
     options: dict | None = None,
-) -> LMResult:
+) -> OptimizeResult:
     """Estimate parameters using Prediction Error Minimization.
 
     Solves the system identification problem by minimizing the prediction
@@ -614,16 +616,16 @@ def pem(
     # For each argument, replicate for all experiments if needed
 
     if isinstance(x0, np.ndarray):
-        x0 = [x0] * n_expt
+        x0 = tuple([x0] * n_expt)
 
     if P0 is None or isinstance(P0, np.ndarray):
-        P0 = [P0] * n_expt
+        P0 = tuple([P0] * n_expt)
 
     if isinstance(estimate_x0, bool):
-        estimate_x0 = [estimate_x0] * n_expt
+        estimate_x0 = tuple([estimate_x0] * n_expt)
 
     sub_objectives = []
-    x0_guess = []
+    x0_guess: list[np.ndarray | None] = []
     for i in range(n_expt):
         if estimate_x0[i]:
             x0_guess.append(x0[i])
@@ -647,11 +649,11 @@ def pem(
     if bounds is not None:
         x0_bounds = [None] * n_expt
         lb, ub = bounds
-        lb = (x0_bounds, lb)
-        ub = (x0_bounds, ub)
+        lb = (x0_bounds, lb)  # type: ignore
+        ub = (x0_bounds, ub)  # type: ignore
         bounds = (lb, ub)
 
-    result = pem_solve(
+    result : OptimizeResult = pem_solve(
         pem_obj=objective,
         p_guess=dvs_guess,
         bounds=bounds,
