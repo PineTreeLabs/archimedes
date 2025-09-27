@@ -35,7 +35,7 @@ jobs:
         token: ${{ secrets.CODECOV_TOKEN }}
 
     - name: Test notebooks
-      run: uv run pytest --nbmake docs/source/notebooks/*.ipynb
+      run: uv run pytest --nbmake docs/source/notebooks/**/*.ipynb
 
     - name: Lint with ruff
       run: |
