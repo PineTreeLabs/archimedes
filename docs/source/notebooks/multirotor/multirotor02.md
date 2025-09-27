@@ -60,14 +60,14 @@ In short, we will create a set of callable classes that implement well-defined i
 
 In the lingo of object-oriented programming, a "functor" is an object that can be called like a function.
 In Python this can be accomplished by implementing the `__call__` method for a class, which allows it to be called with function syntax.
-Combining this with the [`pytree_node`](#archimedes.tree.struct.pytree_node) concept gives us a simple and powerful pattern for organizing our parameters and functional behavior.
+Combining this with the [`struct`](#archimedes.tree.struct) concept (essentially a dataclass) gives us a simple and powerful pattern for organizing our parameters and functional behavior.
 For instance, we can rewrite the 6-dof dynamics function above as follows:
 
 ```python
 import numpy as np
 from archimedes import struct
 
-@struct.pytree_node
+@struct
 class FlightVehicle:
     """Callable dataclass implementation"""
     m: float  # Vehicle mass
@@ -90,9 +90,9 @@ Since the 6-dof dynamics are generic, but the multirotor forces are much more sp
 ```python
 import abc
 import numpy as np
-from archimedes import struct
+from archimedes import struct, module
 
-@struct.pytree_node
+@struct
 class FlightVehicle(metaclass=abc.ABCMeta):
     """Callable dataclass implementation"""
     m: float  # Vehicle mass
@@ -112,7 +112,7 @@ This will throw an error if we try to instantiate a `FlightVehicle` as is, since
 We still have to specialize this to the multirotor by summing contributions from gravity, drag, and each of the rotors:
 
 ```python
-@struct.pytree_node
+@struct
 class MultiRotorVehicle(FlightVehicle):
 
     def net_forces(self, t, x, u, C_BN):
@@ -141,9 +141,9 @@ In the general case the acceleration due to gravity depends on the position of t
 With that in mind, we can define a generic callable interface for gravity, with specific implementations for each of our models:
 
 ```python
-@struct.pytree_node
-class GravityModel(metaclass=abc.ABCMeta):
-    @abc.abstractmethod
+from typing import Protocol
+
+class GravityModel(Protocol):
     def __call__(self, p_N):
         """Gravitational acceleration at the body CM in the inertial frame N
 
@@ -155,16 +155,16 @@ class GravityModel(metaclass=abc.ABCMeta):
         """
 
 
-@struct.pytree_node
-class ConstantGravity(GravityModel):
+@struct
+class ConstantGravity:
     g0: float = 9.81
 
     def __call__(self, p_N):
         return np.array([0, 0, self.g0], like=p_N)
 
 
-@struct.pytree_node
-class PointGravity(GravityModel):
+@struct
+class PointGravity:
     r_EN: np.ndarray  # Position vector from Earth's CM to the origin of the N frame [m]
     G: float = 6.6743e-11  # Gravitational constant [N-m²/kg²]
 
@@ -177,7 +177,7 @@ We could also include an oblate-Earth model, lookup tables based on measured gra
 With this clearly-defined interface, we can add a gravity model to the `MultiRotorVehicle` and reliably access it as follows:
 
 ```python
-@struct.pytree_node
+@struct
 class MultiRotorVehicle(FlightVehicle):
     gravity_model: GravityModel
 
@@ -209,10 +209,10 @@ All told, our basic class structure looks like this:
 ```python
 import abc
 import numpy as np
-from archimedes import struct
+from archimedes import struct, module, field
 
 
-@struct.pytree_node
+@struct
 class FlightVehicle(metaclass=abc.ABCMeta):
     """Callable dataclass implementation"""
     m: float  # Vehicle mass
@@ -228,9 +228,9 @@ class FlightVehicle(metaclass=abc.ABCMeta):
         # ...
 
 
-@struct.pytree_node
+@struct
 class RotorGeometry:
-    offset: np.ndarray = struct.field(default_factory=lambda: np.zeros(3))  # Location of the rotor hub in the body frame B [m]
+    offset: np.ndarray = field(default_factory=lambda: np.zeros(3))  # Location of the rotor hub in the body frame B [m]
     ccw: bool = True  # True if rotor spins counter-clockwise when viewed from above
     torsional_cant: float = 0.0  # torsional cant angle χ [rad]
     flapwise_cant: float = 0.0  # flapwise cant angle γ [rad]
@@ -250,8 +250,7 @@ class RotorGeometry:
         return hash((str(self.offset), self.ccw, self.torsional_cant, self.flapwise_cant))
 
 
-class VehicleDragModel(metaclass=abc.ABCMeta):
-    @abc.abstractmethod
+class VehicleDragModel(Protocol):
     def __call__(self, t, x):
         """Drag forces and moments in body frame B
 
@@ -265,8 +264,7 @@ class VehicleDragModel(metaclass=abc.ABCMeta):
         """
 
 
-class GravityModel(metaclass=abc.ABCMeta):
-    @abc.abstractmethod
+class GravityModel(Protocol):
     def __call__(self, p_N):
         """Gravitational acceleration at the body CM in the inertial frame N
 
@@ -304,7 +302,7 @@ class RotorModel(metaclass=abc.ABCMeta):
         """Aerodynamic forces and moments in wind frame W"""
 
 
-@struct.pytree_node
+@struct
 class MultiRotorVehicle(FlightVehicle):
     rotors: list[RotorGeometry]
     rotor_model: RotorModel
@@ -320,8 +318,8 @@ See the source code for the specific implementations of the code snipped with el
 For the basic dynamics model described above, we will also have concrete implementations of `VehicleDragModel`, `GravityModel`, and `RotorModel`:
 
 ```python
-@struct.pytree_node
-class QuadraticDragModel(VehicleDragModel):
+@struct
+class QuadraticDragModel:
     """Simple velocity-squared drag model for the main vehicle body"""
     rho: float = 1.225  # air density [kg/m^3]
     Cd: float = 0.0  # drag coefficient
@@ -344,8 +342,8 @@ class QuadraticDragModel(VehicleDragModel):
         return D_B, M_B
 
 
-@struct.pytree_node
-class ConstantGravity(GravityModel):
+@struct
+class ConstantGravity:
     """Uniform gravitational field (flat-Earth approximation)"""
     g0: float = 9.81
 
@@ -353,7 +351,7 @@ class ConstantGravity(GravityModel):
         return np.array([0, 0, self.g0], like=p_N)
 
 
-@struct.pytree_node
+@struct
 class QuadraticRotorModel(RotorModel):
     """Velocity-squared model for rotor aerodynamics"""
     kF: float = 1.0  # aerodynamic force constant [N/rad^2]
@@ -409,7 +407,7 @@ This is far from the only (or probably even the best way) to construct this kind
 
 ## Using Archimedes
 
-You may have noticed that none of our model implementations so far use Archimedes beyond using the [`pytree_node`](#archimedes.tree.struct.pytree_node) decorator to create composable models.
+You may have noticed that none of our model implementations so far appear to use Archimedes beyond using the [`@struct`](#archimedes.tree.struct) decorator to create composable models.
 Still, because we have only used NumPy functions (and have been careful to include `like=x` whenever we call `np.array`), we can evaluate any of these methods symbolically just as easily as we can with numerical arrays.
 As we'll see, this makes it easy to develop a model in pure NumPy and then use Archimedes for advanced use cases like accelerated simulation, optimization, stability analysis, and C code generation.
 
@@ -420,7 +418,7 @@ In general, if you start by writing the mathematical equations and then implemen
 Specifically, we don't want to use preallocated "work" variables to store intermediate results:
 
 ```python
-@struct.pytree_node
+@struct
 class PureCallable:
     a: float = 1.0
 
@@ -429,7 +427,7 @@ class PureCallable:
         y = np.sin(a * x)
         return np.exp(y)
 
-@struct.pytree_node
+@struct
 class ImpureCallable:
     a: float = 1.0
     y: float = 0.0  # Try to save allocations with pre-allocated variable
@@ -443,7 +441,7 @@ class ImpureCallable:
 What happens in the latter case is that Archimedes will feed a [`SymbolicArray`](#archimedes.sym) object to `ImpureCallable.__call__`, which will then _store_ the [`SymbolicArray`](#archimedes.sym) resulting from the sine function in `self.y`.
 While this might actually work in this case, you will get stray symbolic objects in unexpected places which can cause all kinds of unexpected problems.
 Basically, behavior for impure functions and callable classes is not well-defined and these should be avoided at all costs.
-In fact, by default the `pytree_node` decorator will create a "frozen" class definition, meaning that it will throw an error if you even try to modify one of the object's fields.
+In fact, by default the [`@struct`](#archimedes.tree.struct) decorator will create a "frozen" class definition, meaning that it will throw an error if you even try to modify one of the object's fields.
 This can be overridden, but it's done as a reminder to write pure functions.
 
 This _does_ mean that the most efficient NumPy code you can write will likely look different from code that is compatible with Archimedes, since fast NumPy code will usually use pre-allocated arrays, as with C or FORTRAN codes.
@@ -458,16 +456,16 @@ Finally, although we have included `FlightVehicle` as part of our class hierarch
 The interface is the same as what we've shown here, and you can look at the source code in [multirotor.py](https://github.com/jcallaham/archimedes/tree/main/docs/source/notebooks/multirotor/multirotor.py) to see how exactly it builds on the generic `FlightVehicle`.
 
 One difference with what we've shown here is that instead of using a flat 12-element vector to represent the state of the vehicle, the built-in `FlightVehicle` defines its own `State` class.
-This is another [`pytree_node`](#archimedes.tree.struct.pytree_node) with fields for each of the four groups of state variables: position (`State.p_N`), attitude (`State.att`), velocity (`State.v_B`), angular velocity (`State.w_B`), and any additional state variables (`State.aux`).
+This is another [`struct`](#archimedes.tree.struct) with fields for each of the four groups of state variables: position (`State.p_N`), attitude (`State.att`), velocity (`State.v_B`), angular velocity (`State.w_B`), and any additional state variables (`State.aux`).
 The naming convention follows [monogram notation](https://drake.mit.edu/doxygen_cxx/group__multibody__notation__basics.html).
 
 This avoids the need to remember what index represents the $y$-component of angular velocity, for example.
 It also makes it easier to switch between attitude representations and allows for arbitrary additional state variables in the `aux` field.
-For instance, if we have a rotor model that includes unsteady aerodynamics, these states can be defined as more [`pytree_node`](#archimedes.tree.struct.pytree_node)s and nested inside the `FlightVehicle.State.aux` field.
+For instance, if we have a rotor model that includes unsteady aerodynamics, these states can be defined as more [`structs`](#archimedes.tree.struct) and nested inside the `FlightVehicle.State.aux` field.
 
-For more details on pure functions and PyTrees, see:
+For more details on pure functions and structs, see:
 
 * [Under the Hood](../../under-the-hood)
-* [Working with PyTrees](../../pytrees)
+* [Structured Data Types](../../trees)
 * [Hierarchical Design Patterns](../../generated/notebooks/modular-design)
 * [Quirks and Gotchas](../../gotchas)

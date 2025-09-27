@@ -18,9 +18,9 @@ Modules
 
     observers
     optimize
+    simulate
     sysid
     tree
-    tree.struct
 
 
 Core Functions
@@ -31,31 +31,35 @@ Core Functions
     :template: base.rst
 
     array
+    callback
     codegen
+    compile
     discretize
+    eye
+    field
+    grad
+    hess
+    implicit
+    integrator
+    interpolant
+    jac
+    jvp
+    minimize
+    nlp_solver
+    odeint
+    ones
+    ones_like
+    qpsol
+    root
+    scan
+    struct
+    StructConfig
+    switch
     sym
     sym_like
-    zeros
-    ones
-    zeros_like
-    ones_like
-    eye
-    scan
-    switch
-    vmap
-    compile
-    callback
-    grad
-    jac
-    hess
-    jvp
+    UnionConfig
     vjp
-    interpolant
-    integrator
-    odeint
-    nlp_solver
-    minimize
-    implicit
-    root
-    qpsol
+    vmap
+    zeros
+    zeros_like
 

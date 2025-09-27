@@ -18,6 +18,10 @@ def cleanup():
         "fib_kernel.c",
         "fib_kernel.h",
         "output.txt",
+        "compound_filter.c",
+        "compound_filter.h",
+        "compound_filter_kernel.c",
+        "compound_filter_kernel.h",
     ):
         if os.path.exists(filename):
             os.remove(filename)

@@ -210,8 +210,8 @@ class TestTimeseries:
         ):
             Timeseries(ts=ts, us=us, ys=ys)
 
-    def test_pytree_functionality(self):
-        """Test that Timeseries works as a PyTree node."""
+    def test_tree_functionality(self):
+        """Test that Timeseries works with tree operations."""
         ts = np.array([0.0, 0.1, 0.2])
         us = np.random.randn(2, 3)
         ys = np.random.randn(1, 3)

@@ -1,3 +1,5 @@
+import pytest
+
 import numpy as np
 
 from archimedes.experimental.aero import (
@@ -7,32 +9,18 @@ from archimedes.experimental.aero import (
     quaternion_inverse,
 )
 
-from f16_plant import SubsonicF16
+from f16_plant import SubsonicF16, GRAV_FTS2
 
 
-g0 = 32.17
-
-# NOTE: The weight in the textbook is 25,000 lbs, but this
-# does not give consistent values - the default value here
-# matches the values given in the tables
-weight = 20490.4459
-
-Axx = 9496.0
-Ayy = 55814.0
-Azz = 63100.0
-Axz = -982.0
-mass = weight / g0
-
-J_B = np.array(
-    [
-        [Axx, 0.0, Axz],
-        [0.0, Ayy, 0.0],
-        [Axz, 0.0, Azz],
-    ]
-)
+@pytest.fixture
+def f16():
+    return SubsonicF16(xcg=0.4)
 
 
-def test_352():
+g0 = GRAV_FTS2  # ft/s^2
+
+
+def test_352(f16: SubsonicF16):
     """Compare to Table 3.5-2 in Lewis, Johnson, Stevens"""
 
     u = np.array([0.9, 20.0, -15.0, -20.0])
@@ -46,7 +34,8 @@ def test_352():
     w_B = np.array([0.7, -0.8, 0.9])  # Angular velocity in body frame
     q = euler_to_quaternion(rpy)
     pow = 90.0  # Engine power
-    x = SubsonicF16.State(p_N, q, v_B, w_B, pow)
+    rb_state = f16.rigid_body.State(p_N, q, v_B, w_B)
+    x = f16.State(rb_state, pow)
 
     # NOTE: There is a typo in the chapter 3 code implementation of the DCM,
     # leading to a sign change for yaw rate xd[11].  Hence, Table 3.5-2 has
@@ -82,25 +71,27 @@ def test_352():
         ]
     )
 
-    model = SubsonicF16(m=mass, J_B=J_B, xcg=0.4)
-    x_t = model.dynamics(0.0, x, u)
+    x_t = f16.dynamics(0.0, x, u)
     assert np.allclose(x_t.p_N, dp_N_ex, atol=1e-2)
     assert np.allclose(x_t.att, q_t, atol=1e-2)
     assert np.allclose(x_t.v_B, dv_B_ex, atol=1e-2)
     assert np.allclose(x_t.w_B, dw_B_ex, atol=1e-2)
 
     # Check with Euler attitude representation
-    model = SubsonicF16(m=mass, J_B=J_B, xcg=0.4, attitude="euler")
-    x = SubsonicF16.State(p_N, rpy, v_B, w_B, pow)
-    x_t = model.dynamics(0.0, x, u)
+    f16 = f16.replace(rigid_body=f16.rigid_body.replace(attitude="euler"))
+    rb_state = f16.rigid_body.State(p_N, rpy, v_B, w_B)
+    x = f16.State(rb_state, pow)
+    x_t = f16.dynamics(0.0, x, u)
     assert np.allclose(x_t.p_N, dp_N_ex, atol=1e-2)
     assert np.allclose(x_t.att, drpy_ex, atol=1e-2)
     assert np.allclose(x_t.v_B, dv_B_ex, atol=1e-2)
     assert np.allclose(x_t.w_B, dw_B_ex, atol=1e-2)
 
 
-def test_36():
+def test_36(f16: SubsonicF16):
     """Trim conditions (Sec. 3.6 in Lewis, Johnson, Stevens)"""
+    f16 = f16.replace(xcg=0.35)
+
     vt = 5.020000e2
     alpha = 2.392628e-1
     beta = 5.061803e-4
@@ -121,12 +112,12 @@ def test_36():
     )  # Angular velocity in body frame
     q = euler_to_quaternion(rpy)
     pow = 6.412363e1  # Engine power
-    x = SubsonicF16.State(p_N, q, v_B, w_B, pow)
+    rb_state = f16.rigid_body.State(p_N, q, v_B, w_B)
+    x = f16.State(rb_state, pow)
 
     u = np.array([thtl, el, ail, rdr])
 
-    model = SubsonicF16(m=mass, J_B=J_B, xcg=0.35)
-    x_t = model.dynamics(0.0, x, u)
+    x_t = f16.dynamics(0.0, x, u)
     assert np.allclose(x_t.v_B, 0.0, atol=1e-4)
     assert np.allclose(x_t.w_B, 0.0, atol=1e-4)
 
@@ -154,9 +145,10 @@ def test_36():
     assert np.allclose(tph1, tph2)
 
     # Recheck with Euler attitude representation
-    model = SubsonicF16(m=mass, J_B=J_B, xcg=0.35, attitude="euler")
-    x = SubsonicF16.State(p_N, rpy, v_B, w_B, pow)
-    x_t = model.dynamics(0.0, x, u)
+    f16 = f16.replace(rigid_body=f16.rigid_body.replace(attitude="euler"))
+    rb_state = f16.rigid_body.State(p_N, rpy, v_B, w_B)
+    x = f16.State(rb_state, pow)
+    x_t = f16.dynamics(0.0, x, u)
 
     assert np.allclose(x_t.v_B, 0.0, atol=1e-4)
     assert np.allclose(x_t.w_B, 0.0, atol=1e-4)

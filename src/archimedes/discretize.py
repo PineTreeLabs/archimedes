@@ -38,6 +38,18 @@ __all__ = ["discretize"]
 #     return step
 
 
+def _euler(f, h):
+    # Take a single Euler step
+
+    def scan_fun(carry, i):
+        t0, x0, u, p = carry
+        x1 = x0 + h * f(t0, x0, u, p)
+        new_carry = (t0 + h, x1, u, p)
+        return new_carry, np.array([])
+
+    return scan_fun
+
+
 def _rk4(f, h):
     # Take a single RK4 step
 
@@ -159,7 +171,7 @@ def discretize(func=None, dt=None, method="rk4", n_steps=1, name=None, **options
         - ``t`` : Current time (scalar)
         - ``x`` : State vector of shape ``(nx,)``
         - ``u`` : Input vector of shape ``(nu,)``
-        - ``params`` : Parameters (any PyTree structure)
+        - ``params`` : Parameters (any tree-compatible structure)
 
         Must return the time derivative ``dx/dt`` as an array of shape ``(nx,)``.
         The function can be a regular Python function or a pre-compiled
@@ -327,6 +339,7 @@ def discretize(func=None, dt=None, method="rk4", n_steps=1, name=None, **options
 
         h = dt_val / n_steps
         scan_fun = {
+            "euler": _euler,
             "rk4": _rk4,
             "radau5": _radau5,
         }[method](f, h, **options)

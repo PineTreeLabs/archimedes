@@ -9,23 +9,23 @@ from scipy.optimize import OptimizeResult
 from scipy.optimize import minimize as scipy_minimize
 
 import archimedes as arc
-from archimedes import compile, scan, struct, tree
+from archimedes import compile, scan, tree
 from archimedes.optimize import lm_solve
 
 if TYPE_CHECKING:
     from archimedes.observers import KalmanFilterBase
     from archimedes.optimize import LMResult
-    from archimedes.typing import PyTree
+    from archimedes.typing import Tree
 
     from ._timeseries import Timeseries
 
-    T = TypeVar("T", bound=PyTree)
+    T = TypeVar("T", bound=Tree)
 
 
 __all__ = ["pem"]
 
 
-@struct.pytree_node
+@tree.struct
 class PEMObjective:
     """Prediction Error Minimization objective function for system identification.
 
@@ -68,16 +68,16 @@ class PEMObjective:
     predictor: KalmanFilterBase
     data: Timeseries
     P0: np.ndarray
-    x0: np.ndarray = struct.field(static=True, default=None)
+    x0: np.ndarray = tree.field(static=True, default=None)
 
-    def forward(self, x0: np.ndarray, params: PyTree) -> dict:
+    def forward(self, x0: np.ndarray, params: Tree) -> dict:
         """Run Kalman filter forward pass and compute prediction errors.
 
         Parameters
         ----------
         x0 : array_like
             Initial state estimate of shape ``(nx,)``.
-        params : PyTree
+        params : Tree
             Model parameters with arbitrary nested structure.
 
         Returns
@@ -133,13 +133,13 @@ class PEMObjective:
         }
 
     def residuals(
-        self, decision_variables: PyTree | tuple[np.ndarray, PyTree]
+        self, decision_variables: Tree | tuple[np.ndarray, Tree]
     ) -> np.ndarray:
         """Evaluate prediction error residuals for least-squares optimization.
 
         Parameters
         ----------
-        decision_variables : PyTree or tuple[np.ndarray, PyTree]
+        decision_variables : Tree or tuple[np.ndarray, Tree]
             Optimization parameters. If ``x0`` is provided during construction,
             this contains only model parameters. Otherwise, it contains both
             initial state and parameters as a flattened array.
@@ -159,7 +159,7 @@ class PEMObjective:
         results = self.forward(x0, params)
         return results["e"].flatten()
 
-    def __call__(self, decision_variables: PyTree | tuple[np.ndarray, PyTree]) -> tuple:
+    def __call__(self, decision_variables: Tree | tuple[np.ndarray, Tree]) -> tuple:
         """Evaluate cost function for general optimization methods.
 
         Parameters
@@ -189,7 +189,7 @@ class PEMObjective:
         return results["V"]
 
 
-@struct.pytree_node
+@tree.struct
 class CompoundPEMObjective:
     """Compound PEM objective function for multiple sub-objectives.
 
@@ -200,8 +200,8 @@ class CompoundPEMObjective:
     sub_objectives: list[PEMObjective]
 
     def _make_sub_dvs(
-        self, decision_variables: tuple[np.ndarray | None, PyTree]
-    ) -> list[tuple[np.ndarray | None, PyTree]]:
+        self, decision_variables: tuple[np.ndarray | None, Tree]
+    ) -> list[tuple[np.ndarray | None, Tree]]:
         """Prepare sub-decision variables for each sub-objective."""
         sub_x0, params = decision_variables
         sub_dvs = []
@@ -217,7 +217,7 @@ class CompoundPEMObjective:
 
         return sub_dvs
 
-    def __call__(self, decision_variables: tuple[np.ndarray | None, PyTree]) -> tuple:
+    def __call__(self, decision_variables: tuple[np.ndarray | None, Tree]) -> tuple:
         """Evaluate cost function for compound PEM objective."""
         sub_dvs = self._make_sub_dvs(decision_variables)
         total_cost = 0.0
@@ -228,7 +228,7 @@ class CompoundPEMObjective:
         return total_cost
 
     def residuals(
-        self, decision_variables: PyTree | tuple[np.ndarray, PyTree]
+        self, decision_variables: Tree | tuple[np.ndarray, Tree]
     ) -> np.ndarray:
         """Evaluate residuals for compound PEM objective."""
         sub_dvs = self._make_sub_dvs(decision_variables)
@@ -309,7 +309,7 @@ def _pem_solve_bfgs(
         options=options,
     )
 
-    # Replace the flat parameters with the original PyTree structure
+    # Replace the flat parameters with the original tree structure
     result.x = unravel(result.x)
     return result
 
@@ -427,7 +427,7 @@ def pem(
         If multiple datasets are provided, the initial state estimates
         (``x0``) should also be a tuple of initial conditions corresponding
         to each dataset.
-    p_guess : PyTree
+    p_guess : Tree
         Initial parameter guess with arbitrary nested structure
         (e.g., ``{"mass": 1.0, "damping": {"c1": 0.1, "c2": 0.2}}``).
         The optimization preserves this structure in the result, enabling
@@ -439,9 +439,9 @@ def pem(
         dataset.
     estimate_x0 : bool, default=False
         Whether to estimate the initial state ``x0`` along with parameters.
-    bounds : tuple of (PyTree, PyTree), optional
+    bounds : tuple of (Tree, Tree), optional
         Parameter bounds as ``(lower_bounds, upper_bounds)`` with the
-        same PyTree structure as ``p_guess``. Enables physical
+        same tree structure as ``p_guess``. Enables physical
         constraints such as:
 
         - Positive masses, stiffnesses, damping coefficients
@@ -489,7 +489,7 @@ def pem(
     -------
     result : scipy.optimize.OptimizeResult
         Optimization result with estimated parameters in ``result.x``
-        preserving the original PyTree structure. Additional fields include:
+        preserving the original tree structure. Additional fields include:
 
         - ``success`` : Whether estimation succeeded
         - ``fun`` : Final prediction error objective value

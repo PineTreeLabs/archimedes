@@ -230,10 +230,12 @@ class FunctionCache:
         # everything we need to construct the CasADi function.
         sym_ret = specialized_func(sym_args)
 
-        if not isinstance(sym_ret, tuple) or hasattr(sym_ret, "_fields"):
+        if not isinstance(sym_ret, (tuple, list)) or hasattr(sym_ret, "_fields"):
             sym_ret = (sym_ret,)
 
         # Ravel all return types to flattened arrays before creating the CasADi function
+        # This list will still have the same length as the original returns (so same
+        # number of return_names), but each _element_ will be individually flattened.
         sym_ret_flat = []
         results_unravel = []
         for x in sym_ret:

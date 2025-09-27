@@ -190,16 +190,17 @@ x = F(x0, p)
 print(f(x, p) == 0)
 ```
 
-(pytrees)=
-## PyTrees
+(trees)=
+## Tree-structured data
 
 Many scientific computing functions assume that data is arranged into flat vectors.
 This includes ODE integrators, optimizers, root-finders, and other solvers.
-It is usually easier to mathematically represent the state of a system or a set of parameters as a vector.
+This is because is often easier and more computationally efficient to mathematically represent the state of a system or a set of parameters as a vector.
 
 However, this is not necessarily the most natural way to implement a physical model, which may have distinct components or hierarchical structure that makes transforming to/from a flat vector tedious and error-prone.
 
-Archimedes addresses this with the concept of a PyTree; a data structure consisting of nested containers that can be flattened, unflattened, or manipulated directly as a tree.
+Archimedes addresses this with the concept of tree-structured data (borrowed from "PyTrees" in JAX and "Modules" in PyTorch).
+Here, a "tree" is a data structure consisting of nested containers that can be flattened, unflattened, or manipulated directly as a tree.
 
 ```python
 state = {"pos": np.array([0.0, 1.0, 2.0]), "vel": np.array([3.0, 4.0, 5.0])}
@@ -210,15 +211,16 @@ print(unravel(flat)) # {'pos': array([0., 1., 2.]), 'vel': array([3., 4., 5.])}
 
 A similar approach can work for containers nested to arbitrary depth, i.e. tuples of dictionaries of lists.
 
+Because the tree representations are flattened before use with optimizers, ODE solvers, and similar functions, this allows you to easily switch between the improved code experience of structured data with the numerical and mathematical convenience of a flat vector.
 
-### Structured Data Classes
+### Structured data classes
 
-If you want to go beyond built-in Python containers, Archimedes provides a `struct` module that combines Python's `dataclass` with automatic PyTree registration:
+If you want to go beyond built-in Python containers, Archimedes provides a `struct` decorator that combines Python's `dataclass` with automatic compatibility with tree operations:
 
 ```python
-from archimedes.tree import struct
+from archimedes import struct
 
-@struct.pytree_node
+@struct
 class VehicleState:
     position: np.ndarray  # [x, y, z]
     velocity: np.ndarray  # [vx, vy, vz]
@@ -248,12 +250,12 @@ def euler_dynamics(state, control):
     )
 ```
 
-In addition, these custom PyTree nodes are regular classes, so you can define methods as usual.
+In addition, these custom structs are regular classes, so you can define methods as usual.
 For example, you can create a callable class with some parameters using the special `__call__` method:
 
 ```python
 
-@struct.pytree_node
+@struct
 class PredatorPrey:
     a: float
     b: float
@@ -273,7 +275,7 @@ x0 = np.array([1.0, 1.0])
 print(model(t0, x0))  # Call like a function
 ```
 
-For more information, see ["Working with PyTrees"](pytrees.md).
+For more information, see ["Structured data types"](trees.md).
 
 (interpolation)=
 ## Interpolation
@@ -479,12 +481,28 @@ If you keep your code as close to the underlying mathematical model as possible,
 (custom-callbacks)=
 ## Custom callbacks
 
-<!--
-TODO: Write this once the functionality is implemented.
--->
+"Callbacks" let you implement pure-Python code and embed it in an otherwise symbolically-evaluated graph.
+In other words, this allows you to use functionality that is available in Python but not supported by CasADi's symbolic computation engine.
 
-(scipy-cookbook)=
-## SciPy Cookbook
+```python
+import math
+
+def unsupported_code(x):
+    print("Evaluating unsupported code")
+    # The "math" library is not supported symbolically
+    return math.tanh(x[0]) * math.exp(-0.1 * x[1]**2)
+
+# Use in a compiled function
+@arc.compile
+def model(x):
+    result_shape_dtypes = 0.0  # Output is a scalar
+    y = arc.callback(unsupported_code, result_shape_dtypes, x)
+    return y * 2
+
+model(np.array([0.5, 1.5]))  # array(0.73801609)
+```
+
+## Using SciPy Functionality
 
 Archimedes supports some common functionality like [ODE solving](#ode-solving), [constrained nonlinear optimization](#optimization), and [nonlinear root-finding](#implicit-functions), but in some cases you may wish to use particular solvers or functionality from larger libraries like SciPy.
 

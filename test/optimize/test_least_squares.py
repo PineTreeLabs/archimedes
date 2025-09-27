@@ -363,7 +363,7 @@ class TestLeastSquares:
                 bounds=(bad_lower, bad_upper),
             )
 
-        bad_lower = {"a": np.array([0.0, 0.0])}  # Wrong PyTree structure
+        bad_lower = {"a": np.array([0.0, 0.0])}  # Wrong tree structure
         with pytest.raises(
             ValueError, match=r"Lower bounds must have the same structure .*"
         ):
@@ -384,7 +384,7 @@ class TestLeastSquares:
                 bounds=(bad_lower, bad_upper),
             )
 
-        bad_upper = {"a": np.array([2.0, 1.0])}  # Wrong PyTree structure
+        bad_upper = {"a": np.array([2.0, 1.0])}  # Wrong tree structure
         with pytest.raises(
             ValueError, match=r"Upper bounds must have the same structure .*"
         ):

@@ -42,7 +42,7 @@ from archimedes.tree._registry import unzip2
 from archimedes.tree._tree_util import tree_flatten, tree_unflatten
 
 if TYPE_CHECKING:
-    from archimedes.typing import ArrayLike, PyTree
+    from archimedes.typing import ArrayLike, Tree
 
 
 # Original: jax._src.util.HashablePartial
@@ -93,18 +93,18 @@ class HashablePartial:
         return self.f(*self.args, *args, **self.kwargs, **kwargs)
 
 
-def ravel_pytree(pytree: PyTree) -> tuple[ArrayLike, HashablePartial]:
+def ravel_tree(tree: Tree) -> tuple[ArrayLike, HashablePartial]:
     """
-    Flatten a pytree to a single 1D array.
+    Flatten a tree to a single 1D array.
 
-    This function flattens a pytree into a single 1D array by concatenating
+    This function flattens a tree into a single 1D array by concatenating
     all leaf values (which must be arrays or scalars), and provides a function
     to reconstruct the original structure.
 
     Parameters
     ----------
-    pytree : Any
-        A pytree of arrays and scalars to flatten. A pytree is a nested structure
+    tree : Any
+        A tree of arrays and scalars to flatten. A tree is a nested structure
         of containers (lists, tuples, dicts) and leaves (arrays or scalars).
 
     Returns
@@ -112,11 +112,11 @@ def ravel_pytree(pytree: PyTree) -> tuple[ArrayLike, HashablePartial]:
     flat_array : ndarray
         A 1D array containing all flattened leaf values concatenated together.
         The dtype is determined by promoting the dtypes of all leaf values.
-        If the input pytree is empty, a 1D empty array of dtype ``np.float32`` is
+        If the input tree is empty, a 1D empty array of dtype ``np.float32`` is
         returned.
     unravel : callable
         A function that takes a 1D array of the same length as ``flat_array`` and
-        returns a pytree with the same structure as the input ``pytree``, with the
+        returns a tree with the same structure as the input ``tree``, with the
         values from the 1D array reshaped to match the original leaf shapes.
 
     Notes
@@ -129,7 +129,7 @@ def ravel_pytree(pytree: PyTree) -> tuple[ArrayLike, HashablePartial]:
       themselves need to be flattened
     - When interfacing with external libraries that require flat arrays
 
-    The resulting unravel function is specific to the structure of the input pytree
+    The resulting unravel function is specific to the structure of the input tree
     and expects an array of exactly the right length.
 
     Examples
@@ -170,14 +170,14 @@ def ravel_pytree(pytree: PyTree) -> tuple[ArrayLike, HashablePartial]:
 
     See Also
     --------
-    flatten : Flatten a pytree into a list of leaves and a treedef
+    flatten : Flatten a tree into a list of leaves and a treedef
     """
-    leaves, treedef = tree_flatten(pytree)
+    leaves, treedef = tree_flatten(tree)
     flat, unravel_list = _ravel_list(leaves)
-    return flat, HashablePartial(unravel_pytree, treedef, unravel_list)
+    return flat, HashablePartial(unravel_tree, treedef, unravel_list)
 
 
-def unravel_pytree(treedef, unravel_list, flat):
+def unravel_tree(treedef, unravel_list, flat):
     return tree_unflatten(treedef, unravel_list(flat))
 
 

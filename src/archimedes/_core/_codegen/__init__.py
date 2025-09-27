@@ -1,5 +1,6 @@
-from ._codegen import codegen
+from ._codegen import CodegenError, codegen
 
 __all__ = [
     "codegen",
+    "CodegenError",
 ]

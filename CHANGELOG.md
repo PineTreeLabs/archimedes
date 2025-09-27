@@ -32,3 +32,21 @@ In particular, the API is still evolving and may change between minor versions, 
   - "Under the hood" technical details
   - Common pitfalls and gotchas
   - Extended tutorials for "multirotor dynamics" and "deploying to hardware"
+
+## [0.2.0a1] - 2025-08-25
+
+New version tag for release to PyPI (previous "Archimedes" project tagged with v0.1.0).
+
+## [0.2.0a2] - WIP
+
+### Changes
+
+- Added support for autogenerating C structs from tree data types ([PR #78](https://github.com/PineTreeLabs/archimedes/pull/78))
+- Added experimental `Rotation` class ([PR #83](https://github.com/PineTreeLabs/archimedes/pull/83))
+- Added `StructConfig` and `UnionConfig` for managing configuration of complex struct hierarchies ([PR #84](https://github.com/PineTreeLabs/archimedes/pull/84))
+- Refactored `FlightVehicle` to `RigidBody` ([PR #86](https://github.com/PineTreeLabs/archimedes/pull/86))
+- Added new tutorial series on end-to-end controls development workflow w/ HIL proof-of-concept ([PR #88](https://github.com/PineTreeLabs/archimedes/pull/88))
+- Added experimental `IIRFilter` class ([PR #88](https://github.com/PineTreeLabs/archimedes/pull/88))
+- Moved images, data, notebooks, etc. to LFS ([PR #88](https://github.com/PineTreeLabs/archimedes/pull/88))
+- Migrated "PyTree" to "struct" terminology ([Issue #89](https://github.com/PineTreeLabs/archimedes/issues/89))
+- Renamed `@pytree_node` decorator to `@struct` ([Issue #89](https://github.com/PineTreeLabs/archimedes/issues/89))

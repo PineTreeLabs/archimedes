@@ -37,7 +37,7 @@ Quick Example
 
    # Automatically generate C code
    template_args = (0.0,)  # Data type for C function
-   arc.codegen(df, "grad_f.c", template_args)
+   arc.codegen(df, "grad_f.c", template_args, return_names=("z",))
 
 Documentation
 -------------
@@ -55,7 +55,7 @@ Documentation
    :caption: Core Concepts
 
    under-the-hood
-   pytrees
+   trees
    generated/notebooks/control-flow
    generated/notebooks/modular-design
 
@@ -65,6 +65,7 @@ Documentation
 
    notebooks/deployment/deployment00
    generated/notebooks/sysid/parameter-estimation
+   notebooks/workflow/workflow00
    notebooks/multirotor/multirotor00
 
 .. toctree::

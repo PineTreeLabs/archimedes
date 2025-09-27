@@ -197,7 +197,7 @@ dnda = arc.interpolant([alpha_vector, beta_vector], dnda_data)
 dndr = arc.interpolant([alpha_vector, beta_vector], dndr_data)
 
 
-@struct.pytree_node
+@struct
 class F16Aerodynamics:
     def __call__(self, vt, alpha, beta, w_B, el, ail, rdr, vehicle: SubsonicF16):
         p, q, r = w_B  # Angular velocity in body frame (ω_B)

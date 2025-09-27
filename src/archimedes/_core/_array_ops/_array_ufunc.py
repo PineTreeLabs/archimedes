@@ -118,10 +118,22 @@ def _divmod(x1, x2, dtype=None):
     return y1, y2
 
 
+def _hypot(x, y):
+    return np.sqrt(x * x + y * y)
+
+
 def _xor(a, b):
     return cs.logic_or(
         cs.logic_and(a, cs.logic_not(b)), cs.logic_and(cs.logic_not(a), b)
     )
+
+
+def _radians(x):
+    return x * (np.pi / 180.0)
+
+
+def _degrees(x):
+    return x * (180.0 / np.pi)
 
 
 # List from numpy.testing.overrides.get_overridable_numpy_ufuncs()
@@ -150,10 +162,10 @@ SUPPORTED_UFUNCS = {
     "power": binary_op(cs.power),
     "copysign": NotImplemented,
     "heaviside": NotImplemented,
-    "rad2deg": NotImplemented,
+    "rad2deg": _degrees,
     "conjugate": NotImplemented,
-    "hypot": NotImplemented,
-    "radians": NotImplemented,
+    "hypot": _hypot,
+    "radians": _radians,
     "clip": NotImplemented,
     "invert": unary_op(cs.logic_not, result_type=bool),
     "reciprocal": NotImplemented,
@@ -191,10 +203,10 @@ SUPPORTED_UFUNCS = {
     "less_equal": binary_op(cs.le, result_type=bool),
     "sqrt": unary_op(cs.sqrt, result_type=DEFAULT_FLOAT),
     "arcsinh": unary_op(cs.asinh, result_type=DEFAULT_FLOAT),
-    "deg2rad": NotImplemented,
+    "deg2rad": _radians,
     "log": unary_op(cs.log, result_type=DEFAULT_FLOAT),
     "square": NotImplemented,
-    "degrees": NotImplemented,
+    "degrees": _degrees,
     "log10": unary_op(cs.log10, result_type=DEFAULT_FLOAT),
     "subtract": binary_op(cs.minus),
     "divide": binary_op(cs.rdivide, result_type=DEFAULT_FLOAT),

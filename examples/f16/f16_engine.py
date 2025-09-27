@@ -138,7 +138,7 @@ Tmil_interpolant = arc.interpolant([alt_vector, mach_vector], Tmil_data)
 Tmax_interpolant = arc.interpolant([alt_vector, mach_vector], Tmax_data)
 
 
-@struct.pytree_node
+@struct
 class F16Engine:
     lo_gear: float = 64.94  # Low gear throttle slope
     hi_gear: float = 217.38  # High gear throttle slope

@@ -1,7 +1,7 @@
 [project]
 name = "archimedes"
-version = "0.1.0"
-description = "Python framework for symbolic/numeric modeling and simulation"
+version = "0.2.0a3"
+description = "Python framework for modeling, simulation, and controls development"
 readme = "README.md"
 authors = [
     { name = "Jared Callaham", email = "jared.callaham@gmail.com" }
@@ -12,9 +12,17 @@ dependencies = [
     "jinja2>=3.1.6",
     "numpy>=2.2.4",
     "osqp>=1.0.4",
+    "pydantic>=2.11.9",
     "scipy>=1.15.2",
     "typing-extensions>=4.12.2",
 ]
+license = "GPL-3.0-or-later"
+license-files = ["LICEN[CS]E*"]
+
+[project.urls]
+Source = "https://github.com/pinetreelabs/archimedes/"
+Documentation = "https://pinetreelabs.github.io/archimedes/"
+Issues = "https://github.com/pinetreelabs/archimedes/issues"
 
 [project.optional-dependencies]
 all = [
@@ -83,6 +91,7 @@ python_functions = "test_*"
 [tool.coverage.run]
 source = ["archimedes"]
 omit = [
+    "*/archimedes/docs/*",
     "*/archimedes/experimental/*",
     "*/archimedes/typing.py",
     "*/archimedes/theme.py",

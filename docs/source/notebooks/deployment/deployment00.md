@@ -38,6 +38,11 @@ This tutorial contains three parts:
     - Preserving modifications within protected regions
     - Customizing generated code with the templating system
 
+4. [**Structured Data Types**](../../generated/notebooks/deployment/deployment04)
+    - Defining nested state, input, and output data types
+    - Mapping composite data types to C code
+    - Simplified memory management for stateful functions
+
 <!-- 4. [**Example: Arduino Deployment**](../../generated/notebooks/deployment/deployment04)
     - Targeting specific hardware with driver templates
     - Deploying generated code to an Arduino -->
@@ -53,6 +58,7 @@ To follow this tutorial, you'll need:
 No prior experience with CasADi or code generation is required.
 
 Before we get started, one last comment: the full "path to hardware" includes not only code generation, but data acquisition and hardware-in-the-loop (HIL) testing workflows.  These are central to the [development roadmap](../../roadmap.md) - stay tuned for more on those capabilities soon.
+For a preview, also check out the [end-to-end controller workflow series](../workflow/workflow00.md).
 
 
 ```{toctree}
@@ -60,5 +66,6 @@ Before we get started, one last comment: the full "path to hardware" includes no
 ../../generated/notebooks/deployment/deployment01
 ../../generated/notebooks/deployment/deployment02
 ../../generated/notebooks/deployment/deployment03
+../../generated/notebooks/deployment/deployment04
    
 ```

@@ -1,20 +1,32 @@
 # ruff: noqa: N802, N803, N806, N815, N816
 import abc
 from functools import cached_property
-from typing import Callable, ClassVar
+from typing import Callable, ClassVar, Protocol
 
 import numpy as np
 from scipy.special import roots_legendre
 
 import archimedes as arc
-from archimedes import struct
+from archimedes.experimental import aero
 from archimedes.experimental.aero import (
-    FlightVehicle,
+    RigidBody,
+    dcm_from_euler,
     z_dcm,
 )
-from archimedes.experimental.aero import (
-    dcm_from_euler as dcm,  # noqa: F401
-)
+
+__all__ = [
+    "dcm_from_euler",
+    "RigidBody",
+    "RotorGeometry",
+    "ConstantGravity",
+    "PointGravity",
+    "QuadraticDragModel",
+    "RotorModel",
+    "QuadraticRotorModel",
+    "MultiRotorVehicle",
+    "VehicleDragModel",
+    "GravityModel",
+]
 
 # (AoA, Cl, Cd, Cm) data for NACA 0012 airfoil
 # NOTE: This data was generated using the incompressible flow solver in
@@ -110,9 +122,9 @@ NACA_0012 = np.array(
 )
 
 
-@struct.pytree_node
+@arc.struct
 class RotorGeometry:
-    offset: np.ndarray = struct.field(
+    offset: np.ndarray = arc.field(
         default_factory=lambda: np.zeros(3)
     )  # Location of the rotor hub in the body frame B [m]
     ccw: bool = True  # True if rotor spins counter-clockwise when viewed from above
@@ -157,8 +169,7 @@ class RotorGeometry:
         )
 
 
-class GravityModel(metaclass=abc.ABCMeta):
-    @abc.abstractmethod
+class GravityModel(Protocol):
     def __call__(self, p_N):
         """Gravitational acceleration at the body CM in the inertial frame N
 
@@ -170,16 +181,16 @@ class GravityModel(metaclass=abc.ABCMeta):
         """
 
 
-@struct.pytree_node
-class ConstantGravity(GravityModel):
+@arc.struct
+class ConstantGravity:
     g0: float = 9.81
 
     def __call__(self, p_N):
         return np.array([0, 0, self.g0], like=p_N)
 
 
-@struct.pytree_node
-class PointGravity(GravityModel):
+@arc.struct
+class PointGravity:
     G: float = 6.6743e-11  # Gravitational constant [N-m²/kg²]
     R_e: float = 6.371e6  # Radius of earth [m]
 
@@ -187,8 +198,7 @@ class PointGravity(GravityModel):
         raise NotImplementedError("Illustrative purposes only")
 
 
-class VehicleDragModel(metaclass=abc.ABCMeta):
-    @abc.abstractmethod
+class VehicleDragModel(Protocol):
     def __call__(self, t, x):
         """Drag forces and moments in body frame B
 
@@ -202,8 +212,8 @@ class VehicleDragModel(metaclass=abc.ABCMeta):
         """
 
 
-@struct.pytree_node
-class QuadraticDragModel(VehicleDragModel):
+@arc.struct
+class QuadraticDragModel:
     """Simple velocity-squared drag model for the main vehicle body"""
 
     rho: float = 1.225  # air density [kg/m^3]
@@ -282,7 +292,7 @@ class RotorModel(metaclass=abc.ABCMeta):
         """Aerodynamic forces and moments in wind frame W"""
 
 
-@struct.pytree_node
+@arc.struct
 class QuadraticRotorModel(RotorModel):
     """Simple velocity-squared model for rotor aerodynamics"""
 
@@ -306,14 +316,45 @@ class QuadraticRotorModel(RotorModel):
         return F_W, M_W, aux_state_derivs
 
 
-@struct.pytree_node
-class MultiRotorVehicle(FlightVehicle):
-    rotors: list[RotorGeometry] = struct.field(default_factory=list)
-    rotor_model: RotorModel = struct.field(default_factory=QuadraticRotorModel)
-    drag_model: VehicleDragModel = struct.field(default_factory=QuadraticDragModel)
-    gravity_model: GravityModel = struct.field(default_factory=ConstantGravity)
+@arc.struct
+class MultiRotorVehicle:
+    rigid_body: RigidBody = arc.field(default_factory=RigidBody)
+    rotors: list[RotorGeometry] = arc.field(default_factory=list)
+    rotor_model: RotorModel = arc.field(default_factory=QuadraticRotorModel)
+    drag_model: VehicleDragModel = arc.field(default_factory=QuadraticDragModel)
+    gravity_model: GravityModel = arc.field(default_factory=ConstantGravity)
 
-    def net_forces(self, t, x, u, C_BN):
+    m: float = 1.0  # mass [kg]
+    J_B: np.ndarray = arc.field(
+        default_factory=lambda: np.eye(3)
+    )  # inertia matrix [kg·m²]
+
+    @arc.struct
+    class State:
+        rigid_body: RigidBody.State
+        aux: np.ndarray = None  # auxiliary state variables for rotors
+
+        @property
+        def p_N(self):
+            return self.rigid_body.p_N
+
+        @property
+        def att(self):
+            return self.rigid_body.att
+
+        @property
+        def v_B(self):
+            return self.rigid_body.v_B
+
+        @property
+        def w_B(self):
+            return self.rigid_body.w_B
+
+    def state(self, p_N, att, v_B, w_B, aux=None) -> State:
+        rb_state = self.rigid_body.State(p_N, att, v_B, w_B)
+        return self.State(rb_state, aux)
+
+    def net_forces(self, t, x: State, u):
         p_N = x.p_N  # Position of the center of mass in inertial frame N
         v_B = x.v_B  # Velocity of the center of mass in body frame B
         w_B = x.w_B  # Roll-pitch-yaw rates in body frame (ω_B)
@@ -353,12 +394,44 @@ class MultiRotorVehicle(FlightVehicle):
         Fdrag_B, Mdrag_B = self.drag_model(t, x)
 
         # Net force in body frame
+        if self.rigid_body.attitude == "euler":
+            C_BN = aero.dcm_from_euler(x.att)
+        elif self.rigid_body.attitude == "quaternion":
+            C_BN = aero.dcm_from_quaternion(x.att)
+
         F_B = Frotor_B + Fdrag_B + C_BN @ Fgravity_N
 
         # Net moment in body frame
         M_B = Mrotor_B + Mdrag_B
 
         return F_B, M_B, aux_state_derivs
+
+    def dynamics(self, t, x: State, u: np.ndarray) -> State:
+        """Compute time derivative of the state
+
+        Args:
+            t: time
+            x: state: (p_N, att, v_B, w_B, rotor aux states)
+            u: control inputs
+
+        Returns:
+            x_dot: time derivative of the state
+        """
+        # Compute the net forces
+        F_B, M_B, aux_state_derivs = self.net_forces(t, x, u)
+
+        rb_input = RigidBody.Input(
+            F_B=F_B,
+            M_B=M_B,
+            m=self.m,
+            J_B=self.J_B,
+        )
+        rb_derivs = self.rigid_body.dynamics(t, x.rigid_body, rb_input)
+
+        return self.State(
+            rigid_body=rb_derivs,
+            aux=aux_state_derivs,
+        )
 
 
 class AirfoilModel(metaclass=abc.ABCMeta):
@@ -387,7 +460,7 @@ class AirfoilModel(metaclass=abc.ABCMeta):
         pass
 
 
-@struct.pytree_node
+@arc.struct
 class ThinAirfoil(AirfoilModel):
     """Airfoil model based on thin airfoil theory.
 
@@ -414,7 +487,7 @@ class ThinAirfoil(AirfoilModel):
         return Cl, Cd, Cm
 
 
-@struct.pytree_node(frozen=False)  # Non-frozen to allow for initializing node data
+@arc.struct(frozen=False)
 class TabulatedAirfoil(AirfoilModel):
     """Airfoil model based on tabulated data"""
 
@@ -422,8 +495,8 @@ class TabulatedAirfoil(AirfoilModel):
     # specifying coefficients as a function of angle of attack. Each
     # item in the list corresponds to a different airfoil section;
     # data is interpolated linearly between sections.
-    airfoil_data: list[np.ndarray] = struct.field(default_factory=list)
-    rad_loc: list[float] = struct.field(
+    airfoil_data: list[np.ndarray] = arc.field(default_factory=list)
+    rad_loc: list[float] = arc.field(
         default_factory=list
     )  # Radial locations of airfoil sections [m]
 
@@ -501,7 +574,7 @@ class TabulatedAirfoil(AirfoilModel):
         return Cl, Cd, Cm
 
 
-@struct.pytree_node(frozen=False)  # Non-frozen to allow for initializing weights
+@arc.struct(frozen=False)
 class BladeElementModel(RotorModel):
     """Blade element model for rotor aerodynamics
 
@@ -519,7 +592,7 @@ class BladeElementModel(RotorModel):
     rho: float = 1.225  # Air density [kg/m^3]
 
     # Airfoil model
-    airfoil_model: AirfoilModel = struct.field(default_factory=ThinAirfoil)
+    airfoil_model: AirfoilModel = arc.field(default_factory=ThinAirfoil)
 
     # Iterative inflow solver parameters
     T0: float = 0.0  # Reference thrust per rotor (e.g. weight / number of rotors)
