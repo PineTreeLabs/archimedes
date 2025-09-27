@@ -94,7 +94,7 @@ def codegen(
 
         - SymbolicArray objects
         - NumPy arrays with the same shape and dtype as expected inputs
-        - [PyTree](../../pytrees.md)-structured data types matching expected inputs
+        - [tree-structured data types](../../trees.md) matching expected inputs
         - The actual values for static arguments
 
         Note: For dynamic arguments, the numeric values are ignored.
@@ -195,19 +195,19 @@ def codegen(
     2. Pass them as hashable static arguments (same effect as a closure)
     3. Pass as "dynamic" arguments that could be edited in the generated code
 
-    **PyTree support**
+    **Tree support**
 
     The code generation system supports structured data types, either as homogeneous
     arrays (lists or tuples with all elements of the same type) or as heterogeneous
-    containers (e.g. dictionaries, named tuples, or :py:func:`pytree_node` classes.
+    containers (e.g. dictionaries, named tuples, or :py:func:`struct` classes.
     The former will be represented as C arrays, while the latter will be represented
     as C structs.
 
-    For example, a PyTree argument defined with
+    For example, a struct argument defined with
 
     .. code-block:: python3
 
-        @struct.pytree_node
+        @struct
         class Point:
             x: float
             y: float
@@ -239,10 +239,10 @@ def codegen(
     will store ``x[k]``, but the updated state will *not* automatically be copied back
     to the input.
 
-    If the state is implemented as a PyTree, it will correspond to a C struct and the
+    If the state is implemented as a `@struct`, it will correspond to a C struct and the
     copy operation can be implemented simply using direct copy semantics.  For example,
     a function with the signature ``func(state, inputs) -> (state_new, outputs)`` for
-    which the state is a PyTree (or dict, or named tuple) will generate a C struct
+    which the state is a `@struct` (or dict, or named tuple) will generate a C struct
     named ``state_t``.  The ``arg`` structure will include a field ``state``, and the
     ``res`` structure will include a field ``state_new``, both of which have type
     ``state_t``.  With direct assignment copying, the updated state can be copied back
@@ -429,15 +429,15 @@ class Context(Protocol):
     ctx_type: str
 
 
-@tree.struct.pytree_node
+@tree.struct
 class NoneContext(Context):
     type_: str = None
     name: str = None
     description: str | None = None
-    ctx_type: str = tree.struct.field(default="none")
+    ctx_type: str = tree.field(default="none")
 
 
-@tree.struct.pytree_node
+@tree.struct
 class LeafContext(Context):
     type_: str
     name: str
@@ -445,26 +445,26 @@ class LeafContext(Context):
     dims: int
     initial_data: np.ndarray
     description: str | None
-    ctx_type: str = tree.struct.field(default="leaf")
+    ctx_type: str = tree.field(default="leaf")
 
 
-@tree.struct.pytree_node
+@tree.struct
 class NodeContext(Context):
-    type_: str = tree.struct.field(static=True)
-    name: str = tree.struct.field(static=True)
+    type_: str = tree.field(static=True)
+    name: str = tree.field(static=True)
     children: list[Context]
-    description: str | None = tree.struct.field(static=True, default=None)
-    ctx_type: str = tree.struct.field(default="node", static=True)
+    description: str | None = tree.field(static=True, default=None)
+    ctx_type: str = tree.field(default="node", static=True)
 
 
-@tree.struct.pytree_node
+@tree.struct
 class ListContext(Context):
-    type_: str = tree.struct.field(static=True)  # Type name of the list elements
-    name: str = tree.struct.field(static=True)
-    length: int = tree.struct.field(static=True)
+    type_: str = tree.field(static=True)  # Type name of the list elements
+    name: str = tree.field(static=True)
+    length: int = tree.field(static=True)
     elements: list[Context]
-    description: str | None = tree.struct.field(static=True, default=None)
-    ctx_type: str = tree.struct.field(static=True, default="list")
+    description: str | None = tree.field(static=True, default=None)
+    ctx_type: str = tree.field(static=True, default="list")
 
 
 @dataclasses.dataclass
@@ -520,7 +520,7 @@ class ContextHelper:
         if not arg:
             return self._process_none(name)
 
-        # Items can be any valid PyTree, but they all must have an identical structure
+        # Items can be any valid tree, but they all must have an identical structure
         treedef0 = tree.structure(arg[0])
         elements: list[Context] = []
         for i, item in enumerate(arg):
@@ -530,7 +530,7 @@ class ContextHelper:
                     f"All items in list '{name}' must have the same structure. "
                     f"Found {treedef0.tree_str} and {treedef.tree_str}.  To return "
                     "heterogeneous data, use a structured data type (e.g. dict, "
-                    "NamedTuple, or pytree_node)."
+                    "NamedTuple, or @struct)."
                 )
             elements.append(self._process_arg(item, f"{name}[{i}]"))
 
@@ -548,7 +548,7 @@ class ContextHelper:
         # Note that all "static" data will be embedded in the computational
         # graph, so here we just need to process the child nodes and leaves
         children = []
-        for field in tree.struct.fields(arg):
+        for field in tree.fields(arg):
             if field.metadata.get("static", False):
                 continue
             child_name = field.name
@@ -606,7 +606,7 @@ class ContextHelper:
             return self._process_none(name)
         if tree.is_leaf(arg):
             return self._process_leaf(arg, name)
-        elif tree.struct.is_pytree_node(arg):
+        elif tree.is_struct(arg):
             return self._process_struct(arg, name)
         elif isinstance(arg, tuple) and hasattr(arg, "_fields"):
             # Special case for named tuples: convert to dict

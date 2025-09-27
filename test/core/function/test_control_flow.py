@@ -215,7 +215,7 @@ class TestSwitch:
             )
 
         x = np.array([1.0, 2.0])
-        with pytest.raises(ValueError, match=r".*must return the same PyTree.*"):
+        with pytest.raises(ValueError, match=r".*must return the same tree.*"):
             apply_operation(x, 0)
 
     # Multiple arguments to branches
@@ -235,8 +235,8 @@ class TestSwitch:
         assert np.isclose(apply_operation(3.0, 4.0, 0), 7.0)
         assert np.isclose(apply_operation(3.0, 4.0, 1), 12.0)
 
-    # PyTree handling
-    def test_pytree_arguments(self):
+    # Tree handling
+    def test_tree_arguments(self):
         def process1(data):
             return {k: v * 2 for k, v in data.items()}
 
@@ -466,7 +466,7 @@ class TestVmap:
         assert np.allclose(z, np.array([np.dot(x[i], y[i]) for i in range(3)]))
 
     def test_vmap_unravel(self):
-        @struct.pytree_node
+        @struct
         class PointMass:
             pos: np.ndarray
             vel: np.ndarray
@@ -485,7 +485,7 @@ class TestVmap:
         assert np.allclose(ps.vel, ps_flat[:, 2:])
 
     def test_vmap_with_arg(self):
-        @struct.pytree_node
+        @struct
         class PointMass:
             pos: np.ndarray
             vel: np.ndarray

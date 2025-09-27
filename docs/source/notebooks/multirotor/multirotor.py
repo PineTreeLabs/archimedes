@@ -7,7 +7,6 @@ import numpy as np
 from scipy.special import roots_legendre
 
 import archimedes as arc
-from archimedes import struct
 from archimedes.experimental import aero
 from archimedes.experimental.aero import (
     RigidBody,
@@ -123,9 +122,9 @@ NACA_0012 = np.array(
 )
 
 
-@struct.module
+@arc.struct
 class RotorGeometry:
-    offset: np.ndarray = struct.field(
+    offset: np.ndarray = arc.field(
         default_factory=lambda: np.zeros(3)
     )  # Location of the rotor hub in the body frame B [m]
     ccw: bool = True  # True if rotor spins counter-clockwise when viewed from above
@@ -182,7 +181,7 @@ class GravityModel(Protocol):
         """
 
 
-@struct.module
+@arc.struct
 class ConstantGravity:
     g0: float = 9.81
 
@@ -190,7 +189,7 @@ class ConstantGravity:
         return np.array([0, 0, self.g0], like=p_N)
 
 
-@struct.module
+@arc.struct
 class PointGravity:
     G: float = 6.6743e-11  # Gravitational constant [N-m²/kg²]
     R_e: float = 6.371e6  # Radius of earth [m]
@@ -213,7 +212,7 @@ class VehicleDragModel(Protocol):
         """
 
 
-@struct.module
+@arc.struct
 class QuadraticDragModel:
     """Simple velocity-squared drag model for the main vehicle body"""
 
@@ -293,7 +292,7 @@ class RotorModel(metaclass=abc.ABCMeta):
         """Aerodynamic forces and moments in wind frame W"""
 
 
-@struct.module
+@arc.struct
 class QuadraticRotorModel(RotorModel):
     """Simple velocity-squared model for rotor aerodynamics"""
 
@@ -317,20 +316,20 @@ class QuadraticRotorModel(RotorModel):
         return F_W, M_W, aux_state_derivs
 
 
-@struct.module
+@arc.struct
 class MultiRotorVehicle:
-    rigid_body: RigidBody = struct.field(default_factory=RigidBody)
-    rotors: list[RotorGeometry] = struct.field(default_factory=list)
-    rotor_model: RotorModel = struct.field(default_factory=QuadraticRotorModel)
-    drag_model: VehicleDragModel = struct.field(default_factory=QuadraticDragModel)
-    gravity_model: GravityModel = struct.field(default_factory=ConstantGravity)
+    rigid_body: RigidBody = arc.field(default_factory=RigidBody)
+    rotors: list[RotorGeometry] = arc.field(default_factory=list)
+    rotor_model: RotorModel = arc.field(default_factory=QuadraticRotorModel)
+    drag_model: VehicleDragModel = arc.field(default_factory=QuadraticDragModel)
+    gravity_model: GravityModel = arc.field(default_factory=ConstantGravity)
 
     m: float = 1.0  # mass [kg]
-    J_B: np.ndarray = struct.field(
+    J_B: np.ndarray = arc.field(
         default_factory=lambda: np.eye(3)
     )  # inertia matrix [kg·m²]
 
-    @struct.pytree_node
+    @arc.struct
     class State:
         rigid_body: RigidBody.State
         aux: np.ndarray = None  # auxiliary state variables for rotors
@@ -461,7 +460,7 @@ class AirfoilModel(metaclass=abc.ABCMeta):
         pass
 
 
-@struct.module
+@arc.struct
 class ThinAirfoil(AirfoilModel):
     """Airfoil model based on thin airfoil theory.
 
@@ -488,7 +487,7 @@ class ThinAirfoil(AirfoilModel):
         return Cl, Cd, Cm
 
 
-@struct.module
+@arc.struct(frozen=False)
 class TabulatedAirfoil(AirfoilModel):
     """Airfoil model based on tabulated data"""
 
@@ -496,8 +495,8 @@ class TabulatedAirfoil(AirfoilModel):
     # specifying coefficients as a function of angle of attack. Each
     # item in the list corresponds to a different airfoil section;
     # data is interpolated linearly between sections.
-    airfoil_data: list[np.ndarray] = struct.field(default_factory=list)
-    rad_loc: list[float] = struct.field(
+    airfoil_data: list[np.ndarray] = arc.field(default_factory=list)
+    rad_loc: list[float] = arc.field(
         default_factory=list
     )  # Radial locations of airfoil sections [m]
 
@@ -575,7 +574,7 @@ class TabulatedAirfoil(AirfoilModel):
         return Cl, Cd, Cm
 
 
-@struct.module
+@arc.struct(frozen=False)
 class BladeElementModel(RotorModel):
     """Blade element model for rotor aerodynamics
 
@@ -593,7 +592,7 @@ class BladeElementModel(RotorModel):
     rho: float = 1.225  # Air density [kg/m^3]
 
     # Airfoil model
-    airfoil_model: AirfoilModel = struct.field(default_factory=ThinAirfoil)
+    airfoil_model: AirfoilModel = arc.field(default_factory=ThinAirfoil)
 
     # Iterative inflow solver parameters
     T0: float = 0.0  # Reference thrust per rotor (e.g. weight / number of rotors)

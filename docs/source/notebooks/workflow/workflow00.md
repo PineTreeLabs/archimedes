@@ -76,10 +76,10 @@ While simplified (and applied to a simple physical system), every aspect of the 
 
 ## Prerequisites
 
-This tutorial integrates several Archimedes concepts, including [PyTrees](../../pytrees.md), [C code generation](#archimedes.codegen), and [system identification](#archimedes.sysid).
+This tutorial integrates several Archimedes concepts, including [structured data types](../../trees.md), [C code generation](#archimedes.codegen), and [system identification](#archimedes.sysid).
 We'll introduce them as needed, but it will be easier to follow if you are already comfortable with these concepts - the following documentation pages are a good place to start:
 
-* [**Working with PyTrees**](../../pytrees.md)
+* [**Structured Data Types**](../../trees.md)
 * [**Hierarchical Design Patterns**](../../generated/notebooks/modular-design.md)
 * [**Parameter Estimation**](../../generated/notebooks/sysid/parameter-estimation.md)
 * [**Deploying to Hardware**](../deployment/deployment00.md)

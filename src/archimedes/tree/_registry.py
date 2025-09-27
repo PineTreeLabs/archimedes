@@ -28,7 +28,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Creation and management of types recognized as pytree nodes"""
+"""Creation and management of types recognized as tree nodes"""
 
 from __future__ import annotations
 
@@ -56,26 +56,26 @@ def unzip2(pairs):
     return lst1, lst2
 
 
-def register_pytree_node(ty: Any, to_iter: Callable, from_iter: Callable) -> None:
+def register_struct(ty: Any, to_iter: Callable, from_iter: Callable) -> None:
     """
-    Register a custom type as a pytree node.
+    Register a custom type as a tree-compatible dataclass.
 
     This function allows custom types to be recognized and processed by Archimedes'
-    pytree functions. You need to provide functions that convert between your type
+    tree functions. You need to provide functions that convert between your type
     and its components.
 
     Parameters
     ----------
     ty : type
-        The type to register as a pytree node.
+        The type to register as a tree node.
     to_iter : callable
         A function that accepts an instance of type `ty` and returns a tuple
         of `(children, aux_data)`, where:
 
-        - `children` is an iterable of the pytree node's children
+        - `children` is an iterable of the tree node's children
 
         - `aux_data` is any auxiliary metadata needed to reconstruct the node\
-        but not part of the pytree structure itself
+        but not part of the tree structure itself
 
     from_iter : callable
         A function that accepts `aux_data` and an iterable of children and returns
@@ -87,18 +87,12 @@ def register_pytree_node(ty: Any, to_iter: Callable, from_iter: Callable) -> Non
 
     Notes
     -----
-    When to use:
-
-    - When you have custom container types that should be traversed by pytree operations
-    - To enable pytree transformations on your own data structures
-    - When creating reusable components that need to be compatible with Archimedes'
-      pytree-based operations
 
     The `to_iter` function should extract the relevant parts of your data structure,
     and the `from_iter` function should be able to reconstruct it exactly.
 
     Usually, instead of using this function directly, you'll want to use the
-    `struct.pytree_node` decorator for classes, which automatically handles
+    `@struct` decorator for classes, which automatically handles
     registration for dataclass-like structures.  This function is used internally to
     register the decorated classes.  It is also available as an alternative interface
     for low-level control of flattening/unflattening behavior and static data for
@@ -129,10 +123,10 @@ def register_pytree_node(ty: Any, to_iter: Callable, from_iter: Callable) -> Non
     ...     x, y, z = children
     ...     return Point3D(x, y, z)
     >>>
-    >>> # Register the class as a pytree node
-    >>> arc.tree.register_pytree_node(Point3D, point_to_iter, point_from_iter)
+    >>> # Register the class as a struct
+    >>> arc.tree.register_struct(Point3D, point_to_iter, point_from_iter)
     >>>
-    >>> # Now Point3D works with pytree operations
+    >>> # Now Point3D works with tree operations
     >>> p = Point3D(np.array([1.0]), np.array([2.0]), np.array([3.0]))
     >>> doubled = arc.tree.map(lambda x: x * 2, p)
     >>> print(doubled)
@@ -140,15 +134,15 @@ def register_pytree_node(ty: Any, to_iter: Callable, from_iter: Callable) -> Non
 
     See Also
     --------
-    struct.pytree_node : Decorator for creating pytree-compatible classes
-    register_dataclass : Register a dataclass as a pytree node
+    struct : Decorator for creating tree-compatible dataclasses
+    register_dataclass : Register a dataclass as a struct
     """
     _registry[ty] = _RegistryEntry(to_iter, from_iter)
 
 
-register_pytree_node(None, lambda x: (None, None), lambda _, xs: None)
-register_pytree_node(tuple, lambda t: (t, None), lambda _, xs: tuple(xs))
-register_pytree_node(list, lambda lst: (lst, None), lambda _, xs: list(xs))
+register_struct(None, lambda x: (None, None), lambda _, xs: None)
+register_struct(tuple, lambda t: (t, None), lambda _, xs: tuple(xs))
+register_struct(list, lambda lst: (lst, None), lambda _, xs: list(xs))
 
 
 # dict
@@ -161,7 +155,7 @@ def _dict_from_iter(keys, vals):
     return dict(zip(keys, vals))
 
 
-register_pytree_node(dict, _dict_to_iter, _dict_from_iter)
+register_struct(dict, _dict_to_iter, _dict_from_iter)
 
 
 # OrderedDict
@@ -169,7 +163,7 @@ def _od_from_iter(keys, vals):
     return OrderedDict(zip(keys, vals))
 
 
-register_pytree_node(OrderedDict, _dict_to_iter, _od_from_iter)
+register_struct(OrderedDict, _dict_to_iter, _od_from_iter)
 
 
 def register_dataclass(
@@ -179,16 +173,16 @@ def register_dataclass(
     drop_fields: Sequence[str] = (),
 ) -> Typ:
     """
-    Register a dataclass as a pytree node with customized field handling.
+    Register a dataclass as tree-compatible with customized field handling.
 
-    This function registers a dataclass type as a pytree node, with control over
+    This function registers a dataclass type as a tree node, with control over
     which fields are treated as leaf data versus metadata. Fields marked as
     metadata are excluded from transformations and treated as static configuration.
 
     Parameters
     ----------
     nodetype : type
-        The dataclass type to register as a pytree node.
+        The dataclass type to register as tree-compatible.
     data_fields : sequence of str, optional
         Names of fields that should be treated as data (leaf values). If None and
         the type is a dataclass, fields are inferred based on metadata.
@@ -201,21 +195,21 @@ def register_dataclass(
     Returns
     -------
     nodetype : type
-        The input type, now registered as a pytree node.
+        The input type, now registered as tree-compatible.
 
     Notes
     -----
     When to use:
-    - For fine-grained control over how dataclass fields are handled in pytree ops
+    - For fine-grained control over how dataclass fields are handled in tree ops
     - When you need some fields to be treated as static configuration rather than data
-    - For advanced customization of pytree behavior for complex data models
+    - For advanced customization of tree behavior for complex data models
 
     Usually, instead of using this function directly, you'll want to use the
-    `struct.pytree_node` decorator which handles registration automatically and
-    allows field classification via the `struct.field(static=True)` parameter.
+    `@struct` decorator which handles registration automatically and
+    allows field classification via the `field(static=True)` parameter.
     This function is mainly used internally to register the decorated classes.
 
-    Data fields are included when flattening a pytree and are considered leaf values
+    Data fields are included when flattening a tree and are considered leaf values
     that can be transformed. Meta fields are static configuration not included in
     transformations but preserved during reconstruction.
 
@@ -271,9 +265,9 @@ def register_dataclass(
 
     See Also
     --------
-    struct.pytree_node : Decorator for creating pytree-compatible classes
-    struct.field : Function to create fields with metadata for pytree behavior
-    register_pytree_node : Register any custom type as a pytree node
+    struct : Decorator for creating tree-compatible classes
+    field : Function to create fields with metadata for tree behavior
+    register_struct : Register any custom type as a tree-compatible dataclass
     """
     if data_fields is None or meta_fields is None:
         if (data_fields is None) != (meta_fields is None):
@@ -332,5 +326,5 @@ def register_dataclass(
         data = tuple(getattr(x, name) for name in data_fields)
         return data, meta
 
-    register_pytree_node(nodetype, flatten_func, unflatten_func)
+    register_struct(nodetype, flatten_func, unflatten_func)
     return nodetype

@@ -32,8 +32,8 @@ def callback(func: Callable, result_shape_dtypes, *args) -> Any:
         The Python function to wrap. This function should accept the same number of
         arguments as provided in ``*args`` and should return values that can be
         converted to NumPy arrays.
-    result_shape_dtypes : PyTree
-        A PyTree structure that defines the expected shape and data types of the
+    result_shape_dtypes : Tree
+        A tree structure that defines the expected shape and data types of the
         function's output. This is used to determine the output shape of the
         callback wrapper without calling the function itself.
     *args : Any
@@ -43,7 +43,7 @@ def callback(func: Callable, result_shape_dtypes, *args) -> Any:
     Returns
     -------
     Any
-        The result of calling ``func(*args)``, structured as a PyTree if applicable.
+        The result of calling ``func(*args)``, structured as a tree if applicable.
 
     Notes
     -----
@@ -72,23 +72,27 @@ def callback(func: Callable, result_shape_dtypes, *args) -> Any:
 
     Examples
     --------
+    >>> import math
     >>> import numpy as np
     >>> import archimedes as arc
     >>>
     >>> # Define an external function
-    >>> def custom_nonlinearity(x):
-    ...     print("Evaluating custom_nonlinearity")
-    ...     return np.tanh(x) * np.exp(-0.1 * x**2)
+    >>> def unsupported_code(x):
+    ...     print("Evaluating unsupported_code")
+    ...     # The "math" library is not supported symbolically
+    ...     return math.tanh(x[0]) * math.exp(-0.1 * x[1]**2)
     >>>
     >>>
     >>> # Use in a compiled function
     >>> @arc.compile
     ... def model(x):
-    ...     result_shape_dtypes = x  # Output has same type as input
-    ...     y = arc.callback(custom_nonlinearity, result_shape_dtypes, x)
+    ...     result_shape_dtypes = 0.0  # Output is a scalar
+    ...     y = arc.callback(unsupported_code, result_shape_dtypes, x)
     ...     return y * 2
     >>>
     >>> model(np.array([0.5, 1.5]))
+    Evaluating unsupported_code
+    array(0.73801609)
 
     See Also
     --------

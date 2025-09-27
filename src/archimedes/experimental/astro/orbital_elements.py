@@ -7,7 +7,7 @@ from .constants import EARTH_RADIUS, EARTH_MU
 from ..aero.rotations import x_dcm, y_dcm, z_dcm
 
 
-@struct.pytree_node
+@struct
 class KeplerElements:
     """Class to represent Keplerian orbital elements."""
 
@@ -19,7 +19,7 @@ class KeplerElements:
     nu: float
 
 
-@struct.pytree_node
+@struct
 class CartesianState:
     """Class to represent a Cartesian state vector."""
 

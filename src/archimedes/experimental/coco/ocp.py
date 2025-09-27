@@ -4,7 +4,7 @@ from typing import Callable
 
 import numpy as np
 
-from archimedes import compile, minimize, vmap, struct
+from archimedes import compile, minimize, struct, field
 
 from .discretization import SplineDiscretization
 from .interpolation import LagrangePolynomial
@@ -76,13 +76,13 @@ def control_bounds(lb, ub):
     return Constraint(lambda t, x, u, p: u, len(lb), lower_bound=lb, upper_bound=ub)
 
 
-@struct.pytree_node
+@struct
 class OptimalControlSolution:
     xp: np.ndarray
     up: np.ndarray
     tp: np.ndarray
-    x: Callable = struct.field(static=True)
-    u: Callable = struct.field(static=True)
+    x: Callable = field(static=True)
+    u: Callable = field(static=True)
     p: np.ndarray
     dvs: np.ndarray = None
 

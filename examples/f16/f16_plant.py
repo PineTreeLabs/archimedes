@@ -4,7 +4,6 @@ import abc
 import numpy as np
 
 import archimedes as arc
-from archimedes import struct
 
 from archimedes.experimental import aero
 from archimedes.experimental.aero import (
@@ -38,7 +37,7 @@ default_J_B = np.array(
 )
 
 
-@struct.module
+@arc.struct
 class ConstantGravity:
     """Constant gravitational acceleration model
 
@@ -52,7 +51,7 @@ class ConstantGravity:
         return np.hstack([0, 0, self.g0])
 
 
-@struct.module
+@arc.struct
 class AtmosphereModel:
     R0: float = 2.377e-3  # Density scale [slug/ft^3]
     gamma: float = 1.4  # Adiabatic index for air [-]
@@ -74,20 +73,20 @@ class AtmosphereModel:
         return amach, qbar
 
 
-@struct.module
+@arc.struct
 class SubsonicF16:
-    rigid_body: RigidBody = struct.field(default_factory=RigidBody)
-    gravity: GravityModel = struct.field(default_factory=ConstantGravity)
-    atmos: AtmosphereModel = struct.field(default_factory=AtmosphereModel)
-    engine: F16Engine = struct.field(default_factory=F16Engine)
-    aero: F16Aerodynamics = struct.field(default_factory=F16Aerodynamics)
+    rigid_body: RigidBody = arc.field(default_factory=RigidBody)
+    gravity: GravityModel = arc.field(default_factory=ConstantGravity)
+    atmos: AtmosphereModel = arc.field(default_factory=AtmosphereModel)
+    engine: F16Engine = arc.field(default_factory=F16Engine)
+    aero: F16Aerodynamics = arc.field(default_factory=F16Aerodynamics)
 
     # NOTE: The weight in the textbook is 25,000 lbs, but this
     # does not give consistent values - the default value here
     # matches the values given in the tables
     m: float = default_mass  # Vehicle mass [slug]
     # Vehicle inertia matrix [slug·ft²]
-    J_B: np.ndarray = struct.field(default_factory=lambda: default_J_B)
+    J_B: np.ndarray = arc.field(default_factory=lambda: default_J_B)
 
     xcg: float = 0.35  # CG location (% of cbar)
 
@@ -97,7 +96,7 @@ class SubsonicF16:
     xcgr: float = 0.35  # Reference CG location (% of cbar)
     hx: float = 160.0  # Engine angular momentum (assumed constant)
 
-    @struct.pytree_node
+    @arc.struct
     class State:
         rigid_body: RigidBody.State
         engine_power: np.ndarray  # Engine power state (0 to 1)

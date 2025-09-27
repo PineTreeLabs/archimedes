@@ -1,10 +1,21 @@
-"""Utilities for working with hierarchical "pytree" data structures."""
+"""Utilities for working with hierarchical tree-structured data."""
 
-from . import struct
-from ._flatten_util import ravel_pytree as ravel
+from ._config import (
+    StructConfig,
+    UnionConfig,
+)
+from ._flatten_util import ravel_tree as ravel
 from ._registry import (
     register_dataclass,
-    register_pytree_node,
+    register_struct,
+)
+from ._struct import (
+    InitVar,
+    field,
+    fields,
+    is_struct,
+    replace,
+    struct,
 )
 from ._tree_util import is_leaf
 from ._tree_util import (
@@ -30,7 +41,7 @@ from ._tree_util import (
 )
 
 __all__ = [
-    "register_pytree_node",
+    "register_struct",
     "register_dataclass",
     "is_leaf",
     "flatten",
@@ -42,4 +53,11 @@ __all__ = [
     "reduce",
     "ravel",
     "struct",
+    "field",
+    "InitVar",
+    "is_struct",
+    "fields",
+    "replace",
+    "StructConfig",
+    "UnionConfig",
 ]

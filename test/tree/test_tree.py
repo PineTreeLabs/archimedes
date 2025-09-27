@@ -61,7 +61,7 @@ from typing import NamedTuple
 import numpy as np
 import pytest
 
-from archimedes import struct, tree
+from archimedes import StructConfig, UnionConfig, field, struct, tree
 from archimedes._core import SymbolicArray, compile, sym
 from archimedes.tree._tree_util import NONE_DEF
 
@@ -206,7 +206,7 @@ def test_custom_node():
         (name,) = aux_data
         return Point(x, y, name)
 
-    tree.register_pytree_node(Point, point_flatten, point_unflatten)
+    tree.register_struct(Point, point_flatten, point_unflatten)
 
     p = Point(1.0, 2.0, "p")
     flat, treedef = tree.flatten(p)
@@ -436,17 +436,17 @@ class TestRavel:
 
 def test_register_struct():
     # Mark static fields using `field`
-    @struct.pytree_node(kw_only=True)
+    @struct(kw_only=True)
     class Point:
         x: float
         y: float
-        name: str = struct.field(static=True)
+        name: str = field(static=True)
 
-    assert struct.is_pytree_node(Point)
+    assert tree.is_struct(Point)
 
     p = Point(x=1.0, y=2.0, name="p")
 
-    # Check that the pytree node is frozen
+    # Check that the dataclass is frozen
     with pytest.raises(dataclasses.FrozenInstanceError):
         p.x = 3.0
 
@@ -463,17 +463,17 @@ def test_register_struct():
     assert p2.y == 0.0
     assert p.y == 2.0
 
-    # Check that re-applying the pytree_node does nothing
-    # because of the `_arc_dataclass` class attribute.
-    assert struct.pytree_node(Point) is Point
+    # Check that re-applying the struct does nothing
+    # because of the `_arc_struct` class attribute.
+    assert struct(Point) is Point
 
 
-@struct.module
+@struct
 class VariantBase:
     pass
 
 
-@struct.module(kw_only=True)  # Add keyword arg to test passing with cls=None
+@struct(kw_only=True)  # Add keyword arg to test passing with cls=None
 class VariantA(VariantBase):
     param: float  # m/s^2
 
@@ -481,7 +481,7 @@ class VariantA(VariantBase):
         return self.param
 
 
-@struct.module(kw_only=True)
+@struct(kw_only=True)
 class VariantB(VariantBase):
     param: float  # m/s^2
 
@@ -490,7 +490,7 @@ class VariantB(VariantBase):
 
 
 # Test that we can create a base class with a shared config
-class VariantConfigBase(struct.ModuleConfig):
+class VariantConfigBase(StructConfig):
     param: float
 
 
@@ -505,21 +505,16 @@ class VariantBConfig(VariantConfigBase, type="negative"):
 
 
 def test_variant_config():
-    struct.UnionConfig[VariantAConfig, VariantBConfig]
+    UnionConfig[VariantAConfig, VariantBConfig]
 
-    with pytest.raises(TypeError, match=r".*must be a subclass of ModuleConfig.*"):
-        struct.UnionConfig[VariantA, VariantB]
+    with pytest.raises(TypeError, match=r".*must be a subclass of StructConfig.*"):
+        UnionConfig[VariantA, VariantB]
 
     # Single-variant config
-    struct.UnionConfig[VariantAConfig]
+    UnionConfig[VariantAConfig]
 
 
-def test_module():
-    assert struct.module(VariantA) is VariantA
-    assert struct.module(VariantB) is VariantB
-
-
-def test_module_config():
+def test_struct_config():
     param = 42
     config = VariantAConfig(param=param)
 

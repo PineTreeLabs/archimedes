@@ -25,7 +25,7 @@ nu = 1  # Input dimension (voltage)
 ny = 2  # Output dimension (position, current)
 
 
-@struct.pytree_node
+@struct
 class MotorParams:
     J: float  # Effective inertia
     b: float  # Viscous friction
@@ -60,7 +60,7 @@ def motor_obs(
     return np.hstack([abs(x[0]), x[1]])
 
 
-@struct.pytree_node
+@struct
 class MotorInputs:
     pwm_duty: float  # PWM duty cycle (0-1)
     ENA: bool

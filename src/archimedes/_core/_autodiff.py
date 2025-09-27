@@ -287,7 +287,7 @@ def jac(
     jvp : Compute Jacobian-vector products
     vjp : Compute vector-Jacobian products
     """
-    # TODO: Support multiple returns using PyTrees?
+    # TODO: Support multiple returns using trees?
 
     if not isinstance(func, FunctionCache):
         func = FunctionCache(
@@ -439,7 +439,7 @@ def hess(
     jac : Compute the Jacobian matrix of a function
     minimize : Optimization using automatic differentiation
     """
-    # TODO: Support multiple returns using PyTrees?
+    # TODO: Support multiple returns using trees?
 
     if not isinstance(func, FunctionCache):
         func = FunctionCache(

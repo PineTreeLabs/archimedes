@@ -171,7 +171,7 @@ def discretize(func=None, dt=None, method="rk4", n_steps=1, name=None, **options
         - ``t`` : Current time (scalar)
         - ``x`` : State vector of shape ``(nx,)``
         - ``u`` : Input vector of shape ``(nu,)``
-        - ``params`` : Parameters (any PyTree structure)
+        - ``params`` : Parameters (any tree-compatible structure)
 
         Must return the time derivative ``dx/dt`` as an array of shape ``(nx,)``.
         The function can be a regular Python function or a pre-compiled

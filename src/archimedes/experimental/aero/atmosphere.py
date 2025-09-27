@@ -3,7 +3,7 @@ from typing import Tuple
 
 import numpy as np
 
-from archimedes import struct
+from archimedes import struct, StructConfig, UnionConfig
 from archimedes._core.utils import find_equal
 
 
@@ -17,7 +17,7 @@ __all__ = [
 ]
 
 
-@struct.module
+@struct
 class AtmosphereModel(metaclass=abc.ABCMeta):
     Rs: float = 287.05287  # Specific gas constant for air [J/(kg·K)]
     gamma: float = 1.4  # Adiabatic index for air [-]
@@ -40,12 +40,12 @@ class AtmosphereModel(metaclass=abc.ABCMeta):
         return amach, qbar
 
 
-class AtmosphereConfigBase(struct.ModuleConfig):
+class AtmosphereConfigBase(StructConfig):
     Rs: float = 287.05287  # Specific gas constant for air [J/(kg·K)]
     gamma: float = 1.4  # Adiabatic index for air [-]
 
 
-@struct.module
+@struct
 class ConstantAtmosphere(AtmosphereModel):
     """Constant atmosphere model"""
 
@@ -85,7 +85,7 @@ p_USSA1976 = np.array([101325, 22632.06, 5474.89, 868.02, 110.91, 66.94, 3.96, 0
 L_USSA1976 = np.array([-0.0065, 0, 0.001, 0.0028, 0, 0.0028, 0, 0])
 
 
-@struct.module
+@struct
 class StandardAtmosphere1976(AtmosphereModel):
     """U.S. Standard Atmosphere, 1976"""
 
@@ -119,7 +119,7 @@ class StandardAtmosphere1976Config(AtmosphereConfigBase, type="ussa1976"):
         )
 
 
-AtmosphereConfig = struct.UnionConfig[
+AtmosphereConfig = UnionConfig[
     ConstantAtmosphereConfig,
     StandardAtmosphere1976Config,
 ]

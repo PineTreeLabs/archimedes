@@ -114,7 +114,7 @@ class TestRotation:
         assert result.shape == (3,)
         assert np.allclose(result, R.apply(v))
 
-    def test_pytree(self):
+    def test_tree_ops(self):
         R = Rotation.from_euler("xyz", [0.1, 0.2, 0.3])
         flat, unflatten = arc.tree.ravel(R)
         R_restored = unflatten(flat)

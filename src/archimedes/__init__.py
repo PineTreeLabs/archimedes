@@ -25,9 +25,15 @@ from .discretize import discretize
 from .optimize import implicit, minimize, nlp_solver, qpsol, root
 from .simulate import integrator, odeint
 from .theme import set_theme
-from .tree import struct
 
 from . import docs, error, observers, sysid, theme, tree  # isort: skip
+
+from .tree import (
+    StructConfig,
+    UnionConfig,
+    field,
+    struct,
+)
 
 __all__ = [
     "docs",
@@ -37,6 +43,9 @@ __all__ = [
     "observers",
     "tree",
     "struct",
+    "field",
+    "StructConfig",
+    "UnionConfig",
     "sysid",
     "array",
     "callback",

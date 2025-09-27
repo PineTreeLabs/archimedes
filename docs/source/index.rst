@@ -55,7 +55,7 @@ Documentation
    :caption: Core Concepts
 
    under-the-hood
-   pytrees
+   trees
    generated/notebooks/control-flow
    generated/notebooks/modular-design
 

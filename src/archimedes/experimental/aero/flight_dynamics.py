@@ -3,7 +3,7 @@ from typing import TYPE_CHECKING, Protocol
 
 import numpy as np
 
-from archimedes import struct
+from archimedes import struct, field, StructConfig
 
 from .rotations import (
     dcm_from_euler,
@@ -11,9 +11,6 @@ from .rotations import (
     euler_kinematics,
     quaternion_derivative,
 )
-
-if TYPE_CHECKING:
-    from archimedes.typing import PyTree
 
 
 def wind_frame(v_rel_B):
@@ -34,18 +31,18 @@ def wind_frame(v_rel_B):
     return vt, alpha, beta
 
 
-@struct.module
+@struct
 class RigidBody:
     attitude: str = "quaternion"  # "euler" or "quaternion"
 
-    @struct.pytree_node
+    @struct
     class State:
         p_N: np.ndarray  # Position of the center of mass in the Newtonian frame N
         att: np.ndarray  # Attitude (orientation) of the vehicle
         v_B: np.ndarray  # Velocity of the center of mass in body frame B
         w_B: np.ndarray  # Angular velocity in body frame (ω_B)
 
-    @struct.pytree_node
+    @struct
     class Input:
         F_B: np.ndarray  # Net forces in body frame B
         M_B: np.ndarray  # Net moments in body frame B
@@ -53,7 +50,7 @@ class RigidBody:
         J_B: np.ndarray  # inertia matrix [kg·m²]
         dm_dt: float = 0.0  # mass rate of change [kg/s]
         # inertia rate of change [kg·m²/s]
-        dJ_dt: np.ndarray = struct.field(default_factory=lambda: np.zeros((3, 3)))
+        dJ_dt: np.ndarray = field(default_factory=lambda: np.zeros((3, 3)))
 
     def calc_kinematics(self, x: State):
         # Unpack the state
@@ -133,7 +130,7 @@ class RigidBody:
         )
 
 
-class RigidBodyConfig(struct.ModuleConfig):
+class RigidBodyConfig(StructConfig):
     attitude: str = "quaternion"  # "euler" or "quaternion"
 
     def build(self) -> RigidBody:

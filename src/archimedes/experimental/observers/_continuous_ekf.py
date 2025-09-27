@@ -1,20 +1,20 @@
 from typing import Callable
 import numpy as np
 
-from archimedes import struct
+from archimedes import struct, field
 from archimedes import jac
 
 
-@struct.pytree_node
+@struct
 class ContinuousEKF:
-    dyn: Callable = struct.field(static=True)  # ẋ = dyn(t, x, u)
-    obs: Callable = struct.field(static=True)  # y = obs(t, x, u)
+    dyn: Callable = field(static=True)  # ẋ = dyn(t, x, u)
+    obs: Callable = field(static=True)  # y = obs(t, x, u)
     Q: np.ndarray  # Process noise covariance
     R: np.ndarray  # Measurement noise covariance
-    unravel_x: Callable = struct.field(static=True, default=None)
-    unravel_y: Callable = struct.field(static=True, default=None)
+    unravel_x: Callable = field(static=True, default=None)
+    unravel_y: Callable = field(static=True, default=None)
 
-    @struct.pytree_node
+    @struct
     class State:
         x: np.ndarray
         P: np.ndarray
