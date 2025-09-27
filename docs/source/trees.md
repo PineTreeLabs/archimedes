@@ -1,4 +1,4 @@
-# Structured data types
+# Structured Data Types
 
 Tree operations in Archimedes provide a way to work with structured data in numerical algorithms that typically expect flat vectors. This page explains what "structured data types" are in this context, how to use them in your code, and how to create custom structures that work seamlessly with Archimedes functions.
 

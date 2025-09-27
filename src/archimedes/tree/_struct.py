@@ -253,7 +253,6 @@ def struct(cls: T | None = None, **kwargs) -> T | Callable:
     See Also
     --------
     field : Define fields with tree-specific metadata
-    module: Decorator for creating functional modules
     """
     # Support passing arguments to the decorator (e.g. @struct(kw_only=True))
     if cls is None:
