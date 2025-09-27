@@ -78,10 +78,10 @@ warn_return_any = true
 disallow_untyped_defs = false
 ignore_missing_imports = true
 check_untyped_defs = true
-
-[[tool.mypy.overrides]]
-module = "archimedes.experimental.*"
-ignore_errors = true
+exclude = [
+    "archimedes/docs/*",
+    "archimedes/experimental/*",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
