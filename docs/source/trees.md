@@ -2,14 +2,20 @@
 
 Tree operations in Archimedes provide a way to work with structured data in numerical algorithms that typically expect flat vectors. This page explains what "structured data types" are in this context, how to use them in your code, and how to create custom structures that work seamlessly with Archimedes functions.
 
-The Archimedes concept of a PyTree is borrowed from [JAX](https://docs.jax.dev/en/latest/pytrees.html), while the `pytree_node` decorator produces composable classes that work similarly to [PyTorch Modules](https://pytorch.org/docs/stable/generated/torch.nn.Module.html).
+The Archimedes concept of a PyTree is borrowed from [JAX](https://docs.jax.dev/en/latest/pytrees.html), while the [`struct`](#archimedes.tree.struct) decorator produces composable classes that work similarly to [PyTorch Modules](https://pytorch.org/docs/stable/generated/torch.nn.Module.html).
 You may also want to scan these documentation pages to get ideas about what these structures are and how they are used.
 
-## What is a PyTree?
+## What is a tree?
 
-A PyTree is any nested structure of "containers" (dictionaries, lists, tuples, NamedTuples) and "leaves" (arrays or scalars). Archimedes automatically recognizes built-in Python containers as PyTree nodes, while arrays and scalars are treated as leaves.
+In this context, a "tree" is any nested structure of "containers" (dictionaries, lists, tuples, NamedTuples) and "leaves" (arrays or scalars).
+Archimedes automatically recognizes built-in Python containers as tree nodes, while arrays and scalars are treated as leaves.
 
-Examples of valid PyTrees:
+This is also what we mean by a "structured data type".
+These are either _array-like_ (NumPy arrays, lists, and tuples), or _struct-like_ (things with fields, like dicts, NamedTuples, and dataclasses).
+One of the key features of these data types is that they map easily to data structures in C (arrays, structs, or arrays of structs).
+The good news is that many data types you'd naturally use in Python are already "structured" in this sense, so while it may be a new concept to you, your code may not have to change all that much.
+
+Examples of structured data:
 
 ```python
 # A list of scalars
@@ -22,11 +28,12 @@ Examples of valid PyTrees:
 (np.array([1.0, 2.0]), [3.0, 4.0], {"value": 5.0})
 ```
 
-## Flattening and Unflattening
+## Flattening and unflattening
 
-The primary operations with PyTrees are:
-- **Flattening**: Converting a structured PyTree into a flat vector
-- **Unflattening**: Restoring a flat vector to its original structure
+The primary tree operations are:
+
+- **Flattening**: Converting a tree into a flat vector
+- **Unflattening**: Restoring a flat vector to its original tree structure
 
 ```python
 import archimedes as arc
@@ -49,9 +56,13 @@ This pattern is essential when working with:
 - Optimization algorithms operating on parameter vectors
 - Root-finding methods that expect flat systems
 
-## Custom PyTree Types
+Note that flattening to an array requires using [`ravel`](#archimedes.tree.ravel).
+There is also a [`flatten`](#archimedes.tree.flatten) function, which returns a list of the leaves along with the tree structure.
+This can be useful for more advanced use cases, but `ravel` is sufficient for typical applications.
 
-For more complex models, create custom classes that work as PyTrees using the `struct` decorator:
+## Custom data types
+
+For more complex models, create custom dataclass-style types that are compatible with tree operations using the [`struct`](#archimedes.tree.struct) decorator:
 
 ```python
 from archimedes.tree import struct
@@ -86,15 +97,15 @@ def dynamics(state, control, dt=0.1):
     )
 ```
 
-The `struct` decorator automatically registers your class with Archimedes' PyTree system, combining the benefits of Python [dataclasses](https://docs.python.org/3/library/dataclasses.html) with PyTree functionality.
+The [`struct`](#archimedes.tree.struct) decorator automatically registers your class with Archimedes' tree system, combining the benefits of Python [dataclasses](https://docs.python.org/3/library/dataclasses.html) with tree functionality.
 
 ### Custom nodes: advanced usage
 
-Since the `pytree_node` decorator converts your class into a standard (frozen) Python dataclass, many typical dataclass considerations carry over directly to custom nodes.
+Since the [`struct`](#archimedes.tree.struct) decorator converts your class into a standard (frozen) Python dataclass, many typical dataclass considerations carry over directly to custom nodes.
 For instance, you should typically avoid implementing `__init__` yourself (as this is constructed automatically by the dataclass), but you can implement `__post_init__` for custom initializations.
 
 In addition, you can apply the usual `field` to any field defined for the node.
-The `struct` module provides its own wrapper of `field`, which extends it with the ability to label a field as `static`.
+Archimedes provides its own wrapper of `field`, which extends it with the ability to label a field as `static`.
 Among other things, this means that it should not be included when translating to/from a flat vector.
 
 These custom nodes are otherwise normal Python classes, so you can define methods on them as usual.
@@ -106,7 +117,7 @@ import numpy as np
 import archimedes as arc
 
 @arc.struct
-class Rocket:
+class Rocket1D:
     # Dynamic variables (included in flattening)
     h: float  # height in meters
     v: float  # velocity in m/s
@@ -122,14 +133,14 @@ class Rocket:
             raise ValueError("Mass must be positive")
 
 # Create a rocket state
-rocket = Rocket(
+rocket = Rocket1D(
     h=0.0,
     v=0.0,
     m=1000.0,
     thrust=15000.0,  # Override the default
 )
 
-print(rocket)  # Rocket(h=0.0, v=0.0, m=1000.0, thrust=15000.0, isp=300.0)
+print(rocket)  # Rocket1D(h=0.0, v=0.0, m=1000.0, thrust=15000.0, isp=300.0)
 
 # Flatten to vector - note that static fields are excluded
 flat_state, unravel = arc.tree.ravel(rocket)
@@ -140,11 +151,11 @@ flat_state[0] += 10  # Increase height by 10 meters
 
 # Unravel back to object - static fields are restored
 new_rocket = unravel(flat_state)
-print(new_rocket)  # Rocket(h=10.0, v=0.0, m=1000.0, thrust=15000.0, isp=300.0)
+print(new_rocket)  # Rocket1D(h=10.0, v=0.0, m=1000.0, thrust=15000.0, isp=300.0)
 ```
 
-You can also nest custom PyTree nodes within each other and define special methods like `__call__`, giving you the ability to create modular and reusable model components.
-For example, if we wanted to simulate a rendezvous between our rocket and the ISS, we could create another PyTree node `Satellite` and the combined state of our system could be defined by a `NamedTuple`, making the entire composite state a valid PyTree:
+You can also nest these `struct` types within each other and define special methods like `__call__`, giving you the ability to create modular and reusable model components.
+For example, if we wanted to simulate a rendezvous between our rocket and the ISS, we could create another `struct` named `Satellite` and the combined state of our system could be defined by a `NamedTuple`, making the entire composite state a valid PyTree:
 
 ```python
 from typing import NamedTuple
@@ -154,7 +165,7 @@ class Satellite(NamedTuple):
     vel: np.ndarray
 
 class RendezvousState(NamedTuple):
-    rocket: Rocket
+    rocket: Rocket1D
     satellite: Satellite
 
 satellite = Satellite(pos=np.zeros(3), vel=np.ones(3))
@@ -164,33 +175,38 @@ flat_state, unravel = arc.tree.ravel(state)
 print(flat_state.shape)  # (9,): three from rocket and six from satellite
 ```
 
-## Example: Pendulum Simulation Using PyTrees
+## Example: pendulum simulation using structured data types
 
-Here's how PyTrees simplify ODE solving with structured data:
+Here's how tree operations simplify ODE solving with structured data:
 
 ```python
 import numpy as np
 import archimedes as arc
 
-# Define a custom PyTree node with dynamics method
+# Define a custom struct with dynamics method
 @arc.struct
-class PendulumState:
-    theta: float      # angle
-    omega: float      # angular velocity
+class Pendulum:
+    g: float = 9.8  # gravity [m/s^2]
+    L: float = 1.0  # arm length [m]
 
-    @classmethod
-    def dynamics(cls, t, state):
-        g, L = 9.81, 1.0
+    # Inner
+    @arc.struct
+    class State:
+        theta: float  # angle [rad]
+        omega: float  # angular velocity [rad/s]
+
+    def dynamics(self, t: float, state: State) -> State:
 
         # Calculate derivatives
         theta_t = state.omega
-        omega_t = -(g/L) * np.sin(state.theta)
+        omega_t = -(self.g/self.L) * np.sin(state.theta)
 
         # Return in the same structure
-        return cls(theta=theta_t, omega=omega_t)
+        return self.State(theta=theta_t, omega=omega_t)
 
 # Initial state and simulation parameters
-initial_state = PendulumState(theta=np.pi/4, omega=0.0)
+system = Pendulum()
+initial_state = system.State(theta=np.pi/4, omega=0.0)
 t_span = (0.0, 10.0)
 t_eval = np.linspace(*t_span, 100)
 
@@ -201,7 +217,7 @@ x0, unravel = arc.tree.ravel(initial_state)
 @arc.compile
 def flat_dynamics(t, x):
     state = unravel(x)  # Unflatten to 
-    derivatives = state.dynamics(t, state)
+    derivatives = system.dynamics(t, state)
     dx, _ = arc.tree.ravel(derivatives)
     return dx  # Return the flattened state
 
@@ -212,28 +228,30 @@ solution = arc.odeint(flat_dynamics, t_span=t_span, x0=x0, t_eval=t_eval)
 states = [unravel(x) for x in solution.T]
 theta = np.array([state.theta for state in states])
 omega = np.array([state.omega for state in states])
+
+# More compact unraveling idiom
+states = arc.vmap(unravel)(solution.T)
+theta, omega = states.theta, states.omega
 ```
 
-## Current Limitations
+## Current limitations
 
-The following limitations will be resolved with further development:
+While some API functions like [`minimize`](#archimedes.optimize.minimize) can naturally handle tree-structures arguments, others like [`odeint`](#archimedes.odeint) do not yet support this.
+This will be resolved with further development, but for the time being you have to manually construct wrapper functions like `flat_dynamics` above.
 
-- **Postprocessing**: The `unravel` functions assume that their arguments have the same shape as the original PyTree, leading to somewhat complicated unpacking operations, particularly for ODE solutions like the previous example.
-- **No automatic conversion**: Functions like `odeint` and `minimize` don't automatically convert all their arguments to PyTrees, meaning you have to manually construct wrapper functions like `flat_dynamics` above.
+**If you encounter what looks like a bug with tree operations or another limitation that should be documented, please file an issue!**
 
-**If you encounter what looks like a bug with PyTrees or another limitation, please file an issue!**
+## Best practices and tips
 
-## Best Practices and Tips
-
-- **Structure Consistency**: When unraveling, the flat array length must match the original PyTree structure
-- **Immutability**: Treat PyTrees as immutable, creating new instances rather than modifying in place
-- **Method Support**: Custom PyTree classes can include methods for operations on your data
-- **Performance**: PyTree flattening/unflattening does reshaping at the tracing stage, meaning that it has minimal runtime overhead compared to typical numerical operations
-- **Type Support**: PyTrees work with both NumPy arrays and Archimedes symbolic arrays
+- **Structure Consistency**: When unraveling, the flat array length must match that of the original tree structure
+- **Immutability**: Treat `struct` types as immutable (or "frozen"), creating new instances or using the `.replace()` method rather than modifying in place
+- **Method Support**: Custom `struct` classes can include methods for operations on your data (e.g. `dynamics` in the pendulum example)
+- **Performance**: Tree flattening/unflattening does reshaping at the tracing stage, meaning that it has minimal runtime overhead compared to typical numerical operations
+- **Type Support**: Tree operations work with both NumPy arrays and Archimedes symbolic arrays
 
 
 ## Further Reading
 
-For more advanced PyTree operations, explore the [`archimedes.tree`](#archimedes.tree) module and the [`struct`](#archimedes.tree.struct) submodule.
+For more advanced tree operations, explore the [`archimedes.tree`](#archimedes.tree) module.
 
-For more on working with PyTrees, also see [Hierarchical Design Patterns](generated/notebooks/modular-design.md) and the section of the [Hardware Deployment](generated/notebooks/deployment/deployment03.md) tutorial dealing with auto-generating C structs.
+For more on working with structured data types, also see [Hierarchical Design Patterns](generated/notebooks/modular-design.md) and the section of the [C Code Generation](generated/notebooks/deployment/deployment03.md) tutorial dealing with auto-generating C structs.

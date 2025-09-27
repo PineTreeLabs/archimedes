@@ -487,7 +487,7 @@ class ThinAirfoil(AirfoilModel):
         return Cl, Cd, Cm
 
 
-@arc.struct
+@arc.struct(frozen=False)
 class TabulatedAirfoil(AirfoilModel):
     """Airfoil model based on tabulated data"""
 
