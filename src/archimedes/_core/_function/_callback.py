@@ -72,23 +72,27 @@ def callback(func: Callable, result_shape_dtypes, *args) -> Any:
 
     Examples
     --------
+    >>> import math
     >>> import numpy as np
     >>> import archimedes as arc
     >>>
     >>> # Define an external function
-    >>> def custom_nonlinearity(x):
-    ...     print("Evaluating custom_nonlinearity")
-    ...     return np.tanh(x) * np.exp(-0.1 * x**2)
+    >>> def unsupported_code(x):
+    ...     print("Evaluating unsupported_code")
+    ...     # The "math" library is not supported symbolically
+    ...     return math.tanh(x[0]) * math.exp(-0.1 * x[1]**2)
     >>>
     >>>
     >>> # Use in a compiled function
     >>> @arc.compile
     ... def model(x):
-    ...     result_shape_dtypes = x  # Output has same type as input
-    ...     y = arc.callback(custom_nonlinearity, result_shape_dtypes, x)
+    ...     result_shape_dtypes = 0.0  # Output is a scalar
+    ...     y = arc.callback(unsupported_code, result_shape_dtypes, x)
     ...     return y * 2
     >>>
     >>> model(np.array([0.5, 1.5]))
+    Evaluating unsupported_code
+    array(0.73801609)
 
     See Also
     --------

@@ -82,7 +82,7 @@ Two key advantages to symbolic-numeric computation are:
 1. **Performance optimization** for complex functions that need to be evaluated repeatedly
 2. **Function transformation** capabilities that would otherwise require difficult manual implementations
 
-## Function fransformations
+## Function transformations
 
 A _function transformation_ is similar to a mathematical operator in that it takes one function and produces a different function.
 
@@ -120,7 +120,7 @@ def f(x, y):
     return x ** 2 + x * np.sin(y) - y
 ```
 
-Rather than manually implementing an iterative solver, Archimedes can transform this into an explicit function $x = F(y)$:
+Rather than manually implementing or calling an iterative solver, Archimedes can transform this into what appears to be an explicit function $x = F(y)$:
 
 ```python
 F = arc.implicit(f)
@@ -134,6 +134,7 @@ Archimedes constructs a computational graph that automatically applies a Newton 
 Archimedes provides a number of useful function transformations, including:
 
 * **Automatic differentiation**: Efficiently compute derivatives with `grad`, `jac`, `hess`, `jvp`, and `vjp`
+* **Vectorized mapping**: Map a function over axes of an array using `vmap`
 * **Implicit functions**: Combine a function with a Newton solver to create an implicit function using `implicit`
 * **ODE solves**: Convert an ODE model into a forward map through time using `integrator`
 * **Optimization solves**: Convert an objective and set of constraints into a parametric optimization solver with `nlp_solver`

@@ -481,12 +481,28 @@ If you keep your code as close to the underlying mathematical model as possible,
 (custom-callbacks)=
 ## Custom callbacks
 
-<!--
-TODO: Write this once the functionality is implemented.
--->
+"Callbacks" let you implement pure-Python code and embed it in an otherwise symbolically-evaluated graph.
+In other words, this allows you to use functionality that is available in Python but not supported by CasADi's symbolic computation engine.
 
-(scipy-cookbook)=
-## SciPy Cookbook
+```python
+import math
+
+def unsupported_code(x):
+    print("Evaluating unsupported code")
+    # The "math" library is not supported symbolically
+    return math.tanh(x[0]) * math.exp(-0.1 * x[1]**2)
+
+# Use in a compiled function
+@arc.compile
+def model(x):
+    result_shape_dtypes = 0.0  # Output is a scalar
+    y = arc.callback(unsupported_code, result_shape_dtypes, x)
+    return y * 2
+
+model(np.array([0.5, 1.5]))  # array(0.73801609)
+```
+
+## Using SciPy Functionality
 
 Archimedes supports some common functionality like [ODE solving](#ode-solving), [constrained nonlinear optimization](#optimization), and [nonlinear root-finding](#implicit-functions), but in some cases you may wish to use particular solvers or functionality from larger libraries like SciPy.
 
