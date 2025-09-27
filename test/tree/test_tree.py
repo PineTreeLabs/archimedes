@@ -61,7 +61,7 @@ from typing import NamedTuple
 import numpy as np
 import pytest
 
-from archimedes import struct, field, tree, module, ModuleConfig, UnionConfig
+from archimedes import struct, field, tree, StructConfig, UnionConfig
 from archimedes._core import SymbolicArray, compile, sym
 from archimedes.tree._tree_util import NONE_DEF
 
@@ -468,12 +468,12 @@ def test_register_struct():
     assert struct(Point) is Point
 
 
-@module
+@struct
 class VariantBase:
     pass
 
 
-@module(kw_only=True)  # Add keyword arg to test passing with cls=None
+@struct(kw_only=True)  # Add keyword arg to test passing with cls=None
 class VariantA(VariantBase):
     param: float  # m/s^2
 
@@ -481,7 +481,7 @@ class VariantA(VariantBase):
         return self.param
 
 
-@module(kw_only=True)
+@struct(kw_only=True)
 class VariantB(VariantBase):
     param: float  # m/s^2
 
@@ -490,7 +490,7 @@ class VariantB(VariantBase):
 
 
 # Test that we can create a base class with a shared config
-class VariantConfigBase(ModuleConfig):
+class VariantConfigBase(StructConfig):
     param: float
 
 
@@ -507,19 +507,15 @@ class VariantBConfig(VariantConfigBase, type="negative"):
 def test_variant_config():
     UnionConfig[VariantAConfig, VariantBConfig]
 
-    with pytest.raises(TypeError, match=r".*must be a subclass of ModuleConfig.*"):
+    with pytest.raises(TypeError, match=r".*must be a subclass of StructConfig.*"):
         UnionConfig[VariantA, VariantB]
 
     # Single-variant config
     UnionConfig[VariantAConfig]
 
 
-def test_module():
-    assert module(VariantA) is VariantA
-    assert module(VariantB) is VariantB
 
-
-def test_module_config():
+def test_struct_config():
     param = 42
     config = VariantAConfig(param=param)
 

@@ -31,8 +31,7 @@ from . import docs, error, observers, sysid, theme, tree  # isort: skip
 from .tree import (
     struct,
     field,
-    module,
-    ModuleConfig,
+    StructConfig,
     UnionConfig,
 )
 
@@ -45,8 +44,7 @@ __all__ = [
     "tree",
     "struct",
     "field",
-    "module",
-    "ModuleConfig",
+    "StructConfig",
     "UnionConfig",
     "sysid",
     "array",

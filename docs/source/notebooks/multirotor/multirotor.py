@@ -122,7 +122,7 @@ NACA_0012 = np.array(
 )
 
 
-@arc.module
+@arc.struct
 class RotorGeometry:
     offset: np.ndarray = arc.field(
         default_factory=lambda: np.zeros(3)
@@ -181,7 +181,7 @@ class GravityModel(Protocol):
         """
 
 
-@arc.module
+@arc.struct
 class ConstantGravity:
     g0: float = 9.81
 
@@ -189,7 +189,7 @@ class ConstantGravity:
         return np.array([0, 0, self.g0], like=p_N)
 
 
-@arc.module
+@arc.struct
 class PointGravity:
     G: float = 6.6743e-11  # Gravitational constant [N-m²/kg²]
     R_e: float = 6.371e6  # Radius of earth [m]
@@ -212,7 +212,7 @@ class VehicleDragModel(Protocol):
         """
 
 
-@arc.module
+@arc.struct
 class QuadraticDragModel:
     """Simple velocity-squared drag model for the main vehicle body"""
 
@@ -292,7 +292,7 @@ class RotorModel(metaclass=abc.ABCMeta):
         """Aerodynamic forces and moments in wind frame W"""
 
 
-@arc.module
+@arc.struct
 class QuadraticRotorModel(RotorModel):
     """Simple velocity-squared model for rotor aerodynamics"""
 
@@ -316,7 +316,7 @@ class QuadraticRotorModel(RotorModel):
         return F_W, M_W, aux_state_derivs
 
 
-@arc.module
+@arc.struct
 class MultiRotorVehicle:
     rigid_body: RigidBody = arc.field(default_factory=RigidBody)
     rotors: list[RotorGeometry] = arc.field(default_factory=list)
@@ -460,7 +460,7 @@ class AirfoilModel(metaclass=abc.ABCMeta):
         pass
 
 
-@arc.module
+@arc.struct
 class ThinAirfoil(AirfoilModel):
     """Airfoil model based on thin airfoil theory.
 
@@ -487,7 +487,7 @@ class ThinAirfoil(AirfoilModel):
         return Cl, Cd, Cm
 
 
-@arc.module
+@arc.struct
 class TabulatedAirfoil(AirfoilModel):
     """Airfoil model based on tabulated data"""
 
@@ -574,7 +574,7 @@ class TabulatedAirfoil(AirfoilModel):
         return Cl, Cd, Cm
 
 
-@arc.module
+@arc.struct(frozen=False)
 class BladeElementModel(RotorModel):
     """Blade element model for rotor aerodynamics
 

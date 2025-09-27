@@ -37,7 +37,7 @@ default_J_B = np.array(
 )
 
 
-@arc.module
+@arc.struct
 class ConstantGravity:
     """Constant gravitational acceleration model
 
@@ -51,7 +51,7 @@ class ConstantGravity:
         return np.hstack([0, 0, self.g0])
 
 
-@arc.module
+@arc.struct
 class AtmosphereModel:
     R0: float = 2.377e-3  # Density scale [slug/ft^3]
     gamma: float = 1.4  # Adiabatic index for air [-]
@@ -73,7 +73,7 @@ class AtmosphereModel:
         return amach, qbar
 
 
-@arc.module
+@arc.struct
 class SubsonicF16:
     rigid_body: RigidBody = arc.field(default_factory=RigidBody)
     gravity: GravityModel = arc.field(default_factory=ConstantGravity)

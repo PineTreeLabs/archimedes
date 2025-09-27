@@ -190,7 +190,7 @@ x = F(x0, p)
 print(f(x, p) == 0)
 ```
 
-(pytrees)=
+(trees)=
 ## PyTrees
 
 Many scientific computing functions assume that data is arranged into flat vectors.

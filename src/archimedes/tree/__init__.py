@@ -35,9 +35,8 @@ from ._struct import (
     fields,
     replace,
 )
-from ._module import (
-    module,
-    ModuleConfig,
+from ._config import (
+    StructConfig,
     UnionConfig,
 )
 
@@ -59,7 +58,6 @@ __all__ = [
     "is_struct",
     "fields",
     "replace",
-    "module",
-    "ModuleConfig",
+    "StructConfig",
     "UnionConfig",
 ]

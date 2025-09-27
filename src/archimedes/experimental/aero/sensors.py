@@ -3,7 +3,7 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
-from archimedes import struct, field, module, ModuleConfig
+from archimedes import struct, field, StructConfig
 from archimedes.experimental.aero import (
     dcm_from_quaternion,
     GravityModel,
@@ -26,7 +26,7 @@ __all__ = [
 ]
 
 
-@module
+@struct
 class Accelerometer:
     """Basic three-axis accelerometer model
 
@@ -52,7 +52,7 @@ class Accelerometer:
         return a_meas_B + self.noise * w
 
 
-class AccelerometerConfig(ModuleConfig, type="basic"):
+class AccelerometerConfig(StructConfig, type="basic"):
     gravity: GravityConfig = field(default_factory=ConstantGravityConfig)
     noise: float = 0.0  # Noise standard deviation [m/s^2]
 
@@ -60,7 +60,7 @@ class AccelerometerConfig(ModuleConfig, type="basic"):
         return Accelerometer(gravity=self.gravity.build(), noise=self.noise)
 
 
-@module
+@struct
 class Gyroscope:
     """Basic three-axis gyroscope model
 
@@ -78,14 +78,14 @@ class Gyroscope:
         return x.w_B + self.noise * w
 
 
-class GyroscopeConfig(ModuleConfig, type="basic"):
+class GyroscopeConfig(StructConfig, type="basic"):
     noise: float = 0.0  # Noise standard deviation [rad/s]
 
     def build(self) -> Gyroscope:
         return Gyroscope(noise=self.noise)
 
 
-@module
+@struct
 class LineOfSight:
     """Basic line-of-sight sensor model"""
 
@@ -107,7 +107,7 @@ class LineOfSight:
         return np.hstack([az, el]) + self.noise * w
 
 
-class LineOfSightConfig(ModuleConfig, type="basic"):
+class LineOfSightConfig(StructConfig, type="basic"):
     noise: float = 0.0  # Noise standard deviation [rad]
 
     def build(self) -> LineOfSight:

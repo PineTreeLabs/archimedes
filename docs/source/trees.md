@@ -1,6 +1,6 @@
-# Working with PyTrees
+# Structured data types
 
-PyTrees in Archimedes provide a way to work with structured data in numerical algorithms that typically expect flat vectors. This page explains what PyTrees are, how to use them in your code, and how to create custom structures that work seamlessly with Archimedes functions.
+Tree operations in Archimedes provide a way to work with structured data in numerical algorithms that typically expect flat vectors. This page explains what "structured data types" are in this context, how to use them in your code, and how to create custom structures that work seamlessly with Archimedes functions.
 
 The Archimedes concept of a PyTree is borrowed from [JAX](https://docs.jax.dev/en/latest/pytrees.html), while the `pytree_node` decorator produces composable classes that work similarly to [PyTorch Modules](https://pytorch.org/docs/stable/generated/torch.nn.Module.html).
 You may also want to scan these documentation pages to get ideas about what these structures are and how they are used.

@@ -3,7 +3,7 @@ from typing import TYPE_CHECKING, Protocol
 
 import numpy as np
 
-from archimedes import struct, module, field, ModuleConfig
+from archimedes import struct, field, StructConfig
 
 from .rotations import (
     dcm_from_euler,
@@ -31,7 +31,7 @@ def wind_frame(v_rel_B):
     return vt, alpha, beta
 
 
-@module
+@struct
 class RigidBody:
     attitude: str = "quaternion"  # "euler" or "quaternion"
 
@@ -130,7 +130,7 @@ class RigidBody:
         )
 
 
-class RigidBodyConfig(ModuleConfig):
+class RigidBodyConfig(StructConfig):
     attitude: str = "quaternion"  # "euler" or "quaternion"
 
     def build(self) -> RigidBody:
