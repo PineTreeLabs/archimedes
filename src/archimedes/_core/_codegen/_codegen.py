@@ -18,7 +18,6 @@ from typing import (
 import numpy as np
 
 from archimedes import tree
-from archimedes.tree._struct import struct
 
 from .._function import FunctionCache
 from ._renderer import _render_template

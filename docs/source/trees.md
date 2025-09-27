@@ -155,7 +155,7 @@ print(new_rocket)  # Rocket1D(h=10.0, v=0.0, m=1000.0, thrust=15000.0, isp=300.0
 ```
 
 You can also nest these `struct` types within each other and define special methods like `__call__`, giving you the ability to create modular and reusable model components.
-For example, if we wanted to simulate a rendezvous between our rocket and the ISS, we could create another `struct` named `Satellite` and the combined state of our system could be defined by a `NamedTuple`, making the entire composite state a valid PyTree:
+For example, if we wanted to simulate a rendezvous between our rocket and the ISS, we could create another `struct` named `Satellite` and the combined state of our system could be defined by a `NamedTuple`, making the entire composite state a valid tree:
 
 ```python
 from typing import NamedTuple

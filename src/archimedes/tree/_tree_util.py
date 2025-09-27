@@ -275,9 +275,7 @@ def _tree_unflatten(treedef: TreeDef, xs: Iterator) -> Tree:
 #
 
 
-def tree_structure(
-    tree: Tree, is_leaf: Callable[[Any], bool] | None = None
-) -> TreeDef:
+def tree_structure(tree: Tree, is_leaf: Callable[[Any], bool] | None = None) -> TreeDef:
     """
     Extract the structure of a tree without the leaf values.
 

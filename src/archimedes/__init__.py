@@ -29,10 +29,10 @@ from .theme import set_theme
 from . import docs, error, observers, sysid, theme, tree  # isort: skip
 
 from .tree import (
-    struct,
-    field,
     StructConfig,
     UnionConfig,
+    field,
+    struct,
 )
 
 __all__ = [

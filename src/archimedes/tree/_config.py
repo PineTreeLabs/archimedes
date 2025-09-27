@@ -1,13 +1,8 @@
 from __future__ import annotations
 
-import dataclasses
-import functools
-from collections.abc import Callable
 from typing import Annotated, Literal, Type, TypeVar, Union
 
 from pydantic import BaseModel, ConfigDict, Field
-from typing_extensions import dataclass_transform
-
 
 __all__ = [
     "StructConfig",

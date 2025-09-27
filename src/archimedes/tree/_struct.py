@@ -168,7 +168,7 @@ def struct(cls: T | None = None, **kwargs) -> T | Callable:
 
     This decorator creates a structured data class that can be seamlessly used
     with Archimedes' tree functions. The class will be registered with the tree
-    system, allowing its instances to be flattened, mapped over, and transformed 
+    system, allowing its instances to be flattened, mapped over, and transformed
     while preserving its structure.
 
     Parameters

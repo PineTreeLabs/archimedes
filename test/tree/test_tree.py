@@ -61,7 +61,7 @@ from typing import NamedTuple
 import numpy as np
 import pytest
 
-from archimedes import struct, field, tree, StructConfig, UnionConfig
+from archimedes import StructConfig, UnionConfig, field, struct, tree
 from archimedes._core import SymbolicArray, compile, sym
 from archimedes.tree._tree_util import NONE_DEF
 
@@ -446,7 +446,7 @@ def test_register_struct():
 
     p = Point(x=1.0, y=2.0, name="p")
 
-    # Check that the pytree node is frozen
+    # Check that the dataclass is frozen
     with pytest.raises(dataclasses.FrozenInstanceError):
         p.x = 3.0
 
@@ -512,7 +512,6 @@ def test_variant_config():
 
     # Single-variant config
     UnionConfig[VariantAConfig]
-
 
 
 def test_struct_config():

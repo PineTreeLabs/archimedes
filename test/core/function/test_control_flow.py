@@ -236,7 +236,7 @@ class TestSwitch:
         assert np.isclose(apply_operation(3.0, 4.0, 1), 12.0)
 
     # Tree handling
-    def test_pytree_arguments(self):
+    def test_tree_arguments(self):
         def process1(data):
             return {k: v * 2 for k, v in data.items()}
 

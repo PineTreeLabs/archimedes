@@ -78,9 +78,7 @@ def test_352(f16: SubsonicF16):
     assert np.allclose(x_t.w_B, dw_B_ex, atol=1e-2)
 
     # Check with Euler attitude representation
-    f16 = f16.replace(
-        rigid_body=f16.rigid_body.replace(attitude="euler")
-    )
+    f16 = f16.replace(rigid_body=f16.rigid_body.replace(attitude="euler"))
     rb_state = f16.rigid_body.State(p_N, rpy, v_B, w_B)
     x = f16.State(rb_state, pow)
     x_t = f16.dynamics(0.0, x, u)
@@ -147,9 +145,7 @@ def test_36(f16: SubsonicF16):
     assert np.allclose(tph1, tph2)
 
     # Recheck with Euler attitude representation
-    f16 = f16.replace(
-        rigid_body=f16.rigid_body.replace(attitude="euler")
-    )
+    f16 = f16.replace(rigid_body=f16.rigid_body.replace(attitude="euler"))
     rb_state = f16.rigid_body.State(p_N, rpy, v_B, w_B)
     x = f16.State(rb_state, pow)
     x_t = f16.dynamics(0.0, x, u)

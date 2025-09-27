@@ -72,7 +72,7 @@ class TestMinimize:
         result = minimize(f, x0=[-1.0, 1.0], static_argnames=("a",), args=(100.0,))
         assert np.allclose(result.x, [1.0, 1.0])
 
-    def test_minimize_pytree(self):
+    def test_minimize_tree(self):
         def f(params):
             x, y = params["x"], params["y"]
             return 100 * (y - x**2) ** 2 + (1 - x) ** 2
@@ -81,7 +81,7 @@ class TestMinimize:
             x, y = params["x"], params["y"]
             return x + y - 1.5  # x + y >= 1.5
 
-        # PyTree initial guess
+        # Tree-structured initial guess
         x0 = {"x": 2.0, "y": 1.0}
 
         # Solve with inequality constraint

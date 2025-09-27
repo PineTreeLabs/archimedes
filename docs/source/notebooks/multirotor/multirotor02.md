@@ -407,7 +407,7 @@ This is far from the only (or probably even the best way) to construct this kind
 
 ## Using Archimedes
 
-You may have noticed that none of our model implementations so far use Archimedes beyond using the [`pytree_node`](#archimedes.tree.struct) decorator to create composable models.
+You may have noticed that none of our model implementations so far appear to use Archimedes beyond using the [`@struct`](#archimedes.tree.struct) decorator to create composable models.
 Still, because we have only used NumPy functions (and have been careful to include `like=x` whenever we call `np.array`), we can evaluate any of these methods symbolically just as easily as we can with numerical arrays.
 As we'll see, this makes it easy to develop a model in pure NumPy and then use Archimedes for advanced use cases like accelerated simulation, optimization, stability analysis, and C code generation.
 
@@ -441,7 +441,7 @@ class ImpureCallable:
 What happens in the latter case is that Archimedes will feed a [`SymbolicArray`](#archimedes.sym) object to `ImpureCallable.__call__`, which will then _store_ the [`SymbolicArray`](#archimedes.sym) resulting from the sine function in `self.y`.
 While this might actually work in this case, you will get stray symbolic objects in unexpected places which can cause all kinds of unexpected problems.
 Basically, behavior for impure functions and callable classes is not well-defined and these should be avoided at all costs.
-In fact, by default the `pytree_node` decorator will create a "frozen" class definition, meaning that it will throw an error if you even try to modify one of the object's fields.
+In fact, by default the [`@struct`](#archimedes.tree.struct) decorator will create a "frozen" class definition, meaning that it will throw an error if you even try to modify one of the object's fields.
 This can be overridden, but it's done as a reminder to write pure functions.
 
 This _does_ mean that the most efficient NumPy code you can write will likely look different from code that is compatible with Archimedes, since fast NumPy code will usually use pre-allocated arrays, as with C or FORTRAN codes.
@@ -456,16 +456,16 @@ Finally, although we have included `FlightVehicle` as part of our class hierarch
 The interface is the same as what we've shown here, and you can look at the source code in [multirotor.py](https://github.com/jcallaham/archimedes/tree/main/docs/source/notebooks/multirotor/multirotor.py) to see how exactly it builds on the generic `FlightVehicle`.
 
 One difference with what we've shown here is that instead of using a flat 12-element vector to represent the state of the vehicle, the built-in `FlightVehicle` defines its own `State` class.
-This is another [`pytree_node`](#archimedes.tree.struct) with fields for each of the four groups of state variables: position (`State.p_N`), attitude (`State.att`), velocity (`State.v_B`), angular velocity (`State.w_B`), and any additional state variables (`State.aux`).
+This is another [`struct`](#archimedes.tree.struct) with fields for each of the four groups of state variables: position (`State.p_N`), attitude (`State.att`), velocity (`State.v_B`), angular velocity (`State.w_B`), and any additional state variables (`State.aux`).
 The naming convention follows [monogram notation](https://drake.mit.edu/doxygen_cxx/group__multibody__notation__basics.html).
 
 This avoids the need to remember what index represents the $y$-component of angular velocity, for example.
 It also makes it easier to switch between attitude representations and allows for arbitrary additional state variables in the `aux` field.
-For instance, if we have a rotor model that includes unsteady aerodynamics, these states can be defined as more [`pytree_node`](#archimedes.tree.struct)s and nested inside the `FlightVehicle.State.aux` field.
+For instance, if we have a rotor model that includes unsteady aerodynamics, these states can be defined as more [`structs`](#archimedes.tree.struct) and nested inside the `FlightVehicle.State.aux` field.
 
-For more details on pure functions and PyTrees, see:
+For more details on pure functions and structs, see:
 
 * [Under the Hood](../../under-the-hood)
-* [Working with PyTrees](../../pytrees)
+* [Structured Data Types](../../trees)
 * [Hierarchical Design Patterns](../../generated/notebooks/modular-design)
 * [Quirks and Gotchas](../../gotchas)

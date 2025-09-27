@@ -88,9 +88,9 @@ def scan(
         - Return a carry with the same structure as the input carry
 
     init_carry : array_like or Tree
-        The initial value of the carry state. Can be a scalar, array, or structured data.
-        The structure of this value defines what ``func`` must return as its first
-        output.
+        The initial value of the carry state. Can be a scalar, array, or structured
+        data type. The structure of this value defines what ``func`` must return as
+        its first output.
     xs : array_like, optional
         The values to loop over, with shape ``(length, ...)``. Each value is passed as
         the second argument to ``func``. Required unless length is provided.

@@ -357,7 +357,7 @@ The pattern shown here of returning any arguments used for printing is a simple 
 
 While Archimedes tries to make symbolic and numeric functions behave identically, there are some unavoidable differences:
 
-1. Compiled functions can't use arbitrary Python objects as inputs - stick to numeric values and arrays, or PyTree data structures that Archimedes knows how to work with
+1. Compiled functions can't use arbitrary Python objects as inputs - stick to numeric values and arrays, or tree-structured data types that Archimedes knows how to work with
 2. Some NumPy functions may have subtly different behavior in symbolic vs. numeric contexts (e.g. [in-place operations](#in-place-operations))
 3. Not all NumPy functionality is available symbolically.  **If you find a missing function you need, feel free to file a feature request (or bump an existing one)**.
 
@@ -376,9 +376,9 @@ def complex_function(x, callback):
 traced_function = arc.compile(complex_function, static_argnames=("callback",))
 ```
 
-## PyTree Handling
+## Tree Handling
 
-While PyTrees provide a powerful way to handle nested data structures, they come with their own quirks:
+While tree-structured data provide a powerful way to handle nested data structures, they come with their own quirks:
 
 ```python
 # Be careful when flattening and unflattening complex structures
@@ -402,7 +402,7 @@ restored = unflatten(modified)  # This works because shape is preserved
 When using ODE solvers, be aware of:
 
 1. The dynamics function signature must match the expected format (t, x, *args)
-2. Integrator state must be a flat vector (use PyTree operations to flatten/unflatten if not)
+2. Integrator state must be a flat vector (use tree operations to flatten/unflatten if not)
 3. In order to maintain static array sizes, ODE solvers can only output data at fixed sample times
 
 For best performance, create an integrator once and reuse it with different inputs:

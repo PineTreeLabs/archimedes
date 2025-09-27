@@ -81,7 +81,7 @@ class TestCompile:
         assert y1.dtype == x.dtype
         assert y2.dtype == x.dtype
 
-    def test_pytree_returns(self):
+    def test_tree_returns(self):
         @compile
         def g(x, y):
             return (x, y), 2 * x
