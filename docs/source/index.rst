@@ -63,7 +63,7 @@ Documentation
    :maxdepth: 1
    :caption: Applications
 
-   generated/notebooks/deployment/deployment00
+   generated/notebooks/codegen/codegen00
    generated/notebooks/sysid/parameter-estimation
    generated/notebooks/workflow/workflow00
    generated/notebooks/multirotor/multirotor00
