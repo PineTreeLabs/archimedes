@@ -233,11 +233,11 @@ def integrator(
 
         # Create a new set of "args" that includes the fresh symbolic parameters
         # for use in evaluating the ODE function symbolically.
-        args = list(unravel(p))
+        args: list[ArrayLike] = list(unravel(p))  # type: ignore[no-redef]
         # If the function has static arguments, we need to interleave them back in the
         # original order.
         for i in static_argnums:
-            args.insert(i, static_args[i])
+            args.insert(i, static_args[i])  # type: ignore[attr-defined]
 
         # Define consistent time and state variables
         t, x = sym("t", kind="MX"), sym_like(x0, name="x0", kind="MX")

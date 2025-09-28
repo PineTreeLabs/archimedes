@@ -395,7 +395,6 @@ def switch(
         # runtime the only evaluation is the CasADi conditional below, which
         # is short-circuiting.
         results_treedef = None
-        results_unravel = None
         results_size = None
         cs_branches = []  # Flat inputs -> flat outputs
         for branch in branches:
@@ -406,6 +405,8 @@ def switch(
             results = branch(*args)
 
             # Flatten the results to a single array for each branch
+            # Note that all branches must have the same treedef, so it
+            # doesn't matter which unravel function we use
             results_flat, results_unravel = tree.ravel(results)
 
             # Check for consistency of the output structure

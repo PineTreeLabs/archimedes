@@ -41,6 +41,7 @@ from typing import (
     Iterator,
     NamedTuple,
     TypeVar,
+    cast,
 )
 
 import numpy as np
@@ -65,12 +66,13 @@ class TreeDef(NamedTuple):
     @property
     def tree_str(self) -> str:
         stars = ["*"] * self.num_leaves
-        return self.unflatten(stars)
+        return cast(str, self.unflatten(stars))
 
     def __repr__(self) -> str:
         return (f"TreeDef({self.tree_str})").replace("'*'", "*")
 
     def __eq__(self, other: object) -> bool:
+        other = cast(TreeDef, other)
         return (
             self.node_data == other.node_data
             and self.children == other.children

@@ -7,7 +7,7 @@ also dispatches to IPOPT rather than solvers available in SciPy.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Callable, Sequence, TypeVar, cast
+from typing import TYPE_CHECKING, Any, Callable, Generic, Sequence, TypeVar, cast
 
 import casadi as cs
 import numpy as np
@@ -25,25 +25,29 @@ from archimedes._core import (
     sym_like,
 )
 
+from ..typing import Tree
 from ._common import _ravel_args
 
 if TYPE_CHECKING:
     from ..typing import ArrayLike
-
-    T = TypeVar("T", bound=ArrayLike)
 
 __all__ = [
     "nlp_solver",
     "minimize",
 ]
 
+T = TypeVar("T", bound=Tree)
 
-class UnravelContainer:
+
+class UnravelContainer(Generic[T]):
     def __init__(self):
-        self._unravel = None
+        self._unravel: Callable[[ArrayLike], T] | None = None
 
-    def __call__(self, x: ArrayLike) -> ArrayLike:
-        return self._unravel(x)
+    def __call__(self, x: ArrayLike) -> T:
+        unravel = self._unravel
+        if TYPE_CHECKING:
+            unravel = cast(Callable[[ArrayLike], T], self._unravel)
+        return unravel(x)
 
 
 def _make_nlp_solver(
@@ -75,7 +79,7 @@ def _make_nlp_solver(
                 "static arguments"
             )
 
-    unravel = UnravelContainer()
+    unravel: UnravelContainer = UnravelContainer()
 
     # Define a function that will solve the NLP
     # This function will be evaluated with SymbolicArray objects.
@@ -666,7 +670,7 @@ def minimize(
 
     # Construct a list of arguments to the solver. The content
     # of this will depend on the configuration of constraints.
-    solver_args = {"x0": x0}
+    solver_args: dict[str, T | ArrayLike] = {"x0": x0}
 
     # Add bounds on the state variables
     if bounds is not None:

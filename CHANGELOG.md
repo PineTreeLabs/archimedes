@@ -37,7 +37,7 @@ In particular, the API is still evolving and may change between minor versions, 
 
 New version tag for release to PyPI (previous "Archimedes" project tagged with v0.1.0).
 
-## [0.2.0a2] - WIP
+## [0.2.0a3] - 2025-09-26
 
 ### Changes
 
@@ -50,3 +50,7 @@ New version tag for release to PyPI (previous "Archimedes" project tagged with v
 - Moved images, data, notebooks, etc. to LFS ([PR #88](https://github.com/PineTreeLabs/archimedes/pull/88))
 - Migrated "PyTree" to "struct" terminology ([Issue #89](https://github.com/PineTreeLabs/archimedes/issues/89))
 - Renamed `@pytree_node` decorator to `@struct` ([Issue #89](https://github.com/PineTreeLabs/archimedes/issues/89))
+
+## [0.2.0a4] - WIP
+- Added MyPy to CI checks
+- Fixed all type checking errors

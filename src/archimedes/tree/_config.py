@@ -96,7 +96,7 @@ class StructConfig(BaseModel):
         super().__init_subclass__(**kwargs)
         if type is not None:
             cls.__annotations__ = {"type": Literal[type], **cls.__annotations__}
-            cls.type = type
+            cls.type = type  # type: ignore
 
     # When printing the config, show the class name and fields only but
     # not the type field
@@ -145,4 +145,4 @@ class UnionConfig:
                 )
 
         # Create the discriminated union
-        return Annotated[Union[item], Field(discriminator="type")]
+        return Annotated[Union[item], Field(discriminator="type")]  # type: ignore
