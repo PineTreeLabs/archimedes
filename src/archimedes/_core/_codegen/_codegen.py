@@ -82,7 +82,7 @@ def codegen(
 
     For a detailed description of the codegen functionality, see the
     :doc:`guide to code
-    generation and hardware deployment <../../notebooks/deployment/deployment00>`.
+    generation and hardware deployment <../../generated/notebooks/deployment/deployment00>`.
 
     Parameters
     ----------
