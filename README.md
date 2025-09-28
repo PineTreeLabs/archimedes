@@ -98,13 +98,14 @@ y_type = np.zeros((2,), dtype=float)
 arc.codegen(f, (x_type, y_type), return_names=("z", ))
 ```
 
-For more details, see the tutorial on [deploying to hardware](https://pinetreelabs.github.io/archimedes/notebooks/deployment/deployment00.html)
+For more details, see the tutorial on [C code generation](https://pinetreelabs.github.io/archimedes/notebooks/codegen/codegen00.html)
 
 ### Extended examples
 
 - [Multirotor vehicle dynamics](https://pinetreelabs.github.io/archimedes/notebooks/multirotor/multirotor00.html)
-- [Embedded code generation](https://pinetreelabs.github.io/archimedes/notebooks/deployment/deployment00.html)
+- [C code generation](https://pinetreelabs.github.io/archimedes/notebooks/codegen/codegen00.html)
 - [Nonlinear system identification](https://pinetreelabs.github.io/archimedes/generated/notebooks/sysid/parameter-estimation.html)
+- [Hardware development workflow](https://pinetreelabs.github.io/archimedes/notebooks/workflow/workflow00.html)
 <!-- - [Pressure-fed rocket engine](examples/draco/draco-model.ipynb) -->
 <!-- - [Adaptive optimal control with pseudospectral collocation](examples/coco/) -->
 <!-- - [Subsonic F-16 benchmark](examples/f16/f16_plant.py) (Work in progress) -->
