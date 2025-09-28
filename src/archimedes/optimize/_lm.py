@@ -679,7 +679,7 @@ def lm_solve(
         return tree.ravel(r)[0]  # Return flattened residuals
 
     @arc.compile
-    def func(x):
+    def func_and_grads(x):
         r = res_func(x)
         J = arc.jac(res_func)(x)
         V = 0.5 * np.sum(r**2)
@@ -690,9 +690,9 @@ def lm_solve(
     # Auto-detect scaling: if diag is None, use automatic scaling
     auto_scale = diag is None
     if diag is None:
-        diag = np.ones(n)
+        diag: np.ndarray = np.ones(n)  # type: ignore[no-redef]
     else:
-        diag, _ = tree.ravel(diag)
+        diag: np.ndarray = tree.ravel(diag)[0]  # type: ignore[no-redef]
 
     # Initialize counters and status variables
     nfev = 0  # Number of function evaluations
@@ -704,7 +704,7 @@ def lm_solve(
     history = []
 
     # Initial evaluation
-    cost, grad, hess = func(x)
+    cost, grad, hess = func_and_grads(x)
     nfev += 1
 
     # Calculate gradient norm for convergence check
@@ -787,7 +787,7 @@ def lm_solve(
             pnorm = np.linalg.norm(diag * step)
 
             # Evaluate function at trial point
-            cost_new, grad_new, hess_new = func(x_new)
+            cost_new, grad_new, hess_new = func_and_grads(x_new)
             nfev += 1
 
             if logger is not None:
