@@ -244,7 +244,7 @@ def qpsol(
     sol = solver(**kwargs)
 
     # Return the solution and dual variables
-    x = array(sol["x"], dtype=ret_dtype).reshape(ret_shape)
+    x = array(sol["x"], dtype=ret_dtype).reshape(ret_shape)  # type: ignore[assignment]
     lam_a = array(sol["lam_g"], dtype=ret_dtype).reshape(g.shape)
 
     return QPSolution(x=x, lam_a=lam_a)

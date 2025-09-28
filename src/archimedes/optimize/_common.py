@@ -1,5 +1,6 @@
 from archimedes import tree
 
+__all__ = ["_ravel_args"]
 
 def _ravel_args(x, bounds, zip_bounds=False):
     # By default, just flatten/unflatten the tree
@@ -37,7 +38,7 @@ def _ravel_args(x, bounds, zip_bounds=False):
             # Zip bounds into (lb, ub) for each parameter (for SciPy compatibility)
             bounds_flat = list(zip(lb, ub))
         else:
-            bounds_flat = (lb, ub)
+            bounds_flat = (lb, ub)  # type: ignore[assignment]
 
     else:
         bounds_flat = None
