@@ -7,7 +7,7 @@ also dispatches to IPOPT rather than solvers available in SciPy.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Callable, Sequence, TypeVar, cast, Generic
+from typing import TYPE_CHECKING, Any, Callable, Generic, Sequence, TypeVar, cast
 
 import casadi as cs
 import numpy as np
@@ -25,8 +25,8 @@ from archimedes._core import (
     sym_like,
 )
 
-from ._common import _ravel_args
 from ..typing import Tree
+from ._common import _ravel_args
 
 if TYPE_CHECKING:
     from ..typing import ArrayLike
@@ -37,6 +37,7 @@ __all__ = [
 ]
 
 T = TypeVar("T", bound=Tree)
+
 
 class UnravelContainer(Generic[T]):
     def __init__(self):

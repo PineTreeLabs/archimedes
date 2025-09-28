@@ -318,7 +318,7 @@ def codegen(
     # provided by the user to this function - overriding the FunctionCache's names
     elif return_names is None and not func.default_return_names:
         return_names = func.return_names
-    
+
     # Now we're sure `return_names` is not None
     return_names = cast(Sequence[str], return_names)
 
@@ -633,7 +633,9 @@ class ContextHelper:
         return self._process_arg(arg, name)
 
 
-def _unique_types(contexts: list[StructContext | LeafContext]) -> dict[str, StructContext]:
+def _unique_types(
+    contexts: list[StructContext | LeafContext],
+) -> dict[str, StructContext]:
     """Collect all unique StructContext types, keyed by type_ field."""
     unique_types = OrderedDict()
 

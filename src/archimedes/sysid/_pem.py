@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, TypeVar, Optional
+from typing import TYPE_CHECKING, Optional, TypeVar
 
 import numpy as np
 from scipy.optimize import OptimizeResult
@@ -14,7 +14,6 @@ from archimedes.optimize import lm_solve
 
 if TYPE_CHECKING:
     from archimedes.observers import KalmanFilterBase
-    from archimedes.optimize import LMResult
     from archimedes.typing import Tree
 
     from ._timeseries import Timeseries
@@ -263,7 +262,9 @@ def _pem_solve_lm(
         "max_nfev": 200,
     }
     options = {**default_options, **options}
-    result: OptimizeResult = lm_solve(pem_obj.residuals, p_guess, bounds=bounds, **options)
+    result: OptimizeResult = lm_solve(
+        pem_obj.residuals, p_guess, bounds=bounds, **options
+    )
     return result
 
 
@@ -654,7 +655,7 @@ def pem(
         ub = (x0_bounds, ub)  # type: ignore
         bounds = (lb, ub)
 
-    result : OptimizeResult = pem_solve(
+    result: OptimizeResult = pem_solve(
         pem_obj=objective,
         p_guess=dvs_guess,
         bounds=bounds,

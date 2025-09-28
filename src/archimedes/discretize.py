@@ -2,9 +2,9 @@
 # ruff: noqa: N802, N806
 
 from __future__ import annotations
-from typing import Callable, Protocol, TYPE_CHECKING, cast
 
 import dataclasses
+from typing import TYPE_CHECKING, Callable, Protocol, cast
 
 import numpy as np
 
@@ -14,6 +14,7 @@ from archimedes.optimize import implicit
 
 if TYPE_CHECKING:
     from archimedes.typing import Tree
+
     DynArgs = tuple[float, np.ndarray, np.ndarray, Tree]
     DynFunc = Callable[[*DynArgs], np.ndarray]
 

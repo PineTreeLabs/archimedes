@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Callable, Sequence, TypeVar
+from typing import TYPE_CHECKING, Any, Callable, TypeVar
 
 import numpy as np
 from scipy.optimize import OptimizeResult

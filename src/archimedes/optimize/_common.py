@@ -2,6 +2,7 @@ from archimedes import tree
 
 __all__ = ["_ravel_args"]
 
+
 def _ravel_args(x, bounds, zip_bounds=False):
     # By default, just flatten/unflatten the tree
     x_flat, unravel_x = tree.ravel(x)
