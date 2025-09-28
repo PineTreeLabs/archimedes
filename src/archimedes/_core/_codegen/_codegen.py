@@ -432,42 +432,42 @@ class Context(Protocol):
     ctx_type: str
 
 
-@tree.struct
-class NoneContext(Context):
-    type_: str = None
-    name: str = None
+@dataclasses.dataclass
+class NoneContext:
+    type_: str = "none"
+    name: str = "none"
     description: str | None = None
-    ctx_type: str = tree.field(default="none")
+    ctx_type: str = dataclasses.field(default="none")
 
 
-@tree.struct
-class LeafContext(Context):
+@dataclasses.dataclass
+class LeafContext:
     type_: str
     name: str
     is_addr: bool
-    dims: int
+    dims: int | None
     initial_data: np.ndarray
     description: str | None
-    ctx_type: str = tree.field(default="leaf")
+    ctx_type: str = "leaf"
 
 
-@tree.struct
-class NodeContext(Context):
-    type_: str = tree.field(static=True)
-    name: str = tree.field(static=True)
+@dataclasses.dataclass
+class StructContext:
+    type_: str
+    name: str
     children: list[Context]
-    description: str | None = tree.field(static=True, default=None)
-    ctx_type: str = tree.field(default="node", static=True)
+    description: str | None = None
+    ctx_type: str = "node"
 
 
-@tree.struct
+@dataclasses.dataclass
 class ListContext(Context):
-    type_: str = tree.field(static=True)  # Type name of the list elements
-    name: str = tree.field(static=True)
-    length: int = tree.field(static=True)
-    elements: list[Context]
-    description: str | None = tree.field(static=True, default=None)
-    ctx_type: str = tree.field(static=True, default="list")
+    type_: str = "list"
+    name: str = "list"
+    length: int = 0
+    elements: list[Context] = dataclasses.field(default_factory=list)
+    description: str | None = None
+    ctx_type: str = "list"
 
 
 @dataclasses.dataclass
@@ -482,24 +482,24 @@ class ContextHelper:
             print(f"\tProcessing None '{name}' for codegen...")
         return NoneContext(name=name, description=self.descriptions.get(name, None))
 
-    def _process_leaf(self, arg: Any, name: str) -> LeafContext:
+    def _process_leaf(self, arg: Any, name: str) -> LeafContext | NoneContext:
         """Process a 'leaf' value (scalar or array)."""
         if self.debug:
             print(f"\tProcessing leaf '{name}' ({arg}) for codegen...")
 
-        arg = np.asarray(arg)
-        if arg.size == 0:
+        arr = np.asarray(arg)
+        if arr.size == 0:
             return self._process_none(name)
 
-        if np.issubdtype(arg.dtype, np.floating):
+        if np.issubdtype(arr.dtype, np.floating):
             dtype = self.float_type
         else:
             dtype = self.int_type
-        if np.isscalar(arg) or arg.shape == ():
+        if np.isscalar(arr) or arr.shape == ():
             dims = None
             is_addr = True
         else:
-            dims = arg.size
+            dims = arr.size
             is_addr = False
 
         # At this point we have the actual dtype information.  However,
@@ -512,11 +512,11 @@ class ContextHelper:
             name=name,
             is_addr=is_addr,
             dims=dims,
-            initial_data=arg,
+            initial_data=arr,
             description=self.descriptions.get(name, None),
         )
 
-    def _process_list(self, arg: list | tuple, name: str) -> NodeContext:
+    def _process_list(self, arg: list | tuple, name: str) -> ListContext | NoneContext:
         if self.debug:
             print(f"\tProcessing list '{name}' ({arg}) for codegen...")
         # Empty lists are treated as None
@@ -545,7 +545,7 @@ class ContextHelper:
             length=len(elements),
         )
 
-    def _process_struct(self, arg: Any, name: str) -> NodeContext:
+    def _process_struct(self, arg: Any, name: str) -> StructContext | NoneContext:
         if self.debug:
             print(f"\tProcessing struct '{name}' ({arg}) for codegen...")
         # Note that all "static" data will be embedded in the computational
@@ -561,7 +561,7 @@ class ContextHelper:
         if len(children) == 0 or all(isinstance(c, NoneContext) for c in children):
             return self._process_none(name)
 
-        return NodeContext(
+        return StructContext(
             type_=f"{_to_snake_case(arg.__class__.__name__)}_t",
             name=name,
             children=children,
@@ -569,8 +569,8 @@ class ContextHelper:
         )
 
     def _process_dict(
-        self, arg: dict[str, Any], name: str, type_: str = None
-    ) -> NodeContext:
+        self, arg: dict[str, Any], name: str, type_: str | None = None
+    ) -> StructContext | NoneContext:
         if self.debug:
             print(f"\tProcessing dict '{name}' ({arg}) for codegen...")
 
@@ -585,14 +585,17 @@ class ContextHelper:
 
         if type_ is None:
             type_ = name
-        return NodeContext(
+        return StructContext(
             type_=f"{_to_snake_case(type_)}_t",
             name=name,
             children=children,
             description=self.descriptions.get(name, None),
         )
 
-    def _process_arg(self, arg: Any, name: str) -> Context:
+    # mypy: ignore[return] because the if/else statements catch all the valid cases
+    # (see note at end of function).  If we added dead code to make the type checker
+    # happy, codecov would fail...
+    def _process_arg(self, arg: Any, name: str) -> Context:  # type: ignore[return]
         """Process a generic arg, which may be a leaf or a node"""
         # Check that the name doesn't end with `_t`, which could be
         # confused with the typedef
@@ -630,12 +633,12 @@ class ContextHelper:
         return self._process_arg(arg, name)
 
 
-def _unique_types(contexts: list[NodeContext | LeafContext]) -> dict[str, NodeContext]:
-    """Collect all unique NodeContext types, keyed by type_ field."""
+def _unique_types(contexts: list[StructContext | LeafContext]) -> dict[str, StructContext]:
+    """Collect all unique StructContext types, keyed by type_ field."""
     unique_types = OrderedDict()
 
     def _traverse(ctx):
-        if isinstance(ctx, NodeContext) and ctx.type_ not in unique_types:
+        if isinstance(ctx, StructContext) and ctx.type_ not in unique_types:
             unique_types[ctx.type_] = ctx
             # Recursively traverse children to find nested types
             for child in ctx.children:
@@ -701,7 +704,7 @@ def _generate_assignments(
                 child_path = f"{current_path}[{i}]"
                 _traverse(child, child_path)
 
-        elif isinstance(ctx, NodeContext):
+        elif isinstance(ctx, StructContext):
             for child in ctx.children:
                 child_path = f"{current_path}.{child.name}"
                 _traverse(child, child_path)

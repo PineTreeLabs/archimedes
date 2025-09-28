@@ -289,9 +289,10 @@ class TestCodegen:
         with pytest.raises(
             arc.CodegenError, match=r"Argument name 'x_t' cannot end with '_t'"
         ):
-            arc.codegen(
-                invalid_arg_func, (x_type,), return_names=("y",), output_dir=temp_dir
-            )
+            arc.codegen(invalid_arg_func, (x_type,), return_names=("y",))
+
+        os.remove("invalid_arg_func_kernel.c")
+        os.remove("invalid_arg_func_kernel.h")
 
 
 class TestExtractProtectedRegions:
