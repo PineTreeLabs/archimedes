@@ -36,6 +36,9 @@ jobs:
       with:
         token: ${{ secrets.CODECOV_TOKEN }}
 
+    - name: MyPy type checking
+      run: uv run mypy src/
+
     - name: Test notebooks
       run: |
         uv run pytest --nbmake docs/source/notebooks/**/*.ipynb
