@@ -28,7 +28,7 @@ SUPPORTED_METHODS = SCIPY_METHODS + ["hess-lm"]
 def least_squares(
     func: Callable[[T, Any], T],
     x0: T,
-    args: Sequence[Any] = (),
+    args: tuple[Any, ...] = (),
     method: str = "hess-lm",
     bounds: tuple[T, T] | None = None,
     options: dict | None = None,
@@ -205,9 +205,9 @@ def least_squares(
             **options,
         )
 
-    x0_flat, bounds, unravel = _ravel_args(x0, bounds)
-    if bounds is None:
-        bounds = (-np.inf, np.inf)
+    x0_flat, flat_bounds, unravel = _ravel_args(x0, bounds)
+    if flat_bounds is None:
+        flat_bounds = (-np.inf, np.inf)
 
     # Compile the function and Jacobian
     @arc.compile
@@ -223,7 +223,7 @@ def least_squares(
         args=args,
         jac=arc.jac(obj_func),
         method=method,
-        bounds=bounds,
+        bounds=flat_bounds,
         **options,
     )
     result.x = unravel(result.x)  # Unravel the result back to original shape

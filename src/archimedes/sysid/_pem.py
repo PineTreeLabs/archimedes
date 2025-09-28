@@ -264,6 +264,7 @@ def _pem_solve_lm(
     }
     options = {**default_options, **options}
     result: OptimizeResult = lm_solve(pem_obj.residuals, p_guess, bounds=bounds, **options)
+    return result
 
 
 def _pem_solve_bfgs(

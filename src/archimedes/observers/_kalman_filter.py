@@ -125,14 +125,14 @@ class KalmanFilterBase(metaclass=abc.ABCMeta):
 
     """
 
-    dyn: Callable = tree.field(static=True)
-    obs: Callable = tree.field(static=True)
+    dyn: Callable = tree.field(static=True)  # type: ignore[assignment]
+    obs: Callable = tree.field(static=True)  # type: ignore[assignment]
     Q: np.ndarray
     R: np.ndarray
 
     missing: Callable[[np.ndarray], bool] = tree.field(
         default=_default_missing, static=True
-    )
+    )  # type: ignore[assignment]
 
     @abc.abstractmethod
     def step(self, t, x, y, P, args=None):

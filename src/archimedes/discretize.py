@@ -1,11 +1,22 @@
 """Utilities for discretizing a continuous ODE function"""
 # ruff: noqa: N802, N806
 
+from __future__ import annotations
+from typing import Callable, Protocol, TYPE_CHECKING, cast
+
+import dataclasses
+
 import numpy as np
 
 from archimedes import scan
 from archimedes._core import FunctionCache
 from archimedes.optimize import implicit
+
+if TYPE_CHECKING:
+    from archimedes.typing import Tree
+    DynArgs = tuple[float, np.ndarray, np.ndarray, Tree]
+    DynFunc = Callable[[*DynArgs], np.ndarray]
+
 
 __all__ = ["discretize"]
 
@@ -38,94 +49,113 @@ __all__ = ["discretize"]
 #     return step
 
 
-def _euler(f, h):
-    # Take a single Euler step
+class RKSolver(Protocol):
+    func: DynFunc
+    h: float
 
-    def scan_fun(carry, i):
+    def __call__(self, carry: DynArgs, i: int) -> tuple[DynArgs, np.ndarray]:
+        """Implement a single integration step in the scan loop."""
+
+
+@dataclasses.dataclass
+class EulerSolver:
+    func: DynFunc
+    h: float
+
+    def __call__(self, carry: DynArgs, i: int) -> tuple[DynArgs, np.ndarray]:
         t0, x0, u, p = carry
-        x1 = x0 + h * f(t0, x0, u, p)
-        new_carry = (t0 + h, x1, u, p)
-        return new_carry, np.array([])
-
-    return scan_fun
+        x1 = x0 + self.h * self.func(t0, x0, u, p)
+        new_carry = (t0 + self.h, x1, u, p)
+        return new_carry, np.array([])  # Dummy output for scan
 
 
-def _rk4(f, h):
-    # Take a single RK4 step
+@dataclasses.dataclass
+class RK4Solver:
+    func: DynFunc
+    h: float
 
-    def scan_fun(carry, i):
+    def __call__(self, carry: DynArgs, i: int) -> tuple[DynArgs, np.ndarray]:
         t0, x0, u, p = carry
 
-        k1 = f(t0, x0, u, p)
-        k2 = f(t0 + h / 2, x0 + h * k1 / 2, u, p)
-        k3 = f(t0 + h / 2, x0 + h * k2 / 2, u, p)
-        k4 = f(t0 + h, x0 + h * k3, u, p)
-        x1 = x0 + h * (k1 + 2 * k2 + 2 * k3 + k4) / 6
+        k1 = self.func(t0, x0, u, p)
+        k2 = self.func(t0 + self.h / 2, x0 + self.h * k1 / 2, u, p)
+        k3 = self.func(t0 + self.h / 2, x0 + self.h * k2 / 2, u, p)
+        k4 = self.func(t0 + self.h, x0 + self.h * k3, u, p)
+        x1 = x0 + self.h * (k1 + 2 * k2 + 2 * k3 + k4) / 6
 
-        new_carry = (t0 + h, x1, u, p)
-        return new_carry, np.array([])
-
-    return scan_fun
+        new_carry = (t0 + self.h, x1, u, p)
+        return new_carry, np.array([])  # Dummy output for scan
 
 
-def _radau5(rhs, h, newton_solver="fast_newton"):
-    # Take a single Radau5 step
+@dataclasses.dataclass
+class Radau5Solver:
+    func: DynFunc
+    h: float
+    newton_solver: dataclasses.InitVar[str] = "fast_newton"
+    solve: Callable[[np.ndarray, *DynArgs], np.ndarray] = dataclasses.field(init=False)
 
-    # Radau5 Butcher tableau
-    c = np.array([(4 - np.sqrt(6)) / 10, (4 + np.sqrt(6)) / 10, 1])
-    b = np.array([(16 - np.sqrt(6)) / 36, (16 + np.sqrt(6)) / 36, 1 / 9])
-    a = np.array(
-        [
+    @property
+    def a(self) -> np.ndarray:
+        return np.array(
             [
-                (88 - 7 * np.sqrt(6)) / 360,
-                (296 - 169 * np.sqrt(6)) / 1800,
-                (-2 + 3 * np.sqrt(6)) / 225,
-            ],
-            [
-                (296 + 169 * np.sqrt(6)) / 1800,
-                (88 + 7 * np.sqrt(6)) / 360,
-                (-2 - 3 * np.sqrt(6)) / 225,
-            ],
-            [(16 - np.sqrt(6)) / 36, (16 + np.sqrt(6)) / 36, 1 / 9],
-        ]
-    )
+                [
+                    (88 - 7 * np.sqrt(6)) / 360,
+                    (296 - 169 * np.sqrt(6)) / 1800,
+                    (-2 + 3 * np.sqrt(6)) / 225,
+                ],
+                [
+                    (296 + 169 * np.sqrt(6)) / 1800,
+                    (88 + 7 * np.sqrt(6)) / 360,
+                    (-2 - 3 * np.sqrt(6)) / 225,
+                ],
+                [(16 - np.sqrt(6)) / 36, (16 + np.sqrt(6)) / 36, 1 / 9],
+            ]
+        )
 
-    sym_kind = rhs._kind  # TODO: Use a better way to get the kind
+    @property
+    def b(self) -> np.ndarray:
+        return np.array([(16 - np.sqrt(6)) / 36, (16 + np.sqrt(6)) / 36, 1 / 9])
 
-    # Define the residual function used in the Newton solver
-    def F(k, t, y, u, p):
-        n = y.size
-        k = np.reshape(k, (3, n))
-        f = np.zeros_like(k)
+    @property
+    def c(self) -> np.ndarray:
+        return np.array([(4 - np.sqrt(6)) / 10, (4 + np.sqrt(6)) / 10, 1])
 
-        ts = t + h * c
-        ys = y + h * a @ k
+    def __post_init__(self, newton_solver: str):
+        func = cast(FunctionCache, self.func)
+        sym_kind: str = func._kind
 
-        # TODO: Use scan here?
-        for i in range(3):
-            f[i] = rhs(ts[i], ys[i], u, p)
+        # Define the residual function used in the Newton solver
+        def F(k, t, y, u, p):
+            n = y.size
+            k = np.reshape(k, (3, n))
+            f = np.zeros_like(k)
 
-        f, k = np.reshape(f, (3 * n,)), np.reshape(k, (3 * n,))
-        return f - k
+            ts = t + self.h * self.c
+            ys = y + self.h * self.a @ k
 
-    F = FunctionCache(
-        F, kind=sym_kind, arg_names=["k", "t", "y", "u", "p"], return_names=["r"]
-    )
-    solve = implicit(F, solver=newton_solver)
+            # TODO: Use scan here?
+            for i in range(3):
+                f[i] = self.func(ts[i], ys[i], u, p)
 
-    def scan_fun(carry, i):
+            f, k = np.reshape(f, (3 * n,)), np.reshape(k, (3 * n,))
+            return f - k
+
+        F = FunctionCache(
+            F, kind=sym_kind, arg_names=["k", "t", "y", "u", "p"], return_names=["r"]
+        )
+        self.solve = implicit(F, solver=newton_solver)
+
+    def __call__(self, carry: DynArgs, i: int) -> tuple[DynArgs, np.ndarray]:
         t, x0, u, p = carry
         n = x0.size
         # Solve the nonlinear system using Newton's method
         k0 = np.hstack([x0, x0, x0])
-        k = solve(k0, t, x0, u, p)
+        k = self.solve(k0, t, x0, u, p)
         k = np.reshape(k, (3, n))
-        t1 = t + h
-        x1 = x0 + h * np.dot(b, k)
+        t1 = t + self.h
+        x1 = x0 + self.h * np.dot(self.b, k)
         new_carry = (t1, x1, u, p)
         return new_carry, np.array([])
-
-    return scan_fun
 
 
 def discretize(func=None, dt=None, method="rk4", n_steps=1, name=None, **options):
@@ -338,10 +368,10 @@ def discretize(func=None, dt=None, method="rk4", n_steps=1, name=None, **options
             func_name = name
 
         h = dt_val / n_steps
-        scan_fun = {
-            "euler": _euler,
-            "rk4": _rk4,
-            "radau5": _radau5,
+        scan_fun: RKSolver = {
+            "euler": EulerSolver,
+            "rk4": RK4Solver,
+            "radau5": Radau5Solver,
         }[method](f, h, **options)
 
         def step(t0, x0, u, p):
