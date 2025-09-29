@@ -22,7 +22,10 @@ help:
 clean:
 	@rm -rf build source/generated/*
 	@rm -rf .jupyter_cache
-	@rm -rf source/_plots/*
+	@find source/ -type d -name "_plots" -print0 | while IFS= read -r -d '' dir; do \
+		echo "Cleaning $$dir"; \
+		rm -rf "$$dir"/* "$$dir"/.[^.]* "$$dir"/..?* 2>/dev/null || true; \
+	done
 
 apidoc:
 	@sphinx-apidoc -f -o source ../src/archimedes ../src/archimedes/experimental/*

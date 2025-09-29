@@ -57,13 +57,13 @@ Again, for our purposes this is a reasonably accurate model, though it does negl
 The driver used in this tutorial is also a Pololu model: the [VNH5019 motor driver carrier board](https://www.pololu.com/product/1451).
 While more expensive than a bare H-bridge, this board has some protection features that make it robust to off-nominal voltage, current, and temperature levels (not always uncommon during prototyping!).
 It also has built-in current sensing, with a pin that outputs an analog voltage proportional to motor current.
-This is useful for characterization (see [Part 2](workflow02.md)), debugging, direct torque control, and the current control loop of a cascaded position or speed controller.
+This is useful for characterization (see [Part 2](deployment02.md)), debugging, direct torque control, and the current control loop of a cascaded position or speed controller.
 
 In addition to the built-in current output, we will also directly measure the voltage on the output side of the driver via voltage dividers and simple RC filters (to smooth out the PWM switching).
 The full circuit is shown [below](#circuit-diagram).
 
 The last piece of the circuit is the power supply.
-Here we will use a simple 12V "wall wart" supply - more on that in [Part 5](workflow05.md).
+Here we will use a simple 12V "wall wart" supply - more on that in [Part 5](deployment05.md).
 
 ## Microcontroller
 
@@ -105,7 +105,8 @@ The only feedback signal that's used in the final controller is position, so if 
 
 For HIL testing, the circuit is similar, but all the physical hardware is replaced by a second Nucleo board running a real-time simulation:
 
-<!-- TODO: HIL Schematic -->
+```{image} _static/hil_schematic.png
+```
 
 The HIL test is another optional step, but as we will see, it is very convenient for troubleshooting and rapidly iterating the control algorithm.
 

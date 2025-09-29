@@ -1,3 +1,14 @@
+---
+jupytext:
+  text_representation:
+    extension: .md
+    format_name: myst
+kernelspec:
+  display_name: Python 3
+  language: python
+  name: archimedes
+---
+
 # Deployment
 
 In this series we've been exploring a structured controller development workflow.
@@ -12,17 +23,17 @@ In this series we've been exploring a structured controller development workflow
 
 So far we've covered:
 
-1. Specification of the physical system ([Part 1](workflow01.md))
-2. Characterization of the system ([Part 2](workflow02.md))
-3. Controller design and simulation ([Part 3](workflow03.md))
-4. HIL testing validation ([Part 4](workflow04.md))
+1. Specification of the physical system ([Part 1](deployment01.md))
+2. Characterization of the system ([Part 2](deployment02.md))
+3. Controller design and simulation ([Part 3](deployment03.md))
+4. HIL testing validation ([Part 4](deployment04.md))
 
 All that's left is to run the controller on the actual hardware!
 
 This final entry in the series will be much lighter than the previous parts, because we've already done the hard work.
 By including the HIL testing stage and being careful to construct a plant model that precisely matches the I/O of the physical system, all we need to do is swap the leads from the HIL board to the motor control circuit and re-run the test sequence.
 
-The circuit is the same as the one we used for the step response in [Part 2](workflow02.md):
+The circuit is the same as the one we used for the step response in [Part 2](deployment02.md):
 
 ```{image} _static/ctrl_schematic.png
 ```
@@ -37,22 +48,23 @@ python serial_receive.py --save deployed_data.csv
 
 How does the real thing compare to simulation and HIL test?
 
+```{code-cell} python
+:tags: [remove-cell]
+from pathlib import Path
 
-```python
+plot_dir = Path.cwd() / "_plots"
+plot_dir.mkdir(exist_ok=True)
+```
+
+```{code-cell} python
+:tags: [hide-cell, remove-output]
 # ruff: noqa: N802, N803, N806, N815, N816
-import os
 
 import matplotlib.pyplot as plt
 import numpy as np
 
 import archimedes as arc
 
-THEME = os.environ.get("ARCHIMEDES_THEME", "dark")
-arc.theme.set_theme(THEME)
-```
-
-
-```python
 hil_data = np.loadtxt("data/hil_data.csv", delimiter="\t", skiprows=1)
 sim_data = np.loadtxt("data/sim_data.csv", delimiter="\t", skiprows=1)
 expt_data = np.loadtxt("data/deployed_data.csv", delimiter="\t", skiprows=1)
@@ -89,17 +101,49 @@ ax[-1].set_xlabel("Time [s]")
 plt.show()
 ```
 
+```{code-cell} python
+:tags: [remove-cell]
 
-    
+for theme in {"light", "dark"}:
+    arc.theme.set_theme(theme)
 
-```{image} workflow05_files/workflow05_2_0.png
+    fig, ax = plt.subplots(4, 1, figsize=(7, 6), sharex=True)
+
+    ax[0].plot(hil_data[:, 0], hil_data[:, 1], label="HIL")
+    ax[0].plot(expt_data[:, 0], expt_data[:, 1], "--", label="Deployed")
+    ax[0].set_ylabel("PWM [0-1]")
+    ax[0].grid()
+    ax[0].legend()
+
+    ax[1].plot(hil_data[:, 0], hil_data[:, 2])
+    ax[1].plot(expt_data[:, 0], expt_data[:, 2], "--", label="Deployed")
+    ax[1].set_ylabel("Voltage [V]")
+    ax[1].grid()
+
+    ax[2].plot(hil_data[:, 0], hil_data[:, 3])
+    ax[2].plot(expt_data[:, 0], expt_data[:, 3], "--", label="Deployed")
+    ax[2].set_ylabel("Current [A]")
+    ax[2].grid()
+
+    ax[3].plot(hil_data[:, 0], hil_data[:, 4])
+    ax[3].plot(expt_data[:, 0], expt_data[:, 4], "--", label="Deployed")
+    ax[3].plot(hil_data[:, 0], pos_cmd, ":", color="gray", label="Command")
+    ax[3].set_ylabel("Position [deg]")
+    ax[3].grid()
+
+    ax[-1].set_xlabel("Time [s]")
+
+    plt.savefig(plot_dir / f"deployment05_0_{theme}.png")
+    plt.close()
+```
+
+```{image} _plots/deployment05_0_light.png
 :class: only-light
 ```
 
-```{image} workflow05_files/workflow05_2_0_dark.png
+```{image} _plots/deployment05_0_dark.png
 :class: only-dark
 ```
-    
 
 
 The correspondence here is not quite as good as it was between HIL and simulation.
@@ -114,7 +158,7 @@ V(t) = V_0 u(t), \qquad u \in (-1, 1),
 $$
 
 where $V_0$ is the supply voltage.
-We were able to roughly confirm this with the ramp test in [Part 2](workflow02.md).
+We were able to roughly confirm this with the ramp test in [Part 2](deployment02.md).
 
 In reality though, the supplied voltage to the motor stays persistently _above_ the predicted value from 60-80 ms, even as the PWM duty cycle drops _below_ the simulation trace as the feedback controller tries to decrease the input voltage.
 Then there is a sharp drop in voltage as the control signal crosses zero and the polarity flips, leading to a spike in current and an overshoot of the target position.
@@ -126,7 +170,7 @@ Most of the other deviations follow directly from this behavior.
 The other discrepancy we might notice is a persistent position error towards the end of the test sequence.
 Again, we can quickly zero in on the problem.
 The persistent small error leads the PI controller to output a 10-15% duty cycle and corresponding current (slowly increasing due to integral action), but the position does not appear to respond.
-However, referring back to the "non-ideal effects" explored at the end of [Part 2](workflow02.md), we can guess that this is solidly in the static friction regime, where additional torque will have no effect on position until the "breakaway torque" threshold.
+However, referring back to the "non-ideal effects" explored at the end of [Part 2](deployment02.md), we can guess that this is solidly in the static friction regime, where additional torque will have no effect on position until the "breakaway torque" threshold.
 
 The observation that the power supply has unmodeled internal dynamics and that static friction causes problems for accurate position tracking with a pure PI controller are enough to send us on another iteration of the design loop.
 We might proceed by:
@@ -143,7 +187,7 @@ The advantage of this kind of structured development workflow is not that you do
 ## Lessons learned
 
 We've already seen two examples of how this approach to control systems development can pay dividends in troublshooting and rapid iteration.
-First, at the end of [Part 4](workflow04.md) we gave a brief anecdote about a misadventure in premature optimization of the control algorithm (the IMC-tuned cascaded controller).
+First, at the end of [Part 4](deployment04.md) we gave a brief anecdote about a misadventure in premature optimization of the control algorithm (the IMC-tuned cascaded controller).
 This controller looked good on paper, but fell apart as soon as it was put into HIL testing, giving us quick and easy feedback that it was not going to work in practice.
 
 Then, by comparing the HIL results with the actual motor performance, we were able to quickly zero in on two problem areas for the physics model and controller, without needing to do any hardware troubleshooting.
@@ -156,8 +200,8 @@ We can do parameter estimation, controller design, HIL testing, and hardware dep
 This series builds on various Archimedes concepts, including:
 
 * [C code generation](../codegen/codegen00.md)
-* [Structured data types](../../../trees.md)
-* [Hierarchical modeling](../modular-design.md)
+* [Structured data types](../../trees.md)
+* [Hierarchical modeling](../../modular-design.md)
 * [Parameter estimation](../sysid/parameter-estimation.md)
 
 If you aren't familiar with any of these, this is a great time to dig deeper and see how these combine to enable this end-to-end development workflow.

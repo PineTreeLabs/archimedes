@@ -45,30 +45,30 @@ While simplified (and applied to a simple physical system), every aspect of the 
 
 ## Outline
 
-1. [**Physical System**](workflow01.md)
+1. [**Physical System**](deployment01.md)
     - Brushed DC motor and physics model
     - Motor driver circuit
     - The STM32 controller board
     - Bill of materials (if you want to build it yourself)
 
-2. [**Characterization**](workflow02.md)
+2. [**Characterization**](deployment02.md)
     - Configuring the STM32
     - Collecting step response data
     - Implementing the physics model
     - Calibration via parameter estimation
 
-3. [**Controller Design**](workflow03.md)
+3. [**Controller Design**]deployment03.md)
     - Implementing a simple PI controller
     - Classical control systems analysis
     - C code generation
 
-4. [**HIL Testing**](workflow04.md)
+4. [**HIL Testing**](deployment04.md)
     - Setting up a real-time simulator
     - The analog communication circuit
     - Generating code for the real-time model
     - Evaluating the controller
 
-5. [**Deployment**](workflow05.md)
+5. [**Deployment**](deployment05.md)
     - Running the same controller on the physical system
     - Comparing to HIL testing results
     - Key takeaways
@@ -76,11 +76,11 @@ While simplified (and applied to a simple physical system), every aspect of the 
 
 ## Prerequisites
 
-This tutorial integrates several Archimedes concepts, including [structured data types](../../../trees.md), [C code generation](#archimedes.codegen), and [system identification](#archimedes.sysid).
+This tutorial integrates several Archimedes concepts, including [structured data types](../../trees.md), [C code generation](#archimedes.codegen), and [system identification](#archimedes.sysid).
 We'll introduce them as needed, but it will be easier to follow if you are already comfortable with these concepts - the following documentation pages are a good place to start:
 
-* [**Structured Data Types**](../../../trees.md)
-* [**Hierarchical Design Patterns**](../modular-design.md)
+* [**Structured Data Types**](../../trees.md)
+* [**Hierarchical Design Patterns**](../../modular-design.md)
 * [**Parameter Estimation**](../sysid/parameter-estimation.md)
 * [**C Code Generation**](../codegen/codegen00.md)
 
@@ -88,12 +88,10 @@ Beyond Archimedes specifics, the tutorial only assumes basic physics and control
 
 ```{toctree}
 :maxdepth: 1
-workflow01
-workflow02
-workflow03
-workflow04
-workflow05
+deployment01
+deployment02
+deployment03
+deployment04
+deployment05
    
 ```
-
-

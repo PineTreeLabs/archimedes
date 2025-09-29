@@ -1,12 +1,23 @@
+---
+jupytext:
+  text_representation:
+    extension: .md
+    format_name: myst
+kernelspec:
+  display_name: Python 3
+  language: python
+  name: archimedes
+---
+
 # Part 3: Running the model
 
 We've now made it through the hard part; the math for the dynamics model is done, and we've translated it into modular and extensible Python code.
 Instantiating the model is a matter of defining the various parameters and then constructing the model components for gravity, vehicle drag, and rotor aerodynamics.
 
 
-```python
+```{code-cell} python
+:tags: [hide-cell]
 # ruff: noqa: N802, N803, N806, N815, N816
-import os
 
 import matplotlib.pyplot as plt
 import multirotor
@@ -14,15 +25,19 @@ import numpy as np
 from scipy.integrate import solve_ivp
 
 import archimedes as arc
+```
 
-THEME = os.environ.get("ARCHIMEDES_THEME", "dark")
-arc.theme.set_theme(THEME)
+```{code-cell} python
+:tags: [remove-cell]
+from pathlib import Path
+
+plot_dir = Path.cwd() / "_plots"
+plot_dir.mkdir(exist_ok=True)
 
 np.set_printoptions(precision=3, suppress=True)
 ```
 
-
-```python
+```{code-cell} python
 m = 2.0  # Body mass [kg]
 R = 0.15  # Rotor radius (also boom length) [m]
 H = 0.15  # Body height [m]
@@ -86,7 +101,7 @@ The vehicle will accelerate rapidly until the velocity-squared body drag balance
 Remember that we've defined our vehicle body frame B as "Forward-Right-Down" and our inertial frame N as "North-East-Down", so that positive body-frame velocity and inertial frame position both indicate "down".
 
 
-```python
+```{code-cell} python
 t0 = 0.0
 t1 = 100.0
 t_span = (t0, t1)
@@ -119,7 +134,8 @@ xs = vmap_unravel(sol.y)  # Return to vehicle.State format
 ```
 
 
-```python
+```{code-cell} python
+:tags: [remove-output]
 fig, ax = plt.subplots(2, 1, figsize=(7, 4), sharex=True)
 ax[0].plot(t_eval, xs.p_N[2], label="z")
 ax[0].grid()
@@ -130,37 +146,43 @@ ax[1].set_ylabel("vz_B [m/s]")
 plt.xlabel("Time [s]")
 ```
 
+```{code-cell} python
+:tags: [remove-cell]
 
+for theme in {"light", "dark"}:
+    arc.theme.set_theme(theme)
+    fig, ax = plt.subplots(2, 1, figsize=(7, 4), sharex=True)
+    ax[0].plot(t_eval, xs.p_N[2], label="z")
+    ax[0].grid()
+    ax[0].set_ylabel("z_N [m]")
+    ax[1].plot(t_eval, xs.v_B[2], label="vz_B")
+    ax[1].grid()
+    ax[1].set_ylabel("vz_B [m/s]")
+    plt.xlabel("Time [s]")
+    plt.savefig(plot_dir / f"multirotor03_0_{theme}.png")
+    plt.close()
+```
 
-
-    Text(0.5, 0, 'Time [s]')
-
-
-
-
-    
-
-```{image} multirotor03_files/multirotor03_5_1.png
+```{image} _plots/multirotor03_0_light.png
 :class: only-light
 ```
 
-```{image} multirotor03_files/multirotor03_5_1_dark.png
+```{image} _plots/multirotor03_0_dark.png
 :class: only-dark
 ```
-    
-
 
 As discussed, it's easy to run the exact same code with Archimedes by simply calling `arc.odeint` instead of `solve_ivp` from SciPy.
 This will trigger construction of a symbolic "computational graph" defined by our model and then run the simulation with the SUNDIALS ODE solver.
 
 
-```python
+```{code-cell} python
 xs_flat = arc.odeint(f, t_span, x0_flat, t_eval=t_eval)
 xs_arc = vmap_unravel(xs_flat)
 ```
 
 
-```python
+```{code-cell} python
+:tags: [remove-output]
 fig, ax = plt.subplots(2, 1, figsize=(7, 4), sharex=True)
 ax[0].plot(t_eval, xs.p_N[2], label="SciPy")
 ax[0].plot(t_eval, xs_arc.p_N[2], "--", label="Archimedes")
@@ -174,25 +196,33 @@ ax[1].set_ylabel("vz_B [m/s]")
 plt.xlabel("Time [s]")
 ```
 
+```{code-cell} python
+:tags: [remove-cell]
 
+for theme in {"light", "dark"}:
+    arc.theme.set_theme(theme)
+    fig, ax = plt.subplots(2, 1, figsize=(7, 4), sharex=True)
+    ax[0].plot(t_eval, xs.p_N[2], label="SciPy")
+    ax[0].plot(t_eval, xs_arc.p_N[2], "--", label="Archimedes")
+    ax[0].legend()
+    ax[0].grid()
+    ax[0].set_ylabel("z_N [m]")
+    ax[1].plot(t_eval, xs.v_B[2])
+    ax[1].plot(t_eval, xs_arc.v_B[2], "--")
+    ax[1].grid()
+    ax[1].set_ylabel("vz_B [m/s]")
+    plt.xlabel("Time [s]")
+    plt.savefig(plot_dir / f"multirotor03_1_{theme}.png")
+    plt.close()
+```
 
-
-    Text(0.5, 0, 'Time [s]')
-
-
-
-
-    
-
-```{image} multirotor03_files/multirotor03_8_1.png
+```{image} _plots/multirotor03_1_light.png
 :class: only-light
 ```
 
-```{image} multirotor03_files/multirotor03_8_1_dark.png
+```{image} _plots/multirotor03_1_dark.png
 :class: only-dark
 ```
-    
-
 
 In terms of simulation performance, a key difference here is that each time the dynamics function of the NumPy version gets evaluated, the code is executed in regular interpreted Python.
 On the other hand, the Archimedes version will evaluate the exact same sequence of operations, but in pre-compiled C++, which can be considerably faster.
@@ -200,22 +230,15 @@ On the other hand, the Archimedes version will evaluate the exact same sequence 
 We can do a head-to-head comparison using the `%%timeit` magic in Jupyter, which will compare the _entire_ execution time of the simulation call, including the construction of the computational graph and any other setup and initialization.
 
 
-```python
+```{code-cell} python
 %%timeit
 solve_ivp(f, t_span, x0_flat, t_eval=t_eval)
 ```
 
-    51 ms ± 7.37 ms per loop (mean ± std. dev. of 7 runs, 10 loops each)
-
-
-
-```python
+```{code-cell} python
 %%timeit
 ys = arc.odeint(f, t_span, x0_flat, t_eval=t_eval)
 ```
-
-    6.57 ms ± 234 μs per loop (mean ± std. dev. of 7 runs, 100 loops each)
-
 
 Here we see about a 5x speedup by running the exact same model with Archimedes instead of pure Python.
 Of course, as noted above, it may be possible to improve the performance of the pure NumPy code by pre-allocating vectors or using vectorization wherever possible, although these optimizations tend to decrease readability and may make debugging more difficult.

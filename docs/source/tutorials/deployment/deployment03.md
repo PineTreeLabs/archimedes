@@ -1,15 +1,26 @@
+---
+jupytext:
+  text_representation:
+    extension: .md
+    format_name: myst
+kernelspec:
+  display_name: Python 3
+  language: python
+  name: archimedes
+---
+
 # Controller design
 
-In [Part 2](workflow02.md) of this series we implemented a first-principles physics model for our DC gearmotor system and calibrated it using experimental data.
+In [Part 2](deployment02.md) of this series we implemented a first-principles physics model for our DC gearmotor system and calibrated it using experimental data.
 The next step of our workflow is _controller design_, where we will develop an algorithm for driving the motor output shaft quickly and efficiently to a reference position.
 
 Again, because the goal of this series is to step through the development workflow and not to build a sophisticated motor controller, we'll keep the controller simple to highlight the process.
 Specifically, we'll use a proportional-integral (PI) controller, a simple and robust solution for reference tracking.
 
 
-```python
+```{code-cell} python
+:tags: [hide-cell]
 # ruff: noqa: N802, N803, N806, N815, N816
-import os
 import pickle
 
 import control
@@ -28,15 +39,20 @@ from motor import (
 from scipy import signal
 
 import archimedes as arc
-from archimedes.docs.utils import display_text, extract_py_class, extract_py_function
 from archimedes.experimental.signal import IIRFilter
+```
 
-THEME = os.environ.get("ARCHIMEDES_THEME", "dark")
-arc.theme.set_theme(THEME)
+```{code-cell} python
+:tags: [remove-cell]
+from archimedes.docs.utils import display_text, extract_py_class, extract_py_function
+```
 
-# Load calibrated parameters from Part 2
-with open("data/motor_params.pkl", "rb") as f:
-    params = MotorParams(**pickle.load(f))
+```{code-cell} python
+:tags: [remove-cell]
+from pathlib import Path
+
+plot_dir = Path.cwd() / "_plots"
+plot_dir.mkdir(exist_ok=True)
 ```
 
 ## Dynamics model
@@ -55,8 +71,15 @@ This is a linear time-invariant model that we can apply classical control analys
 
 In this case it would be easy enough to write the model by hand, but since we have automatic differentiation at our disposal and we know the model is linear, it will be even easier to automatically calculate the Jacobians and determine the linear state-space form:
 
+```{code-cell} python
+:tags: [hide-cell]
+# Load calibrated parameters from Part 2
+with open("data/motor_params.pkl", "rb") as f:
+    params = MotorParams(**pickle.load(f))
+```
 
-```python
+```{code-cell} python
+:tags: [remove-output]
 x0 = np.array([0.0, 0.0, 0.0])
 u0 = np.array([0.0])
 
@@ -76,17 +99,29 @@ ax[0].set_title("Open-loop frequency response")
 plt.show()
 ```
 
+```{code-cell} python
+:tags: [remove-cell]
 
-    
+for theme in {"light", "dark"}:
+    arc.theme.set_theme(theme)
 
-```{image} workflow03_files/workflow03_3_0.png
+    fig, ax = plt.subplots(2, 1, figsize=(6, 4), sharex=True)
+    control.bode_plot(
+        G, dB=True, Hz=True, omega=np.logspace(-2, 5, 100) * 2 * np.pi, ax=ax
+    )
+    ax[0].set_title("Open-loop frequency response")
+
+    plt.savefig(plot_dir / f"deployment03_0_{theme}.png")
+    plt.close()
+```
+
+```{image} _plots/deployment03_0_light.png
 :class: only-light
 ```
 
-```{image} workflow03_files/workflow03_3_0_dark.png
+```{image} _plots/deployment03_0_dark.png
 :class: only-dark
 ```
-    
 
 
 ## PI controller
@@ -108,7 +143,7 @@ $$
 With this and the plant model, we can quickly tune the gains to find a good combination.
 
 
-```python
+```{code-cell} python
 kp = 10.0
 ki = 5.0
 
@@ -116,18 +151,14 @@ C = control.tf(np.array([kp, ki]), np.array([1, 0]), name="controller")
 C
 ```
 
-
-
-
-$$\frac{10 s + 5}{s}$$
-
-
-
-
-```python
+```{code-cell} python
+:tags: [remove-output]
 H_ur = C / (1 + G * C)  # Transfer function from reference -> control input
 H_yr = (G * C) / (1 + G * C)  # Transfer function from reference -> output
+```
 
+```{code-cell} python
+:tags: [hide-cell, remove-output]
 t = np.linspace(0, 0.5, 1000)
 yr_resp = control.step_response(H_yr, t)
 ur_resp = control.step_response(H_ur, t)
@@ -148,17 +179,36 @@ ax[-1].set_xlabel("Time [s]")
 plt.show()
 ```
 
+```{code-cell} python
+:tags: [remove-cell]
 
-    
+for theme in {"light", "dark"}:
+    arc.theme.set_theme(theme)
 
-```{image} workflow03_files/workflow03_6_0.png
+    fig, ax = plt.subplots(2, 1, figsize=(7, 4), sharex=True)
+
+    ax[0].set_title("Closed-loop step response")
+
+    ax[0].plot(t, ur_resp.outputs)
+    ax[0].grid()
+    ax[0].set_ylabel("Voltage [V]")
+    ax[1].plot(t, yr_resp.outputs)
+    ax[1].grid()
+    ax[1].set_ylabel("Position [rad]")
+
+    ax[-1].set_xlabel("Time [s]")
+
+    plt.savefig(plot_dir / f"deployment03_1_{theme}.png")
+    plt.close()
+```
+
+```{image} _plots/deployment03_1_light.png
 :class: only-light
 ```
 
-```{image} workflow03_files/workflow03_6_0_dark.png
+```{image} _plots/deployment03_1_dark.png
 :class: only-dark
 ```
-    
 
 
 Recall that in Part 2 we found that the mechanical time constant was around 100 ms, about the same as we see here for rise time.
@@ -167,31 +217,39 @@ For our purposes, we'll take a response time that matches the natural system dyn
 It's also worth checking Nyquist stability, which confirms that the PI will be a robust closed-loop controller:
 
 
-```python
+```{code-cell} python
 gm, pm, wcg, wcp = control.margin(C * G)
 print(f"Gain margin: {20 * np.log10(gm):.2f} dB at {wcg / (2 * np.pi):.2f} Hz")
 print(f"Phase margin: {pm:.2f} deg at {wcp / (2 * np.pi):.2f} Hz")
+```
 
+```{code-cell} python
+:tags: [remove-output]
 fig, ax = plt.subplots(1, 1, figsize=(6, 4))
 control.nyquist_plot(C * G, ax=ax)
 plt.show()
 ```
-
-    Gain margin: 33.51 dB at 37.70 Hz
-    Phase margin: 75.99 deg at 2.52 Hz
-
-
-
     
+```{code-cell} python
+:tags: [remove-cell]
 
-```{image} workflow03_files/workflow03_8_1.png
+for theme in {"light", "dark"}:
+    arc.theme.set_theme(theme)
+
+    fig, ax = plt.subplots(1, 1, figsize=(6, 4))
+    control.nyquist_plot(C * G, ax=ax)
+
+    plt.savefig(plot_dir / f"deployment03_2_{theme}.png")
+    plt.close()
+```
+
+```{image} _plots/deployment03_2_light.png
 :class: only-light
 ```
 
-```{image} workflow03_files/workflow03_8_1_dark.png
+```{image} _plots/deployment03_2_dark.png
 :class: only-dark
 ```
-    
 
 
 ## Full controller implementation
@@ -203,7 +261,7 @@ The discretization is easy since we have a transfer function representation of o
 We can simply call `sample` to apply a zero-order hold discretization to the transfer function and then implement the discretized form as an infinite impulse response (IIR) digital filter.
 
 
-```python
+```{code-cell} python
 # Convert transfer function to discrete-time IIR filter
 dt = hil_dt
 C_pid = C.sample(dt)  # Position error -> Voltage command
@@ -211,12 +269,6 @@ pid_ctrl = IIRFilter(C_pid.num[0][0], C_pid.den[0][0])
 
 C_pid
 ```
-
-
-
-
-$$\frac{10 z - 9.999}{z - 1}\quad dt = 0.0001$$
-
 
 
 One decision point at this stage is which calculations and conversions are part of the "control algorithm" and which are "embedded implementation details".
@@ -234,7 +286,7 @@ We'll use the same control algorithm implementation in two ways:
 Using the same "source of truth" for both simulation and deployment means there's less that can go wrong when updating the controller logic, and makes it easier to implement smooth workflows that progress from quick "sanity checks" (in simulation) to more expensive "reality checks" (on hardware).
 
 
-```python
+```{code-cell} python
 # Determine motor direction logic values
 # This is basic H-bridge logic; see the VNH5019 datasheet for details
 def motor_logic(d) -> tuple[bool, bool]:
@@ -266,16 +318,6 @@ x0 = pid_ctrl.x0
 controller_step(x0, 0.0, 1.0)
 ```
 
-
-
-
-    [IIRFilter.State(u_prev=array([1., 0.]), y_prev=array([10.])),
-     array(0.83333333),
-     array(0),
-     array(1)]
-
-
-
 ## Simulating the controller
 
 So far we have a calibrated physics model and a tuned PI feedback law implemented as a digital control algorithm.
@@ -299,105 +341,14 @@ We don't need to go into depth with these additional models of the plant behavio
 Below is the full plant model as implemented in `motor.py`, with `motor_dyn` the same discretized plant model we used for system identification and constants like `CS_V_PER_AMP` defined based on the electronic circuit and datasheet specifications.
 
 
-```python
+```{code-cell} python
+:tags: [remove-input]
 extract_py_class("motor.py", "MotorInputs")
 extract_py_class("motor.py", "MotorOutputs")
 extract_py_function("motor.py", "encoder")
 extract_py_function("motor.py", "motor_dir")
 extract_py_function("motor.py", "plant_step")
 ```
-
-
-```python
-@struct
-class MotorInputs:
-    pwm_duty: float  # PWM duty cycle (0-1)
-    ENA: bool
-    ENB: bool
-    INA: bool
-    INB: bool
-```
-
-
-
-```python
-class MotorOutputs(NamedTuple):
-    ENCA: int
-    ENCB: int
-    V_CS: float
-    VOUTA: float
-    VOUTB: float
-```
-
-
-
-```python
-@arc.compile(static_argnames="PPR")
-def encoder(pos: float, PPR: int) -> tuple[int, int]:
-    # Convert position to encoder counts
-    counts = np.fmod((pos / (2 * np.pi)) * PPR / 4, PPR / 4)
-
-    # Generate quadrature signals
-    ENCA = np.fmod(np.floor(counts * 4) + 1, 4) < 2
-    ENCB = np.fmod(np.floor(counts * 4), 4) < 2
-
-    return ENCA, ENCB
-```
-
-
-
-```python
-@arc.compile
-def motor_dir(INA, INB, ENA, ENB):
-    d = (INB + (1 - INA)) - (INA + (1 - INB))
-
-    # Disable if either of ENA or ENB are low
-    return ENA * ENB * (d / 2)
-```
-
-
-
-```python
-@arc.compile(name="plant", return_names=("state_new", "outputs"))
-def plant_step(
-    t,
-    state: np.ndarray,
-    inputs: MotorInputs,
-    params: MotorParams,
-) -> tuple[np.ndarray, MotorOutputs]:
-    # Determine motor direction
-    d = motor_dir(inputs.INA, inputs.INB, inputs.ENA, inputs.ENB)
-    pwm_duty = np.clip(inputs.pwm_duty, 0.0, 1.0)
-    V_motor = d * pwm_duty * SUPPLY_VOLTAGE
-
-    # Motor dynamics model (discretized)
-    u = (V_motor,)
-    state = motor_dyn(t, state, u, params)
-
-    I_motor, pos, vel = state
-
-    # Encoder emulation
-    PPR = ENC_PPR * GEAR_RATIO
-    ENCA, ENCB = encoder(pos, PPR)
-
-    # H-bridge output voltages
-    VOUTA = np.where(d >= 0, V_motor * VOUT_SCALE, 0.0)
-    VOUTB = np.where(d < 0, -V_motor * VOUT_SCALE, 0.0)
-
-    # Current sense voltage
-    V_CS = abs(I_motor) * CS_V_PER_AMP
-
-    outputs = MotorOutputs(
-        VOUTA=VOUTA,
-        VOUTB=VOUTB,
-        V_CS=V_CS,
-        ENCA=ENCA,
-        ENCB=ENCB,
-    )
-
-    return state, outputs
-```
-
 
 One last simulation detail is how we treat the encoder output.
 The STM32 has built-in quadrature pulse counting with a hardware timer, so all we need to do in the embedded implementation is retrieve the current count at every sample and update our position estimate, handling wraparound and integer under/overflow as needed.
@@ -408,34 +359,16 @@ After all, the logic for position estimation isn't in scope for the control algo
 But if we want to check that the encoder emulation is working correctly (a good sanity check before we move onto HIL testing), we could also apply our own pulse counting:
 
 
-```python
+```{code-cell} python
+:tags: [remove-input]
 extract_py_function("motor.py", "quad_count")
-```
-
-
-```python
-@arc.compile
-def quad_count(A, B, count, prev_A, prev_B):
-    rising_A = np.logical_and(A, np.logical_not(prev_A))
-    count += rising_A * np.where(B, -1, 1)  # CCW
-
-    falling_A = np.logical_and(np.logical_not(A), prev_A)
-    count += falling_A * np.where(B, 1, -1)  # CW
-
-    rising_B = np.logical_and(B, np.logical_not(prev_B))
-    count += rising_B * np.where(A, 1, -1)  # CW
-
-    falling_B = np.logical_and(np.logical_not(B), prev_B)
-    count += falling_B * np.where(A, -1, 1)  # CCW
-
-    return count
 ```
 
 
 To run the simulation we just have to match up the inputs and outputs of the plant model and controller and loop over a control sequence.
 
 
-```python
+```{code-cell} python
 tf = 0.5
 ts = np.arange(0, tf, hil_dt)
 pwm_duty = np.zeros_like(ts)
@@ -478,7 +411,8 @@ for i in range(len(ts)):
 ```
 
 
-```python
+```{code-cell} python
+:tags: [hide-cell, remove-output]
 fig, ax = plt.subplots(4, 1, figsize=(7, 6), sharex=True)
 ax[0].plot(ts, pwm_duty)
 ax[0].grid()
@@ -500,24 +434,43 @@ ax[3].set_ylabel("Velocity [rad/s]")
 ax[-1].set_xlabel("Time [s]")
 ```
 
+```{code-cell} python
+:tags: [remove-cell]
 
+for theme in {"light", "dark"}:
+    arc.theme.set_theme(theme)
 
+    fig, ax = plt.subplots(4, 1, figsize=(7, 6), sharex=True)
+    ax[0].plot(ts, pwm_duty)
+    ax[0].grid()
+    ax[0].set_ylabel("PWM [0-1]")
 
-    Text(0.5, 0, 'Time [s]')
+    ax[1].plot(ts, I_motor)
+    ax[1].grid()
+    ax[1].set_ylabel("Current [A]")
 
+    ax[2].plot(ts, pos)
+    ax[2].plot(ts, pos_cmd, linestyle="--", color="gray", label="Command")
+    ax[2].grid()
+    ax[2].set_ylabel("Position [rad]")
 
+    ax[3].step(ts, vel)
+    ax[3].grid()
+    ax[3].set_ylabel("Velocity [rad/s]")
 
+    ax[-1].set_xlabel("Time [s]")
 
-    
+    plt.savefig(plot_dir / f"deployment03_2_{theme}.png")
+    plt.close()
+```
 
-```{image} workflow03_files/workflow03_19_1.png
+```{image} _plots/deployment03_2_light.png
 :class: only-light
 ```
 
-```{image} workflow03_files/workflow03_19_1_dark.png
+```{image} _plots/deployment03_2_dark.png
 :class: only-dark
 ```
-    
 
 
 So far so good!
@@ -532,7 +485,8 @@ What happens to the performance in this case?
 Do we need to add anti-windup to the integral controller?
 
 
-```python
+```{code-cell} python
+:tags: [hide-cell]
 # Save the data to compare to HIL results
 data = np.vstack(
     (
@@ -560,10 +514,10 @@ These don't necessarily need to match the variable names in Python, but it's imp
 
 Second, when we generate the code we need to pass an example of the function arguments we expect to see: in this case, the IIR filter state and two floats (for estimated and commanded position in radians).
 These arguments are used to create appropriate C data structures corresponding to the function inputs, to symbolically "trace" the function logic, and as initial values when you create the input data structure in C.
-As detailed in the codegen tutorial, these arguments can be any valid [structured data type](../../../trees.md); the code generation will either create C arrays or structs depending on the Python data type.
+As detailed in the codegen tutorial, these arguments can be any valid [structured data type](../../trees.md); the code generation will either create C arrays or structs depending on the Python data type.
 
 
-```python
+```{code-cell} python
 args = (x0, 0.0, 0.0)
 arc.codegen(controller_step, args, output_dir="stm32/controller/archimedes")
 ```
@@ -571,59 +525,10 @@ arc.codegen(controller_step, args, output_dir="stm32/controller/archimedes")
 Again, the codegen tutorial gives more details on the generated API, but it's worth taking another look here.
 
 
-```python
+```{code-cell} python
+:tags: [remove-input]
 with open("stm32/controller/archimedes/controller.h", "r") as f:
     display_text(f.read(), language="c")
-```
-
-
-```c
-
-#ifndef CONTROLLER_H
-#define CONTROLLER_H
-
-#include "controller_kernel.h"
-
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-typedef struct {
-    float u_prev[2];
-    float y_prev[1];
-} state_t;
-
-// Input arguments struct
-typedef struct {
-    state_t state;
-    float pos;
-    float pos_ref;
-} controller_arg_t;
-
-// Output results struct
-typedef struct {
-    state_t state_new;
-    float pwm_duty;
-    float INA;
-    float INB;
-} controller_res_t;
-
-// Workspace struct
-typedef struct {
-    long int iw[controller_SZ_IW];
-    float w[controller_SZ_W];
-} controller_work_t;
-
-// Runtime API
-int controller_init(controller_arg_t* arg, controller_res_t* res, controller_work_t* work);
-int controller_step(controller_arg_t* arg, controller_res_t* res, controller_work_t* work);
-
-
-#ifdef __cplusplus
-}
-#endif
-
-#endif // CONTROLLER_H
 ```
 
 
@@ -662,7 +567,7 @@ int main {
 This means that we can easily regenerate the controller code, typically with no changes at all to the main embedded application (unless you change the function arguments or returns).
 This makes the codegen a great handoff point between controls and software teams with clearly defined inputs and outputs to the control algorithm.
 
-In [Part 4](workflow04.md) we will build on this by also generating code for the plant model, and then running both the plant and the controller in real-time to create a simple and effective HIL testing stage in our development workflow.
+In [Part 4](deployment04.md) we will build on this by also generating code for the plant model, and then running both the plant and the controller in real-time to create a simple and effective HIL testing stage in our development workflow.
 
 ## [Bonus] Accelerated simulation
 
@@ -679,7 +584,7 @@ The reason we didn't do this in the first place is that it's admittedly a bit mo
 But if you are going to be running a large number of simulations it's well worth the effort; in this case the simulation is more than 100x faster using `scan`!
 
 
-```python
+```{code-cell} python
 def simulation_step(carry, pos_cmd):
     x_phys, x_ctrl, inputs, enc_state = carry
 
@@ -719,7 +624,8 @@ I_motor, pos, vel, pwm_duty = ys.T
 ```
 
 
-```python
+```{code-cell} python
+:tags: [hide-cell, remove-output]
 fig, ax = plt.subplots(4, 1, figsize=(7, 6), sharex=True)
 ax[0].plot(ts, pwm_duty)
 ax[0].grid()
@@ -741,27 +647,40 @@ ax[3].set_ylabel("Velocity [rad/s]")
 ax[-1].set_xlabel("Time [s]")
 ```
 
+```{code-cell} python
+:tags: [remove-cell]
 
+for theme in {"light", "dark"}:
+    arc.theme.set_theme(theme)
 
+    fig, ax = plt.subplots(4, 1, figsize=(7, 6), sharex=True)
+    ax[0].plot(ts, pwm_duty)
+    ax[0].grid()
+    ax[0].set_ylabel("PWM [0-1]")
 
-    Text(0.5, 0, 'Time [s]')
+    ax[1].plot(ts, I_motor)
+    ax[1].grid()
+    ax[1].set_ylabel("Current [A]")
 
+    ax[2].plot(ts, pos)
+    ax[2].plot(ts, pos_cmd, linestyle="--", color="gray", label="Command")
+    ax[2].grid()
+    ax[2].set_ylabel("Position [rad]")
 
+    ax[3].step(ts, vel)
+    ax[3].grid()
+    ax[3].set_ylabel("Velocity [rad/s]")
 
+    ax[-1].set_xlabel("Time [s]")
 
-    
+    plt.savefig(plot_dir / f"deployment03_3_{theme}.png")
+    plt.close()
+```
 
-```{image} workflow03_files/workflow03_30_1.png
+```{image} _plots/deployment03_3_light.png
 :class: only-light
 ```
 
-```{image} workflow03_files/workflow03_30_1_dark.png
+```{image} _plots/deployment03_3_dark.png
 :class: only-dark
-```
-    
-
-
-
-```python
-
 ```

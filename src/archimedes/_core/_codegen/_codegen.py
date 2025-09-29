@@ -82,7 +82,7 @@ def codegen(
 
     For a detailed description of the codegen functionality, see the
     :doc:`guide to code
-    generation and hardware deployment <../../generated/notebooks/codegen/codegen00>`.
+    generation and hardware deployment <../../tutorials/codegen/codegen00>`.
 
     Parameters
     ----------
@@ -159,7 +159,7 @@ def codegen(
 
     **Generated API**
 
-    The :doc:`codegen guide <../notebooks/codegen/codegen03>` has a detailed
+    The :doc:`codegen guide <../../tutorials/codegen/codegen03>` has a detailed
     description of how to use the generated API.  In short, a Python function named
     ``func`` will generate three top-level C structs:
 
@@ -195,7 +195,7 @@ def codegen(
     2. Pass them as hashable static arguments (same effect as a closure)
     3. Pass as "dynamic" arguments that could be edited in the generated code
 
-    **Tree support**
+    **Support for structured data types**
 
     The code generation system supports structured data types, either as homogeneous
     arrays (lists or tuples with all elements of the same type) or as heterogeneous

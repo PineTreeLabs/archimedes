@@ -1,4 +1,16 @@
-```python
+---
+jupytext:
+  text_representation:
+    extension: .md
+    format_name: myst
+kernelspec:
+  display_name: Python 3
+  language: python
+  name: archimedes
+---
+
+```{code-cell} python
+:tags: [hide-cell]
 # ruff: noqa: N802, N803, N806, N815, N816
 import os
 
@@ -17,7 +29,7 @@ The remaining sections will expand on this same basic workflow so that you can b
 To keep this as simple as possible, we'll work with a Python implementation of the classic Fibonnaci sequence:
 
 
-```python
+```{code-cell} python
 def fib(a, b):
     return b, a + b
 
@@ -29,24 +41,12 @@ for _ in range(10):
     print(a)
 ```
 
-    1
-    1
-    2
-    3
-    5
-    8
-    13
-    21
-    34
-    55
-
-
 ## Converting to C code
 
 Next we generate a C implementation of the Python logic using the [`codegen`](#archimedes.codegen) function, including initial values of the inputs.  Note that we have to provide names for the output variables so that the generated code can use meaningful names.
 
 
-```python
+```{code-cell} python
 # Create "template" arguments for type inference
 # and initialization
 a, b = 0, 1
@@ -57,55 +57,12 @@ arc.codegen(fib, (a, b), return_names=("a_new", "b_new"))
 This will generate several files.  For our purposes in this quick start, the only one we need to look at is `fib.h`.
 
 
-```python
+```{code-cell} python
 with open("fib.h", "r") as f:
     c_code = f.read()
 
 display_text(c_code)
 ```
-
-
-```c
-
-#ifndef FIB_H
-#define FIB_H
-
-#include "fib_kernel.h"
-
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-// Input arguments struct
-typedef struct {
-    float a;
-    float b;
-} fib_arg_t;
-
-// Output results struct
-typedef struct {
-    float a_new;
-    float b_new;
-} fib_res_t;
-
-// Workspace struct
-typedef struct {
-    long int iw[fib_SZ_IW];
-    float w[fib_SZ_W];
-} fib_work_t;
-
-// Runtime API
-int fib_init(fib_arg_t* arg, fib_res_t* res, fib_work_t* work);
-int fib_step(fib_arg_t* arg, fib_res_t* res, fib_work_t* work);
-
-
-#ifdef __cplusplus
-}
-#endif
-
-#endif // FIB_H
-```
-
 
 ## Using the generated code
 
@@ -114,7 +71,7 @@ The basic structure of this API, which is the same for _all_ generated code, is 
 Here's a minimal `main.c` "application" that shows how to use this API to generate the same results we saw from Python:
 
 
-```python
+```{code-cell} python
 with open("main.c", "r") as f:
     c_code = f.read()
 
@@ -122,43 +79,7 @@ display_text(c_code)
 ```
 
 
-```c
-// gcc -o main main.c fib.c fib_kernel.c
-
-#include <stdio.h>
-#include "fib.h"
-
-
-// Declare the argument, result, and workspace structures
-fib_arg_t arg;
-fib_res_t res;
-fib_work_t work;
-
-
-int main() {
-
-    // Initialize the structs
-    fib_init(&arg, &res, &work);
-
-    for (int i = 0; i < 10; i++) {
-        // Perform a step in the Fibonacci sequence
-        fib_step(&arg, &res, &work);
-
-        // Update the arguments for the next step
-        arg.a = res.a_new;
-        arg.b = res.b_new;
-
-        // Print the current Fibonacci number
-        printf("%d\n", (int)arg.a);
-    }
-
-    return 0;
-}
-```
-
-
-
-```python
+```{code-cell} python
 # Compile and run the C application
 os.system("gcc -o main main.c fib.c fib_kernel.c")
 os.system("./main > output.txt")
@@ -168,19 +89,6 @@ with open("output.txt", "r") as f:
 
 print(output)
 ```
-
-    1
-    1
-    2
-    3
-    5
-    8
-    13
-    21
-    34
-    55
-    
-
 
 That's all there is to it.  The generated C code is self-contained, portable, and efficient, so it can be used in a standalone C application like this, called with Cython bindings for speed, or (most importantly) deployed to a wide variety of embedded controllers.
 

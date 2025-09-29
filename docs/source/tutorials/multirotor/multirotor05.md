@@ -1,3 +1,14 @@
+---
+jupytext:
+  text_representation:
+    extension: .md
+    format_name: myst
+kernelspec:
+  display_name: Python 3
+  language: python
+  name: archimedes
+---
+
 # Part 5: Revisiting the rotor model (optional)
 
 In this section we will extend and improve the rotor aerodynamics model, at this point likely the least accurate part of our multirotor model.
@@ -286,9 +297,9 @@ It should be used for illustrative purposes only.
 Using the NACA 0012 data, we will initialize the blade element model using a linearly twisted blade from $20^\circ$ at the root to $10^\circ$ at the tip.  The chord length also varies linearly from 30 mm at the root to 10 mm at the tip.
 
 
-```python
+```{code-cell} python
+:tags: [hide-cell]
 # ruff: noqa: N802, N803, N806, N815, N816
-import os
 
 import control
 import matplotlib.pyplot as plt
@@ -296,15 +307,19 @@ import multirotor
 import numpy as np
 
 import archimedes as arc
+```
 
-THEME = os.environ.get("ARCHIMEDES_THEME", "dark")
-arc.theme.set_theme(THEME)
+```{code-cell} python
+:tags: [remove-cell]
+from pathlib import Path
+
+plot_dir = Path.cwd() / "_plots"
+plot_dir.mkdir(exist_ok=True)
 
 np.set_printoptions(precision=3, suppress=True)
 ```
 
-
-```python
+```{code-cell} python
 # Inertia matrix of a cylinder with mass m, radius r, and height h
 m = 2.0
 g0 = 9.81
@@ -391,7 +406,8 @@ The symbolic interpolant used behind the scenes by CasADi is not compatible with
 Hence, we have to explicitly create an "MX" symbolic function before calling the `odeint` function:
 
 
-```python
+```{code-cell} python
+:tags: [remove-output]
 u0 = 500.0 * np.ones(4)  # Rotor angular velocity (rad/s)
 
 t0 = 0.0
@@ -436,30 +452,37 @@ plt.xlabel("Time [s]")
 ```
 
 
+```{code-cell} python
+:tags: [remove-cell]
 
+for theme in {"light", "dark"}:
+    arc.theme.set_theme(theme)
+    fig, ax = plt.subplots(2, 1, figsize=(7, 4), sharex=True)
+    ax[0].plot(t_eval, xs.p_N[2])
+    ax[0].grid()
+    ax[0].set_ylabel("z_N [m]")
+    ax[1].plot(t_eval, xs.v_B[2])
+    ax[1].grid()
+    ax[1].set_ylabel("vz_B [m/s]")
+    plt.xlabel("Time [s]")
+    plt.savefig(plot_dir / f"multirotor05_0_{theme}.png")
+    plt.close()
+```
 
-    Text(0.5, 0, 'Time [s]')
-
-
-
-
-    
-
-```{image} multirotor05_files/multirotor05_4_1.png
+```{image} _plots/multirotor05_0_light.png
 :class: only-light
 ```
 
-```{image} multirotor05_files/multirotor05_4_1_dark.png
+```{image} _plots/multirotor05_0_dark.png
 :class: only-dark
 ```
-    
 
 
 The same idea about "MX" symbolics apply to identifying a trim point and performing linear stability analysis.
 As a general rule, it's safe to use the default "MX" symbolics - if you want to try improving performance you can experiment with creating "SX" functions, provided they don't contain unsupported operations like root-finding or interpolation.
 
 
-```python
+```{code-cell} python
 # Trim point identification
 
 v_N = np.array([10.0, 0.0, 0.0])  # Target forward velocity in the inertial frame
@@ -500,14 +523,8 @@ print(f"v_B: {v_B_trim}")
 print(f"u: {u_trim}")
 ```
 
-    roll: -0.00 deg
-    pitch: -8.83 deg
-    v_B: [ 9.881  0.    -1.535]
-    u: [512.53  512.517 512.517 512.53 ]
 
-
-
-```python
+```{code-cell} python
 # Longitudinal dynamics include surge (vx), heave (vz), pitch (theta),
 # and pitch rate (q). The other states are assumed to be in trim
 def longitudinal_dofs(x):
@@ -544,23 +561,11 @@ print(f"A_lon:\n{A_lon}")
 print(f"\nB_lon:\n{B_lon}")
 ```
 
-    A_lon:
-    [[ 0.     0.     0.     1.   ]
-     [-9.694 -0.259  0.03   1.535]
-     [ 1.506 -0.288 -2.135  9.882]
-     [ 0.    -0.004  0.011 -0.958]]
-    
-    B_lon:
-    [[ 0.     0.     0.     0.   ]
-     [-0.    -0.    -0.    -0.   ]
-     [-0.01  -0.01  -0.01  -0.01 ]
-     [ 0.274 -0.273 -0.273  0.274]]
-
-
 As a result of the much richer aerodynamics model, the longitudinal dynamics are more strongly coupled, as seen in the more interesting behavior of the transfer functions between a uniform input to all four rotors and the longitudinal state variables:
 
 
-```python
+```{code-cell} python
+:tags: [remove-output]
 C_hat = np.eye(4)
 B_hat = B_lon @ np.ones((4, 1))
 D_lon = np.zeros((C_hat.shape[0], 1))
@@ -571,20 +576,21 @@ control.bode_plot(lti_sys, ax=ax)
 plt.show()
 ```
 
+```{code-cell} python
+:tags: [remove-cell]
 
-    
+for theme in {"light", "dark"}:
+    arc.theme.set_theme(theme)
+    fig, ax = plt.subplots(4, 2, figsize=(10, 6), sharex=True)
+    control.bode_plot(lti_sys, ax=ax)
+    plt.savefig(plot_dir / f"multirotor05_1_{theme}.png")
+    plt.close()
+```
 
-```{image} multirotor05_files/multirotor05_9_0.png
+```{image} _plots/multirotor05_1_light.png
 :class: only-light
 ```
 
-```{image} multirotor05_files/multirotor05_9_0_dark.png
+```{image} _plots/multirotor05_1_dark.png
 :class: only-dark
-```
-    
-
-
-
-```python
-
 ```

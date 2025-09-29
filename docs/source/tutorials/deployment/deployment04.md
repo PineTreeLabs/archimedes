@@ -1,6 +1,17 @@
+---
+jupytext:
+  text_representation:
+    extension: .md
+    format_name: myst
+kernelspec:
+  display_name: Python 3
+  language: python
+  name: archimedes
+---
+
 # HIL testing
 
-In the [previous part](workflow03.md) of this series we designed a control algorithm for the system and evaluated it with a fairly detailed simulation, including sensor and actuator models resolved to I/O voltage levels.
+In the [previous part](deployment03.md) of this series we designed a control algorithm for the system and evaluated it with a fairly detailed simulation, including sensor and actuator models resolved to I/O voltage levels.
 Finally, we used the [`codegen`](#archimedes.codegen) function to output a portable C implementation of the controller.
 
 At this point we are substantially done with the "Python environment" part of our workflow.
@@ -56,17 +67,14 @@ On the other hand, the model itself is not very complicated compared to modern m
 At the same time, the most demanding part of the requirements relates to timing and speed, which is where bare-metal microcontrollers shine.
 This suggests that instead of purchasing or developing a complex workstation-based HIL system, we can build a simple, low-cost DIY version using a second STM32 Nucleo board.
 
-This second "simulation" board will run the same plant model we simulated in [Part 3](workflow03.md), translated to C using the same [`codegen`](#archimedes.codegen) functionality used to deploy the controller.
+This second "simulation" board will run the same plant model we simulated in [Part 3](deployment03.md), translated to C using the same [`codegen`](#archimedes.codegen) functionality used to deploy the controller.
 We can use the onboard D/A conversion to generate "analog" sensor voltages and the GPIO pins to output simulated encoder pulses.
 This eliminates most of the electronics, except for a couple of simple RC filters for signal conditioning (e.g. smoothing out the PWM signal).
 But, since all the inputs and outputs are in the same configuration and range as the physical system from the perspective of the controller board, once we're satisfied with the performance in HIL testing we can simply swap these connections to test on the physical hardware.
 
-<!-- Add link to Tesla battery testing -->
-
-
-```python
+```{code-cell} python
+:tags: [hide-cell]
 # ruff: noqa: N802, N803, N806, N815, N816
-import os
 import pickle
 
 import matplotlib.pyplot as plt
@@ -74,20 +82,23 @@ import numpy as np
 from motor import (
     MotorInputs,
     MotorParams,
-    hil_dt,
-    motor_ode,
     plant_step,
 )
 
 import archimedes as arc
+```
+
+```{code-cell} python
+:tags: [remove-cell]
 from archimedes.docs.utils import display_text, extract_py_class, extract_py_function
+```
 
-THEME = os.environ.get("ARCHIMEDES_THEME", "dark")
-arc.theme.set_theme(THEME)
+```{code-cell} python
+:tags: [remove-cell]
+from pathlib import Path
 
-# Load calibrated parameters from Part 2
-with open("data/motor_params.pkl", "rb") as f:
-    params = MotorParams(**pickle.load(f))
+plot_dir = Path.cwd() / "_plots"
+plot_dir.mkdir(exist_ok=True)
 ```
 
 ## Codegen for the plant
@@ -96,121 +107,14 @@ We've already discussed and tested the discrete-time plant model implemented as 
 
 
 
-```python
+```{code-cell} python
+:tags: [remove-input]
 extract_py_function("motor.py", "motor_ode")
 extract_py_class("motor.py", "MotorInputs")
 extract_py_class("motor.py", "MotorOutputs")
 extract_py_function("motor.py", "encoder")
 extract_py_function("motor.py", "motor_dir")
 extract_py_function("motor.py", "plant_step")
-```
-
-
-```python
-def motor_ode(
-    t: float, x: np.ndarray, u: np.ndarray, params: MotorParams
-) -> np.ndarray:
-    i, _pos, vel = x
-    (V,) = u
-
-    ke = params.kt / GEAR_RATIO  # Velocity -> Back EMF scale
-
-    i_t = (1 / params.L) * (V - (i * params.R) - ke * vel)
-    vel_t = (1 / params.J) * (params.kt * i - params.b * vel)
-
-    return np.hstack([i_t, vel, vel_t])
-```
-
-
-
-```python
-@struct
-class MotorInputs:
-    pwm_duty: float  # PWM duty cycle (0-1)
-    ENA: bool
-    ENB: bool
-    INA: bool
-    INB: bool
-```
-
-
-
-```python
-class MotorOutputs(NamedTuple):
-    ENCA: int
-    ENCB: int
-    V_CS: float
-    VOUTA: float
-    VOUTB: float
-```
-
-
-
-```python
-@arc.compile(static_argnames="PPR")
-def encoder(pos: float, PPR: int) -> tuple[int, int]:
-    # Convert position to encoder counts
-    counts = np.fmod((pos / (2 * np.pi)) * PPR / 4, PPR / 4)
-
-    # Generate quadrature signals
-    ENCA = np.fmod(np.floor(counts * 4) + 1, 4) < 2
-    ENCB = np.fmod(np.floor(counts * 4), 4) < 2
-
-    return ENCA, ENCB
-```
-
-
-
-```python
-@arc.compile
-def motor_dir(INA, INB, ENA, ENB):
-    d = (INB + (1 - INA)) - (INA + (1 - INB))
-
-    # Disable if either of ENA or ENB are low
-    return ENA * ENB * (d / 2)
-```
-
-
-
-```python
-@arc.compile(name="plant", return_names=("state_new", "outputs"))
-def plant_step(
-    t,
-    state: np.ndarray,
-    inputs: MotorInputs,
-    params: MotorParams,
-) -> tuple[np.ndarray, MotorOutputs]:
-    # Determine motor direction
-    d = motor_dir(inputs.INA, inputs.INB, inputs.ENA, inputs.ENB)
-    pwm_duty = np.clip(inputs.pwm_duty, 0.0, 1.0)
-    V_motor = d * pwm_duty * SUPPLY_VOLTAGE
-
-    # Motor dynamics model (discretized)
-    u = (V_motor,)
-    state = motor_dyn(t, state, u, params)
-
-    I_motor, pos, vel = state
-
-    # Encoder emulation
-    PPR = ENC_PPR * GEAR_RATIO
-    ENCA, ENCB = encoder(pos, PPR)
-
-    # H-bridge output voltages
-    VOUTA = np.where(d >= 0, V_motor * VOUT_SCALE, 0.0)
-    VOUTB = np.where(d < 0, -V_motor * VOUT_SCALE, 0.0)
-
-    # Current sense voltage
-    V_CS = abs(I_motor) * CS_V_PER_AMP
-
-    outputs = MotorOutputs(
-        VOUTA=VOUTA,
-        VOUTB=VOUTB,
-        V_CS=V_CS,
-        ENCA=ENCA,
-        ENCB=ENCB,
-    )
-
-    return state, outputs
 ```
 
 
@@ -227,8 +131,14 @@ Here our time steps are small enough that choosing Euler for computational effic
 To generate code for the plant model, we follow the same pattern as for the controller logic.
 Simply define "template" arguments to the function that have the correct data structures, array shapes, initial values, etc. and pass them to [`codegen`](#archimedes.codegen):
 
+```{code-cell} python
+:tags: [hide-cell]
+# Load calibrated parameters from Part 2
+with open("data/motor_params.pkl", "rb") as f:
+    params = MotorParams(**pickle.load(f))
+```
 
-```python
+```{code-cell} python
 # Set up "template" args for the plant
 t0 = 0.0
 x0 = np.zeros(3)  # Initial physical state
@@ -250,79 +160,11 @@ As with the controller, the codegen system has created structs corresponding to 
 These are then used within the top-level argument and result structures/
 
 
-```python
+```{code-cell} python
+:tags: [remove-input]
 with open("stm32/plant/archimedes/plant.h", "r") as f:
     display_text(f.read(), language="c")
 ```
-
-
-```c
-
-#ifndef PLANT_H
-#define PLANT_H
-
-#include "plant_kernel.h"
-
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-typedef struct {
-    float J;
-    float b;
-    float L;
-    float R;
-    float kt;
-} motor_params_t;
-
-typedef struct {
-    float pwm_duty;
-    float ENA;
-    float ENB;
-    float INA;
-    float INB;
-} motor_inputs_t;
-
-typedef struct {
-    float ENCA;
-    float ENCB;
-    float V_CS;
-    float VOUTA;
-    float VOUTB;
-} motor_outputs_t;
-
-// Input arguments struct
-typedef struct {
-    float t;
-    float state[3];
-    motor_inputs_t inputs;
-    motor_params_t params;
-} plant_arg_t;
-
-// Output results struct
-typedef struct {
-    float state_new[3];
-    motor_outputs_t outputs;
-} plant_res_t;
-
-// Workspace struct
-typedef struct {
-    long int iw[plant_SZ_IW];
-    float w[plant_SZ_W];
-} plant_work_t;
-
-// Runtime API
-int plant_init(plant_arg_t* arg, plant_res_t* res, plant_work_t* work);
-int plant_step(plant_arg_t* arg, plant_res_t* res, plant_work_t* work);
-
-
-#ifdef __cplusplus
-}
-#endif
-
-#endif // PLANT_H
-```
-
 
 Since we've provided the calibrated model parameters as one of the args to `codegen`, the `plant_init` function will initialize `plant_arg.params` with the correct values.
 We can update the plant model at every time step using a pattern that exactly mirrors the controller updates:
@@ -352,7 +194,7 @@ int main {
 ## Embedded implementation
 
 We now have two microcontroller boards we need to configure and program.
-The controller board configuration and workflow for cross-compiling and deploying the firmware is identical to what we've already used for data collection in [Part 2](workflow02.md).
+The controller board configuration and workflow for cross-compiling and deploying the firmware is identical to what we've already used for data collection in [Part 2](deployment02.md).
 What's new at this stage is mainly the plant board configuration and the C applications (`main.c`) to be run by each board.
 This section will just give a high-level overview of the board configurations and interconnections, but again the STM32CubeMX configuration files and C source is available on [GitHub](https://github.com/PineTreeLabs/archimedes/tree/main/docs/source/notebooks/workflow/stm32/).
 
@@ -453,7 +295,8 @@ If you want to re-run the tests, just remember to reset both boards so that the 
 Once the tests are done and data is collected, we can compare the HIL results to the simulations from Part 3.
 
 
-```python
+```{code-cell} python
+:tags: [hide-cell, remove-output]
 hil_data = np.loadtxt("data/hil_data.csv", delimiter="\t", skiprows=1)
 sim_data = np.loadtxt("data/sim_data.csv", delimiter="\t", skiprows=1)
 
@@ -485,17 +328,44 @@ plt.show()
 ```
 
 
-    
+```{code-cell} python
+:tags: [remove-cell]
 
-```{image} workflow04_files/workflow04_14_0.png
+for theme in {"light", "dark"}:
+    arc.theme.set_theme(theme)
+
+    fig, ax = plt.subplots(3, 1, figsize=(7, 5), sharex=True)
+
+    ax[0].plot(hil_data[:, 0], hil_data[:, 1], label="HIL")
+    ax[0].plot(sim_data[:, 0], sim_data[:, 1], "--", label="Sim")
+    ax[0].set_ylabel("PWM [0-1]")
+    ax[0].grid()
+    ax[0].legend()
+
+    ax[1].plot(hil_data[:, 0], hil_data[:, 3])
+    ax[1].plot(sim_data[:, 0], sim_data[:, 3], "--")
+    ax[1].set_ylabel("Current [A]")
+    ax[1].grid()
+
+    ax[2].plot(hil_data[:, 0], hil_data[:, 4])
+    ax[2].plot(sim_data[:, 0], sim_data[:, 4], "--")
+    ax[2].plot(hil_data[:, 0], pos_cmd, ":", color="gray", label="Command")
+    ax[2].set_ylabel("Position [deg]")
+    ax[2].grid()
+
+    ax[-1].set_xlabel("Time [s]")
+
+    plt.savefig(plot_dir / f"deployment04_0_{theme}.png")
+    plt.close()
+```
+
+```{image} _plots/deployment04_0_light.png
 :class: only-light
 ```
 
-```{image} workflow04_files/workflow04_14_0_dark.png
+```{image} _plots/deployment04_0_dark.png
 :class: only-dark
 ```
-    
-
 
 The correspondence is generally good, indicating that we're not running into any major problems with latency, A/D sampling noise, embedded implementation bugs, or board configuration issues.
 
@@ -545,8 +415,3 @@ For instance, first-order refinements to this process might include:
 
 But for now, we'll consider this step of the development workflow done.
 In the next and final part of this series, we'll simply swap the leads from the plant board to the physical motor and see how well our controller works in reality!
-
-
-```python
-
-```

@@ -1,16 +1,38 @@
-```python
+---
+jupytext:
+  text_representation:
+    extension: .md
+    format_name: myst
+kernelspec:
+  display_name: Python 3
+  language: python
+  name: archimedes
+---
+
+```{code-cell} python
+:tags: [hide-cell]
 # ruff: noqa: N802, N803, N806, N815, N816
-import os
 
 import matplotlib.pyplot as plt
 import numpy as np
 from scipy import signal
 
 import archimedes as arc
-from archimedes.docs.utils import display_text, extract_c_function
+```
 
-THEME = os.environ.get("ARCHIMEDES_THEME", "dark")
-arc.theme.set_theme(THEME)
+```{code-cell} python
+:tags: [remove-cell]
+from utils import cleanup
+
+from archimedes.docs.utils import display_text, extract_c_function
+```
+
+```{code-cell} python
+:tags: [remove-cell]
+from pathlib import Path
+
+plot_dir = Path.cwd() / "_plots"
+plot_dir.mkdir(exist_ok=True)
 ```
 
 # Code Generation Basics
@@ -33,7 +55,7 @@ The idea is that we can use Python ecosystem tools like `scipy.signal` for filte
 Here's a basic implementation of the IIR difference equation:
 
 
-```python
+```{code-cell} python
 @arc.compile(return_names=("u_hist", "y_hist"))
 def iir_filter(u, b, a, u_prev, y_prev):
     # Update input history
@@ -70,8 +92,8 @@ This is an important potentially counterintuitive point; typically when optimizi
 
 Next we can use SciPy's tools to design filter coefficients:
 
-
-```python
+```{code-cell} python
+:tags: [remove-output]
 dt = 0.01  # Sampling time [seconds]
 Wn = 10  # Cutoff frequency [Hz]
 order = 4
@@ -89,23 +111,36 @@ plt.grid()
 plt.show()
 ```
 
+```{code-cell} python
+:tags: [remove-cell]
 
-    
+for theme in {"light", "dark"}:
+    arc.theme.set_theme(theme)
 
-```{image} codegen02_files/codegen02_5_0.png
+    plt.figure(figsize=(7, 2))
+    plt.plot(w, 20 * np.log10(abs(h)))
+    plt.xlabel("Frequency [Hz]")
+    plt.ylabel("Magnitude [dB]")
+    plt.title("Frequency Response")
+    plt.grid()
+
+    plt.savefig(plot_dir / f"codegen02_0_{theme}.png")
+    plt.close()
+```
+
+```{image} _plots/codegen02_0_light.png
 :class: only-light
 ```
 
-```{image} codegen02_files/codegen02_5_0_dark.png
+```{image} _plots/codegen02_0_dark.png
 :class: only-dark
 ```
     
 
-
 Before proceeding with code generation, it is wise to check that the Python function does what it is intended to.  In this case we can compare the step response as calculated by `iir_filter` to the one calculated by `scipy.signal.lfilter`.  If these match, we can be confident that our code is working properly.  More generally, you might want to implement some simulation code and a set of unit tests to comprehensively test your Python code before converting to C.
 
 
-```python
+```{code-cell} python
 # Apply the IIR filter to a step input
 u = np.ones(50)
 t = np.arange(len(u)) * dt
@@ -120,7 +155,15 @@ for i in range(len(y)):
 # SciPy filter function
 y_sp = signal.lfilter(b, a, u)
 print("Step response matches:", np.allclose(y, y_sp))
+```
 
+```{code-cell} python
+:tags: [remove-cell]
+assert np.allclose(y, y_sp)
+```
+
+```{code-cell} python
+:tags: [remove-output]
 plt.figure(figsize=(7, 2))
 plt.step(t, y, label="Archimedes", where="post")
 plt.step(t, y_sp, "--", label="SciPy", where="post")
@@ -132,21 +175,32 @@ plt.legend()
 plt.show()
 ```
 
-    Step response matches: True
+```{code-cell} python
+:tags: [remove-cell]
 
+for theme in {"light", "dark"}:
+    arc.theme.set_theme(theme)
 
+    plt.figure(figsize=(7, 2))
+    plt.step(t, y, label="Archimedes", where="post")
+    plt.step(t, y_sp, "--", label="SciPy", where="post")
+    plt.grid()
+    plt.xlabel("Time [s]")
+    plt.ylabel("Output [-]")
+    plt.title("Step Response")
+    plt.legend()
 
-    
+    plt.savefig(plot_dir / f"codegen02_1_{theme}.png")
+    plt.close()
+```
 
-```{image} codegen02_files/codegen02_7_1.png
+```{image} _plots/codegen02_1_light.png
 :class: only-light
 ```
 
-```{image} codegen02_files/codegen02_7_1_dark.png
+```{image} _plots/codegen02_1_dark.png
 :class: only-dark
 ```
-    
-
 
 ## Converting to C code
 
@@ -169,7 +223,7 @@ This means that generated code will have all arguments and returns as float type
 Integers are used internally as counters, flags, etc. but cannot be used as inputs and outputs.
 
 
-```python
+```{code-cell} python
 # Create "template" arguments for type inference
 u = 1.0
 u_prev = np.zeros(len(b))
@@ -182,64 +236,15 @@ arc.codegen(iir_filter, args)
 This will generate four files: the C code implementation `iir_filter_kernel.c` and a corresponding header file `iir_filter_kernel.h`, and the API interface layer `iir_filter.c` and `iir_filter.h`.
 We'll get to the API in the next section, but it's worth taking a look at the "kernel" code as well.
 
-The parts of the generated code that are intended to be used directly are enumerated in the header file - let's take a look.
+The parts of the generated code that are intended to be used directly are enumerated in the header file `iir_filter_kernel.h` - let's take a look.
 
-
-```python
+```{code-cell} python
+:tags: [remove-input]
 with open("iir_filter_kernel.h", "r") as f:
     c_code = f.read()
 
 display_text(c_code)
 ```
-
-
-```c
-/* This file was automatically generated by CasADi 3.7.0.
- *  It consists of: 
- *   1) content generated by CasADi runtime: not copyrighted
- *   2) template code copied from CasADi source: permissively licensed (MIT-0)
- *   3) user code: owned by the user
- *
- */
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-#ifndef casadi_real
-#define casadi_real float
-#endif
-
-#ifndef casadi_int
-#define casadi_int long int
-#endif
-
-int iir_filter(const casadi_real** arg, casadi_real** res, casadi_int* iw, casadi_real* w, int mem);
-int iir_filter_alloc_mem(void);
-int iir_filter_init_mem(int mem);
-void iir_filter_free_mem(int mem);
-int iir_filter_checkout(void);
-void iir_filter_release(int mem);
-void iir_filter_incref(void);
-void iir_filter_decref(void);
-casadi_int iir_filter_n_in(void);
-casadi_int iir_filter_n_out(void);
-casadi_real iir_filter_default_in(casadi_int i);
-const char* iir_filter_name_in(casadi_int i);
-const char* iir_filter_name_out(casadi_int i);
-const casadi_int* iir_filter_sparsity_in(casadi_int i);
-const casadi_int* iir_filter_sparsity_out(casadi_int i);
-int iir_filter_work(casadi_int *sz_arg, casadi_int* sz_res, casadi_int *sz_iw, casadi_int *sz_w);
-int iir_filter_work_bytes(casadi_int *sz_arg, casadi_int* sz_res, casadi_int *sz_iw, casadi_int *sz_w);
-#define iir_filter_SZ_ARG 7
-#define iir_filter_SZ_RES 3
-#define iir_filter_SZ_IW 0
-#define iir_filter_SZ_W 27
-#ifdef __cplusplus
-} /* extern "C" */
-#endif
-
-```
-
 
 As stated at the top of the file, this is auto-generated by the CasADi backend, which converts the C++ computational graph for our `iir_filter` function to efficient C code.
 
@@ -269,76 +274,13 @@ However, in our case we will rely on the "interface" layer generated by Archimed
 We can take a look at the actual `iir_filter` implementation in the `iir_filter_kernel.c` file:
 
 
-```python
+```{code-cell} python
+:tags: [remove-input]
 extract_c_function("iir_filter_kernel.c", "iir_filter")
 extract_c_function("iir_filter_kernel.c", "casadi_f0")
 extract_c_function("iir_filter_kernel.c", "casadi_dot")
 extract_c_function("iir_filter_kernel.c", "casadi_copy")
 ```
-
-
-```c
-CASADI_SYMBOL_EXPORT int iir_filter(const casadi_real** arg, casadi_real** res, casadi_int* iw, casadi_real* w, int mem){
-    return casadi_f0(arg, res, iw, w, mem);
-}
-```
-
-
-
-```c
-static int casadi_f0(const casadi_real** arg, casadi_real** res, casadi_int* iw, casadi_real* w, int mem) {
-  casadi_real *rr, *w0=w+0, *w1=w+5, w2, *w3=w+10, *w4=w+13, *w5=w+17, *w6=w+22, w7;
-  const casadi_real *cs;
-    casadi_copy(arg[3], 5, w0);
-    for (rr=w1, cs=w0+0; cs!=w0+4; cs+=1) *rr++ = *cs;
-    for (rr=w0+1, cs=w1; rr!=w0+5; rr+=1) *rr = *cs++;
-    w2 = arg[0] ? arg[0][0] : 0;
-    for (rr=w0+0, cs=(&w2); rr!=w0+1; rr+=1) *rr = *cs++;
-    casadi_copy(w0, 5, res[0]);
-    casadi_copy(arg[4], 4, w1);
-    for (rr=w3, cs=w1+0; cs!=w1+3; cs+=1) *rr++ = *cs;
-    casadi_copy(w1, 4, w4);
-    for (rr=w4+1, cs=w3; rr!=w4+4; rr+=1) *rr = *cs++;
-    casadi_copy(arg[1], 5, w5);
-    w2 = casadi_dot(5, w5, w0);
-    casadi_copy(arg[2], 5, w5);
-    for (rr=w6, cs=w5+1; cs!=w5+5; cs+=1) *rr++ = *cs;
-    w7 = casadi_dot(4, w6, w1);
-    w2 -= w7;
-    for (rr=(&w7), cs=w5+0; cs!=w5+1; cs+=1) *rr++ = *cs;
-    w2 /= w7;
-    for (rr=w4+0, cs=(&w2); rr!=w4+1; rr+=1) *rr = *cs++;
-    casadi_copy(w4, 4, res[1]);
-    return 0;
-}
-```
-
-
-
-```c
-casadi_real casadi_dot(casadi_int n, const casadi_real* x, const casadi_real* y) {
-  casadi_int i;
-  casadi_real r = 0;
-  for (i=0; i<n; ++i) r += *x++ * *y++;
-  return r;
-}
-```
-
-
-
-```c
-void casadi_copy(const casadi_real* x, casadi_int n, casadi_real* y) {
-  casadi_int i;
-  if (y) {
-    if (x) {
-      for (i=0; i<n; ++i) *y++ = *x++;
-    } else {
-      for (i=0; i<n; ++i) *y++ = 0.;
-    }
-  }
-}
-```
-
 
 A few things to note about this implementation:
 
@@ -368,4 +310,7 @@ We could of course use these as global variables in Python, which would effectiv
 Archimedes handles this with a standardized "interface" layer that makes it easier to work with this kernel code.
 In the next part of the tutorial we'll begin to explore this autogenerated API.
 
-
+```{code-cell} python
+:tags: [remove-cell]
+cleanup()  # Clean up any previous generated code
+```

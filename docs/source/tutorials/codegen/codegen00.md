@@ -52,8 +52,8 @@ To follow this tutorial, you'll need:
 
 No prior experience with CasADi or code generation is required.
 
-Before we get started, one last comment: the full "path to hardware" includes not only code generation, but data acquisition and hardware-in-the-loop (HIL) testing workflows.  These are central to the [development roadmap](../../../roadmap.md) - stay tuned for more on those capabilities soon.
-For a preview, also check out the [end-to-end hardware deployment series](../workflow/workflow00.md).
+Before we get started, one last comment: the full "path to hardware" includes not only code generation, but data acquisition and hardware-in-the-loop (HIL) testing workflows.  These are central to the [development roadmap](../../roadmap.md) - stay tuned for more on those capabilities soon.
+For a preview, also check out the [end-to-end hardware deployment series](../deployment/deployment00.md).
 
 
 ```{toctree}

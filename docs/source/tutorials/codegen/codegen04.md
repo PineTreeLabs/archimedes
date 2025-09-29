@@ -1,22 +1,41 @@
-```python
+---
+jupytext:
+  text_representation:
+    extension: .md
+    format_name: myst
+kernelspec:
+  display_name: Python 3
+  language: python
+  name: archimedes
+---
+
+```{code-cell} python
+:tags: [hide-cell]
 # ruff: noqa: N802, N803, N806, N815, N816
-import os
 import pprint
 
 import numpy as np
 from scipy import signal
 
-# Simple utilities for displaying generated code in the notebook
-from utils import cleanup
-
 import archimedes as arc
 from archimedes import struct
+```
+
+```{code-cell} python
+:tags: [remove-cell]
+from utils import cleanup
+
 from archimedes.docs.utils import display_text
 
-THEME = os.environ.get("ARCHIMEDES_THEME", "dark")
-arc.theme.set_theme(THEME)
-
 cleanup()  # Clean up any previous generated code
+```
+
+```{code-cell} python
+:tags: [remove-cell]
+from pathlib import Path
+
+plot_dir = Path.cwd() / "_plots"
+plot_dir.mkdir(exist_ok=True)
 ```
 
 # Structured data types
@@ -24,7 +43,7 @@ cleanup()  # Clean up any previous generated code
 So far we have been working with a function that operates with regular arrays:
 
 
-```python
+```{code-cell} python
 # Design a simple IIR filter with SciPy
 dt = 0.01  # Sampling time [seconds]
 Wn = 10  # Cutoff frequency [Hz]
@@ -67,13 +86,13 @@ One solution is to use hierarchical data structures with well-defined fields and
 We call these "structured data types" or "trees", using terminology borrowed from [JAX](https://docs.jax.dev/en/latest/pytrees.html).
 These let you organize state and parameters in dataclass-like containers which can be mapped directly to a C `struct`.
 They can even be nested inside of one another to arbitrary depth.
-See the overview of [structured data types](../../../trees.md) or the documentation for the [`@struct`](#archimedes.tree.struct) decorator for more details.
+See the overview of [structured data types](../../trees.md) or the documentation for the [`@struct`](#archimedes.tree.struct) decorator for more details.
 
 ## Multiple filters
 
 For example, let's say we have an algorithm that is composed of three discrete transfer functions, implemented as IIR filters:
 
-```raw
+```
                   |--> G --> y_g
 u --> F --> y_f --|
                   |--> H --> y_h
@@ -84,7 +103,7 @@ Instead of maintaining six arrays (one each for `u` and `y` histories, across th
 First, let's rewrite the basic IIR filter to work with a structured state:
 
 
-```python
+```{code-cell} python
 @struct
 class FilterState:
     u_prev: np.ndarray
@@ -113,7 +132,7 @@ def iir_filter(
 Next we can combine three such filters into our "compound" filter with transfer functions `F`, `G`, and `H`:
 
 
-```python
+```{code-cell} python
 @struct
 class CompoundState:
     x_f: FilterState
@@ -154,83 +173,21 @@ x, y = compound_filter(*args)
 pprint.pprint(y)
 ```
 
-    CompoundOutput(y_f=array(0.00482434),
-                   y_g=array(2.32742888e-05),
-                   y_h=array(2.32742888e-05))
-
-
-If you've read the documentation on [structured data types](../../../trees.md) and/or worked with them a bit, you can probably already see where this is going - a class decorated with `@struct` behaves a lot like a C `struct`!
+If you've read the documentation on [structured data types](../../trees.md) and/or worked with them a bit, you can probably already see where this is going - a class decorated with `@struct` behaves a lot like a C `struct`!
 This makes it straightforward to generate code that maps directly back to your Python data structures.
 
 
-```python
+```{code-cell} python
 arc.codegen(compound_filter, args)
+```
 
+```{code-cell} python
+:tags: [remove-input]
 with open("compound_filter.h", "r") as f:
     c_code = f.read()
 
 display_text(c_code)
 ```
-
-
-```c
-
-#ifndef COMPOUND_FILTER_H
-#define COMPOUND_FILTER_H
-
-#include "compound_filter_kernel.h"
-
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-typedef struct {
-    float u_prev[5];
-    float y_prev[4];
-} filter_state_t;
-
-typedef struct {
-    filter_state_t x_f;
-    filter_state_t x_g;
-    filter_state_t x_h;
-} compound_state_t;
-
-typedef struct {
-    float y_f;
-    float y_g;
-    float y_h;
-} compound_output_t;
-
-// Input arguments struct
-typedef struct {
-    compound_state_t state;
-    float u;
-} compound_filter_arg_t;
-
-// Output results struct
-typedef struct {
-    compound_state_t state_new;
-    compound_output_t y;
-} compound_filter_res_t;
-
-// Workspace struct
-typedef struct {
-    long int iw[compound_filter_SZ_IW];
-    float w[compound_filter_SZ_W];
-} compound_filter_work_t;
-
-// Runtime API
-int compound_filter_init(compound_filter_arg_t* arg, compound_filter_res_t* res, compound_filter_work_t* work);
-int compound_filter_step(compound_filter_arg_t* arg, compound_filter_res_t* res, compound_filter_work_t* work);
-
-
-#ifdef __cplusplus
-}
-#endif
-
-#endif // COMPOUND_FILTER_H
-```
-
 
 We see that the `FilterState` struct is automatically translated to `filter_state_t`, and the `CompoundState` and `CompoundOutput` structs are likewise translated to `compound_state_t` and `compound_output_t`.
 
@@ -246,8 +203,6 @@ Since all of the data in our structs is either a scalar, a statically-allocated 
 ```c
 filter_arg.state = filter_res.state_new;
 ```
-
-
 
 ## Using the generated code
 
@@ -338,18 +293,14 @@ This code generation provides a convenient workflow for writing and evaluating h
 
 ### Where to Go From Here
 
-For an example of a more comprehensive development workflow, a great next step is the [end-to-end controller workflow tutorial](../workflow/workflow00.md).
+For an example of a more comprehensive development workflow, a great next step is the [end-to-end hardware deployment tutorial](../deployment/deployment00.md).
 In that series we walk through the development of a simple DC motor controller, including system identification, controller design, HIL testing, and hardware deployment.
 
 This code generation and hardware deployment workflow is an early proof of concept, but it is central to the Archimedes roadmap.
 **If you're using Archimedes for hardware development and have questions, comments, or requests, please don't hesitate to reach out!**
 
 
-```python
+```{code-cell} python
+:tags: [remove-cell]
 cleanup()
-```
-
-
-```python
-
 ```

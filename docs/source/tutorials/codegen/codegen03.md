@@ -1,16 +1,39 @@
-```python
+---
+jupytext:
+  text_representation:
+    extension: .md
+    format_name: myst
+kernelspec:
+  display_name: Python 3
+  language: python
+  name: archimedes
+---
+
+```{code-cell} python
+:tags: [hide-cell]
 # ruff: noqa: N802, N803, N806, N815, N816
-import os
 
 import numpy as np
 from scipy import signal
-from utils import cleanup
 
 import archimedes as arc
+```
+
+```{code-cell} python
+:tags: [remove-cell]
+from utils import cleanup
+
 from archimedes.docs.utils import display_text
 
-THEME = os.environ.get("ARCHIMEDES_THEME", "dark")
-arc.theme.set_theme(THEME)
+cleanup()  # Clean up any previous generated code
+```
+
+```{code-cell} python
+:tags: [remove-cell]
+from pathlib import Path
+
+plot_dir = Path.cwd() / "_plots"
+plot_dir.mkdir(exist_ok=True)
 ```
 
 # Generated C API
@@ -29,10 +52,11 @@ Manually handling these details would be tedious and error-prone - especially wh
 
 Archimedes handles this with an "interface layer", which creates a predictable and easy-to-use API for working with the low-level kernel code.  On this page we will go through some of the details of this interface layer.
 
-First, let's recall the basic IIR filter implementation we were working with:
+First, we will generate the code just as before.
 
+```{code-cell} python
+:tags: [hide-cell]
 
-```python
 # Note: give descriptive names for return values (these don't need
 # to match the variable names, but must be different from arg names)
 @arc.compile(return_names=("u_hist", "y_hist"))
@@ -49,13 +73,7 @@ def iir_filter(u, b, a, u_prev, y_prev):
     y_prev[0] = y
 
     return u_prev, y_prev
-```
 
-We will generate the code just as before:
-
-
-```python
-cleanup()  # Clean up any previous generated code
 
 # Design a simple IIR filter with SciPy
 dt = 0.01  # Sampling time [seconds]
@@ -80,133 +98,26 @@ While highly efficient, this code on its own is difficult to work with directly,
 Here's what the "interface" code looks like:
 
 
-```python
+```{code-cell} python
+:tags: [remove-input]
 with open("iir_filter.h", "r") as f:
     c_code = f.read()
 
 display_text(c_code)
 ```
 
-
-```c
-
-#ifndef IIR_FILTER_H
-#define IIR_FILTER_H
-
-#include "iir_filter_kernel.h"
-
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-// Input arguments struct
-typedef struct {
-    float u;
-    float b[5];
-    float a[5];
-    float u_prev[5];
-    float y_prev[4];
-} iir_filter_arg_t;
-
-// Output results struct
-typedef struct {
-    float u_hist[5];
-    float y_hist[4];
-} iir_filter_res_t;
-
-// Workspace struct
-typedef struct {
-    long int iw[iir_filter_SZ_IW];
-    float w[iir_filter_SZ_W];
-} iir_filter_work_t;
-
-// Runtime API
-int iir_filter_init(iir_filter_arg_t* arg, iir_filter_res_t* res, iir_filter_work_t* work);
-int iir_filter_step(iir_filter_arg_t* arg, iir_filter_res_t* res, iir_filter_work_t* work);
-
-
-#ifdef __cplusplus
-}
-#endif
-
-#endif // IIR_FILTER_H
-```
-
-
 Now, instead of manually wrangling pointer arrays, we have function-specific input and output structs with meaningful names.
 
 The header is enough for us to work with this in our own code, but for completeness here's the corresponding C code:
 
 
-```python
+```{code-cell} python
+:tags: [remove-input]
 with open("iir_filter.c", "r") as f:
     c_code = f.read()
 
 display_text(c_code)
 ```
-
-
-```c
-
-#include <string.h>
-#include "iir_filter.h"
-
-int iir_filter_init(iir_filter_arg_t* arg, iir_filter_res_t* res, iir_filter_work_t* work) {
-    if (!arg || !res || !work) {
-        return -1; // Invalid pointers
-    }
-
-    /* Initialize inputs */
-    memset(arg, 0, sizeof(iir_filter_arg_t));
-
-    /* Initialize outputs */
-    memset(res, 0, sizeof(iir_filter_res_t));
-
-    /* Nonzero assignments */
-    arg->u = 1.000000f;
-    arg->b[0] = 0.004824f;
-    arg->b[1] = 0.019297f;
-    arg->b[2] = 0.028946f;
-    arg->b[3] = 0.019297f;
-    arg->b[4] = 0.004824f;
-    arg->a[0] = 1.000000f;
-    arg->a[1] = -2.369513f;
-    arg->a[2] = 2.313988f;
-    arg->a[3] = -1.054665f;
-    arg->a[4] = 0.187379f;
-
-    _Static_assert(sizeof(iir_filter_arg_t) == 20 * sizeof(float),
-        "Non-contiguous arg struct; please enable -fpack-struct or equivalent.");
-
-    _Static_assert(sizeof(iir_filter_res_t) == 9 * sizeof(float),
-        "Non-contiguous res struct; please enable -fpack-struct or equivalent.");
-
-    return 0;
-}
-
-int iir_filter_step(iir_filter_arg_t* arg, iir_filter_res_t* res, iir_filter_work_t* work) {
-    if (!arg || !res || !work) {
-        return -1; // Invalid pointers
-    }
-
-    // Marshal inputs to CasADi format
-    const float* kernel_arg[iir_filter_SZ_ARG];
-    kernel_arg[0] = &arg->u;
-    kernel_arg[1] = arg->b;
-    kernel_arg[2] = arg->a;
-    kernel_arg[3] = arg->u_prev;
-    kernel_arg[4] = arg->y_prev;
-
-    // Marshal outputs to CasADi format
-    float* kernel_res[iir_filter_SZ_RES];
-    kernel_res[0] = res->u_hist;
-    kernel_res[1] = res->y_hist;
-
-    // Call kernel function
-    return iir_filter(kernel_arg, kernel_res, work->iw, work->w, 0);
-}
-```
-
 
 If you are familiar with C, this code will be largely self-explanatory.
 It takes care of all array and pointer initialization, specifically initializing all arrays to the values of the "template arguments" we passed to `codegen`.
@@ -261,11 +172,13 @@ On the other hand, if you can afford to keep a few extra floats in memory and pe
 
 For example, if we want to choose a different order and cutoff filter, we can do so easily:
 
-
-```python
+```{code-cell} python
+:tags: [remove-cell]
 cleanup()  # Cleanup any previous runs
+```
 
-# Design a simple IIR filter with SciPy
+```{code-cell} python
+# Design an IIR filter with SciPy
 dt = 0.01  # Sampling time [seconds]
 Wn = 20  # Cutoff frequency [Hz]
 order = 2
@@ -278,58 +191,15 @@ y_prev = np.zeros(len(a) - 1)
 args = (u, b, a, u_prev, y_prev)
 
 arc.codegen(iir_filter, args)
+```
 
+```{code-cell} python
+:tags: [remove-input]
 with open("iir_filter.h", "r") as f:
     c_code = f.read()
 
 display_text(c_code)
 ```
-
-
-```c
-
-#ifndef IIR_FILTER_H
-#define IIR_FILTER_H
-
-#include "iir_filter_kernel.h"
-
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-// Input arguments struct
-typedef struct {
-    float u;
-    float b[3];
-    float a[3];
-    float u_prev[3];
-    float y_prev[2];
-} iir_filter_arg_t;
-
-// Output results struct
-typedef struct {
-    float u_hist[3];
-    float y_hist[2];
-} iir_filter_res_t;
-
-// Workspace struct
-typedef struct {
-    long int iw[iir_filter_SZ_IW];
-    float w[iir_filter_SZ_W];
-} iir_filter_work_t;
-
-// Runtime API
-int iir_filter_init(iir_filter_arg_t* arg, iir_filter_res_t* res, iir_filter_work_t* work);
-int iir_filter_step(iir_filter_arg_t* arg, iir_filter_res_t* res, iir_filter_work_t* work);
-
-
-#ifdef __cplusplus
-}
-#endif
-
-#endif // IIR_FILTER_H
-```
-
 
 This has an identical API to the first version and will automatically initialize the correct filter coefficients, meaning we can tune the filter and re-deploy without changing any of the application code!
 
@@ -339,143 +209,25 @@ Similar usage patterns can be applied in a range of contexts; since the generate
 
 For example, here's a "cookbook recipe" for running a generated function in a timed loop on an Arduino.
 
-
-```python
+```{code-cell} python
+:tags: [remove-input]
 with open("iir.ino", "r") as f:
     c_code = f.read()
 
 display_text(c_code)
 ```
 
-
-```c
-#include <Arduino.h>
-#include <TimerOne.h>
-#include "iir_filter.h"
-
-// Sampling rate: 100 Hz
-const unsigned long SAMPLE_RATE_US = 10000;
-
-// Declare the input, output, and workspace structures
-iir_filter_arg_t arg;
-iir_filter_res_t res;
-iir_filter_work_t work;
-
-volatile bool ctrl_flag = false;
-int n = sizeof(arg.b) / sizeof(arg.b[0]) - 1;  // Filter order
-float y;  // Output, to be fed to actuator, control algorithm, etc.
-
-void controller_callback(void) {
-    arg.u = 1.0f;  // Or read from sensor, other algorithm output, etc.
-    iir_filter_step(&arg, &res, &work);
-    y = res.y_hist[0];  // Output, to be fed to actuator, control algorithm, etc.
-
-    // Copy output arrays back to inputs
-    for (int j = 0; j < n; j++) {
-        arg.u_prev[j] = res.u_hist[j];
-        arg.y_prev[j] = res.y_hist[j];
-    }
-    arg.u_prev[n] = res.u_hist[n];
-
-    ctrl_flag = false;
-}
-
-// Timer interrupt handler
-void timerInterrupt() {
-    ctrl_flag = true;
-}
-
-void setup(){
-    // Initialize the structs
-    iir_filter_init(&arg, &res, &work);
-
-    Serial.begin(9600);
-
-    // Initialize Timer1 for interrupts at 100 Hz
-    Timer1.initialize(SAMPLE_RATE_US);
-    Timer1.attachInterrupt(timerInterrupt);
-}
-
-void loop() {
-    // ...non-time-critical tasks
-    
-    if (ctrl_flag) controller_callback();
-}
-```
-
-
 Note that the "callback" function is identical to the previous snippet; the same auto-generated code can target everything from rapid prototyping platforms to production-grade embedded controllers to Unix clusters.
 
 For example, the same timed-loop behavior could be implemented on an STM32 with something like the following:
 
 
-```python
+```{code-cell} python
+:tags: [remove-input]
 with open("stm32_main.c", "r") as f:
     c_code = f.read()
 
 display_text(c_code)
-```
-
-
-```c
-#include <stdbool.h>
-#include "iir_filter.h"
-
-// ...
-
-/* USER CODE BEGIN PV */
-volatile bool ctrl_flag = false;
-
-// Declare the input, output, and workspace structures
-iir_filter_arg_t arg;
-iir_filter_res_t res;
-iir_filter_work_t work;
-/* USER CODE END PV */
-
-// ...
-
-int main(void)
-{
-    // ...
-
-    /* USER CODE BEGIN Init */
-    iir_filter_init(&arg, &res, &work);
-    /* USER CODE END Init */
-
-    // ...
-    
-    /* USER CODE BEGIN WHILE */
-    while (1)
-    {
-        /* USER CODE END WHILE */
-
-        /* USER CODE BEGIN 3 */
-        if (ctrl_flag) controller_callback();
-    }
-    /* USER CODE END 3 */
-}
-
-// ...
-
-/* USER CODE BEGIN 4 */
-void controller_callback(void) {
-    // Same implementation as above
-}
-
-void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
-    if (htim->Instance == TIM3) {  // Or whichever timer you're using
-        ctrl_flag = true;
-    }
-}
-/* USER CODE END 4 */
-
-// ...
-```
-
-
-
-```python
-cleanup()
 ```
 
 ## Summary
@@ -484,4 +236,9 @@ In this part of the hardware deployment tutorial, we covered the basic structure
 
 For this simple case, managing inputs, outputs, and state as individual scalars and arrays works fine.
 However, as functions grow in complexity, manually dealing with individual arrays quickly becomes difficult to maintain.
-In the final part of this series we will rewrite this same example using [structured data types](../../../trees.md) to autogenerate C `struct` types for hierarchical structured data.
+In the final part of this series we will rewrite this same example using [structured data types](../../trees.md) to autogenerate C `struct` types for hierarchical structured data.
+
+```{code-cell} python
+:tags: [remove-cell]
+cleanup()
+```

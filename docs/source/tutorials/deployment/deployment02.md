@@ -1,6 +1,17 @@
+---
+jupytext:
+  text_representation:
+    extension: .md
+    format_name: myst
+kernelspec:
+  display_name: Python 3
+  language: python
+  name: archimedes
+---
+
 # Characterizing the system
 
-In [Part 1](workflow01.md) of this series we described the physical system, including an idealized physics model:
+In [Part 1](deployment01.md) of this series we described the physical system, including an idealized physics model:
 
 ```{image} _static/dc_motor.png
 :class: only-light
@@ -24,20 +35,29 @@ Instead, we will use _parameter estimation_ to determine all the parameters at o
 For more background, see the [tutorial](../sysid/parameter-estimation.md) on parameter estimation in Archimedes.
 
 
-```python
+```{code-cell} python
+:tags: [hide-cell]
 # ruff: noqa: E741, N802, N803, N806, N815, N816
 import dataclasses
-import os
 import pickle
 
 import matplotlib.pyplot as plt
 import numpy as np
 
 import archimedes as arc
-from archimedes.docs.utils import extract_py_class, extract_py_function
+```
 
-THEME = os.environ.get("ARCHIMEDES_THEME", "dark")
-arc.theme.set_theme(THEME)
+```{code-cell} python
+:tags: [remove-cell]
+from archimedes.docs.utils import extract_py_class, extract_py_function
+```
+
+```{code-cell} python
+:tags: [remove-cell]
+from pathlib import Path
+
+plot_dir = Path.cwd() / "_plots"
+plot_dir.mkdir(exist_ok=True)
 ```
 
 ## Data collection
@@ -76,7 +96,8 @@ python serial_receive.py --save step_data.csv
 Once that's ready (you should see `"Waiting for experiment data..."`), go ahead and press the USER button to trigger the step response.  This will save the data in `data/` with the specified filename.
 
 
-```python
+```{code-cell} python
+:tags: [remove-output]
 step_data = np.loadtxt("data/step_data.csv", delimiter="\t", skiprows=1)
 
 fig, ax = plt.subplots(4, 1, figsize=(7, 6), sharex=True)
@@ -102,20 +123,44 @@ ax[-1].set_xlabel("Time [s]")
 plt.show()
 ```
 
+```{code-cell} python
+:tags: [remove-cell]
 
-    
+for theme in {"light", "dark"}:
+    arc.theme.set_theme(theme)
 
-```{image} workflow02_files/workflow02_3_0.png
+    fig, ax = plt.subplots(4, 1, figsize=(7, 6), sharex=True)
+
+    ax[0].plot(step_data[:, 0], step_data[:, 1])
+    ax[0].set_ylabel("PWM [0-1]")
+    ax[0].grid()
+
+    ax[1].plot(step_data[:, 0], step_data[:, 2])
+    ax[1].set_ylabel("Voltage [V]")
+    ax[1].grid()
+
+    ax[2].plot(step_data[:, 0], step_data[:, 3])
+    ax[2].set_ylabel("Current [A]")
+    ax[2].grid()
+
+    ax[3].plot(step_data[:, 0], step_data[:, 4])
+    ax[3].set_ylabel("Position [deg]")
+    ax[3].grid()
+
+    ax[-1].set_xlabel("Time [s]")
+
+    plt.savefig(plot_dir / f"deployment02_0_{theme}.png")
+    plt.close()
+```
+
+```{image} _plots/deployment02_0_light.png
 :class: only-light
 ```
 
-```{image} workflow02_files/workflow02_3_0_dark.png
+```{image} _plots/deployment02_0_dark.png
 :class: only-dark
 ```
     
-
-
-
 
 If you're following along with code and not building the physical system, this data can be downloaded from GitHub.
 
@@ -133,58 +178,20 @@ $$
 where energy conservation requires that $k_\tau = G k_\mathcal{E}$ for gear ratio $G$ (specified in the [motor datasheet](https://www.pololu.com/file/0J1829/pololu-25d-metal-gearmotors.pdf)).
 
 We'll be reusing the same code for the rest of this series, so for consistency we will use a common implementation in [`motor.py`](https://github.com/PineTreeLabs/archimedes/tree/main/docs/source/notebooks/workflow/motor.py) and extract relevant parts of the code.
-The model implementation follows the patterns described in the [structured data types](../../../trees.md) and [hierarchical design](../modular-design.md) documentation pages - defining structured classes for parameters, state, etc.
+The model implementation follows the patterns described in the [structured data types](../../trees.md) and [hierarchical design](../../modular-design.md) documentation pages - defining structured classes for parameters, state, etc.
 
 For a relatively simple system like a DC motor, this may seem like overkill, but it pays dividends for more complex systems that can be naturally represented with hierarchical data structures.
 As we will see, it also leads to more readable auto-generated C code.
 
 
-```python
+```{code-cell} python
+:tags: [remove-input]
 from motor import MotorParams, motor_obs, motor_ode
 
 extract_py_class("motor.py", "MotorParams")
 extract_py_function("motor.py", "motor_ode")
 extract_py_function("motor.py", "motor_obs")
 ```
-
-
-```python
-@struct
-class MotorParams:
-    J: float  # Effective inertia
-    b: float  # Viscous friction
-    L: float  # Motor inductance [H]
-    R: float  # Motor resistance [Ohm]
-    kt: float  # Current -> torque scale [N-m/A]
-```
-
-
-
-```python
-def motor_ode(
-    t: float, x: np.ndarray, u: np.ndarray, params: MotorParams
-) -> np.ndarray:
-    i, _pos, vel = x
-    (V,) = u
-
-    ke = params.kt / GEAR_RATIO  # Velocity -> Back EMF scale
-
-    i_t = (1 / params.L) * (V - (i * params.R) - ke * vel)
-    vel_t = (1 / params.J) * (params.kt * i - params.b * vel)
-
-    return np.hstack([i_t, vel, vel_t])
-```
-
-
-
-```python
-def motor_obs(
-    t: float, x: np.ndarray, u: np.ndarray, params: MotorParams
-) -> np.ndarray:
-    # Measure absolute current and position
-    return np.hstack([abs(x[0]), x[1]])
-```
-
 
 Looking ahead to parameter estimation, we'll start with a rough guess of the model parameters and simulate the model to check for obvious numerical problems.
 We could simulate this as an ODE using [`arc.odeint`](#archimedes.odeint), but we'll discretize with a fixed-step scheme since we need the discrete-time state-space model for parameter estimation anyway.
@@ -193,7 +200,7 @@ Since the time steps are very small and the system is not especially stiff, we c
 This doesn't matter much for running "offline" on a computer, but since real-time simulation performance is critical for HIL testing it's a good idea to make sure we won't run into issues with stability or accuracy.
 
 
-```python
+```{code-cell} python
 # Create I/O data: current and position response to voltage input
 data = arc.sysid.Timeseries(
     ts=step_data[:, 0],
@@ -233,7 +240,7 @@ def simulate(x0, params: MotorParams):
 ```
 
 
-```python
+```{code-cell} python
 # Initial guess for motor parameters
 params_guess = MotorParams(
     J=0.1,
@@ -244,7 +251,10 @@ params_guess = MotorParams(
 )
 
 x0 = np.zeros(3)  # Initial state: zero current, velocity, position
+```
 
+```{code-cell} python
+:tags: [hide-cell, remove-output]
 xs_pred, ys_pred = simulate(x0, params_guess)
 
 fig, ax = plt.subplots(2, 1, figsize=(7, 3), sharex=True)
@@ -261,27 +271,39 @@ ax[1].legend()
 ax[-1].set_xlabel("Time [s]")
 ```
 
+```{code-cell} python
+:tags: [remove-cell]
 
+for theme in {"light", "dark"}:
+    arc.theme.set_theme(theme)
 
+    fig, ax = plt.subplots(2, 1, figsize=(7, 3), sharex=True)
+    ax[0].plot(data.ts, data.ys[0], label="Data")
+    ax[0].plot(data.ts, ys_pred[0], label="Model")
+    ax[0].set_ylabel("Current [A]")
+    ax[0].grid()
 
-    Text(0.5, 0, 'Time [s]')
+    ax[1].plot(data.ts, data.ys[1], label="Data")
+    ax[1].plot(data.ts, ys_pred[1], label="Model")
+    ax[1].set_ylabel("Pos [rad]")
+    ax[1].grid()
+    ax[1].legend()
+    ax[-1].set_xlabel("Time [s]")
 
+    plt.savefig(plot_dir / f"deployment02_1_{theme}.png")
+    plt.close()
+```
 
-
-
-    
-
-```{image} workflow02_files/workflow02_9_1.png
+```{image} _plots/deployment02_1_light.png
 :class: only-light
 ```
 
-```{image} workflow02_files/workflow02_9_1_dark.png
+```{image} _plots/deployment02_1_dark.png
 :class: only-dark
 ```
-    
 
 
-This is not an especially good fit to the data, but there's also nothing particularly concerning in terms of numerical issues.
+This is not a good fit to the data, but there's also nothing particularly concerning in terms of numerical issues.
 Let's move on to fitting the model to the data.
 
 ## Parameter estimation
@@ -302,7 +324,7 @@ $$
 We don't really expect much environmental noise in the velocity and position dynamics, but there may be some electrical noise, so it's reasonable to use a small value for the current dynamics.
 
 
-```python
+```{code-cell} python
 # Noise estimates
 noise_i = 0.5 * np.var(np.diff(data.ys[0]))  # Estimated current noise
 noise_p = 0.5 * np.var(np.diff(data.ys[1]))  # Estimated position noise
@@ -317,50 +339,27 @@ ekf = arc.observers.ExtendedKalmanFilter(motor_dyn, motor_obs, Q, R)
 Now we have everything needed to run the parameter estimation:
 
 
-```python
+```{code-cell} python
+:tags: [hide-output]
 result = arc.sysid.pem(ekf, data, params_guess, x0=x0)
 params_opt = result.p
 params_opt
 ```
 
-    Iteration   Total nfev       Cost       Cost reduction   Step norm    Optimality 
-        0           2         1.2262e+01                                   1.25e+03  
-
-
-        1           3         6.9485e+00       5.31e+00       7.45e+00     5.98e+00  
-
-
-        2           6         6.6308e+00       3.18e-01       6.42e+00     2.02e+01  
-
-
-        3           7         6.5155e+00       1.15e-01       2.09e+00     1.87e+01  
-
-
-        4           8         6.5061e+00       9.39e-03       1.58e-01     3.45e-01  
-
-
-        5           9         6.5061e+00       3.45e-06       1.85e-02     1.89e-02  
-    Both actual and predicted relative reductions in the sum of squares are at most ftol
-
-
-
-
-
-    MotorParams(J=array(0.08910903), b=array(0.81924098), L=array(0.00314336), R=array(2.38683236), kt=array(25.48688943))
-
-
-
-Let's see how it compares to the data:
-
-
-```python
+```{code-cell} python
 # Time constants
 tau_e = params_opt.L / params_opt.R
 tau_m = params_opt.J / (params_opt.b)
 
 print(f"tau_e = {tau_e * 1e3:.2f} ms")
 print(f"tau_m = {tau_m * 1e3:.2f} ms")
+```
 
+Let's see how it compares to the data:
+
+
+```python
+:tags: [hide-cell, remove-output]
 xs_pred, ys_pred = simulate(x0, params_opt)
 
 fig, ax = plt.subplots(2, 1, figsize=(7, 3), sharex=True)
@@ -377,28 +376,36 @@ ax[1].legend()
 ax[-1].set_xlabel("Time [s]")
 ```
 
-    tau_e = 1.32 ms
-    tau_m = 108.77 ms
+```{code-cell} python
+:tags: [remove-cell]
 
+for theme in {"light", "dark"}:
+    arc.theme.set_theme(theme)
 
+    fig, ax = plt.subplots(2, 1, figsize=(7, 3), sharex=True)
+    ax[0].plot(data.ts, data.ys[0], label="Data")
+    ax[0].plot(data.ts, ys_pred[0], label="Model")
+    ax[0].set_ylabel("Current [A]")
+    ax[0].grid()
 
+    ax[1].plot(data.ts, data.ys[1], label="Data")
+    ax[1].plot(data.ts, ys_pred[1], label="Model")
+    ax[1].set_ylabel("Pos [rad]")
+    ax[1].grid()
+    ax[1].legend()
+    ax[-1].set_xlabel("Time [s]")
 
+    plt.savefig(plot_dir / f"deployment02_2_{theme}.png")
+    plt.close()
+```
 
-    Text(0.5, 0, 'Time [s]')
-
-
-
-
-    
-
-```{image} workflow02_files/workflow02_16_2.png
+```{image} _plots/deployment02_2_light.png
 :class: only-light
 ```
 
-```{image} workflow02_files/workflow02_16_2_dark.png
+```{image} _plots/deployment02_2_dark.png
 :class: only-dark
 ```
-    
 
 
 Not bad!
@@ -406,7 +413,8 @@ Not bad!
 We'll use these parameters in two places: for controller design, and in a calibrated real-time model for HIL testing.
 
 
-```python
+```{code-cell} python
+:tags: [hide-cell]
 with open("data/motor_params.pkl", "wb") as f:
     pickle.dump(dataclasses.asdict(params_opt), f)
 ```
@@ -423,7 +431,8 @@ In practice, the "non-ideal" effects that don't show up in an oversimplified tes
 As a first-order correction we can at least use the "ramp" response data to explore the steady-state relationship between PWM duty cycle, supply voltage, and current.
 
 
-```python
+```{code-cell} python
+:tags: [hide-cell, remove-output]
 ramp_data = np.loadtxt("data/ramp_data.csv", delimiter="\t", skiprows=1)
 
 # Unwrap the position data
@@ -455,17 +464,44 @@ plt.show()
 ```
 
 
-    
+```{code-cell} python
+:tags: [remove-cell]
 
-```{image} workflow02_files/workflow02_20_0.png
+for theme in {"light", "dark"}:
+    arc.theme.set_theme(theme)
+
+    fig, ax = plt.subplots(4, 1, figsize=(7, 6), sharex=True)
+
+    ax[0].plot(ramp_data[:, 0], ramp_data[:, 1])
+    ax[0].set_ylabel("PWM [0-1]")
+    ax[0].grid()
+
+    ax[1].plot(ramp_data[:, 0], ramp_data[:, 2])
+    ax[1].set_ylabel("Voltage [V]")
+    ax[1].grid()
+
+    ax[2].plot(ramp_data[:, 0], ramp_data[:, 3])
+    ax[2].set_ylabel("Current [A]")
+    ax[2].grid()
+
+    ax[3].plot(ramp_data[:, 0], np.gradient(ramp_data[:, 4]))
+    ax[3].set_ylabel("Velocity [rad/s]")
+    ax[3].grid()
+    ax[3].set_ylim([-0.05, 0.25])
+
+    ax[-1].set_xlabel("Time [s]")
+
+    plt.savefig(plot_dir / f"deployment02_3_{theme}.png")
+    plt.close()
+```
+
+```{image} _plots/deployment02_3_light.png
 :class: only-light
 ```
 
-```{image} workflow02_files/workflow02_20_0_dark.png
+```{image} _plots/deployment02_3_dark.png
 :class: only-dark
 ```
-    
-
 
 We can already see some interesting effects in this data that indicate some departures from the ideal model.
 At low PWM duty cycle values (< 20\%) the current grows rapidly in response to the inputs, but the output shaft doesn't move.
@@ -473,7 +509,8 @@ This is evidence of static friction in the system; we need to achieve some thres
 The hysteresis at low duty cycle values (especially with velocity) confirms this:
 
 
-```python
+```{code-cell} python
+:tags: [hide-cell, remove-output]
 # Voltage and current vs duty cycle
 pwm_duty = np.unique(ramp_data[:, 1])
 pwm_duty = np.concatenate((pwm_duty[1:], np.flip(pwm_duty[1:-1])))
@@ -529,20 +566,55 @@ plt.show()
 ```
 
 
-    
+```{code-cell} python
+:tags: [remove-cell]
 
-```{image} workflow02_files/workflow02_22_0.png
+for theme in {"light", "dark"}:
+    arc.theme.set_theme(theme)
+
+    fig, ax = plt.subplots(1, 3, figsize=(10, 2))
+    (l,) = ax[0].plot(100 * pwm_up, v_avg[:n_split], ".", label="Ramp up")
+    ax[0].plot(100 * pwm_up, v_avg[:n_split], "-", c=l.get_color())
+    (l,) = ax[0].plot(100 * pwm_down, v_avg[n_split:], ".", label="Ramp down")
+    ax[0].plot(100 * pwm_down, v_avg[n_split:], "-", c=l.get_color())
+    ax[0].set_xlabel("PWM duty [%]")
+    ax[0].set_ylabel("Motor voltage [V]")
+    ax[0].grid()
+    ax[0].legend()
+
+    (l,) = ax[1].plot(100 * pwm_up, i_avg[:n_split], ".")
+    ax[1].plot(100 * pwm_up, i_avg[:n_split], "-", c=l.get_color())
+    (l,) = ax[1].plot(100 * pwm_down, i_avg[n_split:], ".")
+    ax[1].plot(100 * pwm_down, i_avg[n_split:], "-", c=l.get_color())
+    ax[1].set_xlabel("PWM duty [%]")
+    ax[1].set_ylabel("Driver current [A]")
+    ax[1].grid()
+
+    (l,) = ax[2].plot(100 * pwm_up, w_avg[:n_split], ".")
+    ax[2].plot(100 * pwm_up, w_avg[:n_split], "-", c=l.get_color())
+    (l,) = ax[2].plot(100 * pwm_down, w_avg[n_split:], ".")
+    ax[2].plot(100 * pwm_down, w_avg[n_split:], "-", c=l.get_color())
+    ax[2].set_xlabel("PWM duty [%]")
+    ax[2].set_ylabel("Angular velocity [rad/s]")
+    ax[2].grid()
+
+    plt.subplots_adjust(wspace=0.4)
+
+    plt.savefig(plot_dir / f"deployment02_4_{theme}.png")
+    plt.close()
+```
+
+```{image} _plots/deployment02_4_light.png
 :class: only-light
 ```
 
-```{image} workflow02_files/workflow02_22_0_dark.png
+```{image} _plots/deployment02_4_dark.png
 :class: only-dark
 ```
-    
 
 
 Aside from the hysteresis at small values of the duty cycle, the main non-ideal effect observed here is a saturation of supply voltage at large duty cycle values.
 We might expect to see more non-ideal effects with "chirp" tests or with direction reversals, which would test mechanical backlash and higher-frequency electrical dynamics.
 
 However, at low frequencies the behavior remains reasonably linear over a fairly wide range of values, suggesting that the idealized model is a good starting point for controller design.
-In [Part 3](workflow03.md) we will design and evaluate a simple position controller using this calibrated dynamics model.
+In [Part 3](deployment03.md) we will design and evaluate a simple position controller using this calibrated dynamics model.

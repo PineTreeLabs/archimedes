@@ -1,3 +1,14 @@
+---
+jupytext:
+  text_representation:
+    extension: .md
+    format_name: myst
+kernelspec:
+  display_name: Python 3
+  language: python
+  name: archimedes
+---
+
 # Part 2: Implementation in Archimedes
 
 Now that we have a set of equations defining our basic multirotor vehicle model, we can start thinking about implementation.
@@ -80,7 +91,7 @@ class FlightVehicle:
         # Same as above, except now we can use `self.m`, `self.J_B`, etc
 ```
 
-While we will use this callable pattern for other components in our model, for consistency with [recommended design patterns in Archimedes](../modular-design), we will actually use the name `dynamics` to implement the ODE right-hand side calculation.
+While we will use this callable pattern for other components in our model, for consistency with [recommended design patterns in Archimedes](../../../modular-design), we will actually use the name `dynamics` to implement the ODE right-hand side calculation.
 
 At first, it doesn't look like we've gained much with this approach.
 Along with external utility functions `dcm` and `euler_kinematics`, we still rely on separately defined functions to compute the inputs and net forces.
@@ -88,6 +99,7 @@ We could amend the class definition by making `net_forces` a method of this clas
 Since the 6-dof dynamics are generic, but the multirotor forces are much more specific to this particular flight vehicle, it makes sense to define this method as _abstract_:
 
 ```python
+:tags: [skip-execution]
 import abc
 import numpy as np
 from archimedes import struct, module
@@ -467,7 +479,7 @@ For more details on pure functions and structs, see:
 
 * [Under the Hood](../../../under-the-hood)
 * [Structured Data Types](../../../trees)
-* [Hierarchical Design Patterns](../modular-design)
+* [Hierarchical Design Patterns](../../../modular-design)
 * [Quirks and Gotchas](../../../gotchas)
 
 

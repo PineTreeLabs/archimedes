@@ -1,14 +1,23 @@
+---
+jupytext:
+  text_representation:
+    extension: .md
+    format_name: myst
+kernelspec:
+  display_name: Python 3
+  language: python
+  name: archimedes
+---
+
 # Part 4: Model analysis
 
 Besides accelerating simulations, Archimedes also makes it easy to do more advanced analyses like identifying trim conditions and performing stability analysis.
 
 First let's recreate the same model we used for Part 3:
 
-
-
-```python
+```{code-cell} python
+:tags: [hide-cell]
 # ruff: noqa: N802, N803, N806, N815, N816
-import os
 
 import matplotlib.pyplot as plt
 import multirotor
@@ -16,15 +25,19 @@ import numpy as np
 from scipy.optimize import root
 
 import archimedes as arc
+```
 
-THEME = os.environ.get("ARCHIMEDES_THEME", "dark")
-arc.theme.set_theme(THEME)
+```{code-cell} python
+:tags: [remove-cell]
+from pathlib import Path
+
+plot_dir = Path.cwd() / "_plots"
+plot_dir.mkdir(exist_ok=True)
 
 np.set_printoptions(precision=3, suppress=True)
 ```
 
-
-```python
+```{code-cell} python
 m = 2.0  # Body mass [kg]
 R = 0.15  # Rotor radius (also boom length) [m]
 H = 0.15  # Body height [m]
@@ -98,7 +111,7 @@ For a steady operating point we want to require that the six acceleration quanti
 Putting it all together, we can define a residual function as follows:
 
 
-```python
+```{code-cell} python
 # Target forward velocity in the inertial frame
 v_N = np.array([10.0, 0.0, 0.0])
 
@@ -124,19 +137,11 @@ p0 = np.array([0.0, 0.0, u0, u0, u0, u0])
 residual(p0)
 ```
 
-
-
-
-    array([-1.103,  0.   ,  9.81 ,  0.   , -0.   ,  0.   ])
-
-
-
-
 This gives us a nonlinear algebraic system with six equations in six unknowns, which can be efficiently solved using a Newton-Raphson method.
 In Archimedes, this is accessible with the `root` function, which has a similar interface to `scipy.optimize.root` except that it uses (sparse) automatic differentiation to efficiently evaluate the Jacobian matrices.
 
 
-```python
+```{code-cell} python
 p_trim = arc.root(residual, p0)
 
 phi_trim = p_trim[0]
@@ -155,27 +160,16 @@ print(f"v_B: {v_B_trim}")
 print(f"u: {u_trim}")
 ```
 
-    roll: 0.00 deg
-    pitch: -6.41 deg
-    v_B: [ 9.937  0.    -1.117]
-    u: [702.558 702.558 702.558 702.558]
-
-
 Alternatively, the SciPy root-finding solver can still be employed directly, with the autodiff Jacobian constructed using the `arc.jac` function transformation, giving access to alternative algorithms like those in MINPACK:
 
 
-```python
+```{code-cell} python
 sol = root(residual, p0, jac=arc.jac(residual), method="lm")
 
 print(f"Roll: {np.rad2deg(sol.x[0]):.2f} deg")
 print(f"Pitch: {np.rad2deg(sol.x[1]):.2f} deg")
 print(f"u: {sol.x[2:]}")
 ```
-
-    Roll: 0.00 deg
-    Pitch: -6.41 deg
-    u: [702.558 702.558 702.558 702.558]
-
 
 ## Linear stability analysis
 
@@ -191,7 +185,7 @@ The other states are assumed to be in their trim values.
 We can analyze the stability of the longitudinal system by defining a function that maps from these degrees of freedom to their time derivatives, and then using `arc.jac` to compute the Jacobian matrices about the trim point.
 
 
-```python
+```{code-cell} python
 def longitudinal_dofs(x):
     return np.hstack(
         [
@@ -227,19 +221,6 @@ print(f"A_lon:\n{A_lon}")
 print(f"\nB_lon:\n{B_lon}")
 ```
 
-    A_lon:
-    [[ 0.     0.     0.     1.   ]
-     [-9.749 -0.219  0.012  1.117]
-     [ 1.096  0.012 -0.112  9.937]
-     [ 0.     0.     0.     0.   ]]
-    
-    B_lon:
-    [[ 0.     0.     0.     0.   ]
-     [ 0.     0.     0.     0.   ]
-     [-0.007 -0.007 -0.007 -0.007]
-     [ 0.199 -0.199 -0.199  0.199]]
-
-
 This gives us a linearized state-space system in the form
 
 $$
@@ -267,7 +248,8 @@ $$
 Alternatively, this can be analyzed easily by using the [Python Control Systems Library](https://python-control.readthedocs.io/):
 
 
-```python
+```{code-cell} python
+:tags: [remove-output]
 import control
 
 C_hat = np.eye(4)
@@ -280,17 +262,24 @@ control.bode_plot(lti_sys, ax=ax)
 plt.show()
 ```
 
+```{code-cell} python
+:tags: [remove-cell]
 
-    
+for theme in {"light", "dark"}:
+    arc.theme.set_theme(theme)
+    fig, ax = plt.subplots(4, 2, figsize=(10, 6), sharex=True)
+    control.bode_plot(lti_sys, ax=ax)
+    plt.savefig(plot_dir / f"multirotor04_0_{theme}.png")
+    plt.close()
+```
 
-```{image} multirotor04_files/multirotor04_12_0.png
+```{image} _plots/multirotor04_0_light.png
 :class: only-light
 ```
 
-```{image} multirotor04_files/multirotor04_12_0_dark.png
+```{image} _plots/multirotor04_0_dark.png
 :class: only-dark
 ```
-    
 
 
 The lateral-directional dynamics include the remaining dynamical degrees of freedom relevant for perturbations to the trim condition:
@@ -301,7 +290,7 @@ The lateral-directional dynamics include the remaining dynamical degrees of free
 * Yaw rate: $r$
 
 
-```python
+```{code-cell} python
 def lateral_dofs(x):
     return np.hstack(
         [
@@ -335,22 +324,4 @@ B_lat = arc.jac(f_lat, 1)(x_lat_trim, u_trim)
 
 print(f"A_lat:\n{A_lat}")
 print(f"\nB_lat:\n{B_lat}")
-```
-
-    A_lat:
-    [[ 0.     0.     1.    -0.112]
-     [ 9.749 -0.11  -1.117 -9.937]
-     [ 0.     0.     0.     0.   ]
-     [ 0.     0.     0.     0.   ]]
-    
-    B_lat:
-    [[ 0.     0.     0.     0.   ]
-     [ 0.     0.     0.     0.   ]
-     [-0.199 -0.199  0.199  0.199]
-     [ 0.006 -0.006  0.006 -0.006]]
-
-
-
-```python
-
 ```
