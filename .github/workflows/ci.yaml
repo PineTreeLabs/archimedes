@@ -39,15 +39,10 @@ jobs:
     - name: MyPy type checking
       run: uv run mypy src/
 
-    - name: Test notebooks
-      run: |
-        uv run pytest --nbmake docs/source/notebooks/**/*.ipynb
-
     - name: Lint with ruff
       run: |
         uv run ruff check .
         uv run ruff format --check .
-
 
   licensing-check:
     runs-on: ubuntu-latest
@@ -78,6 +73,6 @@ jobs:
     - name: Build documentation
       run: |
         cd docs
-        make nbconvert
         make html
-  
+        uv run ruff check .jupyter_cache
+        uv run ruff format --check .jupyter_cache

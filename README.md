@@ -167,17 +167,11 @@ Alternatively, generate a detailed report with
 uv run pytest --cov=archimedes --cov-report=html
 ```
 
-Check that the notebooks run with
-
-```bash
-uv run pytest --nbmake docs/source/notebooks/**/*.ipynb
-```
-
 Linting and formatting is done with [ruff](https://docs.astral.sh/ruff/):
 
 ```bash
-uv run ruff format src test docs
-uv run ruff check --fix src test docs
+uv run ruff format src test examples
+uv run ruff check --fix src test examples
 ```
 
 We also have a CI test for static type checking with [mypy](https://mypy-lang.org/):
@@ -190,10 +184,21 @@ Finally, to build the documentation locally, run
 
 ```bash
 cd docs
-make clean && make nbconvert && make html
+make clean && make html
 ```
 
-This will scrape API documentation from the docstrings, convert Jupyter notebooks to Markdown files, and then create the HTML website from the outputs.
+This will scrape API documentation from the docstrings, parse and execute MyST Markdown files, and then create the HTML website from the outputs.
+Any tests embedded in the MyST files will also run as part of this workflow.
+
+The outputs will be cached in `.jupyter_cache/` and can be checked for linting with
+
+```bash
+uv run ruff check .jupyter_cache
+uv run ruff format --check .jupyter_cache
+```
+
+Unfortunately, because the MyST files themselves are neither Jupyter notebooks nor standard Python code, these cached notebooks can't directly be auto-fixed.
+Instead, the source `.md` files have to be edited following the feedback from the linter.
 
 ## Security scanning
 
