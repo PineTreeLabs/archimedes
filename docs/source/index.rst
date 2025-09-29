@@ -56,8 +56,8 @@ Documentation
 
    under-the-hood
    trees
-   generated/notebooks/control-flow
-   generated/notebooks/modular-design
+   control-flow
+   modular-design
 
 .. toctree::
    :maxdepth: 1

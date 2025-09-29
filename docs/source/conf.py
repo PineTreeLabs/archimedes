@@ -14,7 +14,8 @@ author = "Jared Callaham"
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
 
 extensions = [
-    "myst_parser",
+    # "myst_parser",
+    "myst_nb",
     "sphinx.ext.napoleon",
     "sphinx.ext.autodoc",
     "sphinx.ext.autosummary",
@@ -43,6 +44,12 @@ myst_enable_extensions = [
     "substitution",
     "tasklist",
 ]
+
+nb_execution_mode = "auto"
+nb_execution_timeout = 60
+nb_kernel_rgx_aliases = {
+    ".*": "archimedes"  # Use the registered Jupyter kernel name
+}
 
 autosummary_generate = True
 autosummary_imported_members = True

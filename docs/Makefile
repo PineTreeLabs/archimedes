@@ -21,6 +21,7 @@ help:
 
 clean:
 	@rm -rf build source/generated/*
+	@rm -rf source/_plots/*
 
 nbconvert:
 	@chmod +x convert_notebooks.sh
