@@ -21,15 +21,8 @@ help:
 
 clean:
 	@rm -rf build source/generated/*
+	@rm -rf .jupyter_cache
 	@rm -rf source/_plots/*
-
-nbconvert:
-	@chmod +x convert_notebooks.sh
-	@./convert_notebooks.sh light source/generated/notebooks
-	@./convert_notebooks.sh dark source/generated/notebooks_dark
-
-	@python nbconvert_post.py
-	@rm -r source/generated/notebooks_dark
 
 apidoc:
 	@sphinx-apidoc -f -o source ../src/archimedes ../src/archimedes/experimental/*

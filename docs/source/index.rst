@@ -63,10 +63,10 @@ Documentation
    :maxdepth: 1
    :caption: Applications
 
-   generated/notebooks/codegen/codegen00
-   generated/notebooks/sysid/parameter-estimation
-   generated/notebooks/workflow/workflow00
-   generated/notebooks/multirotor/multirotor00
+   tutorials/sysid/parameter-estimation
+   tutorials/codegen/codegen00
+   tutorials/deployment/deployment00
+   tutorials/multirotor/multirotor00
 
 .. toctree::
    :maxdepth: 1

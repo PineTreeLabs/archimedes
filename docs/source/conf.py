@@ -45,11 +45,18 @@ myst_enable_extensions = [
     "tasklist",
 ]
 
-nb_execution_mode = "auto"
-nb_execution_timeout = 60
 nb_kernel_rgx_aliases = {
     ".*": "archimedes"  # Use the registered Jupyter kernel name
 }
+nb_execution_mode = "cache"
+nb_execution_timeout = 60
+nb_execution_cache_path = ".jupyter_cache"
+nb_execution_allow_errors = False  # Fail build on exceptions
+nb_execution_raise_on_error = True  # Raise immediately on error
+nb_execution_excludepatterns = [
+    "experimental/*",  # Skip WIP content
+    "benchmarks/*",    # Skip long-running benchmarks
+]
 
 autosummary_generate = True
 autosummary_imported_members = True

@@ -17,7 +17,7 @@ However, the recommendations in this guide are strictly suggestions; you can des
 
 ## Core Concepts
 
-The basic concepts of structured data types and tree operations are covered in the ["Structured Data Types"](../../trees.md) documentation page.
+The basic concepts of structured data types and tree operations are covered in the ["Structured Data Types"](trees.md) documentation page.
 Here we'll build on these concepts to see how they can be used for intuitive and scalable design patterns.
 
 ### Trees for structured states
@@ -47,8 +47,8 @@ Here's a basic example of using these patterns to creating a modular dynamical s
 
 ```{code-cell} python
 :tags: [hide-cell]
-import numpy as np
 import matplotlib.pyplot as plt
+import numpy as np
 
 import archimedes as arc
 from archimedes import struct
@@ -57,7 +57,6 @@ from archimedes import struct
 ```{code-cell} python
 :tags: [remove-cell]
 from pathlib import Path
-import os
 
 plot_dir = Path.cwd() / "_plots"
 plot_dir.mkdir(exist_ok=True)
@@ -239,6 +238,8 @@ sol = arc.vmap(state_unravel, in_axes=1)(sol_flat)
 
 ```{code-cell} python
 :tags: [remove-output]
+# Plot the results
+
 plt.figure(figsize=(7, 2))
 plt.plot(t_eval, sol.osc1.x, label="Oscillator 1")
 plt.plot(t_eval, sol.osc2.x, label="Oscillator 2")
@@ -253,8 +254,6 @@ plt.show()
 ```{code-cell} python
 :tags: [remove-cell]
 
-# Plot the results
-
 for theme in {"light", "dark"}:
     arc.theme.set_theme(theme)
     plt.figure(figsize=(7, 2))
@@ -265,7 +264,7 @@ for theme in {"light", "dark"}:
     plt.title("Coupled Oscillators")
     plt.legend()
     plt.grid(True)
-    plt.savefig(plot_dir / f"modular_design_0_{theme}.png", dpi=150, bbox_inches='tight')
+    plt.savefig(plot_dir / f"modular_design_0_{theme}.png")
     plt.close()
 ```
 
