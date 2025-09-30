@@ -83,9 +83,9 @@ Currently, Archimedes supports C code generation via CasADi's codegen engine.
 CasADi generates self-contained, deterministic low-level C implementations, and Archimedes layers on a predictable API that maps Python data structures to their C equivalents.
 The result is portable, standalone C code generated easily from Python.
 
-For more details, see the [codegen tutorial series](generated/notebooks/codegen/codegen00.md).
+For more details, see the [codegen tutorial series](tutorials/codegen/codegen00.md).
 
-We also have a [proof-of-concept workflow](generated/notebooks/workflow/workflow00.md) incorporating a DIY hardware-in-the-loop (HIL) testing setup, with expanded capabilities outlined below.
+We also have a [proof-of-concept deployment workflow](tutorials/deployment/deployment00.md) incorporating a DIY hardware-in-the-loop (HIL) testing setup, with expanded capabilities outlined below.
 
 **Near-term:**
 - **Production HIL Testing**: Complete framework for automated hardware validation

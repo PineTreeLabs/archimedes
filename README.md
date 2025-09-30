@@ -98,14 +98,14 @@ y_type = np.zeros((2,), dtype=float)
 arc.codegen(f, (x_type, y_type), return_names=("z", ))
 ```
 
-For more details, see the tutorial on [C code generation](https://pinetreelabs.github.io/archimedes/notebooks/codegen/codegen00.html)
+For more details, see the tutorial on [C code generation](https://pinetreelabs.github.io/archimedes/tutorials/codegen/codegen00.html)
 
 ### Extended examples
 
-- [Multirotor vehicle dynamics](https://pinetreelabs.github.io/archimedes/notebooks/multirotor/multirotor00.html)
-- [C code generation](https://pinetreelabs.github.io/archimedes/notebooks/codegen/codegen00.html)
-- [Nonlinear system identification](https://pinetreelabs.github.io/archimedes/generated/notebooks/sysid/parameter-estimation.html)
-- [Hardware development workflow](https://pinetreelabs.github.io/archimedes/notebooks/workflow/workflow00.html)
+- [Multirotor vehicle dynamics](https://pinetreelabs.github.io/archimedes/tutorials/multirotor/multirotor00.html)
+- [C code generation](https://pinetreelabs.github.io/archimedes/tutorials/codegen/codegen00.html)
+- [Nonlinear system identification](https://pinetreelabs.github.io/archimedes/tutorials/sysid/parameter-estimation.html)
+- [Hardware development workflow](https://pinetreelabs.github.io/archimedes/tutorials/deployment/deployment00.html)
 <!-- - [Pressure-fed rocket engine](examples/draco/draco-model.ipynb) -->
 <!-- - [Adaptive optimal control with pseudospectral collocation](examples/coco/) -->
 <!-- - [Subsonic F-16 benchmark](examples/f16/f16_plant.py) (Work in progress) -->
@@ -167,17 +167,11 @@ Alternatively, generate a detailed report with
 uv run pytest --cov=archimedes --cov-report=html
 ```
 
-Check that the notebooks run with
-
-```bash
-uv run pytest --nbmake docs/source/notebooks/**/*.ipynb
-```
-
 Linting and formatting is done with [ruff](https://docs.astral.sh/ruff/):
 
 ```bash
-uv run ruff format src test docs
-uv run ruff check --fix src test docs
+uv run ruff format src test examples
+uv run ruff check --fix src test examples
 ```
 
 We also have a CI test for static type checking with [mypy](https://mypy-lang.org/):
@@ -190,10 +184,21 @@ Finally, to build the documentation locally, run
 
 ```bash
 cd docs
-make clean && make nbconvert && make html
+make clean && make html
 ```
 
-This will scrape API documentation from the docstrings, convert Jupyter notebooks to Markdown files, and then create the HTML website from the outputs.
+This will scrape API documentation from the docstrings, parse and execute MyST Markdown files, and then create the HTML website from the outputs.
+Any tests embedded in the MyST files will also run as part of this workflow.
+
+The outputs will be cached in `.jupyter_cache/` and can be checked for linting with
+
+```bash
+uv run ruff check .jupyter_cache
+uv run ruff format --diff .jupyter_cache
+```
+
+Unfortunately, because the MyST files themselves are neither Jupyter notebooks nor standard Python code, these cached notebooks can't directly be auto-fixed.
+Instead, the source `.md` files have to be edited following the feedback from the linter.
 
 ## Security scanning
 

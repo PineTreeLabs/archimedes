@@ -134,3 +134,13 @@ img[data-theme="light"] {
   [data-theme="dark"] .dark-theme-image {
     display: block;
   }
+
+/* Notebook cell styling */
+.cell_input {
+    border-left: 2px solid #2ecc71 !important;  /* Thinner bar */
+}
+
+/* Different color for dark mode */
+html[data-theme="dark"] .cell_input {
+    border-left-color: #27ae60;  /* Darker green for dark mode */
+}

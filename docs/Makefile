@@ -21,14 +21,11 @@ help:
 
 clean:
 	@rm -rf build source/generated/*
-
-nbconvert:
-	@chmod +x convert_notebooks.sh
-	@./convert_notebooks.sh light source/generated/notebooks
-	@./convert_notebooks.sh dark source/generated/notebooks_dark
-
-	@python nbconvert_post.py
-	@rm -r source/generated/notebooks_dark
+	@rm -rf .jupyter_cache
+	@find source/ -type d -name "_plots" -print0 | while IFS= read -r -d '' dir; do \
+		echo "Cleaning $$dir"; \
+		rm -rf "$$dir"/* "$$dir"/.[^.]* "$$dir"/..?* 2>/dev/null || true; \
+	done
 
 apidoc:
 	@sphinx-apidoc -f -o source ../src/archimedes ../src/archimedes/experimental/*

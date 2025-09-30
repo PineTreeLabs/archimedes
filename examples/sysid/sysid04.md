@@ -67,7 +67,7 @@ By working through three increasingly complex examples, we've seen how to use Ar
 The combination of hierarchical PyTree modeling, automatic differentiation, and familiar NumPy syntax provides a flexible and powerful foundation for system identification.
 
 The identified models are also immediately compatible with the rest of the Archimedes ecosystem, meaning that you can use them for trajectory optimization, sensitivity analysis, and more.
-You can even build up an integrated workflow for system identification → controller design → [hardware deployment](../../notebooks/codegen/codegen00.md) that will take you from data to deployment all from the comfort of Python.
+You can even build up an integrated workflow for system identification → controller design → [hardware deployment](../../tutorials/codegen/codegen00.md) that will take you from data to deployment all from the comfort of Python.
 
 ### Where to go from here
 
@@ -75,7 +75,7 @@ The best way to continue learning is by working through the system identificatio
 For some widely used benchmark data sets to get started, see [Nonlinear Benchmarks](https://www.nonlinearbenchmark.org) and the [DaISy](https://homes.esat.kuleuven.be/~smc/daisy/daisydata.html) database.
 
 If you haven't already, be sure to read the documentation pages on [Working with PyTrees](../../trees.md) and [Hierarchical Design Patterns](../../generated/notebooks/modular-design.md) to get a feel for some approaches to modeling complex systems.
-You may also want to check out the [Multirotor Dynamics](../../notebooks/multirotor/multirotor00.md) series to see these patterns in action.
+You may also want to check out the [Multirotor Dynamics](../../tutorials/multirotor/multirotor00.md) series to see these patterns in action.
 
 To explore Archimedes further, check out:
 

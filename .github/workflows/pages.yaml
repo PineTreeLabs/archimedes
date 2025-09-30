@@ -31,7 +31,6 @@ jobs:
     - name: Build documentation
       run: |
         cd docs
-        make nbconvert
         make html
     
     - name: Setup Pages
