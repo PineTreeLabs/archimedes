@@ -144,3 +144,85 @@ img[data-theme="light"] {
 html[data-theme="dark"] .cell_input {
     border-left-color: #27ae60;  /* Darker green for dark mode */
 }
+
+/* Blog metadata styling */
+/* 
+Use this in MyST with:
+
+:::{admonition} Post Info
+:class: blog-metadata
+
+**Author:** [Name]  
+**Published:** [Date]  
+**Category:** [Category]  
+**Tags:** `tag1` `tag2` `tag3`
+:::
+
+*/
+.admonition.blog-metadata {
+    background: linear-gradient(
+        to right,
+        var(--color-background-secondary) 0%,
+        var(--color-background-primary) 100%
+    );
+    border-left: 2px solid var(--color-brand-secondary);
+    padding: 1rem 1.5rem;
+    margin: 0 0 2.5rem 0;
+    font-size: 0.95rem;
+}
+
+.admonition.blog-metadata .admonition-title {
+    display: none;
+}
+
+.admonition.blog-metadata p {
+    margin: 0.25rem 0;
+    color: var(--color-foreground-secondary);
+}
+
+.admonition.blog-metadata code {
+    background: rgba(var(--color-brand-content), 0.1);
+    padding: 0.15rem 0.5rem;
+    border-radius: 0.25rem;
+    font-size: 0.85rem;
+    font-weight: 500;
+}
+
+/* Author bio styling */
+/* Use this in MyST with:
+
+:::{admonition} About the Author
+:class: blog-author-bio
+
+[bio content here]
+
+:::
+*/
+.admonition.blog-author-bio {
+    background: transparent;
+    border: none;
+    border-top: 2px solid var(--color-background-border);
+    padding: 1.5rem 0 0 0;
+    margin-top: 3rem;
+    font-size: 0.9rem;
+    font-style: italic;
+    color: var(--color-foreground-secondary);
+}
+
+.admonition.blog-author-bio .admonition-title {
+    display: none;
+}
+
+.admonition.blog-author-bio p:first-of-type {
+    font-style: normal;
+    color: var(--color-foreground-primary);
+    margin-bottom: 0.5rem;
+}
+
+.admonition.blog-author-bio strong {
+    font-style: normal;
+}
+
+.admonition.blog-author-bio a {
+    font-style: normal;
+}
