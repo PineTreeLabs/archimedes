@@ -55,7 +55,7 @@ nb_execution_allow_errors = False  # Fail build on exceptions
 nb_execution_raise_on_error = True  # Raise immediately on error
 nb_execution_excludepatterns = [
     "experimental/*",  # Skip WIP content
-    "benchmarks/*",    # Skip long-running benchmarks
+    "benchmarks/*",  # Skip long-running benchmarks
 ]
 
 autosummary_generate = True
