@@ -28,7 +28,7 @@ from .rotations import (
     quaternion_multiply,
     quaternion_to_euler,
 )
-from .flight_dynamics import (
+from .rigid_body import (
     RigidBody,
 )
 from .sensors import (
