@@ -92,7 +92,7 @@ class Rotation:
         cls, quat: np.ndarray, scalar_first: bool = True, normalize: bool = True
     ) -> Rotation:
         """Create a Rotation from a quaternion."""
-        quat = array(quat)
+        quat = np.atleast_1d(quat)
         if quat.ndim == 0:
             raise ValueError("Quaternion must be at least 1D array")
         if quat.shape not in [(4,), (1, 4), (4, 1)]:

@@ -10,16 +10,17 @@ from .rotations import (
     euler_kinematics,
     quaternion_derivative,
 )
+from ..spatial import Rotation
 
 
 @struct
 class RigidBody:
-    attitude: str = "quaternion"  # "euler" or "quaternion"
+    baumgarte: float = 1.0  # Baumgarte stabilization factor for quaternion kinematics
 
     @struct
     class State:
         p_N: np.ndarray  # Position of the center of mass in the Newtonian frame N
-        att: np.ndarray  # Attitude (orientation) of the vehicle
+        att: Rotation  # Attitude (orientation) of the vehicle
         v_B: np.ndarray  # Velocity of the center of mass in body frame B
         w_B: np.ndarray  # Angular velocity in body frame (ω_B)
 
@@ -36,36 +37,37 @@ class RigidBody:
     def calc_kinematics(self, x: State):
         # Unpack the state
         v_B = x.v_B  # Velocity of the center of mass in body frame B
-        w_B = x.w_B  # Angular velocity in body frame (ω_B)
 
-        if self.attitude == "euler":
-            rpy = x.att
+        # if self.attitude == "euler":
+        #     rpy = x.att
 
-            # Convert roll-pitch-yaw (rpy) orientation to the direction cosine matrix.
-            # C_BN rotates from the Newtonian frame N to the body frame B.
-            # C_BN.T = C_NB rotates from the body frame B to the Newtonian frame N.
-            C_BN = dcm_from_euler(rpy)
+        #     # Convert roll-pitch-yaw (rpy) orientation to the direction cosine matrix.
+        #     # C_BN rotates from the Newtonian frame N to the body frame B.
+        #     # C_BN.T = C_NB rotates from the body frame B to the Newtonian frame N.
+        #     C_BN = dcm_from_euler(rpy)
 
-            # Transform roll-pitch-yaw rates in the body frame to time derivatives of Euler angles
-            # These are the Euler kinematic equations (1.4-5)
-            H = euler_kinematics(rpy)
+        #     # Transform roll-pitch-yaw rates in the body frame to time derivatives of Euler angles
+        #     # These are the Euler kinematic equations (1.4-5)
+        #     H = euler_kinematics(rpy)
 
-            # Time derivatives of roll-pitch-yaw (rpy) orientation
-            att_deriv = H @ w_B
+        #     # Time derivatives of roll-pitch-yaw (rpy) orientation
+        #     att_deriv = H @ w_B
 
-        elif self.attitude == "quaternion":
-            q = x.att
+        # elif self.attitude == "quaternion":
+        #     q = x.att
 
-            # Convert roll-pitch-yaw (rpy) orientation to the direction cosine matrix.
-            # C_BN rotates from the Newtonian frame N to the body frame B.
-            # C_BN.T = C_NB rotates from the body frame B to the Newtonian frame N.
-            C_BN = dcm_from_quaternion(q)
+        #     # Convert roll-pitch-yaw (rpy) orientation to the direction cosine matrix.
+        #     # C_BN rotates from the Newtonian frame N to the body frame B.
+        #     # C_BN.T = C_NB rotates from the body frame B to the Newtonian frame N.
+        #     C_BN = dcm_from_quaternion(q)
 
-            # Time derivative of the quaternion
-            att_deriv = quaternion_derivative(q, w_B)
+        #     # Time derivative of the quaternion
+        #     att_deriv = quaternion_derivative(q, w_B)
 
         # Velocity in the Newtonian frame
-        dp_N = C_BN.T @ v_B
+        dp_N = x.att.apply(v_B)
+
+        att_deriv = x.att.derivative(x.w_B, baumgarte=self.baumgarte)
 
         return dp_N, att_deriv
 
@@ -112,8 +114,8 @@ class RigidBody:
 
 
 class RigidBodyConfig(StructConfig):
-    attitude: str = "quaternion"  # "euler" or "quaternion"
+    baumgarte: float = 1.0  # Baumgarte stabilization factor
 
     def build(self) -> RigidBody:
         """Build and return a RigidBody instance."""
-        return RigidBody(attitude=self.attitude)
+        return RigidBody(baumgarte=self.baumgarte)
