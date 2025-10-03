@@ -2,15 +2,11 @@
 
 import numpy as np
 import numpy.testing as npt
-from scipy.spatial.transform import Rotation as ScipyRotation
 
 import archimedes as arc
 from archimedes.experimental.aero import (
     RigidBody,
-    dcm_from_quaternion,
-    euler_to_quaternion,
-    quaternion_derivative,
-    quaternion_multiply,
+    euler_kinematics,
 )
 from archimedes.experimental.spatial import Rotation
 
@@ -20,98 +16,29 @@ J_B = np.diag([0.1, 0.2, 0.3])  # Arbitrary inertia matrix
 J_B_inv = np.linalg.inv(J_B)
 
 
-class TestQuaternionOperations:
-    def test_quaternion_multiply(self):
-        # Test identity quaternion multiplication
-        q1 = np.array([1, 0, 0, 0])
-        q2 = np.array([0, 1, 0, 0])
-        result = quaternion_multiply(q1, q2)
-        npt.assert_allclose(result, q2)
+def test_euler_kinematics():
+    rpy = np.array([0.1, 0.2, 0.3])
 
-        # Test arbitrary quaternion multiplication
-        q1 = np.array([0.7071, 0.7071, 0, 0])  # 90-degree rotation around x
-        q2 = np.array([0.7071, 0, 0.7071, 0])  # 90-degree rotation around y
-        result = quaternion_multiply(q1, q2)
+    # Given roll-pitch-yaw rates, compute the body-frame angular velocity
+    # using the rotation matrices directly.
+    pqr = np.array([0.4, 0.5, 0.6])  # Roll, pitch, yaw rates
+    C_roll = Rotation.from_euler("x", rpy[0]).as_matrix().T  # C_φ
+    C_pitch = Rotation.from_euler("y", rpy[1]).as_matrix().T  # C_θ
+    # Successively transform each rate into the body frame
+    w_B_ex = np.array([pqr[0], 0.0, 0.0]) + C_roll @ (
+        np.array([0.0, pqr[1], 0.0]) + C_pitch @ np.array([0.0, 0.0, pqr[2]])
+    )
 
-        # Compare with scipy's rotation composition
-        r1 = ScipyRotation.from_quat(
-            [0.7071, 0, 0, 0.7071]
-        )  # Note: scipy uses [x,y,z,w]
-        r2 = ScipyRotation.from_quat([0, 0.7071, 0, 0.7071])
-        r_combined = r1 * r2
-        expected = np.roll(r_combined.as_quat(), 1)  # Convert to [w,x,y,z]
-        npt.assert_allclose(result, expected, rtol=1e-4)
+    # Use the Euler kinematics function to duplicate the transformation
+    Hinv = euler_kinematics(rpy, inverse=True)
+    w_B = Hinv @ pqr
 
-    def test_quaternion_derivative(self):
-        # Test zero angular velocity
-        q = np.array([1, 0, 0, 0])
-        w = np.zeros(3)
-        result = quaternion_derivative(q, w)
-        npt.assert_allclose(result, np.zeros(4))
+    npt.assert_allclose(w_B, w_B_ex)
 
-        # Test constant angular velocity
-        q = np.array([1, 0, 0, 0])
-        w = np.array([1, 0, 0])  # Rotation around x-axis
-        result = quaternion_derivative(q, w)
-        expected = np.array([0, 0.5, 0, 0])  # Half the angular velocity
-        npt.assert_allclose(result, expected)
-
-    def test_dcm_from_quaternion(self):
-        test_angles = [
-            np.array([0, 0, 0]),  # Identity
-            np.array([np.pi / 4, 0, 0]),  # 45 degree roll
-            np.array([0, np.pi / 4, 0]),  # 45 degree pitch
-            np.array([0, 0, np.pi / 4]),  # 45 degree yaw
-            np.array([np.pi / 6, np.pi / 4, np.pi / 3]),  # Arbitrary rotation
-        ]
-
-        for angles in test_angles:
-            # Convert Euler angles to quaternion
-            q = euler_to_quaternion(angles)
-            C_BN_custom = dcm_from_quaternion(q)
-
-            # Compare with scipy's rotation
-            r = ScipyRotation.from_euler("ZYX", angles[::-1])
-            C_BN_scipy = r.as_matrix().T
-
-            npt.assert_allclose(
-                C_BN_custom,
-                C_BN_scipy,
-                rtol=1e-6,
-                atol=1e-6,
-                err_msg=f"Mismatch for angles {angles}",
-            )
-
-            # Verify orthogonality
-            identity = np.eye(3)
-            npt.assert_allclose(
-                C_BN_custom @ C_BN_custom.T, identity, rtol=1e-6, atol=1e-8
-            )
-
-            # Verify determinant is 1
-            npt.assert_allclose(np.linalg.det(C_BN_custom), 1.0, rtol=1e-6, atol=1e-8)
-
-    def test_euler_to_quaternion(self):
-        test_angles = [
-            np.array([0, 0, 0]),
-            np.array([np.pi / 4, 0, 0]),
-            np.array([0, np.pi / 4, 0]),
-            np.array([0, 0, np.pi / 4]),
-            np.array([np.pi / 6, np.pi / 4, np.pi / 3]),
-        ]
-
-        for angles in test_angles:
-            q_custom = euler_to_quaternion(angles)
-
-            # Compare with scipy's conversion
-            r = ScipyRotation.from_euler("ZYX", angles[::-1])
-            q_scipy = np.roll(r.as_quat(), 1)  # Convert to [w,x,y,z]
-
-            # Note: quaternions q and -q represent the same rotation
-            if np.sign(q_custom[0]) != np.sign(q_scipy[0]):
-                q_scipy = -q_scipy
-
-            npt.assert_allclose(q_custom, q_scipy, rtol=1e-6)
+    # Test the forward transformation
+    H = euler_kinematics(rpy)
+    result = H @ w_B
+    npt.assert_allclose(pqr, result)
 
 
 class TestVehicleDynamics:

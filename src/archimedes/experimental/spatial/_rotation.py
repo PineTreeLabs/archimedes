@@ -92,7 +92,7 @@ class Rotation:
         cls, quat: np.ndarray, scalar_first: bool = True, normalize: bool = True
     ) -> Rotation:
         """Create a Rotation from a quaternion."""
-        quat = np.atleast_1d(quat)
+        quat = np.hstack(quat)
         if quat.ndim == 0:
             raise ValueError("Quaternion must be at least 1D array")
         if quat.shape not in [(4,), (1, 4), (4, 1)]:
@@ -188,11 +188,15 @@ class Rotation:
 
         intrinsic = _check_seq(seq)
 
-        angles = np.atleast_1d(array(angles))
+        if isinstance(angles, (list, tuple)):
+            angles = np.hstack(angles)
+
+        angles = np.atleast_1d(angles)
         if angles.shape not in [(num_axes,), (1, num_axes), (num_axes, 1)]:
             raise ValueError(
                 f"For {seq} sequence with {num_axes} axes, `angles` must have shape "
-                f"({num_axes},), (1, {num_axes}), or ({num_axes}, 1)"
+                f"({num_axes},), (1, {num_axes}), or ({num_axes}, 1). Got "
+                f"{angles.shape}"
             )
 
         seq = seq.lower()

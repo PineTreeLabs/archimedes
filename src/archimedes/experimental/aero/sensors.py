@@ -5,7 +5,6 @@ import numpy as np
 
 from archimedes import struct, field, StructConfig
 from archimedes.experimental.aero import (
-    dcm_from_quaternion,
     GravityModel,
     GravityConfig,
     ConstantGravity,
@@ -43,7 +42,7 @@ class Accelerometer:
         w: ArrayLike,
     ) -> ArrayLike:
         g_N = self.gravity(x.p_N)  # Inertial gravity vector
-        C_BN = dcm_from_quaternion(x.att)
+        C_BN = x.att.as_dcm()
 
         # Measure inertial acceleration in body coordinates
         a_N_B = a_B + np.cross(x.w_B, x.v_B)

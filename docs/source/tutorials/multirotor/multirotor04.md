@@ -194,7 +194,7 @@ def f_lon(x_lon, u):
     w_B = np.hstack([0.0, q, 0.0])
     # Note we can't compute quaternion kinematics and then
     # convert to Euler rates -> have to use Euler kinematics directly
-    rpy_t = aero.euler_kinematics(rpy, inverse=True) @ w_B
+    rpy_t = aero.euler_kinematics(rpy) @ w_B
     v_B = np.hstack([vx, v_B_trim[1], vz])
     x = vehicle.state(np.zeros(3), rpy, v_B, w_B)
     x_t = vehicle.dynamics(0.0, x, u)
@@ -290,7 +290,7 @@ def f_lat(x_lat, u):
     rpy = np.hstack([phi, theta_trim, 0.0])
     w_B = np.hstack([p, 0.0, r])
     # See previous note about computing Euler kinematics
-    rpy_t = aero.euler_kinematics(rpy, inverse=True) @ w_B
+    rpy_t = aero.euler_kinematics(rpy) @ w_B
     v_B = np.hstack([v_B_trim[0], vy, v_B_trim[2]])
     x = vehicle.state(np.zeros(3), rpy, v_B, w_B)
     x_t = vehicle.dynamics(0.0, x, u)

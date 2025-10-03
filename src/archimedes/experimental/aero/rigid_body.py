@@ -4,13 +4,58 @@ import numpy as np
 
 from archimedes import struct, field, StructConfig
 
-from .rotations import (
-    dcm_from_euler,
-    dcm_from_quaternion,
-    euler_kinematics,
-    quaternion_derivative,
-)
 from ..spatial import Rotation
+
+
+__all__ = ["RigidBody", "RigidBodyConfig", "euler_kinematics"]
+
+
+def euler_kinematics(rpy, inverse=False):
+    """Euler kinematical equations
+
+    Define 𝚽 = [phi, theta, psi] == Euler angles for roll, pitch, yaw (same in body and inertial frames)
+
+    The kinematics in body and inertial frames are:
+            ω = [P, Q, R] == [roll_rate, pitch_rate, yaw_rate] in body frame
+            d𝚽/dt = time derivative of Euler angles (inertial frame)
+
+    Returns matrix H(𝚽) such that d𝚽/dt = H(𝚽) * ω
+    If inverse=True, returns matrix H(𝚽)^-1 such that ω = H(𝚽)^-1 * d𝚽/dt.
+
+    Note that the RigidBody class uses quaternions for attitude representation,
+    but special cases like stability analysis may use Euler angle kinematics.
+    """
+
+    φ, θ = rpy[0], rpy[1]  # Roll, pitch
+
+    sφ, cφ = np.sin(φ), np.cos(φ)
+    sθ, cθ = np.sin(θ), np.cos(θ)
+    tθ = np.tan(θ)
+
+    _1 = np.ones_like(φ)
+    _0 = np.zeros_like(φ)
+
+    if inverse:
+        Hinv = np.array(
+            [
+                [_1, _0, -sθ],
+                [_0, cφ, cθ * sφ],
+                [_0, -sφ, cθ * cφ],
+            ],
+            like=rpy,
+        )
+        return Hinv
+
+    else:
+        H = np.array(
+            [
+                [_1, sφ * tθ, cφ * tθ],
+                [_0, cφ, -sφ],
+                [_0, sφ / cθ, cφ / cθ],
+            ],
+            like=rpy,
+        )
+        return H
 
 
 @struct

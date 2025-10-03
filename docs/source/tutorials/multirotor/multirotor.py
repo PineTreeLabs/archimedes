@@ -9,13 +9,10 @@ from scipy.special import roots_legendre
 import archimedes as arc
 from archimedes.experimental.aero import (
     RigidBody,
-    dcm_from_euler,
-    z_dcm,
 )
 from archimedes.experimental.spatial import Rotation
 
 __all__ = [
-    "dcm_from_euler",
     "RigidBody",
     "RotorGeometry",
     "ConstantGravity",
@@ -265,7 +262,7 @@ class RotorModel(metaclass=abc.ABCMeta):
         # effect and the wind angle is undefined (+/- 90 degrees will also work).
         psi_w = np.where(abs(v_H[0]) < 1e-6, np.sign(v_H[1]) * np.pi / 2, psi_w)
 
-        R_WH = z_dcm(psi_w)
+        R_WH = Rotation.from_euler("z", psi_w).as_matrix().T
 
         v_W = R_WH @ v_H  # Rotate velocity to wind frame
         w_W = R_WH @ w_H  # Rotate angular velocity to wind frame

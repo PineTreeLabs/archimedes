@@ -10,7 +10,6 @@ from multirotor import (
     RotorGeometry,
     ThinAirfoil,
 )
-from scipy.spatial.transform import Rotation as ScipyRotation
 
 import archimedes as arc
 from archimedes.experimental import aero
@@ -20,82 +19,6 @@ m = 1.7  # Arbitrary mass
 g0 = 9.81
 J_B = np.diag([0.1, 0.2, 0.3])  # Arbitrary inertia matrix
 J_B_inv = np.linalg.inv(J_B)
-
-
-class TestVehicleKinematics:
-    def test_dcm(self):
-        # Test cases: [roll, pitch, yaw] in radians
-        test_angles = [
-            np.array([0, 0, 0]),  # Identity
-            np.array([np.pi / 4, 0, 0]),  # 45 degree roll
-            np.array([0, np.pi / 4, 0]),  # 45 degree pitch
-            np.array([0, 0, np.pi / 4]),  # 45 degree yaw
-            np.array([np.pi / 6, np.pi / 4, np.pi / 3]),  # Arbitrary rotation
-            np.array([np.pi, np.pi / 2, np.pi / 4]),  # Edge case
-        ]
-
-        for angles in test_angles:
-            C_BN_custom = aero.dcm_from_euler(angles)
-
-            # Rotation representation (use 'ZYX' for intrinsic rotations, which is
-            # equivalent to yaw-pitch-roll).  Note that SciPy expects angles
-            # in sequence order, so in this case yaw-pitch-roll and will return
-            # the inertial-to-body transformation matrix (the transpose of `dcm`).
-            # More simply, this is "xyz" extrinsic rotations.
-            r = ScipyRotation.from_euler("xyz", angles)
-            C_BN_scipy = r.as_matrix().T
-
-            # Compare the results
-            npt.assert_allclose(
-                C_BN_custom,
-                C_BN_scipy,
-                rtol=1e-6,
-                atol=1e-6,
-                err_msg=f"Mismatch for angles {angles}",
-            )
-
-            # Verify orthogonality
-            identity = np.eye(3)
-            npt.assert_allclose(
-                C_BN_custom @ C_BN_custom.T,
-                identity,
-                rtol=1e-6,
-                atol=1e-6,
-                err_msg=f"Non-orthogonal matrix for angles {angles}",
-            )
-
-            # Verify determinant is 1 (proper rotation)
-            npt.assert_allclose(
-                np.linalg.det(C_BN_custom),
-                1.0,
-                rtol=1e-6,
-                atol=1e-6,
-                err_msg=f"Determinant not 1 for angles {angles}",
-            )
-
-    def test_euler_kinematics(self):
-        rpy = np.array([0.1, 0.2, 0.3])
-
-        # Given roll-pitch-yaw rates, compute the body-frame angular velocity
-        # using the rotation matrices directly.
-        pqr = np.array([0.4, 0.5, 0.6])  # Roll, pitch, yaw rates
-        C_roll = aero.dcm_from_euler(np.array([rpy[0], 0, 0]))  # C_φ
-        C_pitch = aero.dcm_from_euler(np.array([0, rpy[1], 0]))  # C_θ
-        # Successively transform each rate into the body frame
-        w_B_ex = np.array([pqr[0], 0.0, 0.0]) + C_roll @ (
-            np.array([0.0, pqr[1], 0.0]) + C_pitch @ np.array([0.0, 0.0, pqr[2]])
-        )
-
-        # Use the Euler kinematics function to duplicate the transformation
-        Hinv = aero.euler_kinematics(rpy, inverse=True)
-        w_B = Hinv @ pqr
-
-        npt.assert_allclose(w_B, w_B_ex)
-
-        # Test the forward transformation
-        H = aero.euler_kinematics(rpy)
-        result = H @ w_B
-        npt.assert_allclose(pqr, result)
 
 
 class TestBladeElementModel:
