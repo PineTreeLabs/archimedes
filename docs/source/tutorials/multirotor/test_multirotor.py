@@ -10,10 +10,11 @@ from multirotor import (
     RotorGeometry,
     ThinAirfoil,
 )
-from scipy.spatial.transform import Rotation
+from scipy.spatial.transform import Rotation as ScipyRotation
 
 import archimedes as arc
 from archimedes.experimental import aero
+from archimedes.experimental.spatial import Rotation
 
 m = 1.7  # Arbitrary mass
 g0 = 9.81
@@ -36,11 +37,12 @@ class TestVehicleKinematics:
         for angles in test_angles:
             C_BN_custom = aero.dcm_from_euler(angles)
 
-            # SciPy's rotation (use 'ZYX' for intrinsic rotations, which is
+            # Rotation representation (use 'ZYX' for intrinsic rotations, which is
             # equivalent to yaw-pitch-roll).  Note that SciPy expects angles
             # in sequence order, so in this case yaw-pitch-roll and will return
             # the inertial-to-body transformation matrix (the transpose of `dcm`).
-            r = Rotation.from_euler("ZYX", angles[::-1])
+            # More simply, this is "xyz" extrinsic rotations.
+            r = ScipyRotation.from_euler("xyz", angles)
             C_BN_scipy = r.as_matrix().T
 
             # Compare the results
@@ -472,7 +474,7 @@ class TestTrimStability:
             theta += np.pi / 2
             ccw = not ccw
 
-        rigid_body = aero.RigidBody(attitude="euler")
+        rigid_body = aero.RigidBody()
         vehicle = MultiRotorVehicle(
             rigid_body=rigid_body,
             rotors=rotors,
@@ -496,10 +498,8 @@ class TestTrimStability:
         def residual(p):
             phi, theta = p[:2]  # (pitch, roll) angles
             u = p[2:]  # Rotor angular velocities
-            rpy = np.array([phi, theta, 0.0], like=p)
-            C_BN = aero.dcm_from_euler(rpy)
-            v_B = C_BN @ v_N
-            x = vehicle.state(p_N, rpy, v_B, w_B)
+            rpy = np.hstack([phi, theta, 0.0])
+            x = vehicle.state(p_N, rpy, v_N, w_B, inertial_velocity=True)
             x_t = vehicle.dynamics(0.0, x, u)
             # Residuals of dynamics equations only
             return np.hstack([x_t.v_B, x_t.w_B])
@@ -519,42 +519,32 @@ class TestTrimStability:
         npt.assert_allclose(theta_trim, 0.0, atol=1e-6)
         npt.assert_allclose(u_trim, u_trim_ex, atol=1e-6)
 
-        rpy_trim = np.array([phi_trim, theta_trim, 0.0])
-        C_BN = aero.dcm_from_euler(rpy_trim)
-        v_B_trim = C_BN @ v_N
-        x_trim = vehicle.state(p_N, rpy_trim, v_B_trim, w_B)
+        rpy_trim = Rotation.from_euler("xyz", [phi_trim, theta_trim, 0.0])
+        v_B_trim = rpy_trim.apply(v_N, inverse=True)
 
         #
         # Linear stability analysis for longitudinal motion
         #
-
         # Longitudinal dynamics include surge (vx), heave (vz),
         # pitch (theta), and pitch rate (q). The other states are
         # assumed to be in trim
-        def longitudinal_dofs(x):
-            return np.hstack(
-                [
-                    x.att[1],  # theta
-                    x.v_B[0],  # vx
-                    x.v_B[2],  # vz
-                    x.w_B[1],  # q
-                ]
-            )
+        
+        # (theta, vx, vz, q) at trim
+        x_lon_trim = np.hstack([theta_trim, v_B_trim[0], v_B_trim[2], w_B[1]])
 
-        # Right-hand side function for the lateral dynamics
+        # Right-hand side function for the longitudinal dynamics
         @arc.compile
         def f_lon(x_lon, u):
             theta, vx, vz, q = x_lon  # Perturbations
-            x = vehicle.state(
-                np.zeros(3),
-                np.hstack([phi_trim, theta, 0.0]),
-                np.hstack([vx, v_B_trim[1], vz]),
-                np.hstack([0.0, q, 0.0]),
-            )
+            rpy = np.hstack([phi_trim, theta, 0.0])
+            w_B = np.hstack([0.0, q, 0.0])
+            # Note we can't compute quaternion kinematics and then
+            # convert to Euler rates -> have to use Euler kinematics directly
+            rpy_t = aero.euler_kinematics(rpy, inverse=True) @ w_B
+            v_B = np.hstack([vx, v_B_trim[1], vz])
+            x = vehicle.state(np.zeros(3), rpy, v_B, w_B)
             x_t = vehicle.dynamics(0.0, x, u)
-            return longitudinal_dofs(x_t)
-
-        x_lon_trim = longitudinal_dofs(x_trim)
+            return np.hstack([rpy_t[1], x_t.v_B[0], x_t.v_B[2], x_t.w_B[1]])
 
         # Linearized state-space matrices
         A_lon = arc.jac(f_lon, 0)(x_lon_trim, u_trim)
@@ -589,30 +579,22 @@ class TestTrimStability:
         # side-slip (vy), roll rate (p), and yaw rate (r).
         # The other states are assumed to be in trim
 
-        def lateral_dofs(x):
-            return np.hstack(
-                [
-                    x.att[0],  # phi
-                    x.v_B[1],  # vy
-                    x.w_B[0],  # p
-                    x.w_B[2],  # r
-                ]
-            )
+        # (phi, vy, p, r) at trim
+        x_lat_trim = np.hstack([phi_trim, v_B_trim[1], 0.0, 0.0])
 
-        # Right-hand side function for the lateral dynamics
+        # Right-hand side function for the lateral-directional dynamics
         @arc.compile
         def f_lat(x_lat, u):
             phi, vy, p, r = x_lat  # Perturbations
-            x = vehicle.state(
-                np.zeros(3),
-                np.hstack([phi, theta_trim, 0.0]),
-                np.hstack([v_B_trim[0], vy, v_B_trim[2]]),
-                np.hstack([p, 0.0, r]),
-            )
+            rpy = np.hstack([phi, theta_trim, 0.0])
+            w_B = np.hstack([p, 0.0, r])
+            # Note we can't compute quaternion kinematics and then
+            # convert to Euler rates -> have to use Euler kinematics directly
+            rpy_t = aero.euler_kinematics(rpy, inverse=True) @ w_B
+            v_B = np.hstack([v_B_trim[0], vy, v_B_trim[2]])
+            x = vehicle.state(np.zeros(3), rpy, v_B, w_B)
             x_t = vehicle.dynamics(0.0, x, u)
-            return lateral_dofs(x_t)
-
-        x_lat_trim = lateral_dofs(x_trim)
+            return np.hstack([rpy_t[0], x_t.v_B[1], x_t.w_B[0], x_t.w_B[2]])
 
         # Linearized state-space matrices
         A_lat = arc.jac(f_lat, 0)(x_lat_trim, u_trim)

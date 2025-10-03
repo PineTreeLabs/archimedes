@@ -2,6 +2,7 @@ import numpy as np
 
 __all__ = ["wind_frame"]
 
+
 def wind_frame(v_rel_B):
     """Compute total velocity, angle of attack, and sideslip angle
 

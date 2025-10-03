@@ -2,7 +2,6 @@
 
 import numpy as np
 import numpy.testing as npt
-import pytest
 from scipy.spatial.transform import Rotation as ScipyRotation
 
 import archimedes as arc
@@ -35,7 +34,9 @@ class TestQuaternionOperations:
         result = quaternion_multiply(q1, q2)
 
         # Compare with scipy's rotation composition
-        r1 = ScipyRotation.from_quat([0.7071, 0, 0, 0.7071])  # Note: scipy uses [x,y,z,w]
+        r1 = ScipyRotation.from_quat(
+            [0.7071, 0, 0, 0.7071]
+        )  # Note: scipy uses [x,y,z,w]
         r2 = ScipyRotation.from_quat([0, 0.7071, 0, 0.7071])
         r_combined = r1 * r2
         expected = np.roll(r_combined.as_quat(), 1)  # Convert to [w,x,y,z]

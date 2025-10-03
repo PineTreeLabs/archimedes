@@ -38,32 +38,6 @@ class RigidBody:
         # Unpack the state
         v_B = x.v_B  # Velocity of the center of mass in body frame B
 
-        # if self.attitude == "euler":
-        #     rpy = x.att
-
-        #     # Convert roll-pitch-yaw (rpy) orientation to the direction cosine matrix.
-        #     # C_BN rotates from the Newtonian frame N to the body frame B.
-        #     # C_BN.T = C_NB rotates from the body frame B to the Newtonian frame N.
-        #     C_BN = dcm_from_euler(rpy)
-
-        #     # Transform roll-pitch-yaw rates in the body frame to time derivatives of Euler angles
-        #     # These are the Euler kinematic equations (1.4-5)
-        #     H = euler_kinematics(rpy)
-
-        #     # Time derivatives of roll-pitch-yaw (rpy) orientation
-        #     att_deriv = H @ w_B
-
-        # elif self.attitude == "quaternion":
-        #     q = x.att
-
-        #     # Convert roll-pitch-yaw (rpy) orientation to the direction cosine matrix.
-        #     # C_BN rotates from the Newtonian frame N to the body frame B.
-        #     # C_BN.T = C_NB rotates from the body frame B to the Newtonian frame N.
-        #     C_BN = dcm_from_quaternion(q)
-
-        #     # Time derivative of the quaternion
-        #     att_deriv = quaternion_derivative(q, w_B)
-
         # Velocity in the Newtonian frame
         dp_N = x.att.apply(v_B)
 

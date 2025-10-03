@@ -76,6 +76,7 @@ def test_352(f16: SubsonicF16):
     assert np.allclose(x_t.v_B, dv_B_ex, atol=1e-2)
     assert np.allclose(x_t.w_B, dw_B_ex, atol=1e-2)
 
+
 def test_36(f16: SubsonicF16):
     """Trim conditions (Sec. 3.6 in Lewis, Johnson, Stevens)"""
     f16 = f16.replace(xcg=0.35)

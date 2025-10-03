@@ -153,11 +153,6 @@ class SubsonicF16:
         F_grav_N = self.m * self.gravity(x.p_N)
         F_aero_B = qbar * self.S * np.stack([cxt, cyt, czt])
 
-        # if self.rigid_body.attitude == "euler":
-        #     C_BN = aero.dcm_from_euler(x.att)
-        # elif self.rigid_body.attitude == "quaternion":
-        #     C_BN = aero.dcm_from_quaternion(x.att)
-
         F_grav_B = x.att.apply(F_grav_N, inverse=True)
 
         F_B = F_aero_B + F_eng_B + F_grav_B

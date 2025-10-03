@@ -146,6 +146,8 @@ uv run ipython kernel install --user --env VIRTUAL_ENV $(pwd)/.venv --name=archi
 
 # Testing and development
 
+<!-- TODO: Move this to dev/ -->
+
 You can run a version of the CI test workflow locally as follows.
 
 First, set up an environment using UV and installing development dependencies as described above.
