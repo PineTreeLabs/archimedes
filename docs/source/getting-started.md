@@ -134,7 +134,7 @@ For example, here we solve the classic Rosenbrock problem:
 def f(x):
     return 100 * (x[1] - x[0] ** 2) ** 2 + (1 - x[0]) ** 2
 
-x_opt = arc.minimize(f, x0=[-1.0, 1.0])
+result = arc.minimize(f, x0=[-1.0, 1.0])
 ```
 
 and a [constrained variation](https://en.wikipedia.org/wiki/Test_functions_for_optimization#Test_functions_for_constrained_optimization):

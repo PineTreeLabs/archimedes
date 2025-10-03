@@ -12,7 +12,7 @@ author: Jared Callaham
 
 **_A Python toolkit for hardware engineering_**
 
-Jared Callaham • 30 Sep 2025
+By Jared Callaham • 30 Sep 2025
 
 ---
 
@@ -23,9 +23,7 @@ But you can't _only_ be a hacker; developing complex systems in aerospace, autom
 You need tools that let you be both fast _and_ rigorous.
 
 <!--
-
 Not clear how the _rigor_ translates here. Speed -> Python, but rigor -> C?  Be explicit about where the rigor comes from.
-
 -->
 
 Modern deep learning frameworks solved this years ago — you can develop in PyTorch or JAX and deploy anywhere.
@@ -280,80 +278,175 @@ For more on how this works (and when it doesn't), see the [What is Archimedes?](
 
 ### Simulation
 
-Archimedes provides a SciPy-like interface to the powerful and robust [CVODES](https://computing.llnl.gov/projects/sundials/cvodes) solver from SUNDIALS.
+Archimedes provides a SciPy-like interface to the powerful and robust [CVODES](https://computing.llnl.gov/projects/sundials/cvodes) solver from SUNDIALS:
 
 ```python
 xs = arc.odeint(dynamics, (0, 10), x0, t_eval=ts)
 ```
 
-
+These solves can also be embedded in compiled computational graphs for accelerated simulation.
 
 ### Optimization & Root-finding
 
-```python
-# Find trim conditions automatically
-x_trim = arc.root(residual, x0)
-```
-
-### Automatic differentiation
+We also have a SciPy-like optimization interface that can solve constrained nonlinear problems with IPOPT:
 
 ```python
-# Linearize for stability analysis
-A = arc.jac(dynamics, argnums=1)(t, x_eq, u)
+# Rosenbrock problem
+def f(x):
+    return 100 * (x[1] - x[0] ** 2) ** 2 + (1 - x[0]) ** 2
+
+result = arc.minimize(f, x0=[-1.0, 1.0])
 ```
 
-- Linearization (stability analysis, controller design)
-- Sensitivity analysis
-- Gradients for optimization
-- Jacobians for implicit ODE/DAE solvers
+and a root-finding interface for iteratively solving nonlinear algebraic systems using Newton iterations and similar methods:
 
-Note sparse-mode support
+```python
+def f(x):
+    return np.array([
+        x[0] + 0.5 * (x[0] - x[1])**3 - 1.0,
+        0.5 * (x[1] - x[0])**3 + x[1]
+    ], like=x)
 
+x = arc.root(f, x0=np.array([0.0, 0.0]))
+```
 
-### Structured data types
+### Automatic Differentiation
+
+Besides execution speed, compilation into a CaADi computational graph also gives us the ability to perform accurate and efficient automatic differentiation:
+
+```python
+def lotka_volterra(t, x):
+    a, b, c, d = 1.5, 1.0, 1.0, 3.0
+    return np.hstack([
+        a * x[0] - b * x[0] * x[1],
+        c * x[0] * x[1] - d * x[1],
+    ])
+
+# Linearize the system
+J = arc.jac(dynamics, argnums=1)
+print(J(0.0, [1.0, 1.0]))
+```
+
+Besides linearizing models for stability analysis and controller design, this is a feature you may not directly use very often.
+But gradients and Jacobians are used pervasively in numerical methods:
+
+- **Optimization** solvers use gradients of the objective, Jacobians of the constraints, and sometimes even Hessian information
+- **Simulation** algorithms use Jacobians of the dynamics model for implicit solvers, especially for "stiff" ODE/DAE problems
+- **Root-finding** solvers like Newton's method use Jacobians at every iteration to find an improved guess at the solution point
+
+So when you do parameter estimation, trajectory optimization, trim point identification, or even just call `odeint`, you don't _think_ about "autodiff", but it's happening behind the scenes to solve your problem.
+
+Traditional scientific computing packages like SciPy and MATLAB usually fall back to slow and inaccurate finite differencing unless you provide manually implemented gradients, Jacobians, etc. - but for anything but the simplest problems this is prohibitively complicated to calculate and implement.
+
+Newer frameworks like Julia, JAX, and PyTorch rely much more heavily on autodiff, but none of these are tailored towards hardware and controls engineering applications.
+My personal experience has been that CasADi (the autodiff framework used under the hood by Archimedes) has far and away the best autodiff system for the kinds of large, sparse problems that commonly arise in engineering (like parameter estimation, trajectory optimization, model-predictive control, etc.).
+
+All that is to say, the derivatives are there if you need them.
+
+### Structured Data Types
+
+Modern ML frameworks (specifically JAX and PyTorch) have developed a nice set of designs around working with hierarchically structured data.
+This comes up frequently in deep learning: models are naturally organized as hierarchical modules with trainable parameters.
+This is the root of the `nn.Module` in PyTorch and the "PyTree" concept in JAX.
+
+But hierarchical data and logic might even be _more_ common in engineering.
+Physical systems are naturally organized into subsystems and components that have well-defined interfaces, and each of these might have its own dynamic state and configurable parameters.
+
+Archimedes takes inspiration from these frameworks and supports "tree operations" (functions applied to hierarchical data) and a [`@struct`](#archimedes.struct) decorator to create tree-compatible data classes:
+
+```python
+@arc.struct
+class PointMass:
+    pos: np.ndarray
+    vel: np.ndarray
+
+state = PointMass(np.zeros(3), np.ones(3))  # state.pos, state.vel
+flat_state, unravel = arc.tree.ravel(state)  # flat_state is a vector
+state = unravel(flat_state)  # Back to a PointMass instance
+```
+
+These `@struct`-decorated classes can be nested inside one another, flattened to/from a 1D vector, and used to auto-generate nested `struct` types in deployable C code.
+If a `PointMass` is used as an argument to a codegen function, it will become:
+
+```c
+typedef struct {
+    float pos[3];
+    float vel[3];
+} point_mass_t;
+```
+
+This gives you a predictable and intuitive way to switch back and forth between Python and auto-generated C.
+
+For much more on structured data types, see [Structured Data Types](../../trees.md), [Hierarchical Design Patterns](../../modular-design.md), and the [C Code Generation](../../tutorials/codegen/codegen00.md) tutorial series.
 
 ## Why Archimedes?
 
-Existing vision/philosophy
+There are lots of modeling and simulation tools out there, from rock-solid commercial tools building on 30-year legacies to innovative modern frameworks experimenting with new languages, JIT-compilation, and physics-informed ML.
 
-### Why _not_ [language/framework X]?
+I created Archimedes because none of these really solved the problems I was having in my own work.
+Codebases that started out being logical and well-organized invariably ended up growing into a gnarled, difficult-to-maintain mass in order to support increasingly complex models and analyses.
+Then when it's time to move towards testing and production, you're back to square one to translate to C code.
 
-I'm not here to sell you on a language or framework.
-If you're happy with your current development tools, then by all means stick with them.
-I know that Julia, JAX, Numba, PyTorch, MATLAB/Simulink, pure CasADi, Rust, C++, Fortran, etc., etc. all have their superfans, and all of these have places where they definitively shine.
+Granted, these complaints might just indicate that I'm not a great software developer - but I'm _not_ a software developer.
+That's the point.
+I wanted a framework that would let me write code that looked as clean as a deep learning repository in PyTorch, but would also be high-performance for simulation and optimization, _and_ had a path to hardware deployment.
 
-What I'll try to do here is give an honest and concise assessment of where Archimedes falls among all of these to give you a sense of whether it might be right for you.
+I've enjoyed using Archimedes in my own work, and I think it could be useful to others as well, so I'm open-sourcing and hoping to build a community around it.
+<!-- Should I say what the purpose of the community would be? -->
 
-To be clear, what we're talking about is a workflow involving some combination of:
+**One last comment**: from personal experience, it takes a little time (but maybe less than you think) to grok the functional programming and hierarchical data types that are core to Archimedes.
+(I've spent a lot of time in JAX, which heavily influenced the design of this library.)
+It's different than what you might be used to, and there are also some [quirks and gotchas](../../gotchas.md) related to compilation and control flow.
 
-- complex physics modeling and simulation
-- advanced control algorithm development
-- constrained nonlinear optimization
-- deployment to an embedded real-time controller
-
-**Julia**
-
-**JAX/Numba**
-
-**PyTorch**
-
-**MATLAB/Simulink**
-
-**Pure CasADi**
-
-**C/C++/Rust**
-
-I probably shouldn't lump languages this different into the same category, but these are all low-level "systems" languages.
-
-The advantage to working with these directly is that what you write what gets run, giving you complete control over the code.
-If you're good, you can write powerful frameworks with high-quality, reliable code that solve _exactly_ your problem.
-
-The downside is that for mere mortals, it's hard to do this well - and doubly hard on a demanding development timeline.
-It can also be more complicated to integrate with high-level analysis and design tools - not impossible, just more complicated than working directly in Python.
+But these concepts do actually map quite neatly to our mental/mathematical models for dynamical systems and control algorithms.
+Once it clicks, you'll be able to write clean, modular, maintainable workflows that cut down your iteration time and make it faster to design, debug, deploy, and debug, and debug, and redesign, and debug, and...
 
 ## Get Started
 
-CTAs to tutorials, quickstart, GitHub
+If you want to give Archimedes a try, it's easy to get started.
+The [Quickstart](../../quickstart.md) page will walk you through the setup, and [Getting Started](../../getting-started.md) will teach you the basic concepts.
+
+Then there are tutorials and deep dives on:
+
+- [Structured Data Types](../../trees.md)
+- [Control Flow](../../control-flow.md)
+- [Modular Design Patterns](../../modular-design.md)
+- [Parameter Estimation](../../tutorials/sysid/parameter-estimation.md)
+- [C Code Generation](../../tutorials/codegen/codegen00.md)
+
+The [Hardware Deployment](../../tutorials/deployment/deployment00.md) tutorial is a bit more advanced, but shows an end-to-end example of the kinds of workflows you can build in Archimedes.
+
+To see where the project is headed and some more detail on the vision, also check out the [roadmap](../../roadmap.md).
+
+### On-ramp Projects
+
+Once you learn the basics, I bet in an hour or two you could:
+
+- Deploy a PI temperature controller to an Arduino
+- Write an integrator for the IMU strapdown equations
+- Run parameter estimation on some step response data you have lying around
+- Design an [energy-shaping controller](https://underactuated.csail.mit.edu/pend.html#energy_shaping) for a pendulum
+- Benchmark some old hand-written C code against the auto-generated equivalent (and share the results)
+
+If you have a cool first project that you're willing to share, feel free to post about it on the [Discussions](https://github.com/pinetreelabs/archimedes/discussions) page - if it's interesting it could become its own tutorial or blog post.
+
+### Supporting Archimedes
+
+This post might read a bit like ad copy, but Archimedes is a free, open-source project.
+The codebase, ongoing status, and discussions all live on the [GitHub repository](https://github.com/pinetreelabs/archimedes).
+
+If you want to support it, the best thing you can do right now is try it out and give feedback.
+What worked well? What didn't work? What did you like? What was confusing? What was confusing at first but you liked once you got used to it? What would you like to try with Archimedes? What would you like to try but there's a functionality gap?
+
+The [Discussions](https://github.com/pinetreelabs/archimedes/discussions) page is a great place to share general feedback, and bug reports or feature requests are welcome on the [Issues](https://github.com/pinetreelabs/archimedes/issues) tab.
+
+Besides feedback, other easy ways to support the project include:
+
+- **⭐ Star the Repository**: This shows support and interest and helps others discover the project
+- **📢 Spread the Word**: Think anyone you know might be interested?
+- **🐛 Report Issues**: Detailed bug reports, documentation gaps, and feature requests are invaluable
+
+Thanks for checking out the project!
 
 ---
 
