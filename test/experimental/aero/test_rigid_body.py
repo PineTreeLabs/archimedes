@@ -11,7 +11,6 @@ from archimedes.experimental.aero import (
 from archimedes.experimental.spatial import Rotation
 
 m = 1.7  # Arbitrary mass
-g0 = 9.81
 J_B = np.diag([0.1, 0.2, 0.3])  # Arbitrary inertia matrix
 J_B_inv = np.linalg.inv(J_B)
 
