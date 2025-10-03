@@ -30,7 +30,6 @@ from .rotations import (
 )
 from .flight_dynamics import (
     RigidBody,
-    wind_frame,
 )
 from .sensors import (
     Accelerometer,
@@ -40,6 +39,7 @@ from .sensors import (
     LineOfSight,
     LineOfSightConfig,
 )
+from .frames import wind_frame
 
 __all__ = [
     "RigidBody",
