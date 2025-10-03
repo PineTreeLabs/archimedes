@@ -8,7 +8,6 @@ from scipy.spatial.transform import Rotation as ScipyRotation
 import archimedes as arc
 from archimedes.experimental.aero import (
     RigidBody,
-    dcm_from_euler,
     dcm_from_quaternion,
     euler_to_quaternion,
     quaternion_derivative,

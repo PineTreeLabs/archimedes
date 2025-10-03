@@ -341,12 +341,16 @@ class Rotation:
         q_inv = np.array([q[0], -q[1], -q[2], -q[3]], like=q)
         return Rotation.from_quat(q_inv, scalar_first=True)
 
-    def __mul__(self, other: Rotation) -> Rotation:
+    def mul(self, other: Rotation, normalize: bool = False) -> Rotation:
         """Compose this rotation with another rotation"""
         q1 = self.as_quat(scalar_first=True)
         q2 = other.as_quat(scalar_first=True)
         q = _compose_quat(q1, q2)
-        return Rotation.from_quat(q, scalar_first=True)
+        return Rotation.from_quat(q, scalar_first=True, normalize=normalize)
+
+    def __mul__(self, other: Rotation) -> Rotation:
+        """Compose this rotation with another rotation"""
+        return self.mul(other, normalize=True)
 
     def derivative(self, w: np.ndarray, baumgarte: float = 0.0) -> Rotation:
         """Return the time derivative of the rotation given angular velocity w"""
