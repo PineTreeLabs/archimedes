@@ -28,5 +28,5 @@ Professional hardware-in-the-loop testing on a startup budget.
 ```{toctree}
 :maxdepth: 1
 
-2025/introduction
+Introducing Archimedes <2025/introduction>
 2025/dummy

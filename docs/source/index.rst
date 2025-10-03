@@ -1,7 +1,13 @@
 
-==========================
-Archimedes
-==========================
+.. ==========================
+.. Archimedes
+.. ==========================
+
+.. image:: _static/rocket.png
+   :alt: Archimedes Rocket Logo
+   :align: center
+
+-----------------
 
 **Archimedes** is an open-source Python framework designed to simplify complex modeling
 and simulation tasks, with the ultimate goal of making it possible to do practical

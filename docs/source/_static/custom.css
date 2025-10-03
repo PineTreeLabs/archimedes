@@ -226,3 +226,21 @@ Use this in MyST with:
 .admonition.blog-author-bio a {
     font-style: normal;
 }
+
+/* Hide specific titles in blog posts */
+.hidden-title {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0,0,0,0);
+    border: 0;
+}
+
+/* Reduce spacing for h1 elements that only contain hidden titles */
+h1:has(.hidden-title) {
+    margin-top: 0.5rem;
+    margin-bottom: 0.5rem;
+}

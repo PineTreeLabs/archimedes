@@ -1,4 +1,14 @@
-# Introducing Archimedes
+---
+title: Introducing Archimedes
+description: Public beta release announcement
+author: Jared Callaham
+---
+
+# [Introducing Archimedes]{.hidden-title}
+
+```{image} _static/rocket_intro.png
+:alt: Introducing Archimedes
+```
 
 **_A Python toolkit for hardware engineering_**
 
@@ -10,13 +20,16 @@ A great engineer (controls being no exception) has to be part hacker, part maste
 
 You have to be a hacker because things rarely "just work" in the real world without a little... creativity.
 But you can't _only_ be a hacker; developing complex systems in aerospace, automotive, robotics, and similar industries demands a disciplined, methodical approach.
+You need tools that let you be both fast _and_ rigorous.
 
-You need a workflow that lets you be both fast _and_ rigorous.
+<!--
+
+Not clear how the _rigor_ translates here. Speed -> Python, but rigor -> C?  Be explicit about where the rigor comes from.
+
+-->
 
 Modern deep learning frameworks solved this years ago — you can develop in PyTorch or JAX and deploy anywhere.
 But those tools were built for neural net models, GPUs, and cloud deployments, not dynamics models, MCUs, and HIL testing.
-
-**But what if that _was_ how controls development worked?**
 
 That's where Archimedes comes in.
 The goal is to build an open-source "PyTorch for hardware" that gives you the productivity of Python with the deployability of C.
