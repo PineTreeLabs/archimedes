@@ -68,6 +68,7 @@ select = [
 exclude = [
     "src/archimedes/experimental/*",
     "examples/*",
+    "docs/source/conf.py"
 ]
 
 [tool.ruff.lint.isort]
