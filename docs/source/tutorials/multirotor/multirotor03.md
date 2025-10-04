@@ -90,7 +90,7 @@ vehicle = multirotor.MultiRotorVehicle(
     drag_model=drag_model,
     rotor_model=rotor_model,
     gravity_model=gravity_model,
-    rigid_body=multirotor.RigidBody(attitude="euler"),
+    rigid_body=multirotor.RigidBody(),
 )
 ```
 
@@ -109,9 +109,9 @@ t_span = (t0, t1)
 u0 = 500.0 * np.ones(4)  # Rotor angular velocity
 
 x0 = vehicle.state(
-    p_N=np.zeros(3),  # Initial position [m]
-    att=np.zeros(3),  # Initial roll-pitch-yaw [rad]
-    v_B=np.zeros(3),  # Initial velocity [m/s]
+    pos=np.zeros(3),  # Initial position [m]
+    rpy=np.zeros(3),  # Initial roll-pitch-yaw [rad]
+    vel=np.zeros(3),  # Initial body-frame velocity [m/s]
     w_B=np.zeros(3),  # Initial angular velocity [rad/s]
 )
 x0_flat, unravel = arc.tree.ravel(x0)

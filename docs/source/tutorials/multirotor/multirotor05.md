@@ -307,6 +307,8 @@ import multirotor
 import numpy as np
 
 import archimedes as arc
+from archimedes.experimental import aero
+from archimedes.experimental.spatial import Rotation
 ```
 
 ```{code-cell} python
@@ -396,7 +398,7 @@ vehicle = multirotor.MultiRotorVehicle(
     drag_model=drag_model,
     rotor_model=rotor_model,
     gravity_model=gravity_model,
-    rigid_body=multirotor.RigidBody(attitude="euler"),
+    rigid_body=multirotor.RigidBody(),
 )
 ```
 
@@ -416,9 +418,9 @@ t1 = 20.0
 
 # Initial state for simulation
 x0 = vehicle.state(
-    p_N=np.zeros(3),  # Initial position [m]
-    att=np.zeros(3),  # Initial roll-pitch-yaw [rad]
-    v_B=np.zeros(3),  # Initial velocity [m/s]
+    pos=np.zeros(3),  # Initial position [m]
+    rpy=np.zeros(3),  # Initial roll-pitch-yaw [rad]
+    vel=np.zeros(3),  # Initial body-frame velocity [m/s]
     w_B=np.zeros(3),  # Initial angular velocity [rad/s]
 )
 x0_flat, unravel = arc.tree.ravel(x0)
@@ -492,12 +494,10 @@ w_B = np.zeros(3)  # Target angular velocity in the body frame
 
 @arc.compile
 def residual(p):
-    phi, theta = p[:2]  # (pitch, roll) angles
+    phi, theta = p[:2]  # (roll, pitch) angles
     u = p[2:]  # Rotor angular velocities
-    rpy = np.array([phi, theta, 0.0], like=p)
-    C_BN = multirotor.dcm_from_euler(rpy)
-    v_B = C_BN @ v_N
-    x = vehicle.state(p_N, rpy, v_B, w_B)
+    rpy = np.hstack([phi, theta, 0.0])
+    x = vehicle.state(p_N, rpy, v_N, w_B, inertial_velocity=True)
     x_t = vehicle.dynamics(0.0, x, u)
     return np.hstack([x_t.v_B, x_t.w_B])  # Residuals of dynamics equations only
 
@@ -511,11 +511,8 @@ phi_trim = p_trim[0]
 theta_trim = p_trim[1]
 u_trim = p_trim[2:]
 
-rpy_trim = np.array([phi_trim, theta_trim, 0.0])
-C_BN = multirotor.dcm_from_euler(rpy_trim)
-v_B_trim = C_BN @ v_N
-
-x_trim = vehicle.state(p_N, rpy_trim, v_B_trim, w_B)
+rpy_trim = Rotation.from_euler("xyz", [phi_trim, theta_trim, 0.0])
+v_B_trim = rpy_trim.apply(v_N, inverse=True)
 
 print(f"roll: {np.rad2deg(phi_trim):.2f} deg")
 print(f"pitch: {np.rad2deg(theta_trim):.2f} deg")
@@ -525,33 +522,23 @@ print(f"u: {u_trim}")
 
 
 ```{code-cell} python
-# Longitudinal dynamics include surge (vx), heave (vz), pitch (theta),
-# and pitch rate (q). The other states are assumed to be in trim
-def longitudinal_dofs(x):
-    return np.hstack(
-        [
-            x.att[1],  # theta
-            x.v_B[0],  # vx
-            x.v_B[2],  # vz
-            x.w_B[1],  # q
-        ]
-    )
+# (theta, vx, vz, q) at trim
+x_lon_trim = np.hstack([theta_trim, v_B_trim[0], v_B_trim[2], w_B[1]])
 
 
 # Right-hand side function for the longitudinal dynamics
 def f_lon(x_lon, u):
-    theta, vx, vz, q = x_lon  # Longitudinal degrees of freedom
-    x = vehicle.state(
-        np.zeros(3),
-        np.hstack([phi_trim, theta, 0.0]),
-        np.hstack([vx, v_B_trim[1], vz]),
-        np.hstack([0.0, q, 0.0]),
-    )
+    theta, vx, vz, q = x_lon  # Perturbations
+    rpy = np.hstack([phi_trim, theta, 0.0])
+    w_B = np.hstack([0.0, q, 0.0])
+    # Note we can't compute quaternion kinematics and then
+    # convert to Euler rates -> have to use Euler kinematics directly
+    rpy_t = aero.euler_kinematics(rpy) @ w_B
+    v_B = np.hstack([vx, v_B_trim[1], vz])
+    x = vehicle.state(np.zeros(3), rpy, v_B, w_B)
     x_t = vehicle.dynamics(0.0, x, u)
-    return longitudinal_dofs(x_t)
+    return np.hstack([rpy_t[1], x_t.v_B[0], x_t.v_B[2], x_t.w_B[1]])
 
-
-x_lon_trim = longitudinal_dofs(x_trim)
 
 # Linearized state-space matrices
 A_lon = arc.jac(f_lon, 0)(x_lon_trim, u_trim)

@@ -3,11 +3,9 @@ import pytest
 import numpy as np
 
 from archimedes.experimental.aero import (
-    euler_to_quaternion,
     euler_kinematics,
-    quaternion_multiply,
-    quaternion_inverse,
 )
+from archimedes.experimental.spatial import Rotation
 
 from f16_plant import SubsonicF16, GRAV_FTS2
 
@@ -32,23 +30,16 @@ def test_352(f16: SubsonicF16):
     rpy = np.array([-1.0, 1.0, -1.0])  # Roll, pitch, yaw
     v_B = np.array([430.0447, -99.3347, 234.9345])  # Velocity in body frame
     w_B = np.array([0.7, -0.8, 0.9])  # Angular velocity in body frame
-    q = euler_to_quaternion(rpy)
+
+    att = Rotation.from_euler("xyz", rpy)
     pow = 90.0  # Engine power
-    rb_state = f16.rigid_body.State(p_N, q, v_B, w_B)
+    rb_state = f16.rigid_body.State(p_N, att, v_B, w_B)
     x = f16.State(rb_state, pow)
 
     # NOTE: There is a typo in the chapter 3 code implementation of the DCM,
     # leading to a sign change for yaw rate xd[11].  Hence, Table 3.5-2 has
     # 248.1241 instead of -248.1241 (the latter is consistent with the SciPy
     # DCM implementation).
-    q_t = 0.5 * quaternion_multiply(q, np.array([0, *w_B]))
-    drpy_ex = np.array(
-        [
-            2.505734,  # phi (roll)
-            0.3250820,  # theta (pitch)
-            2.145926,  # psi (yaw)
-        ]
-    )
     dp_N_ex = np.array(
         [
             342.4439,  # x (north)
@@ -72,18 +63,16 @@ def test_352(f16: SubsonicF16):
     )
 
     x_t = f16.dynamics(0.0, x, u)
-    assert np.allclose(x_t.p_N, dp_N_ex, atol=1e-2)
-    assert np.allclose(x_t.att, q_t, atol=1e-2)
-    assert np.allclose(x_t.v_B, dv_B_ex, atol=1e-2)
-    assert np.allclose(x_t.w_B, dw_B_ex, atol=1e-2)
 
-    # Check with Euler attitude representation
-    f16 = f16.replace(rigid_body=f16.rigid_body.replace(attitude="euler"))
-    rb_state = f16.rigid_body.State(p_N, rpy, v_B, w_B)
-    x = f16.State(rb_state, pow)
-    x_t = f16.dynamics(0.0, x, u)
+    # Extract body angular velocity from quaternion derivative
+    # q_t = 0.5 * q ⊗ ω_B
+    # => ω_B = 2 * q⁻¹ ⊗ q_t
+    # This gives a check on the quaternion derivative calculation
+    # without using the roll-pitch-yaw rates.
+    w_B_out = 2 * (att.inv().mul(x_t.att, normalize=False)).as_quat()[1:]
+
     assert np.allclose(x_t.p_N, dp_N_ex, atol=1e-2)
-    assert np.allclose(x_t.att, drpy_ex, atol=1e-2)
+    assert np.allclose(w_B_out, w_B, atol=1e-2)
     assert np.allclose(x_t.v_B, dv_B_ex, atol=1e-2)
     assert np.allclose(x_t.w_B, dw_B_ex, atol=1e-2)
 
@@ -110,9 +99,10 @@ def test_36(f16: SubsonicF16):
     w_B = np.array(
         [-1.499617e-2, 2.933811e-1, 6.084932e-2]
     )  # Angular velocity in body frame
-    q = euler_to_quaternion(rpy)
+
+    att = Rotation.from_euler("xyz", rpy)
     pow = 6.412363e1  # Engine power
-    rb_state = f16.rigid_body.State(p_N, q, v_B, w_B)
+    rb_state = f16.rigid_body.State(p_N, att, v_B, w_B)
     x = f16.State(rb_state, pow)
 
     u = np.array([thtl, el, ail, rdr])
@@ -126,41 +116,20 @@ def test_36(f16: SubsonicF16):
     rpy_t = np.array([0.0, 0.0, 0.3])  # Roll, pitch-up, turn rates
     H_inv = euler_kinematics(rpy, inverse=True)  # rpy_t -> w_B
     w_B_expected = H_inv @ rpy_t
-    # Second, convert the angular momentum to a quaternion rate
-    q_t_expected = 0.5 * quaternion_multiply(q, np.array([0, *w_B_expected]))
-    assert np.allclose(x_t.att, q_t_expected, atol=1e-4)
+
+    # Second, convert the quaternion derivative to angular momentum
+    # See notes above on this conversion
+    w_B_out = 2 * (att.inv().mul(x_t.att, normalize=False)).as_quat()[1:]
+    assert np.allclose(w_B_out, w_B_expected, atol=1e-4)
 
     # Turn coordination when flight path angle is zero
     # This verifies equation 3.6-7 in Lewis, Johnson, Stevens
     phi = rpy[0]
-    w_B = 2 * quaternion_multiply(quaternion_inverse(q), x_t.att)
-    w_B = w_B[1:]  # Discard the scalar component of the angular momentum "quaternion"
     H = euler_kinematics(rpy)  # w_B -> rpy_t
-    rpy_t = H @ w_B
+    rpy_t = H @ w_B_out
     psi_t = rpy_t[2]  # Turn rate
 
     G = psi_t * vt / g0
-    tph1 = np.tan(phi)
-    tph2 = G * np.cos(beta) / (np.cos(alpha) - G * np.sin(alpha) * np.sin(beta))
-    assert np.allclose(tph1, tph2)
-
-    # Recheck with Euler attitude representation
-    f16 = f16.replace(rigid_body=f16.rigid_body.replace(attitude="euler"))
-    rb_state = f16.rigid_body.State(p_N, rpy, v_B, w_B)
-    x = f16.State(rb_state, pow)
-    x_t = f16.dynamics(0.0, x, u)
-
-    assert np.allclose(x_t.v_B, 0.0, atol=1e-4)
-    assert np.allclose(x_t.w_B, 0.0, atol=1e-4)
-
-    # Check command rates
-    assert np.allclose(x_t.att[0], 0.0, atol=1e-4)  # Roll rate
-    assert np.allclose(x_t.att[1], 0.0, atol=1e-4)  # Pitch-up rate
-    assert np.allclose(x_t.att[2], 0.3, atol=1e-4)  # Turn rate
-
-    # Turn coordination when flight path angle is zero
-    phi, theta, _psi = x.att
-    G = x_t.att[2] * vt / g0
     tph1 = np.tan(phi)
     tph2 = G * np.cos(beta) / (np.cos(alpha) - G * np.sin(alpha) * np.sin(beta))
     assert np.allclose(tph1, tph2)

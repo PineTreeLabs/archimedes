@@ -22,11 +22,27 @@ jobs:
     - name: Install the project
       run: |
         uv sync --dev
+
+    - name: Check pip-audit exceptions
+      run: |
     
     - name: Run pip-audit
       run: |
+        # === TEMPORARY SECURITY EXCEPTIONS ===
+        #
+        # CVE-2025-8869 (pip tarfile symlink vulnerability)
+        # - ID: GHSA-4xh5-x5gv-qwph
+        # - Affects: pip 25.2 and earlier
+        # - Resolution: pip 25.3
+        # - Tracking: https://github.com/PineTreeLabs/archimedes/issues/103
+        # - Impact: Does not affect Archimedes functionality
+        EXPIRY_DATE="2025-12-01"
+        if [[ $(date +%Y-%m-%d) > $EXPIRY_DATE ]]; then
+          echo "ERROR: pip-audit exception has expired. Review issue #103."
+          exit 1
+        fi
         uv export --no-emit-project --format requirements-txt > requirements.txt
-        uv run pip-audit -r requirements.txt --disable-pip
+        uv run pip-audit -r requirements.txt --disable-pip --ignore-vuln GHSA-4xh5-x5gv-qwph
     
     - name: Run Bandit scan
       run: bandit -r src -c pyproject.toml

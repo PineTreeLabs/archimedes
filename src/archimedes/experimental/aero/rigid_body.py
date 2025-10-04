@@ -1,44 +1,71 @@
 from __future__ import annotations
-from typing import TYPE_CHECKING, Protocol
 
 import numpy as np
 
 from archimedes import struct, field, StructConfig
 
-from .rotations import (
-    dcm_from_euler,
-    dcm_from_quaternion,
-    euler_kinematics,
-    quaternion_derivative,
-)
+from ..spatial import Rotation
 
 
-def wind_frame(v_rel_B):
-    """Compute total velocity, angle of attack, and sideslip angle
+__all__ = ["RigidBody", "RigidBodyConfig", "euler_kinematics"]
 
-    The input should be the vehicle wind-relative velocity computed in
-    body-frame axes.  If the inertial velocity of the vehicle expressed in
-    body-frame axes is v_B and the Earth-relative wind velocity is w_N,
-    then the relative velocity is v_rel_B = v_B + R_BN @ w_N, where R_BN
-    is the rotation matrix from inertial to body frame.
 
-    If there is no wind, then v_rel_B = v_B.
+def euler_kinematics(rpy, inverse=False):
+    """Euler kinematical equations
+
+    Define 𝚽 = [phi, theta, psi] == Euler angles for roll, pitch, yaw (same in body and inertial frames)
+
+    The kinematics in body and inertial frames are:
+            ω = [P, Q, R] == [roll_rate, pitch_rate, yaw_rate] in body frame
+            d𝚽/dt = time derivative of Euler angles (inertial frame)
+
+    Returns matrix H(𝚽) such that d𝚽/dt = H(𝚽) * ω
+    If inverse=True, returns matrix H(𝚽)^-1 such that ω = H(𝚽)^-1 * d𝚽/dt.
+
+    Note that the RigidBody class uses quaternions for attitude representation,
+    but special cases like stability analysis may use Euler angle kinematics.
     """
-    u, v, w = v_rel_B
-    vt = np.sqrt(u**2 + v**2 + w**2)
-    alpha = np.arctan2(w, u)
-    beta = np.arcsin(v / vt)
-    return vt, alpha, beta
+
+    φ, θ = rpy[0], rpy[1]  # Roll, pitch
+
+    sφ, cφ = np.sin(φ), np.cos(φ)
+    sθ, cθ = np.sin(θ), np.cos(θ)
+    tθ = np.tan(θ)
+
+    _1 = np.ones_like(φ)
+    _0 = np.zeros_like(φ)
+
+    if inverse:
+        Hinv = np.array(
+            [
+                [_1, _0, -sθ],
+                [_0, cφ, cθ * sφ],
+                [_0, -sφ, cθ * cφ],
+            ],
+            like=rpy,
+        )
+        return Hinv
+
+    else:
+        H = np.array(
+            [
+                [_1, sφ * tθ, cφ * tθ],
+                [_0, cφ, -sφ],
+                [_0, sφ / cθ, cφ / cθ],
+            ],
+            like=rpy,
+        )
+        return H
 
 
 @struct
 class RigidBody:
-    attitude: str = "quaternion"  # "euler" or "quaternion"
+    baumgarte: float = 1.0  # Baumgarte stabilization factor for quaternion kinematics
 
     @struct
     class State:
         p_N: np.ndarray  # Position of the center of mass in the Newtonian frame N
-        att: np.ndarray  # Attitude (orientation) of the vehicle
+        att: Rotation  # Attitude (orientation) of the vehicle
         v_B: np.ndarray  # Velocity of the center of mass in body frame B
         w_B: np.ndarray  # Angular velocity in body frame (ω_B)
 
@@ -55,36 +82,11 @@ class RigidBody:
     def calc_kinematics(self, x: State):
         # Unpack the state
         v_B = x.v_B  # Velocity of the center of mass in body frame B
-        w_B = x.w_B  # Angular velocity in body frame (ω_B)
-
-        if self.attitude == "euler":
-            rpy = x.att
-
-            # Convert roll-pitch-yaw (rpy) orientation to the direction cosine matrix.
-            # C_BN rotates from the Newtonian frame N to the body frame B.
-            # C_BN.T = C_NB rotates from the body frame B to the Newtonian frame N.
-            C_BN = dcm_from_euler(rpy)
-
-            # Transform roll-pitch-yaw rates in the body frame to time derivatives of Euler angles
-            # These are the Euler kinematic equations (1.4-5)
-            H = euler_kinematics(rpy)
-
-            # Time derivatives of roll-pitch-yaw (rpy) orientation
-            att_deriv = H @ w_B
-
-        elif self.attitude == "quaternion":
-            q = x.att
-
-            # Convert roll-pitch-yaw (rpy) orientation to the direction cosine matrix.
-            # C_BN rotates from the Newtonian frame N to the body frame B.
-            # C_BN.T = C_NB rotates from the body frame B to the Newtonian frame N.
-            C_BN = dcm_from_quaternion(q)
-
-            # Time derivative of the quaternion
-            att_deriv = quaternion_derivative(q, w_B)
 
         # Velocity in the Newtonian frame
-        dp_N = C_BN.T @ v_B
+        dp_N = x.att.apply(v_B)
+
+        att_deriv = x.att.derivative(x.w_B, baumgarte=self.baumgarte)
 
         return dp_N, att_deriv
 
@@ -131,8 +133,8 @@ class RigidBody:
 
 
 class RigidBodyConfig(StructConfig):
-    attitude: str = "quaternion"  # "euler" or "quaternion"
+    baumgarte: float = 1.0  # Baumgarte stabilization factor
 
     def build(self) -> RigidBody:
         """Build and return a RigidBody instance."""
-        return RigidBody(attitude=self.attitude)
+        return RigidBody(baumgarte=self.baumgarte)

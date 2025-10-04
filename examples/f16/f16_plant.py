@@ -142,7 +142,7 @@ class SubsonicF16:
 
         # Engine thrust model
         pow = x.engine_power
-        Feng_B = self.engine.calc_thrust(pow, alt, amach)
+        F_eng_B = self.engine.calc_thrust(pow, alt, amach)
 
         force_coeffs, moment_coeffs = self.aero(
             vt, alpha, beta, x.w_B, el, ail, rdr, self
@@ -150,15 +150,12 @@ class SubsonicF16:
         cxt, cyt, czt = force_coeffs
         clt, cmt, cnt = moment_coeffs
 
-        Fgrav_N = self.m * self.gravity(x.p_N)
-        Faero_B = qbar * self.S * np.stack([cxt, cyt, czt])
+        F_grav_N = self.m * self.gravity(x.p_N)
+        F_aero_B = qbar * self.S * np.stack([cxt, cyt, czt])
 
-        if self.rigid_body.attitude == "euler":
-            C_BN = aero.dcm_from_euler(x.att)
-        elif self.rigid_body.attitude == "quaternion":
-            C_BN = aero.dcm_from_quaternion(x.att)
+        F_grav_B = x.att.apply(F_grav_N, inverse=True)
 
-        F_B = Faero_B + Feng_B + C_BN @ Fgrav_N
+        F_B = F_aero_B + F_eng_B + F_grav_B
 
         # Moments
         p, q, r = x.w_B  # Angular velocity in body frame (ω_B)

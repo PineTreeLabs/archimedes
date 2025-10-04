@@ -7,15 +7,12 @@ import numpy as np
 from scipy.special import roots_legendre
 
 import archimedes as arc
-from archimedes.experimental import aero
 from archimedes.experimental.aero import (
     RigidBody,
-    dcm_from_euler,
-    z_dcm,
 )
+from archimedes.experimental.spatial import Rotation
 
 __all__ = [
-    "dcm_from_euler",
     "RigidBody",
     "RotorGeometry",
     "ConstantGravity",
@@ -265,7 +262,7 @@ class RotorModel(metaclass=abc.ABCMeta):
         # effect and the wind angle is undefined (+/- 90 degrees will also work).
         psi_w = np.where(abs(v_H[0]) < 1e-6, np.sign(v_H[1]) * np.pi / 2, psi_w)
 
-        R_WH = z_dcm(psi_w)
+        R_WH = Rotation.from_euler("z", psi_w).as_matrix().T
 
         v_W = R_WH @ v_H  # Rotate velocity to wind frame
         w_W = R_WH @ w_H  # Rotate angular velocity to wind frame
@@ -350,8 +347,11 @@ class MultiRotorVehicle:
         def w_B(self):
             return self.rigid_body.w_B
 
-    def state(self, p_N, att, v_B, w_B, aux=None) -> State:
-        rb_state = self.rigid_body.State(p_N, att, v_B, w_B)
+    def state(self, pos, rpy, vel, w_B, aux=None, inertial_velocity=False) -> State:
+        att = Rotation.from_euler("xyz", rpy)
+        if inertial_velocity:
+            vel = att.apply(vel, inverse=True)
+        rb_state = self.rigid_body.State(pos, att, vel, w_B)
         return self.State(rb_state, aux)
 
     def net_forces(self, t, x: State, u):
@@ -393,13 +393,9 @@ class MultiRotorVehicle:
         # Calculate drag forces and moments in body frame B
         Fdrag_B, Mdrag_B = self.drag_model(t, x)
 
-        # Net force in body frame
-        if self.rigid_body.attitude == "euler":
-            C_BN = aero.dcm_from_euler(x.att)
-        elif self.rigid_body.attitude == "quaternion":
-            C_BN = aero.dcm_from_quaternion(x.att)
+        Fgravity_B = x.att.apply(Fgravity_N, inverse=True)
 
-        F_B = Frotor_B + Fdrag_B + C_BN @ Fgravity_N
+        F_B = Frotor_B + Fdrag_B + Fgravity_B
 
         # Net moment in body frame
         M_B = Mrotor_B + Mdrag_B
