@@ -27,7 +27,7 @@ be familiar to NumPy users.
         :link: blog/index
         :link-type: doc
         
-        Announcements, deep divesd and case studies
+        Announcements, deep dives, and case studies
 
 **Key features**:
 

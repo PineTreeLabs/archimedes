@@ -4,22 +4,13 @@
 ::::{grid} 1 1 2 2
 :gutter: 3
 
-:::{grid-item-card} 5x Faster Simulations: The CasADi Advantage
+:::{grid-item-card} Introducing Archimedes
 :link: 2025/introduction
 :link-type: doc
 
-**January 15, 2024** · Performance
+**30 Sep 2025** · Announcements
 
-Deep dive into why symbolic compilation delivers dramatic speedups in multirotor simulation.
-:::
-
-:::{grid-item-card} Building a $100 HIL Platform
-:link: 2025/dummy
-:link-type: doc
-
-**January 8, 2024** · Hardware
-
-Professional hardware-in-the-loop testing on a startup budget.
+A Python toolkit for hardware engineering
 :::
 
 ::::
@@ -29,4 +20,3 @@ Professional hardware-in-the-loop testing on a startup budget.
 :maxdepth: 1
 
 Introducing Archimedes <2025/introduction>
-2025/dummy
