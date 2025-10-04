@@ -39,7 +39,7 @@ For instance, you can write a physics model in Python, calibrate it with data, u
 :class: only-dark
 ```
 
-This is _one_ workflow you might use with Archimedes (specifically, the one from the [hardware deployment tutorial](../../tutorials/deployment/deployment00.md)), but it's designed to be flexibile, so you're free to build up whatever workflow suits your style and application best.
+This is _one_ workflow you might use with Archimedes (specifically, the one from the [hardware deployment tutorial](../../tutorials/deployment/deployment00.md)), but it's designed to be flexible, so you're free to build up whatever workflow suits your style and application best.
 
 ## The Linchpin: Python → C Code Generation
 
