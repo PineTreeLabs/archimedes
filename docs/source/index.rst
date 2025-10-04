@@ -1,7 +1,13 @@
 
-==========================
-Archimedes
-==========================
+.. ==========================
+.. Archimedes
+.. ==========================
+
+.. image:: _static/rocket.png
+   :alt: Archimedes Rocket Logo
+   :align: center
+
+-----------------
 
 **Archimedes** is an open-source Python framework designed to simplify complex modeling
 and simulation tasks, with the ultimate goal of making it possible to do practical
@@ -9,7 +15,21 @@ hardware engineering with Python. It builds on the powerful symbolic computation
 capabilities of `CasADi <https://web.casadi.org/docs/>`_ with an interface designed to
 be familiar to NumPy users.
 
-Key features:
+.. grid:: 2
+
+    .. grid-item-card:: 📚 Quickstart
+        :link: quickstart
+        :link-type: doc
+        
+        Learn how to use Archimedes
+    
+    .. grid-item-card:: 📝 Blog
+        :link: blog/index
+        :link-type: doc
+        
+        Announcements, deep dives, and case studies
+
+**Key features**:
 
 * NumPy-compatible array API with automatic dispatch
 * Efficient execution of computational graphs in compiled C++
@@ -44,11 +64,18 @@ Documentation
 
 .. toctree::
    :maxdepth: 1
-   :caption: Getting Started
+   :caption: Introduction
 
    quickstart
    about
    getting-started
+
+
+.. toctree::
+   :maxdepth: 1
+   :caption: Resources
+
+   blog/index
 
 .. toctree::
    :maxdepth: 1

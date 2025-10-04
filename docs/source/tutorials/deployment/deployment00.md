@@ -57,7 +57,7 @@ While simplified (and applied to a simple physical system), every aspect of the 
     - Implementing the physics model
     - Calibration via parameter estimation
 
-3. [**Controller Design**]deployment03.md)
+3. [**Controller Design**](deployment03.md)
     - Implementing a simple PI controller
     - Classical control systems analysis
     - C code generation
