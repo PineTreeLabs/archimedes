@@ -22,6 +22,7 @@ extensions = [
     "sphinx.ext.autosummary",
     "sphinx.ext.intersphinx",
     "sphinx.ext.mathjax",
+    "sphinxcontrib.googleanalytics",
 ]
 
 intersphinx_mapping = {
@@ -66,6 +67,7 @@ autosummary_imported_members = True
 templates_path = ["_templates"]
 exclude_patterns = []
 
+googleanalytics_id = "G-DMLVH3TEDW"
 
 # -- Options for HTML output -------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output
