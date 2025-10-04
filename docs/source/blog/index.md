@@ -4,6 +4,9 @@
 ::::{grid} 1 1 2 2
 :gutter: 3
 
+<!--
+HOLD FOR RELEASE
+
 :::{grid-item-card} Introducing Archimedes
 :link: 2025/introduction
 :link-type: doc
@@ -12,11 +15,6 @@
 
 A Python toolkit for hardware engineering
 :::
+-->
 
 ::::
-
-## All Posts
-```{toctree}
-:maxdepth: 1
-
-Introducing Archimedes <2025/introduction>
