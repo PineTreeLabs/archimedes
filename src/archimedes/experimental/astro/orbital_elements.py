@@ -4,7 +4,7 @@ import numpy as np
 from archimedes import struct
 
 from .constants import EARTH_RADIUS, EARTH_MU
-from ..aero.rotations import x_dcm, y_dcm, z_dcm
+from ..spatial import Rotation
 
 
 @struct
@@ -98,15 +98,8 @@ def kepler_to_cartesian(
         ]
     )
 
-    # Rotation matrix from perifocal to ECI frame.  Note that this is not the most
-    # efficient way to do this, but since this will primarily be evaluated
-    # symbolically, we're basically relying on CasADi to generate
-    # optimized code.
-
-    # R = Rz(Ω) * Rx(i) * Rz(ω)
-    # R = Rotations.RotZXZ(Ω, i, ω)
-    # R = inv(angle_to_dcm(Ω, i, ω, :ZXZ))
-    R = z_dcm(Ω).T @ x_dcm(i).T @ z_dcm(ω).T
+    # Rotation matrix from perifocal to ECI frame.
+    R = Rotation.from_euler("ZXZ", [Ω, i, ω]).as_matrix()
     r_ECI = R @ r_PQW
     v_ECI = R @ v_PQW
     return CartesianState(r_ECI, v_ECI)
