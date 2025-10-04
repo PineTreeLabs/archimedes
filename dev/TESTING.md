@@ -26,8 +26,8 @@ uv run pytest --cov=archimedes --cov-report=html
 Linting and formatting is done with [ruff](https://docs.astral.sh/ruff/):
 
 ```bash
-uv run ruff format src test examples
-uv run ruff check --fix src test examples
+uv run ruff format src test examples docs
+uv run ruff check --fix src test examples docs
 ```
 
 We also have a CI test for static type checking with [mypy](https://mypy-lang.org/):
