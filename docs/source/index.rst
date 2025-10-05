@@ -87,13 +87,12 @@ Documentation
 
 .. toctree::
    :maxdepth: 1
-   :caption: Applications
+   :caption: Tutorials
 
    tutorials/hierarchical/hierarchical00
    tutorials/sysid/parameter-estimation
    tutorials/codegen/codegen00
    tutorials/deployment/deployment00
-   tutorials/multirotor/multirotor00
 
 .. toctree::
    :maxdepth: 1
