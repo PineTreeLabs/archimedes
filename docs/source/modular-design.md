@@ -13,32 +13,81 @@ kernelspec:
 
 This page covers best practices and design patterns for creating composable dynamical systems models, control algorithms, and other modular functionality using Archimedes.
 By leveraging the [`struct`](#archimedes.tree.struct) decorator, you can create modular components that can be combined into complex hierarchical models while maintaining clean, organized code.
-However, the recommendations in this guide are strictly suggestions; you can design your models and workflows however you wish.
+But while this guide provides some tips and best practices, these are strictly suggestions; you can design your models and workflows however you wish.
 
 ## Core Concepts
 
 The basic concepts of structured data types and tree operations are covered in the ["Structured Data Types"](trees.md) documentation page.
 Here we'll build on these concepts to see how they can be used for intuitive and scalable design patterns.
 
-### Trees for structured states
-
-Dynamical systems often have state variables that benefit from logical grouping.
+Dynamical systems often have natural subsystems and state variables that benefit from logical grouping.
 Using tree-structured representations allows you to:
 
 1. Group related state variables together
 2. Create nested hierarchies that mirror the physical structure of your system
 3. Maintain clean interfaces between subsystems
-4. Flatten and unflatten states automatically for ODE solvers
+4. Flatten and unflatten states automatically for simulation, optimization, stability analysis, etc.
 
 ### Design Patterns
 
-Some recommended patterns for building modular dynamics components in Archimedes are:
+The first step in creating a hierarchical dynamics model is to identify the subsystems, components, etc. that naturally decompose a complex system into its logical building blocks.
+For each of these modular dynamics components, you can then implement state-space systems of the form
 
-1. **Modular Components**: Create a [`struct`](#archimedes.tree.struct) for each logical system component
-2. **Hierarchical Parameters**: Add model parameters as fields in the struct
-3. **Nested State Classes**: Define a `State` class inside each model component
-4. **Dynamics Methods**: Implement `dynamics(self, t, state, ...)` methods that return state derivatives
-5. **Compositional Models**: Build larger models by combining smaller components
+$$
+\begin{align}
+\dot{x} &= f(t, x, u, p) \\
+y &= h(t, x, u, p),
+\end{align}
+$$
+
+where $t$ is time, $x$ is the state, $u$ are external (control) inputs, and $p$ are parameters.
+Some recommended patterns to implement these components include:
+
+1. **Structured Data Classes**: Decorate each class as a [`struct`](#archimedes.tree.struct)
+3. **Nested Struct Definitions**: Define a `State` class inside each model component (and `Input` and `Output` as necessary)
+2. **Hierarchical Parameters**: Add model parameters as fields in the struct or as a nested `Parameters` class
+4. **Standardized Methods**: Implement `dynamics(self, t, state, ...)` methods that return state derivatives, and/or `output(self, t, state, ...)` methods that return the outputs of a state-space model
+
+A template for a generic dynamics model following these patterns would look like this:
+
+```python
+@struct
+class Component:
+    # Define model parameters here
+    ...
+
+    # OR create an inner struct to organize them
+    @struct
+    class Parameters:
+        ...  # Model parameters (p)
+
+    @struct
+    class State:
+        ...  # Dynamic state (x)
+
+    @struct
+    class Input:
+        ...  # Inputs to the system (u)
+
+    @struct
+    class Output:
+        ...  # Measured outputs (y)
+
+    def dynamics(self, t: float, x: State, u: Input, p: Parameters) -> State:
+        ...  # Implement ẋ = f(t, x, u, p)
+
+    def output(self, t: float, x: State, u: Input, p: Parameters) -> Output:
+        ...  # Implement y = h(t, x, u, p)
+```
+
+One important recommendation is to use `abc` metaclasses or `Protocol` classes to clearly define interfaces for components - then you can define multiple variants and easily switch between them without touching the rest of your system model.
+This template code itself could be a `Protocol`, for instance.
+
+Then you can create composite models by nesting these components together to organize and abstract the details of complex system models.
+The `abc`/`Protocol` approach also lets you define an interface for a component and then implement "multi-fidelity modeling" by creating implementations of varying speed and accuracy.
+
+For example, you might create a sensor component and then have three variants that implement a (1) simplified version with no dynamics, (2) a simple linear system model (e.g. second-order transfer function), and (3) a high-fidelity physics-based model.
+Then you can separately calibrate each using [parameter estimation](tutorials/sysid/parameter-estimation.md) and easily switch between them depending on the context (e.g. low-fidelity for model-based control or high-fidelity for simulated evaluation).
 
 ## Basic Component Pattern
 
@@ -47,6 +96,8 @@ Here's a basic example of using these patterns to creating a modular dynamical s
 
 ```{code-cell} python
 :tags: [hide-cell]
+from __future__ import annotations
+
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -78,10 +129,10 @@ class Oscillator:
     class State:
         """State variables for the mass-spring-damper system."""
 
-        x: np.ndarray
-        v: np.ndarray
+        x: float
+        v: float
 
-    def dynamics(self, t, state: State, f_ext=0.0):
+    def dynamics(self, t, state: State, f_ext: float = 0.0) -> State:
         """Compute the time derivatives of the state variables."""
 
         # Compute derivatives
@@ -99,7 +150,9 @@ x0 = system.State(x=1.0, v=0.0)
 x0
 ```
 
-For such a simple system, the advantages to this design are relatively limited, but because these nodes can be nested within each other, it can be a useful way to organize states, parameters, and functions associated with complex models.
+Note that since this particular system is very simple we didn't implement the full machinery shown in the `Component` protocol above - that would be overkill here.
+In fact, for such a simple system, the advantages to following this design pattern are relatively limited overall (it would have been easier to just implement a simple ODE right-hand-side function).
+But because these nodes can be nested within each other, it can be a useful way to organize states, parameters, and functions associated with more complex models.
 
 ## Working with tree-structured data
 
@@ -157,10 +210,9 @@ This is useful for applications in optimization and parameter estimation.
 Another common pattern is to define yet another `struct` for the parameters, rather than having them as fields in the system model.
 This comes down to individual preference and whatever works best for the specific application.
 
-## Complete Example: Coupled Oscillators
+## Composite System: Coupled Oscillators
 
-Larger systems can be built by composing multiple components together.
-Let's build a system of coupled oscillators to demonstrate these patterns.
+Larger systems can be built by composing multiple components together:
 
 
 ```{code-cell} python
@@ -237,6 +289,7 @@ sol = arc.vmap(state_unravel, in_axes=1)(sol_flat)
 ```
 
 ```{code-cell} python
+:tags: [hide-cell]
 :tags: [remove-output]
 # Plot the results
 
@@ -275,7 +328,6 @@ for theme in {"light", "dark"}:
 ```{image} _plots/modular_design_0_dark.png
 :class: only-dark
 ```
-    
 
 
 ## Summary
@@ -283,20 +335,18 @@ for theme in {"light", "dark"}:
 The recommended approach to building hierarchical and modular dynamical systems in Archimedes follows these key patterns:
 
 1. Use [`@struct`](#archimedes.tree.struct) to define structured component classes
-2. Create nested `State` classes to organize state variables
-3. Implement `dynamics` methods that compute state derivatives
+2. Create nested `State` classes to organize state variables (and maybe `Input`, `Output`, `Parameters`)
+3. Implement `dynamics` methods that compute state derivatives (and maybe `output`)
 4. Compose larger systems from smaller components
 5. Add helper methods to simplify simulation and analysis
 
 Other best practices include:
 
-1. **Consistent Interfaces**: Keep the `dynamics(self, t, state, *args)` method signature consistent across all components
-2. **Immutable States**: Always return new state objects instead of modifying existing ones
-3. **Physical Units**: Document physical units in comments or docstrings
-4. **Input Validation**: Add validation in constructors to catch errors early
-5. **Meaningful Names**: Use descriptive names that reflect physical components, or consistent pseudo-mathematical notation like the [monogram](https://drake.mit.edu/doxygen_cxx/group__multibody__notation__basics.html) convention
-6. **Domain Decomposition**: Decompose complex systems into logical components (mechanical, electrical, etc.)
-7. **Structured Parameters**: Define physical parameters as fields in the structs, and use the [`field(static=True)`](#archimedes.tree.field) annotation to mark configuration variables.
-
+1. **Immutable States**: Always return new state objects instead of modifying existing ones
+2. **Physical Units**: Document physical units in comments or docstrings
+3. **Meaningful Names**: Use descriptive names that reflect physical components, or consistent pseudo-mathematical notation like the [monogram](https://drake.mit.edu/doxygen_cxx/group__multibody__notation__basics.html) convention
+4. **Domain Decomposition**: Decompose complex systems into logical components (mechanical, electrical, etc.)
+5. **Physical Parameters**: Define physical parameters as fields in the structs or as inner classes
+6. **Configuration Parameters**: Define as fields in the struct and use the [`field(static=True)`](#archimedes.tree.field) annotation.
 
 These patterns enable clean, organized, and reusable model components by leveraging Archimedes' tree operations to handle the conversion between structured and flat representations needed by ODE solvers.
