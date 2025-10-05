@@ -11,17 +11,12 @@ We use [UV](https://github.com/astral-sh/uv) for development and recommend it as
 # Create and activate a virtual environment 
 uv venv
 source .venv/bin/activate
-```
 
-Package installation can be done by installing from source (pending listing on PyPI):
+# Install with minimal dependencies
+uv pip install archimedes
 
-```bash
-# Download the source code
-git clone https://github.com/jcallaham/archimedes.git
-cd archimedes
-
-# Install the package with development dependencies
-uv pip install -e ".[all]"
+# OR install with extras (control, jupyter, matplotlib, etc.)
+uv pip install archimedes[all]
 ```
 
 If you are not using UV, simply omit `uv` in the final `pip install` command.
@@ -59,7 +54,7 @@ print(J(x, theta))
 
 ## Next steps
 
-If you have not read about the fundamental concepts in Archimedes on [What is Archimedes?](about.md), you may want to start there.
+If you have not read the [introduction](blog/2025/introduction.md), you may want to start there to understand the motivation and philosophy of the project.
 Alternatively, you can skip to [Getting Started](getting-started.md) if you just want to jump right into coding.
 Optionally, to get a deeper understanding of how Archimedes works (and therefore how to work with it), see [Under the Hood](under-the-hood.md).
 

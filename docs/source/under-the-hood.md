@@ -2,7 +2,7 @@
 
 Once you are up and running with Archimedes, it may be useful to understand some of the internal details of how some of the main functionality works.
 This is helpful for debugging and writing more effective and performant code with Archimedes.
-This page will revisit the core concepts from ["What is Archimedes?"](about.md) but will get more into the weeds about symbolic arrays, function tracing, and transformations.
+This page will get into the weeds about symbolic arrays, function tracing, and transformations.
 
 (symbolic-arrays)=
 ## Symbolic arrays

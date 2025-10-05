@@ -17,6 +17,13 @@ capabilities of `CasADi <https://web.casadi.org/docs/>`_ with an interface desig
 be familiar to NumPy users.
 
 .. grid:: 2
+    :gutter: 3
+
+    .. grid-item-card:: ⭐ Introduction
+        :link: blog/2025/introduction
+        :link-type: doc
+        
+        Introduction to the Archimedes project
 
     .. grid-item-card:: 📚 Quickstart
         :link: quickstart
@@ -67,17 +74,10 @@ Documentation
 
 .. toctree::
    :maxdepth: 1
-   :caption: Introduction
-
-   quickstart
-   about
-   getting-started
-
-
-.. toctree::
-   :maxdepth: 1
    :caption: Resources
 
+   quickstart
+   getting-started
    blog/index
 
 .. toctree::

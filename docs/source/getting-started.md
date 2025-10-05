@@ -1,7 +1,9 @@
 # Getting Started
 
-This page will walk through some basic functionality and examples to get you started with some of the patterns and conventions of Archimedes.
-Before working through this page, you may want to make sure you have a working [installation](quickstart) and read through ["What is Archimedes?"](about) to understand the basic conceptual framework and terminology.
+Archimedes lets you develop control algorithms in Python and automatically generate optimized C code for embedded deployment.
+It combines NumPy-based development with automatic differentiation, efficient ODE solving, and hardware deployment - giving you the productivity of Python with the deployability of C.
+New to Archimedes? Read the [introduction](blog/2025/introduction.md) to understand the motivation and design philosophy.
+You may also want to see the [quickstart](quickstart) for installation and a simple "Hello, World!" example.
 
 (compiling-functions)=
 ## Compiling functions

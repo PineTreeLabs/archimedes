@@ -283,7 +283,7 @@ This approach is not "Just-In-Time" (JIT) compilation in the sense used by Julia
 We'll show some benchmarking in a separate post, but generally what you can expect is that these JIT-compiled frameworks will be somewhat faster than pre-compiled CasADi (and hence, Archimedes).
 However, by avoiding the overhead and "unrolling" of true JIT compilation, we get a massive reduction in compilation time for the kind of complex functions typical of advanced controls applications.
 
-For more on how this works (and when it doesn't), see the [What is Archimedes?](../../about.md) and [Under the Hood](../../under-the-hood.md) documentation pages.
+For more on how this works (and when it doesn't), see the [Under the Hood](../../under-the-hood.md) documentation page.
 
 ### Simulation, Optimization, & Root-finding
 
