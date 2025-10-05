@@ -5,7 +5,9 @@
 [![codecov](https://codecov.io/gh/pinetreelabs/archimedes/graph/badge.svg?token=37QNTHS42R)](https://codecov.io/gh/pinetreelabs/archimedes)
 [![REUSE status](https://api.reuse.software/badge/github.com/PineTreeLabs/archimedes)](https://api.reuse.software/info/github.com/PineTreeLabs/archimedes)
 
-Archimedes is an open-source Python framework designed to simplify complex modeling and simulation tasks, with the ultimate goal of making it possible to do practical hardware engineering with Python.
+**Archimedes** is an open-source Python framework designed to simplify the development of complex engineering systems by providing tools for **modeling**, **simulation**, **optimization**, **controls**, and **hardware deployment**. 
+The ultimate goal is to make it possible to do practical
+hardware engineering with Python.
 
 For more details, see the [documentation site](https://pinetreelabs.github.io/archimedes/)
 
@@ -14,25 +16,23 @@ For more details, see the [documentation site](https://pinetreelabs.github.io/ar
 By combining the powerful symbolic capabilities of [CasADi](https://web.casadi.org/docs/) with the intuitive interface designs of NumPy, PyTorch, and JAX, Archimedes provides a number of key features:
 
 * NumPy-compatible array API with automatic dispatch
-* JAX-style function transformations
-* PyTorch-style hierarchical data structures for parameters and dynamics modeling
 * Efficient execution of computational graphs in compiled C++
 * Automatic differentiation with forward- and reverse-mode sparse autodiff
-* Automated C code generation for embedded applications
 * Interface to "plugin" solvers for ODE/DAEs, root-finding, and nonlinear programming
+* Automated C code generation for embedded applications
+* JAX-style function transformations
+* PyTorch-style hierarchical data structures for parameters and dynamics modeling
 
-### ⚠️ WARNING: PRE-RELEASE! ⚠️
-
-This project has not been "officially" released yet, although the source code has been made public as part of pre-release workflow testing.
-Feel free to try out the code, submit bug report, etc., but recognize that the project will be more unstable than usual until the formal release determination is made.
-
-**⚠️ API Stability Notice ⚠️**: Archimedes is currently pre-1.0 software. The API is still evolving and may change between minor versions. We'll aim to document breaking changes in the changelog, but you should expect some instability until version 1.0 is released.
+**⚠️ API Stability Notice ⚠️**: Archimedes is currently pre-1.0 software. The API is still evolving and may change between minor versions. We'll document breaking changes in the changelog and will follow semantic versioning for 0.X releases, but expect to see some instability until version 1.0 is released.
 
 # Examples
 
 ### Automatic differentiation
 
 ```python
+import numpy as np
+import archimedes as arc
+
 def f(x):
     return np.sin(x**2)
 
@@ -88,6 +88,9 @@ print(np.allclose(x_opt, [1.0, 1.0], atol=1e-3))
 Archimedes can convert plain NumPy functions to standalone C code for use in embedded applications:
 
 ```python
+import numpy as np
+import archimedes as arc
+
 def f(x, y):
     return x + np.sin(y)
 
@@ -123,6 +126,8 @@ The easiest way to install is from PyPI:
 pip install archimedes
 ```
 
+Test with any of the examples shown above.
+
 ### Recommended setup
 
 For development (or just a more robust environment configuration), we recommend using [UV](https://docs.astral.sh/uv/) for faster dependency resolution and virtual environment management:
@@ -132,17 +137,32 @@ For development (or just a more robust environment configuration), we recommend 
 uv venv
 source .venv/bin/activate
 
+# Install with minimal dependencies
+uv pip install archimedes
+
+# OR install with extras (control, jupyter, matplotlib, etc.)
+uv pip install archimedes[all]
+```
+
+To install a Jupyter notebook kernel, if you have installed the additional dependencies with `[all]` you can run:
+
+```bash
+uv run ipython kernel install --user --env VIRTUAL_ENV $(pwd)/.venv --name=archimedes
+```
+
+This will create a kernel named `archimedes` - you can change the name to whatever you'd like.
+
+### Source installation
+
+To install from source locally (e.g. for development or building the docs), the recommended procedure is to create a UV virtual environment as described above and then run:
+
+```bash
 git clone https://github.com/pinetreelabs/archimedes.git
 cd archimedes
 
 # Install the package with development dependencies
 uv pip install -e ".[all]"
-```
-
-To install the Jupyter notebook kernel, if you have installed `[all]` dependencies you can run
-
-```bash
-uv run ipython kernel install --user --env VIRTUAL_ENV $(pwd)/.venv --name=archimedes
+uv sync --all-extras
 ```
 
 # Testing and development

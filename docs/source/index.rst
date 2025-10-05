@@ -9,9 +9,10 @@
 
 -----------------
 
-**Archimedes** is an open-source Python framework designed to simplify complex modeling
-and simulation tasks, with the ultimate goal of making it possible to do practical
-hardware engineering with Python. It builds on the powerful symbolic computation
+**Archimedes** is an open-source Python framework designed to simplify the development of complex engineering systems by providing tools for **modeling**, **simulation**, **optimization**, **controls**, and **hardware deployment**. 
+The ultimate goal is to make it possible to do practical
+hardware engineering with Python.
+Archimedes builds on the powerful symbolic computation
 capabilities of `CasADi <https://web.casadi.org/docs/>`_ with an interface designed to
 be familiar to NumPy users.
 
@@ -28,16 +29,6 @@ be familiar to NumPy users.
         :link-type: doc
         
         Announcements, deep dives, and case studies
-
-**Key features**:
-
-* NumPy-compatible array API with automatic dispatch
-* Efficient execution of computational graphs in compiled C++
-* Automatic differentiation with forward- and reverse-mode sparse autodiff
-* Interface to "plugin" solvers for ODE/DAEs, root-finding, and nonlinear programming
-* Automated C code generation for embedded applications
-* JAX-style function transformations
-* PyTorch-style hierarchical data structures for parameters and dynamics modeling
 
 
 Quick Example
@@ -58,6 +49,18 @@ Quick Example
    # Automatically generate C code
    template_args = (0.0,)  # Data type for C function
    arc.codegen(df, "grad_f.c", template_args, return_names=("z",))
+
+
+**Key features**:
+
+* NumPy-compatible array API with automatic dispatch
+* Efficient execution of computational graphs in compiled C++
+* Automatic differentiation with forward- and reverse-mode sparse autodiff
+* Interface to "plugin" solvers for ODE/DAEs, root-finding, and nonlinear programming
+* Automated C code generation for embedded applications
+* JAX-style function transformations
+* PyTorch-style hierarchical data structures for parameters and dynamics modeling
+
 
 Documentation
 -------------
