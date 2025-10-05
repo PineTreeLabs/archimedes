@@ -1,5 +1,5 @@
 
-# Engineering Blog
+# Archimedes Blog
 
 ::::{grid} 1 1 2 2
 :gutter: 3
@@ -8,7 +8,7 @@
 :link: 2025/introduction
 :link-type: doc
 
-**30 Sep 2025** · Announcements
+**11 Oct 2025** · Announcements
 
 A Python toolkit for hardware engineering
 :::

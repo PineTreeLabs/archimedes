@@ -12,7 +12,7 @@ author: Jared Callaham
 
 **_A Python toolkit for hardware engineering_**
 
-By Jared Callaham • 30 Sep 2025
+By Jared Callaham • 11 Oct 2025
 
 ---
 
