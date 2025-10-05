@@ -84,12 +84,12 @@ Documentation
    under-the-hood
    trees
    control-flow
-   modular-design
 
 .. toctree::
    :maxdepth: 1
    :caption: Applications
 
+   tutorials/hierarchical/hierarchical00
    tutorials/sysid/parameter-estimation
    tutorials/codegen/codegen00
    tutorials/deployment/deployment00

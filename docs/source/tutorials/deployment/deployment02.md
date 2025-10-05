@@ -178,7 +178,7 @@ $$
 where energy conservation requires that $k_\tau = G k_\mathcal{E}$ for gear ratio $G$ (specified in the [motor datasheet](https://www.pololu.com/file/0J1829/pololu-25d-metal-gearmotors.pdf)).
 
 We'll be reusing the same code for the rest of this series, so for consistency we will use a common implementation in [`motor.py`](https://github.com/PineTreeLabs/archimedes/tree/main/docs/source/notebooks/workflow/motor.py) and extract relevant parts of the code.
-The model implementation follows the patterns described in the [structured data types](../../trees.md) and [hierarchical design](../../modular-design.md) documentation pages - defining structured classes for parameters, state, etc.
+The model implementation follows the patterns described in the [structured data types](../../trees.md) and [hierarchical design](../hierarchical/hierarchical00.md) documentation pages - defining structured classes for parameters, state, etc.
 
 For a relatively simple system like a DC motor, this may seem like overkill, but it pays dividends for more complex systems that can be naturally represented with hierarchical data structures.
 As we will see, it also leads to more readable auto-generated C code.

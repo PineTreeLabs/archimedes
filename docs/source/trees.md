@@ -254,4 +254,4 @@ This will be resolved with further development, but for the time being you have 
 
 For more advanced tree operations, explore the [`archimedes.tree`](#archimedes.tree) module.
 
-For more on working with structured data types, also see [Hierarchical Design Patterns](modular-design.md) and the section of the [C Code Generation](tutorials/codegen/codegen03.md) tutorial dealing with auto-generating C structs.
+For more on working with structured data types, also see [Hierarchical Design Patterns](tutorials/hierarchical/hierarchical00.md) and the section of the [C Code Generation](tutorials/codegen/codegen03.md) tutorial dealing with auto-generating C structs.

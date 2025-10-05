@@ -11,13 +11,13 @@ kernelspec:
 
 # Hierarchical Design Patterns
 
-This page covers best practices and design patterns for creating composable dynamical systems models, control algorithms, and other modular functionality using Archimedes.
+Part 1 of this tutorial covers best practices and design patterns for creating composable dynamical systems models, control algorithms, and other modular functionality using Archimedes.
 By leveraging the [`struct`](#archimedes.tree.struct) decorator, you can create modular components that can be combined into complex hierarchical models while maintaining clean, organized code.
 But while this guide provides some tips and best practices, these are strictly suggestions; you can design your models and workflows however you wish.
 
 ## Core Concepts
 
-The basic concepts of structured data types and tree operations are covered in the ["Structured Data Types"](trees.md) documentation page.
+The basic concepts of structured data types and tree operations are covered in the ["Structured Data Types"](../../trees.md) documentation page.
 Here we'll build on these concepts to see how they can be used for intuitive and scalable design patterns.
 
 Dynamical systems often have natural subsystems and state variables that benefit from logical grouping.
@@ -87,7 +87,9 @@ Then you can create composite models by nesting these components together to org
 The `abc`/`Protocol` approach also lets you define an interface for a component and then implement "multi-fidelity modeling" by creating implementations of varying speed and accuracy.
 
 For example, you might create a sensor component and then have three variants that implement a (1) simplified version with no dynamics, (2) a simple linear system model (e.g. second-order transfer function), and (3) a high-fidelity physics-based model.
-Then you can separately calibrate each using [parameter estimation](tutorials/sysid/parameter-estimation.md) and easily switch between them depending on the context (e.g. low-fidelity for model-based control or high-fidelity for simulated evaluation).
+Then you can separately calibrate each using [parameter estimation](../sysid/parameter-estimation.md) and easily switch between them depending on the context (e.g. low-fidelity for model-based control or high-fidelity for simulated evaluation).
+
+We'll see more on implementing the `Protocol` concept in [Part 2](hierarchical02.md), covering configuration management for hierarchical models.
 
 ## Basic Component Pattern
 
@@ -222,7 +224,7 @@ class CoupledOscillators:
 
     osc1: Oscillator
     osc2: Oscillator
-    coupling_constant: float
+    coupling: float
 
     @struct
     class State:
@@ -238,7 +240,7 @@ class CoupledOscillators:
         x2 = state.osc2.x
 
         # Compute equal and opposite coupling force
-        f_ext = self.coupling_constant * (x2 - x1)
+        f_ext = self.coupling * (x2 - x1)
 
         return self.State(
             osc1=self.osc1.dynamics(t, state.osc1, f_ext),
@@ -250,7 +252,7 @@ class CoupledOscillators:
 system = CoupledOscillators(
     osc1=Oscillator(m=1.0, k=4.0, b=0.1),
     osc2=Oscillator(m=1.5, k=2.0, b=0.2),
-    coupling_constant=0.5,
+    coupling=0.5,
 )
 
 # Create initial state
@@ -289,8 +291,7 @@ sol = arc.vmap(state_unravel, in_axes=1)(sol_flat)
 ```
 
 ```{code-cell} python
-:tags: [hide-cell]
-:tags: [remove-output]
+:tags: [hide-cell, remove-output]
 # Plot the results
 
 plt.figure(figsize=(7, 2))
@@ -317,15 +318,15 @@ for theme in {"light", "dark"}:
     plt.title("Coupled Oscillators")
     plt.legend()
     plt.grid(True)
-    plt.savefig(plot_dir / f"modular_design_0_{theme}.png")
+    plt.savefig(plot_dir / f"hierarchical0_0_{theme}.png")
     plt.close()
 ```
 
-```{image} _plots/modular_design_0_light.png
+```{image} _plots/hierarchical0_0_light.png
 :class: only-light
 ```
 
-```{image} _plots/modular_design_0_dark.png
+```{image} _plots/hierarchical0_0_dark.png
 :class: only-dark
 ```
 

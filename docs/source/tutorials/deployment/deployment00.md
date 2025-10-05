@@ -80,7 +80,7 @@ This tutorial integrates several Archimedes concepts, including [structured data
 We'll introduce them as needed, but it will be easier to follow if you are already comfortable with these concepts - the following documentation pages are a good place to start:
 
 * [**Structured Data Types**](../../trees.md)
-* [**Hierarchical Design Patterns**](../../modular-design.md)
+* [**Hierarchical Systems Modeling**](../hierarchical/hierarchical00.md)
 * [**Parameter Estimation**](../sysid/parameter-estimation.md)
 * [**C Code Generation**](../codegen/codegen00.md)
 

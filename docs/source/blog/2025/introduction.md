@@ -398,7 +398,7 @@ typedef struct {
 
 This gives you a predictable and intuitive way to switch back and forth between Python and auto-generated C.
 
-For much more on structured data types, see [Structured Data Types](../../trees.md), [Hierarchical Design Patterns](../../modular-design.md), and the [C Code Generation](../../tutorials/codegen/codegen00.md) tutorial series.
+For much more on structured data types, see [Structured Data Types](../../trees.md), [Hierarchical Systems Modeling](../../tutorials/hierarchical/hierarchical00.md), and the [C Code Generation](../../tutorials/codegen/codegen00.md) tutorial series.
 
 ## Why Another Framework?
 
@@ -429,7 +429,7 @@ Then there are tutorials and deep dives on:
 
 - [Structured Data Types](../../trees.md)
 - [Control Flow](../../control-flow.md)
-- [Modular Design Patterns](../../modular-design.md)
+- [Hierarchical Systems Modeling](../../tutorials/hierarchical/hierarchical00.md)
 - [Parameter Estimation](../../tutorials/sysid/parameter-estimation.md)
 - [C Code Generation](../../tutorials/codegen/codegen00.md)
 
