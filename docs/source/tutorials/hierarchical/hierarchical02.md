@@ -40,15 +40,15 @@ Here's what this looks like, reusing the `Oscillator` example from Part 1:
 :tags: [hide-cell]
 from __future__ import annotations
 
-import yaml
-from typing import Protocol
 from pprint import pprint
+from typing import Protocol
 
 import matplotlib.pyplot as plt
 import numpy as np
+import yaml
 
 import archimedes as arc
-from archimedes import struct, StructConfig, UnionConfig
+from archimedes import StructConfig, UnionConfig, struct
 ```
 
 ```{code-cell} python

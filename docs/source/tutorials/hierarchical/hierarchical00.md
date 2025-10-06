@@ -3,7 +3,7 @@
 This tutorial series covers the basics of _hierarchical modeling_ in Archimedes.
 In this context, "hierarchical modeling" just means having nested or composite models of complex dynamical systems.
 
-The design patterns described in [Part 1](hierarchical00.md) let you write code that maps to how you naturally think about engineering systems in terms of a hierarchy of subsystems and components.
+The design patterns described in [Part 1](hierarchical01.md) let you write code that maps to how you naturally think about engineering systems in terms of a hierarchy of subsystems and components.
 [Part 2](hierarchical02.md) takes a deeper dive into some more advanced topics including defining interfaces for generic components and creating a scalable configuration management system.
 
 :::{warning}
