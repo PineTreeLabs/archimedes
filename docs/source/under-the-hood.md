@@ -404,6 +404,8 @@ These function transformations enable complex operations like sensitivity analys
 Modern engineering models often involve complex, nested data structures that go beyond simple arrays.
 Archimedes adopts the ["PyTree" concept from JAX](https://docs.jax.dev/en/latest/pytrees.html) to seamlessly work with tree-structured data and blends it with the [composable "Module" design from PyTorch](https://pytorch.org/docs/stable/notes/modules.html) for constructing hierarchical, modular functionality.
 
+Here we'll give a brief overview of this at a conceptual level; for more detail see the documentation page on ["Structured Data Types"](trees.md)
+
 ### What is tree-structured data?
 
 In this context, "trees" are nested structures of containers (lists, tuples, dictionaries) and leaves (arrays or scalars) that can be flattened to a vector and "unflattened" back to their original structure.
@@ -420,12 +422,12 @@ However, for complex systems the "state" may contain many sub-components and it 
 # Example of a tree representing a simple robot state
 state = {
     'joints': {
-        'positions': np.array([0.1, 0.2, 0.3]),
-        'velocities': np.array([0.01, 0.02, 0.03])
+        'pos': np.array([0.1, 0.2, 0.3]),
+        'vel': np.array([0.01, 0.02, 0.03])
     },
     'end_effector': {
-        'position': np.array([1.0, 2.0, 3.0]),
-        'orientation': np.array([1.0, 0.0, 0.0, 0.0])
+        'pos': np.array([1.0, 2.0, 3.0]),
+        'q': np.array([1.0, 0.0, 0.0, 0.0])
     }
 }
 ```
@@ -444,25 +446,69 @@ flat_state, unravel = arc.tree.ravel(state)
 print(flat_state)  # array([1.  , 0.  , 0.  , 0.  , 1.  , 2.  , ...
 
 # Reconstruct the original tree structure
-print(unravel(flat_state))  # {'end_effector': {'orientation': array([1., 0., 0., 0.]), ...
+print(unravel(flat_state))  # {'end_effector': {'q': array([1., 0., 0., 0.]), ...
 ```
 
 You can also perform other functional operations like mapping a function over the leaves of a tree:
 
 ```python
-arc.tree.map(lambda x: -x, state)  # {'end_effector': {'orientation': array([-1., 0., 0., 0.]), ...
+arc.tree.map(lambda x: -x, state)  # {'end_effector': {'q': array([-1., 0., 0., 0.]), ...
 ```
-
-Trees are particularly valuable when:
-
-1. **Working with complex dynamical systems** - Maintain logical separation of system components while allowing operations on the whole system
-2. **Building hierarchical models** - Compose sub-models into larger systems
-3. **Implementing optimization problems** - Package decision variables in meaningful structures
-4. **Designing control systems** - Keep controller states organized
 
 ### Structured data types
 
-While you can build up tree-structured data using built-in Python types like 
+While you can build up tree-structured data using built-in Python types like dicts, tuples, etc., it is often cleaner to write your own classes.
+
+Archimedes offers a [`@struct`] decorator for classes that turns the class into a Python [dataclass](https://docs.python.org/3/library/dataclasses.html) that is compatible with tree operations.
+
+For example, the `state` dictionary above could be rewritten as:
+
+```python
+from archimedes import struct
+
+@struct
+class JointState:
+    pos: float
+    vel: float
+
+@struct
+class EndEffectorState:
+    pos: np.ndarray
+    q: np.ndarray
+
+@struct
+class ArmState:
+    joints: tuple[JointState]
+    end_effector: EndEffectorState
+```
+
+These `struct` types are also standard Python classes, so you can define methods on them as usual.
+These gives you the ability to construct hierarchical data types in the same vein as the PyTorch `Module` system - but with the ability to flatten/unflatten and apply other tree operations.
+For more on recommended design patterns for `struct`-based classes, including configuration management for complex systems, see the [Hierarchical Modeling](tutorials/hierarchical/hierarchical00.md) tutorial series.
+
+These `struct` types also work naturally with C code generation.
+For example, if an `ArmState` is used as the argument to a codegen function, the following C code will be produced:
+
+```c
+typedef struct {
+    float pos;
+    float vel;
+} joint_state_t;
+
+typedef struct {
+    float pos[3];
+    float q[4];
+} end_effector_state_t;
+
+typedef struct {
+    joint_state_t joints[4];
+    end_effector_state_t end_effector;
+} arm_state_t;
+```
+
+This gives you a predictable and intuitive way to switch back and forth between Python and auto-generated C.
+
+For details on structured data types and codegen, see the [C Code Generation](tutorials/codegen/codegen00.md) tutorial.
 
 ## Conclusion
 
