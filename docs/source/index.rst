@@ -9,13 +9,21 @@
 
 -----------------
 
-**Archimedes** is an open-source Python framework designed to simplify complex modeling
-and simulation tasks, with the ultimate goal of making it possible to do practical
-hardware engineering with Python. It builds on the powerful symbolic computation
+**Archimedes** is an open-source Python framework designed to simplify the development of complex engineering systems by providing tools for **modeling**, **simulation**, **optimization**, **controls**, and **hardware deployment**. 
+The ultimate goal is to make it possible to do practical
+hardware engineering with Python.
+Archimedes builds on the powerful symbolic computation
 capabilities of `CasADi <https://web.casadi.org/docs/>`_ with an interface designed to
 be familiar to NumPy users.
 
 .. grid:: 2
+    :gutter: 3
+
+    .. grid-item-card:: ⭐ Introduction
+        :link: blog/2025/introduction
+        :link-type: doc
+        
+        Introduction to the Archimedes project
 
     .. grid-item-card:: 📚 Quickstart
         :link: quickstart
@@ -28,16 +36,6 @@ be familiar to NumPy users.
         :link-type: doc
         
         Announcements, deep dives, and case studies
-
-**Key features**:
-
-* NumPy-compatible array API with automatic dispatch
-* Efficient execution of computational graphs in compiled C++
-* Automatic differentiation with forward- and reverse-mode sparse autodiff
-* Interface to "plugin" solvers for ODE/DAEs, root-finding, and nonlinear programming
-* Automated C code generation for embedded applications
-* JAX-style function transformations
-* PyTorch-style hierarchical data structures for parameters and dynamics modeling
 
 
 Quick Example
@@ -59,22 +57,27 @@ Quick Example
    template_args = (0.0,)  # Data type for C function
    arc.codegen(df, "grad_f.c", template_args, return_names=("z",))
 
+
+**Key features**:
+
+* NumPy-compatible array API with automatic dispatch
+* Efficient execution of computational graphs in compiled C++
+* Automatic differentiation with forward- and reverse-mode sparse autodiff
+* Interface to "plugin" solvers for ODE/DAEs, root-finding, and nonlinear programming
+* Automated C code generation for embedded applications
+* JAX-style function transformations
+* PyTorch-style hierarchical data structures for parameters and dynamics modeling
+
+
 Documentation
 -------------
 
 .. toctree::
    :maxdepth: 1
-   :caption: Introduction
-
-   quickstart
-   about
-   getting-started
-
-
-.. toctree::
-   :maxdepth: 1
    :caption: Resources
 
+   quickstart
+   getting-started
    blog/index
 
 .. toctree::
@@ -84,16 +87,15 @@ Documentation
    under-the-hood
    trees
    control-flow
-   modular-design
 
 .. toctree::
    :maxdepth: 1
-   :caption: Applications
+   :caption: Tutorials
 
+   tutorials/hierarchical/hierarchical00
    tutorials/sysid/parameter-estimation
    tutorials/codegen/codegen00
    tutorials/deployment/deployment00
-   tutorials/multirotor/multirotor00
 
 .. toctree::
    :maxdepth: 1

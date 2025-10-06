@@ -304,7 +304,7 @@ print("Optimized parameters:", result.p)
 
 The parameters (or even the model itself) can also be a nested structure composed of custom classes.
 This allows you to create reusable components, define standardized interfaces, and construct hierarchical models of the system.
-See the documentation pages on [Structured Data Types](../../trees.md) and [Hierarchical Design Patterns](../../modular-design.md) for more information.
+See the documentation pages on [Structured Data Types](../../trees.md) and [Hierarchical Modeling](../hierarchical/hierarchical00.md) for more information.
 
 ## Parameter Bounds
 

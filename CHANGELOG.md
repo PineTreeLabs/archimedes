@@ -54,3 +54,5 @@ New version tag for release to PyPI (previous "Archimedes" project tagged with v
 ## [0.2.0a4] - WIP
 - Added MyPy to CI checks
 - Fixed all type checking errors
+- Use `Rotation` for attitude in `RigidBody`
+- Revised "Hierarchical Modeling" tutorial

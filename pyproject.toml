@@ -52,6 +52,7 @@ dev = [
     "ruff>=0.11.2",
     "sphinx>=8.2.3",
     "sphinx-design>=0.6.1",
+    "sphinxcontrib-googleanalytics>=0.5",
 ]
 
 [tool.ruff]

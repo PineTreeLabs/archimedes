@@ -1,0 +1,12 @@
+osc1:
+  type: linear
+  m: 1.0
+  k: 4.0
+  b: 0.1
+osc2:
+  type: duffing
+  m: 1.0
+  a: 1.0
+  b: 5.0
+  c: 0.02
+coupling: 5.0

@@ -201,7 +201,7 @@ This series builds on various Archimedes concepts, including:
 
 * [C code generation](../codegen/codegen00.md)
 * [Structured data types](../../trees.md)
-* [Hierarchical modeling](../../modular-design.md)
+* [Hierarchical modeling](../hierarchical/hierarchical00.md)
 * [Parameter estimation](../sysid/parameter-estimation.md)
 
 If you aren't familiar with any of these, this is a great time to dig deeper and see how these combine to enable this end-to-end development workflow.

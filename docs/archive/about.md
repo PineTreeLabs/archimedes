@@ -1,8 +1,10 @@
 # What is Archimedes?
 
-Archimedes is an open-source Python framework designed to simplify complex modeling and simulation tasks, with the ultimate goal of enabling practical hardware engineering with Python.
+**Archimedes** is an open-source Python framework designed to simplify the development of complex engineering systems by providing tools for **modeling**, **simulation**, **optimization**, **controls**, and **hardware deployment**. 
+The ultimate goal is to make it possible to do practical
+hardware engineering with Python.
 
-The core functionality of Archimedes is the ability to transform plain NumPy functions into high-performance C++ _computational graphs_. By leveraging CasADi, a symbolic framework for automatic differentiation and numerical optimization designed specifically for optimal control applications, Archimedes allows users to implement complex models using familiar NumPy syntax while gaining significant performance improvements and advanced capabilities.
+The core functionality of Archimedes is the ability to transform plain NumPy functions into high-performance C++ _computational graphs_. By leveraging [CasADi](https://web.casadi.org/docs/), a symbolic framework for automatic differentiation and numerical optimization designed specifically for optimal control applications, Archimedes allows users to implement complex models using familiar NumPy syntax while gaining significant performance improvements and advanced capabilities.
 
 Archimedes is based on three core concepts:
 
