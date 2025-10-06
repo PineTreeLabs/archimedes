@@ -115,6 +115,15 @@ For more details, see the tutorial on [C code generation](https://pinetreelabs.g
 <!-- - [Subsonic F-16 benchmark](examples/f16/f16_plant.py) (Work in progress) -->
 <!-- - [CartPole control](examples/cartpole/finite-horizon.ipynb) (Work in progress) -->
 
+### Examples
+
+The [examples folder](examples) includes some examples that are not as well-documented as those on the website, but showcase some additional functionality in different application domains.
+These include:
+
+- [Multirotor vehicle dynamics](examples/multirotor)
+- [CartPole system ID + control](examples/cartpole)
+- [Subsonic F-16 benchmark](examples/f16)
+- [Trajectory optimization](examples/trajopt/)
 
 # Installation
 
@@ -186,6 +195,24 @@ For organizations that would like more flexible licensing contact [info@archimed
 ## Third-Party Components
 Archimedes incorporates code from several open source projects, including JAX (Apache 2.0), Flax (Apache 2.0), SciPy (BSD-3), and NumPy (NumPy license). See [NOTICE.md](NOTICE.md) for a complete list of attributions, including licenses for key dependencies (CasADi and NumPy).
 
+# Citing Archimedes
+
+At this time Archimedes does not have a DOI-linked publication, though a draft is in progress.
+Feel free to link to the repository in the meantime.
+
+If you use Archimedes in published work, please also consider citing [CasADi](https://web.casadi.org/), the symbolic-numeric backend for Archimedes:
+
+```raw
+@Article{Andersson2018,
+  Author = {Joel A E Andersson and Joris Gillis and Greg Horn
+            and James B Rawlings and Moritz Diehl},
+  Title = {{CasADi} -- {A} software framework for nonlinear optimization
+           and optimal control},
+  Journal = {Mathematical Programming Computation},
+  Year = {2018},
+}
+```
+
 # Getting involved
 
 We're excited to build a community around Archimedes - here's how you can get involved at this stage:
@@ -193,8 +220,11 @@ We're excited to build a community around Archimedes - here's how you can get in
 - **⭐ Star the Repository**: The simplest way to show support and help others discover the project
 - **🐛 Report Issues**: Detailed bug reports, documentation gaps, and feature requests are invaluable
 - **💬 Join Discussions**: Share your use cases, ask questions, or provide feedback in our [GitHub Discussions](github.com/pinetreelabs/archimedes/discussions)
+- **🗞️ Stay In the Loop**: [Subscribe](https://jaredcallaham.substack.com/embed) to the newsletter for updates and announcements
 - **📢 Spread the Word**: Tell colleagues, mention us in relevant forums, or share on social media
 - **📝 Document Use Cases**: Share how you're using (or planning to use) Archimedes
+
+## Contributing
 
 At this early stage of development:
 

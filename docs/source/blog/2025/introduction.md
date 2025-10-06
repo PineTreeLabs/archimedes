@@ -12,7 +12,7 @@ author: Jared Callaham
 
 **_A Python toolkit for hardware engineering_**
 
-By Jared Callaham • 11 Oct 2025
+By Jared Callaham • 6 Oct 2025
 
 ---
 
@@ -435,6 +435,8 @@ Then there are tutorials and deep dives on:
 
 The [Hardware Deployment](../../tutorials/deployment/deployment00.md) tutorial is a bit more advanced, but shows an end-to-end example of the kinds of workflows you can build in Archimedes.
 
+Upcoming tutorial and example content includes 6dof flight vehicle dynamics, rotor aerodynamics, system identification, low-cost HIL testing workflows, and deep dives on C code generation.
+
 To see where the project is headed and some more detail on the vision, also check out the [roadmap](../../roadmap.md).
 
 ### On-ramp Projects
@@ -467,6 +469,14 @@ Ongoing development priorities are outlined in detail in the [roadmap](../../roa
 - **Physics Modeling**: Built-in functionality like reference frames, kinematic trees, polynomial/spline primitives, and templates for domain-specific components.
 - **Algorithm Development**: State machines, trajectory optimization, MPC, sensor fusion, uncertainty quantification, etc.
 
+### Stay Updated
+
+For updates on Archimedes, including release announcements, new features, blog posts, application examples, and case studies, subscribe to the free newsletter:
+
+<iframe src="https://jaredcallaham.substack.com/embed" width="480" height="320" style="border:1px solid #EEE; background:white;" frameborder="0" scrolling="no"></iframe>
+
+You can expect infrequent posts (maybe monthly) with a strong technical focus - no ads, spam, or paywalls.
+
 ### Supporting Archimedes
 
 This post might read a bit like ad copy, but Archimedes is a free, open-source project.
@@ -482,6 +492,7 @@ Besides feedback, other easy ways to support the project include:
 - **⭐ Star the Repository**: This shows support and interest and helps others discover the project
 - **📢 Spread the Word**: Think anyone you know might be interested?
 - **🐛 Report Issues**: Detailed bug reports, documentation gaps, and feature requests are invaluable
+- **🗞️ Stay In the Loop**: [Subscribe](https://jaredcallaham.substack.com/embed) to the newsletter for updates and announcements
 
 Thanks for checking out the project!
 
@@ -491,6 +502,7 @@ Thanks for checking out the project!
 :class: blog-author-bio
 
 **Jared Callaham** is the creator of Archimedes and principal at Pine Tree Labs.
+He is a consulting engineer on modeling, simulation, optimization, and control systems with a particular focus on applications in aerospace engineering.
 
 *Have questions or feedback? [Open a discussion on GitHub](https://github.com/jcallaham/archimedes/discussions)*
 :::
