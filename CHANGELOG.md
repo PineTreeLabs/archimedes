@@ -51,8 +51,10 @@ New version tag for release to PyPI (previous "Archimedes" project tagged with v
 - Migrated "PyTree" to "struct" terminology ([Issue #89](https://github.com/PineTreeLabs/archimedes/issues/89))
 - Renamed `@pytree_node` decorator to `@struct` ([Issue #89](https://github.com/PineTreeLabs/archimedes/issues/89))
 
-## [0.2.0a4] - WIP
+## [0.3.0]
 - Added MyPy to CI checks
 - Fixed all type checking errors
 - Use `Rotation` for attitude in `RigidBody`
 - Revised "Hierarchical Modeling" tutorial
+- Add blog to website
+- Convert all notebooks to MyST
