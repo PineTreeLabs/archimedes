@@ -35,6 +35,8 @@ from .tree import (
     struct,
 )
 
+from . import spatial  # isort: skip
+
 __all__ = [
     "docs",
     "error",
@@ -46,6 +48,7 @@ __all__ = [
     "field",
     "StructConfig",
     "UnionConfig",
+    "spatial",
     "sysid",
     "array",
     "callback",

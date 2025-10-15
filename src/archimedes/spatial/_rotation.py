@@ -2,10 +2,11 @@
 from __future__ import annotations
 
 import re
+from typing import cast
 
 import numpy as np
 
-from archimedes import array, field, struct
+from .. import array, field, struct
 
 __all__ = ["Rotation"]
 
@@ -218,7 +219,7 @@ class Rotation:
     """
 
     quat: np.ndarray
-    scalar_first: bool = field(default=True, static=True)
+    scalar_first: bool = field(default=True, static=True)  # type: ignore
 
     def __len__(self):
         return len(self.quat)
@@ -244,7 +245,7 @@ class Rotation:
         Rotation
             A new Rotation instance.
         """
-        quat = np.hstack(quat)
+        quat = np.hstack(quat)  # type: ignore
         if quat.shape not in [(4,), (1, 4), (4, 1)]:
             raise ValueError("Quaternion must have shape (4,), (1, 4), or (4, 1)")
         quat = quat.flatten()
@@ -275,7 +276,7 @@ class Rotation:
                Journal of guidance, control, and dynamics vol. 31.2, pp.
                440-442, 2008.
         """
-        matrix = array(matrix)
+        matrix = cast(np.ndarray, array(matrix))
         if matrix.shape != (3, 3):
             raise ValueError("Rotation matrix must be 3x3")
 
@@ -553,16 +554,18 @@ class Rotation:
         if inverse:
             matrix = matrix.T
 
-        vectors = array(vectors)
+        vectors = cast(np.ndarray, array(vectors))
         if vectors.ndim == 1:
             if vectors.shape != (3,):
                 raise ValueError("For 1D input, `vectors` must have shape (3,)")
-            return matrix @ vectors
+            result = matrix @ vectors
 
-        elif vectors.ndim == 2:
+        else:
             if vectors.shape[1] != 3:
                 raise ValueError("For 2D input, `vectors` must have shape (N, 3)")
-            return vectors @ matrix.T
+            result = vectors @ matrix.T
+
+        return cast(np.ndarray, result)
 
     def inv(self) -> Rotation:
         """Return the inverse rotation"""

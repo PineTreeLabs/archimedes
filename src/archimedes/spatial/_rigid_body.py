@@ -1,10 +1,12 @@
 # ruff: noqa: N806, N803, N815
 from __future__ import annotations
 
+from typing import cast
+
 import numpy as np
 
-from archimedes import StructConfig, field, struct
-from archimedes.spatial import Rotation
+from ..tree import StructConfig, field, struct
+from ._rotation import Rotation
 
 __all__ = [
     "RigidBody",
@@ -244,7 +246,7 @@ class RigidBody:
         J_B: np.ndarray  # inertia matrix [kg·m²]
         dm_dt: float = 0.0  # mass rate of change [kg/s]
         # inertia rate of change [kg·m²/s]
-        dJ_dt: np.ndarray = field(default_factory=lambda: np.zeros((3, 3)))
+        dJ_dt: np.ndarray = field(default_factory=lambda: np.zeros((3, 3)))  # type: ignore
 
     def calc_kinematics(self, x: State) -> tuple[np.ndarray, Rotation | np.ndarray]:
         """Calculate kinematics (position and attitude derivatives)
@@ -270,7 +272,7 @@ class RigidBody:
         separately for special analysis or testing.
         """
         if self.rpy_attitude:
-            rpy = x.att
+            rpy = cast(np.ndarray, x.att)
 
             # Convert roll-pitch-yaw (rpy) orientation to the direction cosine matrix.
             # C_BN rotates from the Newtonian frame N to the body frame B.
@@ -287,8 +289,9 @@ class RigidBody:
             dp_N = C_BN.T @ x.v_B
 
         else:
-            dp_N = x.att.apply(x.v_B)
-            att_deriv = x.att.derivative(x.w_B, baumgarte=self.baumgarte)
+            att = cast(Rotation, x.att)
+            dp_N = att.apply(x.v_B)
+            att_deriv = att.derivative(x.w_B, baumgarte=self.baumgarte)
 
         return dp_N, att_deriv
 
