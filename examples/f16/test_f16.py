@@ -2,10 +2,7 @@ import pytest
 
 import numpy as np
 
-from archimedes.experimental.aero import (
-    euler_kinematics,
-)
-from archimedes.spatial import Rotation
+from archimedes.spatial import Rotation, euler_kinematics
 
 from f16_plant import SubsonicF16, GRAV_FTS2
 

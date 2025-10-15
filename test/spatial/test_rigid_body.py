@@ -4,11 +4,11 @@ import numpy as np
 import numpy.testing as npt
 
 import archimedes as arc
-from archimedes.experimental.aero import (
+from archimedes.spatial import (
+    Rotation,
     RigidBody,
     euler_kinematics,
 )
-from archimedes.spatial import Rotation
 
 m = 1.7  # Arbitrary mass
 J_B = np.diag([0.1, 0.2, 0.3])  # Arbitrary inertia matrix

@@ -13,7 +13,7 @@ from archimedes.experimental.aero import (
 
 if TYPE_CHECKING:
     from archimedes.typing import ArrayLike
-    from archimedes.experimental.aero import RigidBody
+    from archimedes.spatial import RigidBody
 
 __all__ = [
     "Accelerometer",

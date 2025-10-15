@@ -12,8 +12,7 @@ from multirotor import (
 )
 
 import archimedes as arc
-from archimedes.spatial import Rotation
-from archimedes.experimental.aero import (
+from archimedes.spatial import (
     RigidBody, euler_kinematics, dcm_from_euler
 )
 

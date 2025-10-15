@@ -25,8 +25,9 @@ import numpy as np
 from scipy.optimize import root
 
 import archimedes as arc
-from archimedes.experimental.aero import dcm_from_euler, euler_kinematics
-from archimedes.spatial import Rotation
+from archimedes.spatial import (
+    Rotation, dcm_from_euler, euler_kinematics
+)
 ```
 
 ```{code-cell} python

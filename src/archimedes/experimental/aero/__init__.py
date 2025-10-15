@@ -17,12 +17,6 @@ from .atmosphere import (
     StandardAtmosphere1976Config,
     AtmosphereConfig,
 )
-from .rigid_body import (
-    RigidBody,
-    RigidBodyConfig,
-    euler_kinematics,
-    dcm_from_euler,
-)
 from .sensors import (
     Accelerometer,
     AccelerometerConfig,

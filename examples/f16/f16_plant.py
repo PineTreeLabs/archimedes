@@ -5,11 +5,9 @@ import numpy as np
 
 import archimedes as arc
 
+from archimedes.spatial import RigidBody
 from archimedes.experimental import aero
-from archimedes.experimental.aero import (
-    GravityModel,
-    RigidBody,
-)
+from archimedes.experimental.aero import GravityModel
 
 from f16_engine import F16Engine
 from f16_aero import F16Aerodynamics

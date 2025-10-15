@@ -7,8 +7,8 @@ import numpy as np
 from scipy.special import roots_legendre
 
 import archimedes as arc
-from archimedes.spatial import Rotation
-from archimedes.experimental.aero import (
+from archimedes.spatial import (
+    Rotation,
     RigidBody,
     dcm_from_euler,
 )
