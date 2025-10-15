@@ -111,7 +111,6 @@ class RigidBody:
         dJ_dt: np.ndarray = field(default_factory=lambda: np.zeros((3, 3)))
 
     def calc_kinematics(self, x: State):
-
         if self.rpy_attitude:
             rpy = x.att
 

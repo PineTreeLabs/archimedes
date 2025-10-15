@@ -1,7 +1,10 @@
 from __future__ import annotations
+
 import re
+
 import numpy as np
-from archimedes import struct, array, field
+
+from archimedes import array, field, struct
 
 __all__ = ["Rotation"]
 
@@ -30,7 +33,7 @@ def _compose_quat(q1, q2):
 
 def _check_seq(seq: str) -> bool:
     # The following checks are verbatim from:
-    # https://github.com/scipy/scipy/blob/3ead2b543df7c7c78619e20f0cb6139e344a8866/scipy/spatial/transform/_rotation_cy.pyx#L461-L476  ruff: noqa: E501
+    # https://github.com/scipy/scipy/blob/3ead2b543df7c7c78619e20f0cb6139e344a8866/scipy/spatial/transform/_rotation_cy.pyx#L461-L476  # ruff: noqa: E501
     intrinsic = re.match(r"^[XYZ]{1,3}$", seq) is not None
     extrinsic = re.match(r"^[xyz]{1,3}$", seq) is not None
     if not (intrinsic or extrinsic):
@@ -51,7 +54,7 @@ def _elementary_basis_index(axis: str) -> int:
     return {"x": 1, "y": 2, "z": 3}[axis.lower()]
 
 
-# See https://github.com/scipy/scipy/blob/3ead2b543df7c7c78619e20f0cb6139e344a8866/scipy/spatial/transform/_rotation_cy.pyx#L358-L372  ruff: noqa: E501
+# See https://github.com/scipy/scipy/blob/3ead2b543df7c7c78619e20f0cb6139e344a8866/scipy/spatial/transform/_rotation_cy.pyx#L358-L372  # ruff: noqa: E501
 def _make_elementary_quat(axis: str, angle: float) -> np.ndarray:
     """Create a quaternion representing a rotation about a principal axis."""
 
@@ -62,7 +65,7 @@ def _make_elementary_quat(axis: str, angle: float) -> np.ndarray:
     return quat
 
 
-# See https://github.com/scipy/scipy/blob/3ead2b543df7c7c78619e20f0cb6139e344a8866/scipy/spatial/transform/_rotation_cy.pyx#L376-L391  ruff: noqa: E501
+# See https://github.com/scipy/scipy/blob/3ead2b543df7c7c78619e20f0cb6139e344a8866/scipy/spatial/transform/_rotation_cy.pyx#L376-L391  # ruff: noqa: E501
 def _elementary_quat_compose(
     seq: str, angles: np.ndarray, intrinsic: bool
 ) -> np.ndarray:
@@ -236,7 +239,7 @@ class Rotation:
             like=self.quat,
         )
 
-    # See: https://github.com/scipy/scipy/blob/3ead2b543df7c7c78619e20f0cb6139e344a8866/scipy/spatial/transform/_rotation_cy.pyx#L774-L851  ruff: noqa: E501
+    # See: https://github.com/scipy/scipy/blob/3ead2b543df7c7c78619e20f0cb6139e344a8866/scipy/spatial/transform/_rotation_cy.pyx#L774-L851  # ruff: noqa: E501
     def as_euler(self, seq: str, degrees: bool = False) -> np.ndarray:
         """Return the Euler angles from the rotation
 
