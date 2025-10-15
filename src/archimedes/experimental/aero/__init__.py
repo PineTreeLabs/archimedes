@@ -34,6 +34,7 @@ _deprecated = {
     "dcm_from_euler",
 }
 
+
 def __getattr__(name):
     if name in _deprecated:
         warnings.warn(
@@ -41,7 +42,7 @@ def __getattr__(name):
             "and will be removed in version 1.0. "
             "Please import from archimedes.spatial instead.",
             DeprecationWarning,
-            stacklevel=2
+            stacklevel=2,
         )
         return getattr(__import__("archimedes.spatial", fromlist=[name]), name)
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

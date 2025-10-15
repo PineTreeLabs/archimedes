@@ -5,11 +5,11 @@ import numpy.testing as npt
 
 import archimedes as arc
 from archimedes.spatial import (
-    Rotation,
     RigidBody,
     RigidBodyConfig,
-    euler_kinematics,
+    Rotation,
     dcm_from_euler,
+    euler_kinematics,
 )
 
 m = 1.7  # Arbitrary mass

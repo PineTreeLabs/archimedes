@@ -19,6 +19,7 @@ Modules
     observers
     optimize
     simulate
+    spatial
     sysid
     tree
 

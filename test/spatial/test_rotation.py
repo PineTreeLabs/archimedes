@@ -167,7 +167,7 @@ class TestRotation:
 
         # Invalid output sequence
         with pytest.raises(ValueError, match="Expected `seq` to be a string"):
-            Rotation.identity().as_euler('xz')
+            Rotation.identity().as_euler("xz")
 
         # Invalid quat shape
         with pytest.raises(ValueError, match="Quaternion must have shape"):

@@ -1,3 +1,4 @@
+# ruff: noqa: N806, N803
 from __future__ import annotations
 
 import re
@@ -99,7 +100,7 @@ class Rotation:
     This class is closely modeled after [scipy.spatial.transform.Rotation](
     https://docs.scipy.org/doc/scipy/reference/generated/scipy.spatial.transform.Rotation.html)
     with a few differences:
-    
+
     - By default the quaternion is represented in scalar-first format
       (i.e. [w, x, y, z]) instead of scalar-last ([x, y, z, w]).
     - This class is designed for symbolic computation, so some checks (e.g. for valid
@@ -215,6 +216,7 @@ class Rotation:
     euler_kinematics : Transform roll-pitch-yaw rates to body-frame angular
 
     """
+
     quat: np.ndarray
     scalar_first: bool = field(default=True, static=True)
 
@@ -362,12 +364,12 @@ class Rotation:
             angles must match the length of `seq`.
         degrees : bool, optional
             If True, the angles are assumed to be in degrees. Default is False (radians).
-        
+
         Returns
         -------
         Rotation
             A new Rotation instance.
-            
+
         Raises
         ------
         ValueError
@@ -405,7 +407,7 @@ class Rotation:
 
     def as_quat(self, scalar_first: bool = True) -> np.ndarray:
         """Return the quaternion as a numpy array.
-        
+
         Parameters
         ----------
         scalar_first : bool, optional
@@ -423,7 +425,7 @@ class Rotation:
 
     def as_matrix(self) -> np.ndarray:
         """Return the rotation as a rotation matrix.
-        
+
         Returns
         -------
         np.ndarray
@@ -540,7 +542,7 @@ class Rotation:
 
     def apply(self, vectors: np.ndarray, inverse: bool = False) -> np.ndarray:
         """Apply the rotation to a set of vectors
-        
+
         If the rotation represents the attitude of a body B relative to a frame A,
         then this method transforms a vector v_A expressed in frame A to the same
         vector expressed in frame B, v_B = R * v_A. If `inverse` is True, the inverse
@@ -581,10 +583,10 @@ class Rotation:
 
     def derivative(self, w: np.ndarray, baumgarte: float = 0.0) -> Rotation:
         """Return the time derivative of the rotation given angular velocity w.
-        
+
         Note that if the rotation represents the attitude of a body B relative to a
         frame A, then w should be the body relative angular velocity, i.e. ω_B.
-        
+
         The derivative is computed using quaternion kinematics:
             dq/dt = 0.5 * q ⊗ [0, ω]
         where ⊗ is the quaternion multiplication operator.
