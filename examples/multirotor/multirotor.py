@@ -7,11 +7,11 @@ import numpy as np
 from scipy.special import roots_legendre
 
 import archimedes as arc
+from archimedes.spatial import Rotation
 from archimedes.experimental.aero import (
     RigidBody,
     dcm_from_euler,
 )
-from archimedes.experimental.spatial import Rotation
 
 __all__ = [
     "RigidBody",

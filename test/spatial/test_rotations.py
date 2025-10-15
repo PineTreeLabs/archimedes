@@ -5,7 +5,7 @@ import pytest
 from scipy.spatial.transform import Rotation as ScipyRotation
 
 import archimedes as arc
-from archimedes.experimental.spatial import Rotation
+from archimedes.spatial import Rotation
 
 np.random.seed(0)
 

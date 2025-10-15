@@ -8,7 +8,7 @@ from archimedes.experimental.aero import (
     RigidBody,
     euler_kinematics,
 )
-from archimedes.experimental.spatial import Rotation
+from archimedes.spatial import Rotation
 
 m = 1.7  # Arbitrary mass
 J_B = np.diag([0.1, 0.2, 0.3])  # Arbitrary inertia matrix

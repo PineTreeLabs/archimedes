@@ -12,10 +12,10 @@ from multirotor import (
 )
 
 import archimedes as arc
+from archimedes.spatial import Rotation
 from archimedes.experimental.aero import (
     RigidBody, euler_kinematics, dcm_from_euler
 )
-from archimedes.experimental.spatial import Rotation
 
 m = 1.7  # Arbitrary mass
 g0 = 9.81

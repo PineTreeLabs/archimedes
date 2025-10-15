@@ -3,8 +3,7 @@ from __future__ import annotations
 import numpy as np
 
 from archimedes import struct, field, StructConfig
-
-from ..spatial import Rotation
+from archimedes.spatial import Rotation
 
 
 __all__ = [

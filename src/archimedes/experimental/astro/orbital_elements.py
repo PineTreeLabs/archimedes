@@ -2,9 +2,9 @@ from __future__ import annotations
 import numpy as np
 
 from archimedes import struct
+from archimedes.spatial import Rotation
 
 from .constants import EARTH_RADIUS, EARTH_MU
-from ..spatial import Rotation
 
 
 @struct

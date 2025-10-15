@@ -308,7 +308,7 @@ import numpy as np
 
 import archimedes as arc
 from archimedes.experimental.aero import euler_kinematics, dcm_from_euler
-from archimedes.experimental.spatial import Rotation
+from archimedes.spatial import Rotation
 ```
 
 ```{code-cell} python
