@@ -96,8 +96,6 @@ class Rotation:
     ) -> Rotation:
         """Create a Rotation from a quaternion."""
         quat = np.hstack(quat)
-        if quat.ndim == 0:
-            raise ValueError("Quaternion must be at least 1D array")
         if quat.shape not in [(4,), (1, 4), (4, 1)]:
             raise ValueError("Quaternion must have shape (4,), (1, 4), or (4, 1)")
         quat = quat.flatten()
