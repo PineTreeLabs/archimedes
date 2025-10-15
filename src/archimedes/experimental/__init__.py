@@ -7,7 +7,6 @@ from .balanced_truncation import balanced_truncation
 
 
 def __getattr__(name):
-    print("HERE")
     if name == "spatial":
         warnings.warn(
             "Importing from archimedes.experimental.spatial is deprecated "

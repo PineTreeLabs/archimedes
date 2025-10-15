@@ -109,7 +109,7 @@ class Rotation:
     - The class currently does not support some representations like Rodrigues parameters
       or rotation vectors
     - The class does not support multiple rotations in a single object
-    - This implementation support kinematic calculations
+    - This implementation supports kinematic calculations
 
     The following operations on rotations are supported:
 
@@ -214,7 +214,7 @@ class Rotation:
     scipy.spatial.transform.Rotation : Similar class in SciPy
     RigidBody : Rigid body dynamics using this Rotation class
     dcm_from_euler : Directly calculate rotation matrix from roll-pitch-yaw angles
-    euler_kinematics : Transform roll-pitch-yaw rates to body-frame angular
+    euler_kinematics : Transform roll-pitch-yaw rates to body-frame angular velocity
 
     """
 
