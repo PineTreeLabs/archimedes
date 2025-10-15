@@ -51,10 +51,15 @@ New version tag for release to PyPI (previous "Archimedes" project tagged with v
 - Migrated "PyTree" to "struct" terminology ([Issue #89](https://github.com/PineTreeLabs/archimedes/issues/89))
 - Renamed `@pytree_node` decorator to `@struct` ([Issue #89](https://github.com/PineTreeLabs/archimedes/issues/89))
 
-## [0.3.0]
+## [0.3.0] - 2025-10-06
 - Added MyPy to CI checks
 - Fixed all type checking errors
 - Use `Rotation` for attitude in `RigidBody`
 - Revised "Hierarchical Modeling" tutorial
 - Add blog to website
 - Convert all notebooks to MyST
+
+## [0.3.1]
+- Bugfix for `Rotation.as_euler` for rotations with odd permutations
+- Move `RigidBody` and related functionality to `spatial` module
+- Move `spatial` module out of `experimental` (+codecov, documentation)

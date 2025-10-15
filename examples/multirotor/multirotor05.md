@@ -307,8 +307,9 @@ import multirotor
 import numpy as np
 
 import archimedes as arc
-from archimedes.experimental import aero
-from archimedes.experimental.spatial import Rotation
+from archimedes.spatial import (
+    Rotation, euler_kinematics, dcm_from_euler
+)
 ```
 
 ```{code-cell} python
@@ -398,7 +399,7 @@ vehicle = multirotor.MultiRotorVehicle(
     drag_model=drag_model,
     rotor_model=rotor_model,
     gravity_model=gravity_model,
-    rigid_body=multirotor.RigidBody(),
+    rigid_body=multirotor.RigidBody(rpy_attitude=True),
 )
 ```
 
@@ -511,8 +512,8 @@ phi_trim = p_trim[0]
 theta_trim = p_trim[1]
 u_trim = p_trim[2:]
 
-rpy_trim = Rotation.from_euler("xyz", [phi_trim, theta_trim, 0.0])
-v_B_trim = rpy_trim.apply(v_N, inverse=True)
+R_BN = dcm_from_euler(np.array([phi_trim, theta_trim, 0.0]))
+v_B_trim = R_BN @ v_N
 
 print(f"roll: {np.rad2deg(phi_trim):.2f} deg")
 print(f"pitch: {np.rad2deg(theta_trim):.2f} deg")
@@ -531,9 +532,7 @@ def f_lon(x_lon, u):
     theta, vx, vz, q = x_lon  # Perturbations
     rpy = np.hstack([phi_trim, theta, 0.0])
     w_B = np.hstack([0.0, q, 0.0])
-    # Note we can't compute quaternion kinematics and then
-    # convert to Euler rates -> have to use Euler kinematics directly
-    rpy_t = aero.euler_kinematics(rpy) @ w_B
+    rpy_t = euler_kinematics(rpy) @ w_B
     v_B = np.hstack([vx, v_B_trim[1], vz])
     x = vehicle.state(np.zeros(3), rpy, v_B, w_B)
     x_t = vehicle.dynamics(0.0, x, u)

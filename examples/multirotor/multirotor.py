@@ -7,10 +7,11 @@ import numpy as np
 from scipy.special import roots_legendre
 
 import archimedes as arc
-from archimedes.experimental.aero import (
+from archimedes.spatial import (
+    Rotation,
     RigidBody,
+    dcm_from_euler,
 )
-from archimedes.experimental.spatial import Rotation
 
 __all__ = [
     "RigidBody",
@@ -348,9 +349,14 @@ class MultiRotorVehicle:
             return self.rigid_body.w_B
 
     def state(self, pos, rpy, vel, w_B, aux=None, inertial_velocity=False) -> State:
-        att = Rotation.from_euler("xyz", rpy)
+        if self.rigid_body.rpy_attitude:
+            att = rpy
+            R_BN = dcm_from_euler(rpy)
+        else:
+            att = Rotation.from_euler("xyz", rpy)
+            R_BN = att.as_matrix()
         if inertial_velocity:
-            vel = att.apply(vel, inverse=True)
+            vel = R_BN @ vel
         rb_state = self.rigid_body.State(pos, att, vel, w_B)
         return self.State(rb_state, aux)
 
@@ -393,7 +399,12 @@ class MultiRotorVehicle:
         # Calculate drag forces and moments in body frame B
         Fdrag_B, Mdrag_B = self.drag_model(t, x)
 
-        Fgravity_B = x.att.apply(Fgravity_N, inverse=True)
+        if self.rigid_body.rpy_attitude:
+            R_BN = dcm_from_euler(x.att)
+            Fgravity_B = R_BN @ Fgravity_N
+
+        else:
+            Fgravity_B = x.att.apply(Fgravity_N, inverse=True)
 
         F_B = Frotor_B + Fdrag_B + Fgravity_B
 

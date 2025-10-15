@@ -1,3 +1,5 @@
+import warnings
+
 from .gravity import (
     GravityModel,
     ConstantGravity,
@@ -15,11 +17,6 @@ from .atmosphere import (
     StandardAtmosphere1976Config,
     AtmosphereConfig,
 )
-from .rigid_body import (
-    RigidBody,
-    RigidBodyConfig,
-    euler_kinematics,
-)
 from .sensors import (
     Accelerometer,
     AccelerometerConfig,
@@ -30,11 +27,30 @@ from .sensors import (
 )
 from .frames import wind_frame
 
-__all__ = [
+_deprecated = {
     "RigidBody",
     "RigidBodyConfig",
-    "wind_frame",
     "euler_kinematics",
+    "dcm_from_euler",
+}
+
+
+def __getattr__(name):
+    if name in _deprecated:
+        warnings.warn(
+            f"Importing {name} from archimedes.experimental.aero is deprecated "
+            "and will be removed in version 1.0. "
+            "Please import from archimedes.spatial instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return getattr(__import__("archimedes.spatial", fromlist=[name]), name)
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+
+__all__ = [
+    *_deprecated,
+    "wind_frame",
     "GravityModel",
     "ConstantGravity",
     "ConstantGravityConfig",

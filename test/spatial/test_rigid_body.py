@@ -4,11 +4,13 @@ import numpy as np
 import numpy.testing as npt
 
 import archimedes as arc
-from archimedes.experimental.aero import (
+from archimedes.spatial import (
     RigidBody,
+    RigidBodyConfig,
+    Rotation,
+    dcm_from_euler,
     euler_kinematics,
 )
-from archimedes.experimental.spatial import Rotation
 
 m = 1.7  # Arbitrary mass
 J_B = np.diag([0.1, 0.2, 0.3])  # Arbitrary inertia matrix
@@ -41,6 +43,16 @@ def test_euler_kinematics():
 
 
 class TestVehicleDynamics:
+    def test_build_from_config(self):
+        config = {
+            "baumgarte": 0.5,
+            "rpy_attitude": False,
+        }
+        rb = RigidBodyConfig(**config).build()
+        assert isinstance(rb, RigidBody)
+        assert rb.baumgarte == 0.5
+        assert rb.rpy_attitude is False
+
     def test_constant_velocity_no_orientation(self):
         rigid_body = RigidBody()
         t = 0
@@ -78,7 +90,10 @@ class TestVehicleDynamics:
         v_B = np.array([1, 2, 3])
 
         att = Rotation.from_euler("xyz", rpy)
-        v_N = att.apply(v_B)
+
+        # Could do att.apply(v_B) but this tests dcm_from_euler
+        R_NB = dcm_from_euler(rpy, transpose=True)
+        v_N = R_NB @ v_B
 
         t = 0
         x = rigid_body.State(

@@ -12,8 +12,7 @@ from multirotor import (
 )
 
 import archimedes as arc
-from archimedes.experimental import aero
-from archimedes.experimental.spatial import Rotation
+from archimedes.spatial import RigidBody, euler_kinematics, dcm_from_euler
 
 m = 1.7  # Arbitrary mass
 g0 = 9.81
@@ -397,7 +396,7 @@ class TestTrimStability:
             theta += np.pi / 2
             ccw = not ccw
 
-        rigid_body = aero.RigidBody()
+        rigid_body = RigidBody(rpy_attitude=True)
         vehicle = MultiRotorVehicle(
             rigid_body=rigid_body,
             rotors=rotors,
@@ -442,8 +441,8 @@ class TestTrimStability:
         npt.assert_allclose(theta_trim, 0.0, atol=1e-6)
         npt.assert_allclose(u_trim, u_trim_ex, atol=1e-6)
 
-        rpy_trim = Rotation.from_euler("xyz", [phi_trim, theta_trim, 0.0])
-        v_B_trim = rpy_trim.apply(v_N, inverse=True)
+        R_BN = dcm_from_euler(np.array([phi_trim, theta_trim, 0.0]))
+        v_B_trim = R_BN @ v_N
 
         #
         # Linear stability analysis for longitudinal motion
@@ -461,9 +460,7 @@ class TestTrimStability:
             theta, vx, vz, q = x_lon  # Perturbations
             rpy = np.hstack([phi_trim, theta, 0.0])
             w_B = np.hstack([0.0, q, 0.0])
-            # Note we can't compute quaternion kinematics and then
-            # convert to Euler rates -> have to use Euler kinematics directly
-            rpy_t = aero.euler_kinematics(rpy) @ w_B
+            rpy_t = euler_kinematics(rpy) @ w_B
             v_B = np.hstack([vx, v_B_trim[1], vz])
             x = vehicle.state(np.zeros(3), rpy, v_B, w_B)
             x_t = vehicle.dynamics(0.0, x, u)
@@ -511,9 +508,7 @@ class TestTrimStability:
             phi, vy, p, r = x_lat  # Perturbations
             rpy = np.hstack([phi, theta_trim, 0.0])
             w_B = np.hstack([p, 0.0, r])
-            # Note we can't compute quaternion kinematics and then
-            # convert to Euler rates -> have to use Euler kinematics directly
-            rpy_t = aero.euler_kinematics(rpy) @ w_B
+            rpy_t = euler_kinematics(rpy) @ w_B
             v_B = np.hstack([v_B_trim[0], vy, v_B_trim[2]])
             x = vehicle.state(np.zeros(3), rpy, v_B, w_B)
             x_t = vehicle.dynamics(0.0, x, u)

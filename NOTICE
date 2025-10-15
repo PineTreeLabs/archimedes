@@ -31,7 +31,7 @@ This document lists third-party software components used by or incorporated into
 ### SciPy
 - **Source**: https://github.com/scipy/scipy
 - **License**: BSD-3 Clause License
-- **Files**: `experimental/signal/tf2ss.py`, `experimental/spatial/_rotation.py`
+- **Files**: `experimental/signal/tf2ss.py`, `spatial/_rotation.py`
 
 ## Key Dependencies
 

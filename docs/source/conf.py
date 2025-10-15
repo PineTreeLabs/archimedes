@@ -64,6 +64,11 @@ nb_execution_excludepatterns = [
 autosummary_generate = True
 autosummary_imported_members = True
 
+# Maximum signature line length before breaking into multiple lines
+maximum_signature_line_length = 88
+autodoc_preserve_defaults = True
+# autodoc_typehints = "description"  # or "signature", "both", "none"
+
 templates_path = ["_templates"]
 exclude_patterns = []
 
