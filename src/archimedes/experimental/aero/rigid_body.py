@@ -7,7 +7,38 @@ from archimedes import struct, field, StructConfig
 from ..spatial import Rotation
 
 
-__all__ = ["RigidBody", "RigidBodyConfig", "euler_kinematics"]
+__all__ = [
+    "RigidBody",
+    "RigidBodyConfig",
+    "euler_kinematics",
+    "dcm_from_euler",
+]
+
+
+def dcm_from_euler(rpy, transpose=False):
+    """Returns matrix to transform from inertial to body frame (R_BN)
+
+    If transpose=True, returns matrix to transform from body to inertial frame (R_NB).
+    """
+    φ, θ, ψ = rpy[0], rpy[1], rpy[2]
+
+    sφ, cφ = np.sin(φ), np.cos(φ)
+    sθ, cθ = np.sin(θ), np.cos(θ)
+    sψ, cψ = np.sin(ψ), np.cos(ψ)
+
+    R = np.array(
+        [
+            [cθ * cψ, cθ * sψ, -sθ],
+            [sφ * sθ * cψ - cφ * sψ, sφ * sθ * sψ + cφ * cψ, sφ * cθ],
+            [cφ * sθ * cψ + sφ * sψ, cφ * sθ * sψ - sφ * cψ, cφ * cθ],
+        ],
+        like=rpy,
+    )
+
+    if transpose:
+        R = R.T
+
+    return R
 
 
 def euler_kinematics(rpy, inverse=False):
@@ -60,12 +91,13 @@ def euler_kinematics(rpy, inverse=False):
 
 @struct
 class RigidBody:
+    rpy_attitude: bool = False  # If True, use roll-pitch-yaw for attitude
     baumgarte: float = 1.0  # Baumgarte stabilization factor for quaternion kinematics
 
     @struct
     class State:
         p_N: np.ndarray  # Position of the center of mass in the Newtonian frame N
-        att: Rotation  # Attitude (orientation) of the vehicle
+        att: Rotation | np.ndarray  # Attitude (orientation) of the vehicle
         v_B: np.ndarray  # Velocity of the center of mass in body frame B
         w_B: np.ndarray  # Angular velocity in body frame (ω_B)
 
@@ -80,13 +112,27 @@ class RigidBody:
         dJ_dt: np.ndarray = field(default_factory=lambda: np.zeros((3, 3)))
 
     def calc_kinematics(self, x: State):
-        # Unpack the state
-        v_B = x.v_B  # Velocity of the center of mass in body frame B
 
-        # Velocity in the Newtonian frame
-        dp_N = x.att.apply(v_B)
+        if self.rpy_attitude:
+            rpy = x.att
 
-        att_deriv = x.att.derivative(x.w_B, baumgarte=self.baumgarte)
+            # Convert roll-pitch-yaw (rpy) orientation to the direction cosine matrix.
+            # C_BN rotates from the Newtonian frame N to the body frame B.
+            C_BN = dcm_from_euler(rpy)
+
+            # Transform roll-pitch-yaw rates in the body frame to time derivatives of Euler angles
+            # These are the Euler kinematic equations
+            H = euler_kinematics(rpy)
+
+            # Time derivatives of roll-pitch-yaw (rpy) orientation
+            att_deriv = H @ x.w_B
+
+            # Time derivative of position in Newtonian frame N
+            dp_N = C_BN.T @ x.v_B
+
+        else:
+            dp_N = x.att.apply(x.v_B)
+            att_deriv = x.att.derivative(x.w_B, baumgarte=self.baumgarte)
 
         return dp_N, att_deriv
 
@@ -134,7 +180,8 @@ class RigidBody:
 
 class RigidBodyConfig(StructConfig):
     baumgarte: float = 1.0  # Baumgarte stabilization factor
+    rpy_attitude: bool = False  # If True, use roll-pitch-yaw for attitude
 
     def build(self) -> RigidBody:
         """Build and return a RigidBody instance."""
-        return RigidBody(baumgarte=self.baumgarte)
+        return RigidBody(baumgarte=self.baumgarte, rpy_attitude=self.rpy_attitude)
