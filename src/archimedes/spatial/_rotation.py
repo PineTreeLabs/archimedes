@@ -84,6 +84,124 @@ def _elementary_quat_compose(
 
 @struct
 class Rotation:
+    """Rotation in 3 dimensions.
+
+    This class provides an interface to initialize from and represent rotations
+    with:
+
+    - Quaternions
+    - Rotation Matrices
+    - Euler Angles
+
+    Internally, the rotation is always represented as a unit quaternion, which is a
+    minimal and singularity-free representation.
+
+    This class is closely modeled after [scipy.spatial.transform.Rotation](
+    https://docs.scipy.org/doc/scipy/reference/generated/scipy.spatial.transform.Rotation.html)
+    with a few differences:
+    
+    - By default the quaternion is represented in scalar-first format
+      (i.e. [w, x, y, z]) instead of scalar-last ([x, y, z, w]).
+    - This class is designed for symbolic computation, so some checks (e.g. for valid
+      rotation matrices) are omitted, since these cannot be done symbolically.
+    - The class currently does not support some representations like Rodrigues parameters
+      or rotation vectors
+    - The class does not support multiple rotations in a single object
+    - This implementation support kinematic calculations
+
+    The following operations on rotations are supported:
+
+    - Application on vectors (rotations of vectors)
+    - Rotation Composition
+    - Rotation Inversion
+    - Kinematic time derivative given angular velocity
+
+    Parameters
+    ----------
+    quat : array_like, shape (4,)
+        Quaternion representing the rotation. By default, this is in scalar-first
+        format (i.e. [w, x, y, z]). See `scalar_first` parameter.  Typically, the
+        class should not be constructed directly, but instead initialized with one of
+        the class methods like `from_quat`, `from_matrix`, or `from_euler`.
+    scalar_first : bool, optional
+        If True, the quaternion is in scalar-first format (i.e. [w, x, y, z]).
+        If False, the quaternion is in scalar-last format (i.e. [x, y, z, w]).
+        Default is True.
+
+    Methods
+    -------
+    __len__
+    from_quat
+    from_matrix
+    from_euler
+    as_quat
+    as_matrix
+    as_euler
+    identity
+    apply
+    inv
+    mul
+    derivative
+
+    Examples
+    --------
+    >>> from archimedes.spatial import Rotation
+    >>> import numpy as np
+
+    A `Rotation` instance can be initialized in any of the above formats and
+    converted to any of the others. The underlying object is independent of the
+    representation used for initialization.
+
+    Consider a counter-clockwise rotation of 90 degrees about the z-axis. This
+    corresponds to the following quaternion (in scalar-first format):
+
+    >>> R = Rotation.from_quat([np.cos(np.pi/4), 0, 0, np.sin(np.pi/4)])
+
+    The rotation can be expressed in any of the other formats:
+
+    >>> R.as_matrix()
+    array([[ 2.22044605e-16, -1.00000000e+00,  0.00000000e+00],
+    [ 1.00000000e+00,  2.22044605e-16,  0.00000000e+00],
+    [ 0.00000000e+00,  0.00000000e+00,  1.00000000e+00]])
+    >>> R.as_euler('zyx', degrees=True)
+    array([90.,  0.,  0.])
+
+    The same rotation can be initialized using a rotation matrix:
+
+    >>> R = Rotation.from_matrix([[0, -1, 0],
+    ...                    [1, 0, 0],
+    ...                    [0, 0, 1]])
+
+    Representation in other formats:
+
+    >>> R.as_quat()
+    array([0.        , 0.        , 0.70710678, 0.70710678])
+    >>> R.as_euler('zyx', degrees=True)
+    array([90.,  0.,  0.])
+
+    The ``from_euler`` method is quite flexible in the range of input formats
+    it supports. Here we initialize a single rotation about a single axis:
+
+    >>> R = Rotation.from_euler('z', 90, degrees=True)
+
+    Again, the object is representation independent and can be converted to any
+    other format:
+
+    >>> R.as_quat()
+    array([0.        , 0.        , 0.70710678, 0.70710678])
+    >>> R.as_matrix()
+    array([[ 2.22044605e-16, -1.00000000e+00,  0.00000000e+00],
+           [ 1.00000000e+00,  2.22044605e-16,  0.00000000e+00],
+           [ 0.00000000e+00,  0.00000000e+00,  1.00000000e+00]])
+
+    See Also
+    --------
+    scipy.spatial.transform.Rotation : Similar class in SciPy
+    RigidBody : Rigid body dynamics using this Rotation class
+    dcm_from_euler : Directly calculate rotation matrix from roll-pitch-yaw angles
+    euler_kinematics : Transform roll-pitch-yaw rates to body-frame angular
+
+    """
     quat: np.ndarray
     scalar_first: bool = field(default=True, static=True)
 
@@ -278,7 +396,7 @@ class Rotation:
                 q[0] - q[j],
                 q[i] + q[k] * sign,
                 q[j] + q[0],
-                q[k] - q[i] * sign,
+                q[k] * sign - q[i],
             )
 
         # 2. Compute second angle

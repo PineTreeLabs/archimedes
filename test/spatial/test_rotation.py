@@ -96,6 +96,7 @@ class TestRotation:
         "seq",
         [
             "xyz",  # Standard roll-pitch-yaw
+            "zyx",  # Standard yaw-pitch-roll
             "zxz",  # Symmetric sequence
             "ZYX",  # Intrinsic sequence
             "XZX",  # Symmetric intrinsic sequence
