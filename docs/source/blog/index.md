@@ -13,4 +13,13 @@
 A Python toolkit for hardware engineering
 :::
 
+:::{grid-item-card} Spatial Mechanics
+:link: 2025/spatial
+:link-type: doc
+
+20 Oct 2025 · Announcements
+
+Inside the new `spatial` module
+:::
+
 ::::
