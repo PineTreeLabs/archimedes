@@ -36,7 +36,7 @@ This post serves as an announcement of these new features, but will also be upda
 ## What `spatial` Does
 
 The [`spatial`](#archimedes.spatial) module is designed for _cross-domain spatial mechanics_.
-This means that there's no specific physics modeling like aerodynamics or gravity, but there are reusable components that come in handy across a wide range of application areas; satellites, airplanes, rockets, drones, watercraft, cars, and steampunk dirigibles can all use the same basic spatial dynamics primitives.
+This means that there's no specific physics modeling like aerodynamics or gravity, but there are reusable components that come in handy across a wide range of application areas; satellites, airplanes, rockets, drones, watercraft, and cars can all use the same basic spatial dynamics primitives.
 
 The module is built on two main capabilities: **3D rotation representations**, and **6dof rigid body dynamics**.
 We'll cover these next.
@@ -106,7 +106,7 @@ The actual implementation of quaternion kinematics deviates slightly from the id
 With a stabilization factor of $\lambda$, the full kinematics model is:
 
 ```{math}
-\dot{\mathbf{q}} = \frac{1}{2} \mathbf{q} \otimes \mathbf{\omega}_B - \lambda * (||q||² - 1) \mathbf{q}.
+\dot{\mathbf{q}} = \frac{1}{2} \mathbf{q} \otimes \mathbf{\omega}_B - \lambda * (||\mathbf{q}||² - 1) \mathbf{q}.
 ```
 
 A factor of $\lambda = 1$ is a good default (and is the default in `RigidBody` as well).
@@ -157,14 +157,14 @@ Then the equations of motion are:
 \begin{align*}
 \dot{\mathbf{p}}_N &= \mathbf{R}_{BN}^T(\mathbf{q}) \mathbf{v}_B \\
 \dot{\mathbf{q}} &= \frac{1}{2} \mathbf{q} \otimes \mathbf{\omega}_B
-    - \lambda * (||q||² - 1) \mathbf{q} \\
+    - \lambda * (||\mathbf{q}||^2 - 1) \mathbf{q} \\
 \dot{\mathbf{v}}_B &= \frac{1}{m}\mathbf{F}_B - \mathbf{\omega}_B \times \mathbf{v}_B \\
 \dot{\mathbf{\omega}}_B &= \mathbf{J}_B^{-1}(\mathbf{M}_B
     - \mathbf{\omega}_B \times (\mathbf{J}_B \mathbf{\omega}_B))
 \end{align*}
 ```
 
-The `RigidBody` class exists to calculate these equations for a generic body; you just have to provide forces, moments, mass, and inertia characteristics. 
+The `RigidBody` class exists to calculate these equations for a generic body - you just have to provide forces, moments, mass, and inertia characteristics. 
 The idea is that you can use this as a building block and construct your own vehicle models (or models of whatever it is you're building) by implementing the domain-specific physics models and letting Archimedes handle the generic parts.
 
 ### Implementation
@@ -235,14 +235,14 @@ Here's the `RigidBody` class in action:
 ```{code-cell} python
 rb = RigidBody()
 
-x = rb.State(
+x = RigidBody.State(
     p_N=np.array([0.0, 0.0, 10.0]),
     att=Rotation.identity(),
     v_B=np.zeros(3),
     w_B=np.zeros(3),
 )
 
-u = rb.Input(
+u = RigidBody.Input(
     F_B=np.array([0.0, 0.0, 9.8]),
     M_B=np.array([0.0, 0.1, 0.0]),
     m=10.0,
@@ -257,10 +257,150 @@ In this simple case, since the body and world axes are aligned (`Rotation.identi
 ## Custom Vehicle Models
 
 The power of `RigidBody` comes from being able to use this as a component inside more complex vehicle models.
-We'll be releasing some more in-depth examples soon, but 
 
-<!-- Have to implement your own force/moment models -->
+Two basic patterns you might use for this are **inheritance** and **composition**.
 
-## On the Roadmap
+### Inheritance
 
-<!-- On the roadmap: slerp, transformations, kinematic trees -->
+With this pattern, the vehicle model simply inherits from `RigidBody` directly.
+This is convenient when there are no additional state variables in the model, for instance with a flight dynamics model that uses lookup tables for aerodynamics and propulsion models:
+
+```python
+@struct
+class Aircraft(RigidBody):
+    m: float
+    J_B: np.ndarray
+
+    @struct
+    class Input:
+        throttle: float
+        rudder: float
+        aileron: float
+        elevator: float
+
+    def calc_aero(
+        self, x: RigidBody.State, u: Aircraft.Input
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """Calculate aerodynamic forces and moments"""
+
+    def calc_eng(
+        self, x: RigidBody.State, u: Aircraft.Input
+    ) -> np.ndarray:
+        """Calculate engine thrust"""
+
+    def dynamics(
+        self, t: float, x: RigidBody.State, u: Aircraft.Input
+    ) -> RigidBody.State:
+        # Aerodynamics and propulsion models
+        F_aero_B, M_aero_B = self.calc_aero(x, u)
+        F_eng_B = self.calc_eng(x, u)
+
+        # Use the state attitude to calculate gravity in body axes
+        F_grav_N = self.m * np.hstack([0, 0, 9.81])
+        F_grav_B = x.att.apply(F_grav_N, inverse=True)
+
+        # Net forces/moments
+        F_B = F_aero_B + F_eng_B + F_grav_B
+        M_B = M_aero_B
+
+        # Use RigidBody.dynamics to evaluate the equations of motion
+        u_rb = RigidBody.Input(F_B=F_B, M_B=M_B, m=self.m, J_B=self.J_B)
+        return super().dynamics(t, x, u_rb)
+```
+
+### Composition
+
+For more complex models it is usually more convenient to instead treat the `RigidBody` as one component of several.
+This can be a more natural way to organize hierarchical state variables:
+
+```python
+@struct
+class Aircraft:
+    gravity: GravityModel
+    atmosphere: AtmosphereModel
+    rigid_body: RigidBody
+
+    aero: AeroModel
+    engine: EngineModel
+
+    m: float
+    J_B: np.ndarray
+
+    @struct
+    class State:
+        rigid_body: RigidBody.State
+        aero: AeroModel.State
+        engine: Engine.State
+
+    @struct
+    class Input:
+        throttle: float
+        rudder: float
+        aileron: float
+        elevator: float
+
+    def dynamics(
+        self, t: float, x: RigidBody.State, u: Aircraft.Input
+    ) -> RigidBody.State:
+        # Aerodynamics and propulsion models
+        F_aero_B, M_aero_B = self.aero.output(x, u)
+        F_eng_B = self.engine.output(x, u)
+
+        # Time derivatives of aerodynamic and engine states
+        x_aero_dot = self.aero.dynamics(x, u)
+        x_eng_dot = self.engine.dynamics(x, u)
+
+        # Use the state attitude to calculate gravity in body axes
+        F_grav_N = self.gravity(x.rigid_body.p_N)
+        F_grav_B = x.att.apply(F_grav_N, inverse=True)
+
+        # Net forces/moments
+        F_B = F_aero_B + F_prop_B + F_grav_B
+        M_B = M_aero_B
+
+        # Evaluate the equations of motion
+        u_rb = self.rigid_body.Input(F_B=F_B, M_B=M_B, m=self.m, J_B=self.J_B)
+        x_rb_dot = self.rigid_body.dynamics(x.rigid_body, u_rb)
+
+        return self.State(rigid_body=x_rb_dot, aero=x_aero_dot, engine=x_eng_dot)
+```
+
+Now the aerodynamic state can handle lag effects or other unsteady aerodynamic behavior, and the engine can have its own internal dynamics as well.
+This can be a much more flexible and powerful approach - since the `Aircraft` implementation doesn't handle the details of any of these subsystems, it's easy to create and test a range of different component models.
+For instance, the engine model here could be anything from a simple linear thrust approximation to a detailed physics-based propulsion system model including turbomachinery and combustion calculations.
+
+:::{note}
+For a deeper dive on hierarchical modeling in Archimedes, check out the [tutorial series](../../tutorials/hierarchical/hierarchical00.md), which goes into detail on the [`@struct`](#archimedes.struct) decorator, recommended design patterns, and configuration management for complicated hierarchical models.
+:::
+
+We'll be releasing more in-depth examples of different vehicle dynamics models soon, so be sure to [sign up for the mailing list](https://jaredcallaham.substack.com/embed) to stay in the loop.
+
+## What's Next
+
+The new `spatial` module is the first core physics modeling functionality in Archimedes, but this is just the beginning.
+For `spatial` itself, the next priorities are _spatial transformations_ (transformation + rotation), _kinematic trees_ for handling multiple reference frames, and _interpolations_ (slerp) for trajectory generation and optimization.
+
+Beyond `spatial`, we'll be adding some common functionality for different classes of vehicle models, such as reference gravitational and atmospheric models like WGS84 and USSA1976.
+Tools for detailed propulsion systems modeling are more niche and thus farther out on the roadmap, but there are proof of concept demos already, so feel free to reach out if you're interested in that.
+
+Finally, some detailed application examples will be released soon to provide full reference implementations of different classes of vehicle dynamics models (particularly aerospace-related, but also reach out if there's something else you'd like to see).
+
+Speaking of getting in touch, if you're interested in this topic or Archimedes more generally, be sure to:
+
+- **⭐ Star the Repository**: This shows support and interest and helps others discover the project
+- **📢 Spread the Word**: Think anyone you know might be interested?
+- **🗞️ Stay in the Loop**: [Subscribe](https://jaredcallaham.substack.com/embed) to the newsletter for updates and announcements
+
+The [GitHub Discussions](https://github.com/pinetreelabs/archimedes/discussions) page is also a great place to give feedback, ask questions, or share any projects you want to use Archimedes for.
+Bug reports, feature requests, and complaints about documentation quality are invaluable for open-source projects like Archimedes; these are also welcome on the [Issues](https://github.com/pinetreelabs/archimedes/issues) tab.
+
+---
+
+:::{admonition} About the Author
+:class: blog-author-bio
+
+**Jared Callaham** is the creator of Archimedes and principal at Pine Tree Labs.
+He is a consulting engineer on modeling, simulation, optimization, and control systems with a particular focus on applications in aerospace engineering.
+
+*Have questions or feedback? [Open a discussion on GitHub](https://github.com/jcallaham/archimedes/discussions)*
+:::

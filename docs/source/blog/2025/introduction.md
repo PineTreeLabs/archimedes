@@ -492,7 +492,7 @@ Besides feedback, other easy ways to support the project include:
 - **⭐ Star the Repository**: This shows support and interest and helps others discover the project
 - **📢 Spread the Word**: Think anyone you know might be interested?
 - **🐛 Report Issues**: Detailed bug reports, documentation gaps, and feature requests are invaluable
-- **🗞️ Stay In the Loop**: [Subscribe](https://jaredcallaham.substack.com/embed) to the newsletter for updates and announcements
+- **🗞️ Stay in the Loop**: [Subscribe](https://jaredcallaham.substack.com/embed) to the newsletter for updates and announcements
 
 Thanks for checking out the project!
 
