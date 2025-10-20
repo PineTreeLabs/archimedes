@@ -65,13 +65,17 @@ Archimedes represents these rotations using the [`Rotation`](#archimedes.spatial
 This class is modeled directly on [SciPy's `Rotation` class](https://docs.scipy.org/doc/scipy/reference/generated/scipy.spatial.transform.Rotation.html) and is unit tested directly against the SciPy behavior.
 However, by re-implementing it in Archimedes we can ensure that it is compatible with all of the symbolic-numeric capabilities like autodiff and codegen.
 
+```{code-cell} python
+:tags: [remove-cell]
+# ruff: noqa: N803, N816
+```
 
 ```{code-cell} python
 :tags: [hide-cell]
 import numpy as np
 
 import archimedes as arc
-from archimedes.spatial import Rotation, RigidBody
+from archimedes.spatial import RigidBody, Rotation
 ```
 
 ```{code-cell} python
