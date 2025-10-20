@@ -5,9 +5,8 @@
 [![codecov](https://codecov.io/gh/pinetreelabs/archimedes/graph/badge.svg?token=37QNTHS42R)](https://codecov.io/gh/pinetreelabs/archimedes)
 [![REUSE status](https://api.reuse.software/badge/github.com/PineTreeLabs/archimedes)](https://api.reuse.software/info/github.com/PineTreeLabs/archimedes)
 
-**Archimedes** is an open-source Python framework designed to simplify the development of complex engineering systems by providing tools for **modeling**, **simulation**, **optimization**, **controls**, and **hardware deployment**. 
-The ultimate goal is to make it possible to do practical
-hardware engineering with Python.
+**Archimedes** is an open-source Python framework designed for deployment of control systems to hardware.
+To make this possible, it provides a comprehensive toolkit for **modeling**, **simulation**, **optimization**, and **C code generation**.
 
 For more details, see the [documentation site](https://pinetreelabs.github.io/archimedes/)
 
