@@ -9,9 +9,17 @@ kernelspec:
   name: archimedes
 ---
 
-# Spatial Mechanics
+# [Spatial Mechanics]{.hidden-title}
 
-_Inside the new `spatial` module_
+```{image} _static/spatial_graduates_light.png
+:class: only-light
+```
+
+```{image} _static/spatial_graduates_dark.png
+:class: only-dark
+```
+
+**_Inside the new `spatial` module_**
 
 Jared Callaham • 16 Oct 2025
 
@@ -132,13 +140,19 @@ A "6dof" rigid body has three translational and three rotational "degrees of fre
 From a state-space modeling perspective, this system has either 12 or 13 dynamical states (depending on whether you use Euler or quaternion kinematics).
 The rigid body dynamics model implements the equations of motion of such a body given specified forces, torques, and mass/inertia characteristics.
 
-The Archimedes [`RigidBody`](#archimedes.spatial.RigidBody) implementation follows the conventions of the classic GNC textbook ["Aircraft Control and Simulation"](https//doi.org/10.1002/9781119174882) by Stevens, Lewis, and Johnson.
+The Archimedes [`RigidBody`](#archimedes.spatial.RigidBody) implementation follows the conventions of the classic GNC textbook ["Aircraft Control and Simulation"](https://doi.org/10.1002/9781119174882) by Stevens, Lewis, and Johnson.
 Hence, the terminology and implementation is heavily based on flight dynamics applications, though this can be adapted straightforwardly to other domains.
 For an in-depth description of the conventions, notation, and derivation of the equations of motion, refer to the textbook.
 
 Our rigid body model assumes two reference frames: a body-fixed frame "B" with the origin at the center of mass, and a Newtonian inertial frame "N" (for instance the world or ground frame in flight dynamics).
 
-<!-- TODO: Add figure for the reference frames -->
+```{image} _static/spatial_frames_light.png
+:class: only-light
+```
+
+```{image} _static/spatial_frames_dark.png
+:class: only-dark
+```
 
 Vectors are suffixed with `*_B` or `*_N` to indicate their coordinate systems.
 In this convention, the dynamical states for a rigid body are four vectors:
