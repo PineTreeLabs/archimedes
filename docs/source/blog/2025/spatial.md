@@ -239,7 +239,7 @@ So, a point mass in 2D has two degrees of freedom ($x$ and $y$), while a 3D poin
 Full 3D rigid body dynamics have six degrees of freedom, and certain aftermarket Deloreans have seven (all the usual ones plus time).
 
 This is a bit with the prevalence of modern state-space modeling, since there are roughly twice as many dynamical states as there are "degrees of freedom".
-As implemented here, the "6dof" model has thirteed dynamical states (three position, three velocity, four quaternion, and three angular velocity).
+As implemented here, the "6dof" model has thirteen dynamical states (three position, three velocity, four quaternion, and three angular velocity).
 Flux capacitors not included.
 :::
 -->
@@ -354,8 +354,8 @@ class Aircraft:
         elevator: float
 
     def dynamics(
-        self, t: float, x: RigidBody.State, u: Aircraft.Input
-    ) -> RigidBody.State:
+        self, t: float, x: Aircraft.State, u: Aircraft.Input
+    ) -> Aircraft.State:
         # Aerodynamics and propulsion models
         F_aero_B, M_aero_B = self.aero.output(x, u)
         F_eng_B = self.engine.output(x, u)
@@ -366,7 +366,7 @@ class Aircraft:
 
         # Use the state attitude to calculate gravity in body axes
         F_grav_N = self.gravity(x.rigid_body.p_N)
-        F_grav_B = x.att.apply(F_grav_N, inverse=True)
+        F_grav_B = x.rigid_body.att.apply(F_grav_N, inverse=True)
 
         # Net forces/moments
         F_B = F_aero_B + F_prop_B + F_grav_B

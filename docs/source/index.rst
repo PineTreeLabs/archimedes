@@ -40,7 +40,7 @@ be familiar to NumPy users.
 Quick Example
 -------------
 
-See the [Quickstart](quickstart) for recommended installation; the easiest version is:
+See the :doc:`Quickstart <quickstart>` for recommended installation; the easiest version is:
 
 .. code-block:: bash
 
