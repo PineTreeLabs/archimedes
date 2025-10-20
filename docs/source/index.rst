@@ -9,9 +9,8 @@
 
 -----------------
 
-**Archimedes** is an open-source Python framework designed to simplify the development of complex engineering systems by providing tools for **modeling**, **simulation**, **optimization**, **controls**, and **hardware deployment**. 
-The ultimate goal is to make it possible to do practical
-hardware engineering with Python.
+**Archimedes** is an open-source Python framework designed for deployment of control systems to hardware.
+To make this possible, it provides a comprehensive toolkit for **modeling**, **simulation**, **optimization**, and **C code generation**.
 Archimedes builds on the powerful symbolic computation
 capabilities of `CasADi <https://web.casadi.org/docs/>`_ with an interface designed to
 be familiar to NumPy users.
@@ -40,6 +39,16 @@ be familiar to NumPy users.
 
 Quick Example
 -------------
+
+See the :doc:`Quickstart <quickstart>` for recommended installation; the easiest version is:
+
+.. code-block:: bash
+
+   pip install archimedes
+
+Archimedes combines design features from SciPy, JAX, and PyTorch to make it possible to write
+regular NumPy functions that can be automatically differentiated and translated to C code for
+embedded applications:
 
 .. code-block:: python
 

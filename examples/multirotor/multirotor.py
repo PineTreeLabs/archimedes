@@ -354,7 +354,7 @@ class MultiRotorVehicle:
             R_BN = dcm_from_euler(rpy)
         else:
             att = Rotation.from_euler("xyz", rpy)
-            R_BN = att.as_matrix()
+            R_BN = att.as_matrix().T
         if inertial_velocity:
             vel = R_BN @ vel
         rb_state = self.rigid_body.State(pos, att, vel, w_B)

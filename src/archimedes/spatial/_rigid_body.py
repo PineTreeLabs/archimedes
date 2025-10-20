@@ -23,8 +23,15 @@ def dcm_from_euler(rpy: np.ndarray, transpose: bool = False) -> np.ndarray:
 
     This is the direction cosine matrix (DCM) corresponding to the given
     roll-pitch-yaw (rpy) angles.  This follows the standard aerospace
-    convention and corresponds to the "xyz" sequence when using the ``Rotation``
-    class.
+    convention and corresponds to the "xyz" sequence when using the
+    :py:class:`Rotation` class.  However, by default this function returns the inverse
+    of the rotation implemented by :py:meth:`Rotation.apply`.  Specifically, the
+    following will generate equivalent DCMs:
+
+    .. code-block:: python
+
+        R_BN = dcm_from_euler(rpy)
+        R_BN = Rotation.from_euler('xyz', rpy).inv().as_matrix()
 
     In general, the ``Rotation`` class should be preferred over Euler representations,
     although Euler angles are used in some special cases (e.g. stability analysis).
@@ -159,17 +166,21 @@ class RigidBody:
     - ``v_B`` = velocity of the center of mass in body frame B
     - ``w_B`` = angular velocity in body frame (ω_B)
 
+    Note that the attitude is implemented using the :py:class:`Rotation` class.
+    The transformation implemented by ``Rotation.apply`` with this attitude
+    represents ``R_NB``, the rotation from the body frame B to the inertial frame N.
+
     The equations of motion are given by
 
     .. math::
-        \\dot{p}_N &= R_{BN}^T(\\mathbf{q}) v_B \\\\
-        \\dot{\\mathbf{q}} &= \\frac{1}{2} \\mathbf{\\omega}_B
-            \\otimes \\mathbf{q} \\\\
-        \\dot{v}_B &= \\frac{1}{m}(\\mathbf{F}_B - \\dot{m} v_B)
-            - \\mathbf{\\omega}_B \\times v_B \\\\
-        \\dot{\\mathbf{\\omega}}_B &= J_B^{-1}(\\mathbf{M}_B
-            - \\dot{J}_B \\mathbf{\\omega}_B - \\mathbf{\\omega}_B
-            \\times (J_B \\mathbf{\\omega}_B))
+        \\dot{\\mathbf{p}}_N &= \\mathbf{R}_{BN}^T(\\mathbf{q}) \\mathbf{v}_B \\\\
+        \\dot{\\mathbf{q}} &= \\frac{1}{2} \\mathbf{q} \\otimes \\mathbf{\\omega}_B
+            \\\\
+        \\dot{\\mathbf{v}}_B &= \\frac{1}{m}(\\mathbf{F}_B - \\dot{m} \\mathbf{v}_B)
+            - \\mathbf{\\omega}_B \\times \\mathbf{v}_B \\\\
+        \\dot{\\mathbf{\\omega}}_B &= \\mathbf{J}_B^{-1}(\\mathbf{M}_B
+            - \\dot{\\mathbf{J}}_B \\mathbf{\\omega}_B - \\mathbf{\\omega}_B
+            \\times (\\mathbf{J}_B \\mathbf{\\omega}_B))
 
     where
 
@@ -275,8 +286,8 @@ class RigidBody:
             rpy = cast(np.ndarray, x.att)
 
             # Convert roll-pitch-yaw (rpy) orientation to the direction cosine matrix.
-            # C_BN rotates from the Newtonian frame N to the body frame B.
-            C_BN = dcm_from_euler(rpy)
+            # R_BN rotates from the Newtonian frame N to the body frame B.
+            R_BN = dcm_from_euler(rpy)
 
             # Transform roll-pitch-yaw rates in the body frame to time derivatives of
             # Euler angles - Euler kinematic equations
@@ -286,7 +297,7 @@ class RigidBody:
             att_deriv = H @ x.w_B
 
             # Time derivative of position in Newtonian frame N
-            dp_N = C_BN.T @ x.v_B
+            dp_N = R_BN.T @ x.v_B
 
         else:
             att = cast(Rotation, x.att)
