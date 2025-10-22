@@ -5,7 +5,9 @@ import numpy as np
 import archimedes as arc
 
 from archimedes import struct
-from archimedes.spatial import RigidBody, Rotation, euler_kinematics
+from archimedes.spatial import (
+    RigidBody, Rotation, euler_kinematics, dcm_from_euler
+)
 from archimedes.experimental import aero
 from archimedes.experimental.aero import GravityModel
 
@@ -105,6 +107,15 @@ class SubsonicF16:
         aileron: float  # Aileron deflection [deg]
         rudder: float  # Rudder deflection [deg]
 
+    def calc_gravity(self, x: State):
+        F_grav_N = self.m * self.gravity(x.p_N)
+        if self.rigid_body.rpy_attitude:
+            F_grav_B = dcm_from_euler(x.att) @ F_grav_N
+        else:
+            F_grav_B = x.att.apply(F_grav_N, inverse=True)
+        return F_grav_B
+
+
     def net_forces(self, t, x: State, u: Input):
         """Net forces and moments in body frame B, plus any extra state derivatives
 
@@ -135,10 +146,8 @@ class SubsonicF16:
         cxt, cyt, czt = force_coeffs
         clt, cmt, cnt = moment_coeffs
 
-        F_grav_N = self.m * self.gravity(x.p_N)
+        F_grav_B = self.calc_gravity(x)
         F_aero_B = qbar * self.S * np.stack([cxt, cyt, czt])
-
-        F_grav_B = x.att.apply(F_grav_N, inverse=True)
 
         F_B = F_aero_B + F_eng_B + F_grav_B
 
@@ -272,9 +281,14 @@ def trim_state(
     R_WB = Rotation.from_euler("zy", [-beta, alpha])
     v_B = R_WB.apply(v_W, inverse=True)
 
+    if model.rigid_body.rpy_attitude:
+        att = rpy
+    else:
+        att = Rotation.from_euler("xyz", rpy)
+
     return model.State(
         p_N=np.hstack([0.0, 0.0, -condition.alt]),
-        att=Rotation.from_euler('xyz', rpy),
+        att=att,
         v_B=v_B,
         w_B=w_B,
         engine_power=model.engine.tgear(params.throttle)

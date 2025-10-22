@@ -3,10 +3,20 @@ from pathlib import Path
 import yaml
 
 import numpy as np
+import numpy.testing as npt
 
-from archimedes.spatial import Rotation, euler_kinematics
+import archimedes as arc
+from archimedes.spatial import Rotation, RigidBody, euler_kinematics
 
 from f16 import SubsonicF16, GRAV_FTS2, trim
+from stability import (
+    LongitudinalState,
+    LongitudinalInput,
+    LateralState,
+    LateralInput,
+    StabilityState,
+    StabilityInput,
+)
 
 CURRENT_PATH = Path(__file__).parent
 
@@ -146,7 +156,7 @@ def test_362(f16: SubsonicF16):
     assert np.allclose(tph1, tph2)
 
 
-def test_363(trim_cases):
+def test_trim(trim_cases):
     """Trim conditions (Sec. 3.6-3 in Stevens, Lewis, Johnson)"""
 
     tolerances = {
@@ -175,3 +185,150 @@ def test_363(trim_cases):
             close = np.allclose(expected, actual, atol=atol)
             print("\t", field, close)
             assert close
+
+
+def test_linearization(trim_cases):
+    """Linearization about a trim point (Sec. 3.7 in Stevens, Lewis, Johnson)"""
+    case = next(case for case in trim_cases if case["name"] == "pull_up")
+    print(case)
+
+    rigid_body = RigidBody(rpy_attitude=True)
+    f16 = SubsonicF16(rigid_body=rigid_body, xcg=case["xcg"])
+    result = trim(f16, **case["condition"])
+        
+    x0 = StabilityState.from_full_state(result.state)
+    u0 = StabilityInput.from_full_input(result.inputs)
+
+    x0_flat, unravel_x = arc.tree.ravel(x0)
+    u0_flat, unravel_u = arc.tree.ravel(u0)
+
+    def unravel_stab(x_flat, u_flat):
+        x_stab = unravel_x(x_flat)
+        u_stab = unravel_u(u_flat)
+        x_full = x_stab.as_full_state(rpy_attitude=True)
+        u_full = u_stab.as_full_input()
+        return x_full, u_full
+
+    def dynamics(t, x_flat, u_flat, x0_dot_flat=None):
+        x_full, u_full = unravel_stab(x_flat, u_flat)
+        x_dot_full = f16.dynamics(t, x_full, u_full)
+
+        x_dot = StabilityState.from_full_derivative(x_full, x_dot_full)
+
+        x_dot_flat, _ = arc.tree.ravel(x_dot)
+        if x0_dot_flat is not None:
+            x_dot_flat -= x0_dot_flat
+
+        return x_dot_flat
+
+
+    def output(t, x_flat, u_flat, y0_flat=None):
+        # Output normal acceleration, pitch rate, and angle of attack
+        x_full, u_full = unravel_stab(x_flat, u_flat)
+
+        x_stab = unravel_x(x_flat)
+        q = x_stab.long.q
+        alpha = np.rad2deg(x_stab.long.alpha)  # Angle of attack [deg]
+
+        # Normal acceleration [g's]
+        F_net_B, _, _ = f16.net_forces(t, x_full, u_full)
+        F_grav_B = f16.calc_gravity(x_full)
+        a_n = -(F_net_B[2] - F_grav_B[2]) / (f16.m * GRAV_FTS2)
+
+        y = np.hstack([a_n, q, alpha])
+
+        if y0_flat is not None:
+            y -= y0_flat
+
+        return y
+
+
+    x0_dot_flat = dynamics(0.0, x0_flat, u0_flat)
+    x0_dot_expected = StabilityState(
+        long=LongitudinalState(
+            vt=0.0,
+            alpha=0.0,
+            theta=case["condition"]["pitch_rate"],
+            q=0.0,
+            pow=0.0,
+        ),
+        lat=LateralState(
+            beta=0.0,
+            phi=0.0,
+            p=0.0,
+            r=0.0,
+        ),
+    )
+    assert np.allclose(
+        x0_dot_flat,
+        arc.tree.ravel(x0_dot_expected)[0],
+        atol=1e-3,
+    )
+
+    y0 = output(0.0, x0_flat, u0_flat)
+    y0_expected = np.array([5.4267, 0.3, 17.2208])
+    assert np.allclose(y0, y0_expected, atol=1e-3)
+
+    A, B = arc.jac(dynamics, argnums=(1, 2))(0.0, x0_flat, u0_flat, x0_dot_flat)
+    C, D = arc.jac(output, argnums=(1, 2))(0.0, x0_flat, u0_flat, y0)
+
+    A_long_ex = np.array([
+        [-0.127, -235, -32.2, -9.51, 0.314],
+        [-7e-4, -0.969, 0, 0.908, -2e-4],
+        [0, 0, 0, 1, 0],
+        [9e-4, -4.56, 0, -1.58, 0],
+        [0, 0, 0, 0, -5]
+    ])
+    npt.assert_allclose(A[:5, :5], A_long_ex, rtol=1e-2, atol=1e-3)
+
+    A_lat_ex = np.array([
+        [-0.322, 0.0612, 0.298, -0.948],
+        [0, 0.093, 1.0, 0.310],
+        [-62.5, 0, -3.0, 1.99],
+        [7.67, 0, -0.262, -0.629],
+    ])
+    npt.assert_allclose(A[5:, 5:], A_lat_ex, rtol=0.05, atol=1e-3)
+
+    A_mix_ex = np.array([
+        [-0.0028, 0.00126, 5e-5, 2e-4],
+        [1.5e-5, 0, -4e-5, -1e-5],
+        [0, 0, 0, 0],
+        [9.2e-5, 0, 0, -0.00287],
+        [0, 0, 0, 0],
+    ])
+    npt.assert_allclose(A[:5, 5:], A_mix_ex, rtol=0.1, atol=1e-2)
+
+    A_mix_ex = np.array([
+        [1e-8, 2e-5, 3e-6, 8e-7, -3e-8],
+        [0, 0, 0, 0, 0],
+        [-3e-7, -0.00248, 0, 3e-4, 0],
+        [-3e-6, -0.00188, 0, 0.00254, 0],
+    ])
+    npt.assert_allclose(A[5:, :5], A_mix_ex, rtol=0.1, atol=1e-2)
+
+    B_ex = np.array([
+        [0, -0.244, 6e-6, 2e-5],
+        [0, -0.00209, 0, 0],
+        [0, 0, 0, 0],
+        [0, -0.199, 0, 0],
+        [1087, 0, 0, 0],
+        [0, 2e-8, 3e-4, 8e-4],
+        [0, 0, 0, 0],
+        [0, 0, -0.645, 0.126],
+        [0, 0, -0.018, -0.0657],
+    ])
+    npt.assert_allclose(B, B_ex, rtol=1e-3, atol=1e-3)
+
+    C_ex = np.array([
+        [0.0208, 15.2, 0, 1.45, 0, -4.5e-4, 0, 0, 0],
+        [0, 0, 0, 1, 0, 0, 0, 0, 0],
+        [0, 57.3, 0, 0, 0, 0, 0, 0, 0],
+    ])
+    npt.assert_allclose(C, C_ex, rtol=1e-2, atol=1e-3)
+
+    D_ex = np.array([
+        [0, 0.0333, 0, 0],
+        [0, 0, 0, 0],
+        [0, 0, 0, 0],
+    ])
+    npt.assert_allclose(D, D_ex, rtol=1e-3, atol=1e-3)
