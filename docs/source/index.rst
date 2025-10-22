@@ -108,6 +108,12 @@ Documentation
 
 .. toctree::
    :maxdepth: 1
+   :caption: Applications
+
+   tutorials/f16/f16_00
+
+.. toctree::
+   :maxdepth: 1
    :caption: Reference
 
    gotchas

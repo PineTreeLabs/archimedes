@@ -1,15 +1,26 @@
 import pytest
+from pathlib import Path
+import yaml
 
 import numpy as np
 
 from archimedes.spatial import Rotation, euler_kinematics
 
-from f16 import SubsonicF16, GRAV_FTS2
+from f16 import SubsonicF16, GRAV_FTS2, trim
+
+CURRENT_PATH = Path(__file__).parent
+
+
+@pytest.fixture
+def trim_cases():
+    with open(CURRENT_PATH / "_static" / "trim_cases.yaml", "r") as f:
+        trim_cases = yaml.safe_load(f)
+    return trim_cases
 
 
 @pytest.fixture
 def f16():
-    return SubsonicF16(xcg=0.4)
+    return SubsonicF16(xcg=0.35)
 
 
 g0 = GRAV_FTS2  # ft/s^2
@@ -17,8 +28,14 @@ g0 = GRAV_FTS2  # ft/s^2
 
 def test_352(f16: SubsonicF16):
     """Compare to Table 3.5-2 in Lewis, Johnson, Stevens"""
+    f16 = f16.replace(xcg=0.40)
 
-    u = np.array([0.9, 20.0, -15.0, -20.0])
+    u = f16.Input(
+        throttle=0.9,
+        elevator=20.0,
+        aileron=-15.0,
+        rudder=-20.0,
+    )
 
     # Original state used (Vt, alpha, beta) = (500.0, 0.5, -0.2)
     # New model uses equivalent (u, v, w) = (430.0447, -99.3347, 234.9345)
@@ -30,8 +47,7 @@ def test_352(f16: SubsonicF16):
 
     att = Rotation.from_euler("xyz", rpy)
     pow = 90.0  # Engine power
-    rb_state = f16.rigid_body.State(p_N, att, v_B, w_B)
-    x = f16.State(rb_state, pow)
+    x = f16.State(p_N, att, v_B, w_B, pow)
 
     # NOTE: There is a typo in the chapter 3 code implementation of the DCM,
     # leading to a sign change for yaw rate xd[11].  Hence, Table 3.5-2 has
@@ -76,7 +92,6 @@ def test_352(f16: SubsonicF16):
 
 def test_362(f16: SubsonicF16):
     """Trim conditions (Sec. 3.6-2 in Lewis, Johnson, Stevens)"""
-    f16 = f16.replace(xcg=0.35)
 
     vt = 5.020000e2
     alpha = 2.392628e-1
@@ -84,11 +99,6 @@ def test_362(f16: SubsonicF16):
     u = vt * np.cos(alpha) * np.cos(beta)
     v = vt * np.sin(beta)
     w = vt * np.sin(alpha) * np.cos(beta)
-
-    thtl = 8.349601e-1
-    el = -1.481766e0
-    ail = 9.553108e-2
-    rdr = -4.118124e-1
 
     p_N = np.array([0.0, 0.0, 0.0])  # NED-frame position
     rpy = np.array([1.366289e0, 5.000808e-2, 2.340769e-1])  # Roll, pitch, yaw
@@ -99,10 +109,14 @@ def test_362(f16: SubsonicF16):
 
     att = Rotation.from_euler("xyz", rpy)
     pow = 6.412363e1  # Engine power
-    rb_state = f16.rigid_body.State(p_N, att, v_B, w_B)
-    x = f16.State(rb_state, pow)
+    x = f16.State(p_N, att, v_B, w_B, pow)
 
-    u = np.array([thtl, el, ail, rdr])
+    u = f16.Input(
+        throttle=8.349601e-1,
+        elevator=-1.481766e0,
+        aileron=9.553108e-2,
+        rudder=-4.118124e-1,
+    )
 
     x_t = f16.dynamics(0.0, x, u)
     assert np.allclose(x_t.v_B, 0.0, atol=1e-4)
@@ -132,34 +146,32 @@ def test_362(f16: SubsonicF16):
     assert np.allclose(tph1, tph2)
 
 
-def test_363(f16: SubsonicF16):
-    """Trim conditions (Sec. 3.6-3 in Lewis, Johnson, Stevens)"""
-    f16 = f16.replace(xcg=0.35)
+def test_363(trim_cases):
+    """Trim conditions (Sec. 3.6-3 in Stevens, Lewis, Johnson)"""
 
-    vt = 5.020000e2
-    alpha = 0.03691
-    beta = -4e-9
-    u = vt * np.cos(alpha) * np.cos(beta)
-    v = vt * np.sin(beta)
-    w = vt * np.sin(alpha) * np.cos(beta)
+    tolerances = {
+        "alpha": 1e-3,
+        "beta": 1e-3,
+        "throttle": 1e-3,
+        "elevator": 1e-2,
+        "aileron": 1e-2,
+        "rudder": 1e-1,
+    }
 
-    thtl = 0.1385  # Throttle setting [0-1]
-    el = -0.7588  # Elevator angle [deg]
-    ail = -1.2e-7  # Aileron angle [deg]
-    rdr = -6.2e-7  # Rudder angle [deg]
+    for case in trim_cases:
+        print(case["name"])
+        print(case["description"])
 
-    p_N = np.array([0.0, 0.0, 0.0])  # NED-frame position
-    rpy = np.array([0.0, 0.03691, 0.0])  # Roll, pitch, yaw
-    v_B = np.array([u, v, w])  # Velocity in body frame
-    w_B = np.array([0.0, 0.0, 0.0])  # Angular velocity in body frame
+        f16 = SubsonicF16(xcg=case["xcg"])
+        result = trim(f16, **case["condition"])
 
-    att = Rotation.from_euler("xyz", rpy)
-    pow = f16.engine.tgear(thtl)  # Engine power
-    rb_state = f16.rigid_body.State(p_N, att, v_B, w_B)
-    x = f16.State(rb_state, pow)
+        # Check that the residuals (v_B and w_B) are small
+        assert np.linalg.norm(result.residuals) < 1e-8
 
-    u = np.array([thtl, el, ail, rdr])
-
-    x_t = f16.dynamics(0.0, x, u)
-    assert np.allclose(x_t.v_B, 0.0, atol=1e-3)
-    assert np.allclose(x_t.w_B, 0.0, atol=1e-4)
+        # Check that the trim point matches Table 3.6-3
+        for field, atol in tolerances.items():
+            expected = float(case["variables"].get(field))
+            actual = getattr(result.variables, field)
+            close = np.allclose(expected, actual, atol=atol)
+            print("\t", field, close)
+            assert close

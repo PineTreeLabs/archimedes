@@ -260,6 +260,7 @@ clp_data = np.array(
         -0.1,
     ]
 )
+# NOTE: Second entry is listed as -0.540 in Appendix A.8 - typo??
 cmq_data = np.array(
     [-7.21, -0.54, -5.23, -5.26, -6.11, -6.64, -5.69, -6, -6.2, -6.4, -6.6, -6]
 )

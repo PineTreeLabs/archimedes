@@ -4,7 +4,8 @@ import numpy as np
 
 import archimedes as arc
 
-from archimedes.spatial import RigidBody
+from archimedes import struct
+from archimedes.spatial import RigidBody, Rotation, euler_kinematics
 from archimedes.experimental import aero
 from archimedes.experimental.aero import GravityModel
 
@@ -94,27 +95,17 @@ class SubsonicF16:
     hx: float = 160.0  # Engine angular momentum (assumed constant)
 
     @arc.struct
-    class State:
-        rigid_body: RigidBody.State
-        engine_power: np.ndarray  # Engine power state (0 to 1)
+    class State(RigidBody.State):
+        engine_power: np.ndarray  # Engine power state [0-1]
 
-        @property
-        def p_N(self):
-            return self.rigid_body.p_N
+    @arc.struct
+    class Input:
+        throttle: float  # Throttle command [0-1]
+        elevator: float  # Elevator deflection [deg]
+        aileron: float  # Aileron deflection [deg]
+        rudder: float  # Rudder deflection [deg]
 
-        @property
-        def att(self):
-            return self.rigid_body.att
-
-        @property
-        def v_B(self):
-            return self.rigid_body.v_B
-
-        @property
-        def w_B(self):
-            return self.rigid_body.w_B
-
-    def net_forces(self, t, x: State, u):
+    def net_forces(self, t, x: State, u: Input):
         """Net forces and moments in body frame B, plus any extra state derivatives
 
         Args:
@@ -128,9 +119,6 @@ class SubsonicF16:
             aux_state_derivs: time derivatives of auxiliary state variables
         """
 
-        # Unpack state and controls
-        thtl, el, ail, rdr = u
-
         vt, alpha, beta = aero.wind_frame(x.v_B)
 
         # Atmosphere model
@@ -142,7 +130,7 @@ class SubsonicF16:
         F_eng_B = self.engine.calc_thrust(pow, alt, amach)
 
         force_coeffs, moment_coeffs = self.aero(
-            vt, alpha, beta, x.w_B, el, ail, rdr, self
+            vt, alpha, beta, x.w_B, u.elevator, u.aileron, u.rudder, self
         )
         cxt, cyt, czt = force_coeffs
         clt, cmt, cnt = moment_coeffs
@@ -156,19 +144,19 @@ class SubsonicF16:
 
         # Moments
         p, q, r = x.w_B  # Angular velocity in body frame (ω_B)
-        Meng_B = self.hx * np.array([0.0, -r, q])
+        Meng_B = self.hx * np.hstack([0.0, -r, q])
         Maero_B = (
-            qbar * self.S * np.array([self.b * clt, self.cbar * cmt, self.b * cnt])
+            qbar * self.S * np.hstack([self.b * clt, self.cbar * cmt, self.b * cnt])
         )
         M_B = Meng_B + Maero_B
 
         # Dynamic component of engine state (auxiliary state)
-        pow_t = self.engine.dynamics(t, pow, thtl)
+        pow_t = self.engine.dynamics(t, pow, u.throttle)
 
         pow_t = np.atleast_1d(pow_t)
         return F_B, M_B, pow_t
 
-    def dynamics(self, t, x: State, u: np.ndarray) -> State:
+    def dynamics(self, t, x: State, u: Input) -> State:
         """Compute time derivative of the state
 
         Args:
@@ -188,9 +176,162 @@ class SubsonicF16:
             m=self.m,
             J_B=self.J_B,
         )
-        rb_derivs = self.rigid_body.dynamics(t, x.rigid_body, rb_input)
+        rb_derivs = self.rigid_body.dynamics(t, x, rb_input)
 
         return self.State(
-            rigid_body=rb_derivs,
+            p_N=rb_derivs.p_N,
+            att=rb_derivs.att,
+            v_B=rb_derivs.v_B,
+            w_B=rb_derivs.w_B,
             engine_power=engine_deriv,
         )
+
+
+@struct
+class TrimCondition:
+    vt: float  # True airspeed [ft/s]
+    alt: float = 0.0  # Altitude [ft]
+    gamma: float = 0.0  # Flight path angle [deg]
+    roll_rate: float = 0.0  # Roll rate [rad/s]
+    pitch_rate: float = 0.0  # Pitch rate [rad/s]
+    turn_rate: float = 0.0  # Turn rate [rad/s]
+
+
+@struct
+class TrimVariables:
+    alpha: float  # Angle of attack [rad]
+    beta: float  # Sideslip angle [rad]
+    throttle: float  # Throttle setting [0-1]
+    elevator: float  # Elevator deflection [deg]
+    aileron: float  # Aileron deflection [deg]
+    rudder: float  # Rudder deflection [deg]
+
+    @property
+    def inputs(self) -> SubsonicF16.Input:
+        return SubsonicF16.Input(
+            throttle=self.throttle,
+            elevator=self.elevator,
+            aileron=self.aileron,
+            rudder=self.rudder,
+        )
+
+
+@struct
+class TrimPoint:
+    condition: TrimCondition
+    variables: TrimVariables
+    xcg: float  # CG location [-]
+    name: str = ""
+    description: str = ""
+    state: SubsonicF16.State | None = None
+    residuals: np.ndarray | None = None
+
+    @property
+    def inputs(self) -> SubsonicF16.Input:
+        return self.variables.inputs
+    
+
+def trim_state(
+    params: TrimVariables,
+    condition: TrimCondition,
+    model: SubsonicF16,
+) -> SubsonicF16.State:
+    gamma = np.deg2rad(condition.gamma)
+    alpha = params.alpha
+    beta = params.beta
+
+    # Turn constraint (determines roll angle)
+    G = condition.turn_rate * condition.vt / GRAV_FTS2  # Centripetal acceleration [g's]
+    a = 1 - G * np.tan(alpha) * np.sin(beta)
+    b = np.sin(gamma) / np.cos(beta)
+    c = 1 + G ** 2 * np.cos(beta) ** 2
+
+    num = G * np.cos(beta) * np.sqrt(
+        (a - b ** 2) + b * np.tan(alpha) * (c * (1 - b ** 2) + G ** 2 * np.sin(beta) ** 2)
+    )
+    den = np.cos(alpha) * (a ** 2 - b ** 2 * (1 + c * np.tan(alpha) ** 2))
+    phi = np.arctan2(num, den)
+
+    # Rate-of-climb constraint (determines pitch angle)
+    a = np.cos(alpha) * np.cos(beta)
+    b = np.sin(phi) * np.sin(beta) + np.cos(phi) * np.sin(alpha) * np.cos(beta)
+    num = a * b + np.sin(gamma) * np.sqrt(a ** 2 + b ** 2 - np.sin(gamma) ** 2)
+    den = a ** 2 - np.sin(gamma) ** 2 
+    theta = np.arctan2(num, den)
+
+    # Calculate the angular velocity based on the Euler rates and
+    # roll-pitch-yaw angles (inverse Euler kinematics)
+    rpy = np.hstack([phi, theta, 0.0])  # Arbitrary yaw angle
+    H_inv = euler_kinematics(rpy, inverse=True)
+    w_B = H_inv @ np.hstack([
+        condition.roll_rate, condition.pitch_rate, condition.turn_rate
+    ])
+
+    # Body-frame velocity (rotate from wind frame)
+    v_W = np.array([condition.vt, 0.0, 0.0])  # Wind-frame velocity [ft/s]
+    R_WB = Rotation.from_euler("zy", [-beta, alpha])
+    v_B = R_WB.apply(v_W, inverse=True)
+
+    return model.State(
+        p_N=np.hstack([0.0, 0.0, -condition.alt]),
+        att=Rotation.from_euler('xyz', rpy),
+        v_B=v_B,
+        w_B=w_B,
+        engine_power=model.engine.tgear(params.throttle)
+    )
+
+
+def trim_residual(
+    params: TrimVariables,
+    condition: TrimCondition,
+    model: SubsonicF16,
+) -> np.ndarray:
+    x = trim_state(params, condition, model)
+    u = params.inputs
+    x_t = model.dynamics(0.0, x, u)
+    return np.hstack([x_t.v_B, x_t.w_B])
+
+
+def trim(
+    model: SubsonicF16,
+    vt: float,  # True airspeed [ft/s]
+    alt: float = 0.0,  # Altitude [ft]
+    gamma: float = 0.0,  # Flight path angle [deg]
+    roll_rate: float = 0.0,  # Roll rate [rad/s]
+    pitch_rate: float = 0.0,  # Pitch rate [rad/s]
+    turn_rate: float = 0.0,  # Turn rate [rad/s]
+) -> TrimPoint:
+    condition = TrimCondition(
+        vt=vt,
+        alt=alt,
+        gamma=gamma,
+        roll_rate=roll_rate,
+        pitch_rate=pitch_rate,
+        turn_rate=turn_rate,
+    )
+    params_guess = TrimVariables(
+        alpha=0.0,
+        beta=0.0,
+        throttle=0.0,
+        elevator=0.0,
+        aileron=0.0,
+        rudder=0.0,
+    )
+
+    params_guess_flat, unravel = arc.tree.ravel(params_guess)
+    def residual(params_flat):
+        params = unravel(params_flat)
+        return trim_residual(params, condition, model)
+
+    params_opt_flat = arc.root(residual, params_guess_flat)
+    params_opt = unravel(params_opt_flat)
+
+    state_opt = trim_state(params_opt, condition, model)
+
+    return TrimPoint(
+        condition=condition,
+        variables=params_opt,
+        state=state_opt,
+        xcg=model.xcg,
+        residuals=residual(params_opt_flat),
+    )
