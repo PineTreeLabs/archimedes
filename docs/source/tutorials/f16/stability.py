@@ -40,10 +40,6 @@ class LongitudinalState:
 
     def as_full_state(self, rpy_attitude=True) -> SubsonicF16.State:
         # Assume zero sideslip, zero lateral states
-        beta = 0.0
-        phi = 0.0
-        p = 0.0
-        r = 0.0
 
         v_B = np.hstack([
             self.vt * np.cos(self.alpha),
@@ -51,13 +47,13 @@ class LongitudinalState:
             self.vt * np.sin(self.alpha),
         ])
 
-        rpy = np.hstack([phi, self.theta, 0.0])
+        rpy = np.hstack([0.0, self.theta, 0.0])
         if rpy_attitude:
             att = rpy
         else:
-            att = Rotation.from_euler("xyz", [phi, self.theta, 0.0])
+            att = Rotation.from_euler("xyz", [0.0, self.theta, 0.0])
 
-        w_B = np.array([p, self.q, r])
+        w_B = np.hstack([0.0, self.q, 0.0])
 
         return SubsonicF16.State(
             p_N=np.zeros(3),
@@ -110,32 +106,6 @@ class LateralState:
             r=x.w_B[2],
         )
 
-    def as_full_state(self, vt: float, rpy_attitude=True) -> SubsonicF16.State:
-        # Assume zero longitudinal states
-        pow = 0.0
-
-        v_B = np.hstack([
-            vt * np.cos(self.beta),
-            vt * np.sin(self.beta),
-            0.0,
-        ])
-
-        rpy = np.hstack([self.phi, 0.0, 0.0])
-        if rpy_attitude:
-            att = rpy
-        else:
-            att = Rotation.from_euler("xyz", [self.phi, 0.0, 0.0])
-
-        w_B = np.array([self.p, 0.0, self.r])
-
-        return SubsonicF16.State(
-            p_N=np.zeros(3),
-            att=att,
-            v_B=v_B,
-            w_B=w_B,
-            engine_power=pow,
-        )
-
 @struct
 class LateralInput:
     aileron: float
@@ -181,8 +151,8 @@ class StabilityState:
         vt_dot = np.dot(x.v_B, x_dot.v_B) / vt
         dum = x.v_B[0] ** 2 + x.v_B[2] ** 2
         beta = np.arcsin(x.v_B[1] / vt)
-        alpha_dot = (x.v_B[0]*x_dot.v_B[2] - x.v_B[2]*x_dot.v_B[0]) / dum
-        beta_dot = (vt * x_dot.v_B[1] - x.v_B[1] * vt_dot) * np.cos(beta) / dum
+        alpha_dot = (x.v_B[0] * x_dot.v_B[2] - x.v_B[2] * x_dot.v_B[0]) / dum
+        beta_dot = (vt * x_dot.v_B[1] - x.v_B[1] * vt_dot) / (vt**2 * np.cos(beta))
         return cls(
             long=LongitudinalState.from_full_state(x_dot, vt=vt_dot, alpha=alpha_dot),
             lat=LateralState.from_full_state(x_dot, beta=beta_dot),

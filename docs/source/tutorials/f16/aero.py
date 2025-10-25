@@ -57,7 +57,6 @@ cz_data = [
 ]
 
 # Cl(alpha, beta)
-# TODO: Should be able to use the textbook numbers here
 cl_data = np.array(
     [
         [0.0, -0.001, -0.003, -0.001, 0.0, 0.007, 0.009],
@@ -74,6 +73,14 @@ cl_data = np.array(
         [0.0, -0.015, -0.019, -0.027, -0.035, -0.059, -0.076],
     ]
 )  # Textbook data
+
+# # aerobench modifications
+# # TODO: Should be able to use the textbook numbers here
+# cl_data[5:8] = np.array([
+#     [0.0, -0.022, -0.041, -0.054, -0.060, -0.063, -0.068],
+#     [0.0, -0.022, -0.045, -0.057, -0.069, -0.081, -0.089],
+#     [0.0, -0.021, -0.040, -0.054, -0.067, -0.079, -0.088],
+# ])
 
 # Cm(alpha, ele)
 cm_data = np.array(
@@ -395,10 +402,22 @@ class F16Aerodynamics:
         return (-0.19 / 25) * el + cz_lookup * (1.0 - (beta / 57.3) ** 2)
 
     def _calc_cl(self, alpha, beta):
-        return np.sign(beta) * cl_interpolant(alpha, np.abs(beta))
+        # NOTE: Cl is antisymmetric in beta
+        # A more intuitive way to do this would be sign(beta) * cl(alpha, abs(beta))
+        # but that causes problems with autodiff
+        return np.where(
+            beta >= 0,
+            cl_interpolant(alpha, beta),
+            -cl_interpolant(alpha, -beta),
+        )
 
     def _calc_cm(self, alpha, el):
         return cm_interpolant(alpha, el)
 
     def _calc_cn(self, alpha, beta):
-        return np.sign(beta) * cn_interpolant(alpha, np.abs(beta))
+        # See note about autodiff in _calc_cl
+        return np.where(
+            beta >= 0,
+            cn_interpolant(alpha, beta),
+            -cn_interpolant(alpha, -beta),
+        )

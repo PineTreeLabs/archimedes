@@ -332,3 +332,192 @@ def test_linearization(trim_cases):
         [0, 0, 0, 0],
     ])
     npt.assert_allclose(D, D_ex, rtol=1e-3, atol=1e-3)
+
+
+def test_lon_stability():
+    """Test case for longitudinal stability"""
+    # Steady pitch-up
+    rigid_body = RigidBody(rpy_attitude=True)
+    model = SubsonicF16(rigid_body=rigid_body, xcg=0.3)
+    result = trim(model, vt=502, pitch_rate=0.0)
+
+    x0 = LongitudinalState.from_full_state(result.state)
+    x0_lat = LateralState.from_full_state(result.state)
+    u0 = LongitudinalInput.from_full_input(result.inputs)
+
+    x0_flat, unravel_x = arc.tree.ravel(x0)
+    u0_flat, unravel_u = arc.tree.ravel(u0)
+
+
+    def unravel_stab(x_flat, u_flat):
+        x_stab = StabilityState(long=unravel_x(x_flat), lat=x0_lat)
+        u_stab = unravel_u(u_flat)
+        x_full = x_stab.as_full_state(rpy_attitude=True)
+        u_full = u_stab.as_full_input()
+        return x_full, u_full
+
+    def dynamics(t, x_flat, u_flat, x0_dot_flat=None):
+        x_full, u_full = unravel_stab(x_flat, u_flat)
+        x_dot_full = model.dynamics(t, x_full, u_full)
+
+        x_dot = StabilityState.from_full_derivative(x_full, x_dot_full)
+
+        x_dot_flat, _ = arc.tree.ravel(x_dot.long)
+        if x0_dot_flat is not None:
+            x_dot_flat -= x0_dot_flat
+
+        return x_dot_flat
+
+
+    def output(t, x_flat, u_flat, y0_flat=None):
+        # Output normal acceleration, pitch rate, and angle of attack
+        x_full, u_full = unravel_stab(x_flat, u_flat)
+
+        x_stab = unravel_x(x_flat)
+        q = x_stab.q
+        alpha = np.rad2deg(x_stab.alpha)  # Angle of attack [deg]
+
+        # Normal acceleration [g's]
+        F_net_B, _, _ = model.net_forces(t, x_full, u_full)
+        F_grav_B = model.calc_gravity(x_full)
+        a_n = -(F_net_B[2] - F_grav_B[2]) / (model.m * GRAV_FTS2)
+
+        y = np.hstack([a_n, q, alpha])
+
+        if y0_flat is not None:
+            y -= y0_flat
+
+        return y
+
+
+    x0_dot_flat = dynamics(0.0, x0_flat, u0_flat)
+    y0 = output(0.0, x0_flat, u0_flat)
+
+    A = arc.jac(dynamics, argnums=(1,))(0.0, x0_flat, u0_flat, x0_dot_flat)
+    evals, evecs = np.linalg.eig(A)
+
+    phugoid_idx = np.argmax(evals.real)
+    short_idx = np.argmax(evals.imag)
+
+    # Stevens, Lewis, Johnson values:
+    slj_phugoid = -0.0087  + 0.0739j
+    slj_short = -1.2039 + 1.4922j
+
+    print(f"Phugoid mode:\t\t{evals[phugoid_idx].real:.4f} ± {evals[phugoid_idx].imag:.4f}j")
+    print(f"Short period mode:\t{evals[short_idx].real:.4f} ± {evals[short_idx].imag:.4f}j")
+
+    assert np.allclose(evals[phugoid_idx], slj_phugoid, rtol=1e-3)
+    assert np.allclose(evals[short_idx], slj_short, rtol=1e-3)
+
+    v_phugoid = evecs[:, phugoid_idx]
+    if np.any(v_phugoid.imag < 0):
+        v_phugoid = v_phugoid.conj()  # Make imaginary part positive for comparison
+    npt.assert_allclose(
+        v_phugoid,
+        np.array([1.0, -9.6e-5 + 5e-7j, -3.8e-4 + 2.3e-3j, 1.7e-4 + 8.4e-6j, 0]),
+        rtol=1e-2,
+        atol=1e-5,
+    )
+
+    v_short = evecs[:, short_idx]
+    if np.any(v_short.imag < 0):
+        v_short = v_short.conj()  # Make imaginary part positive for comparison
+    npt.assert_allclose(
+        v_short,
+        np.array([1.0, 0.09 + 0.017j, 0.059 + 0.054j, 0.0092 - 0.15j, 0]),
+        rtol=5e-2,
+        atol=1e-5,
+    )
+
+
+def test_lat_stability():
+    """Test case for lateral-directional stability"""
+    # Steady pitch-up
+    rigid_body = RigidBody(rpy_attitude=True)
+    model = SubsonicF16(rigid_body=rigid_body, xcg=0.3)
+    result = trim(model, vt=502, pitch_rate=0.0)
+
+    vt = result.condition.vt
+
+    x0 = LateralState.from_full_state(result.state)
+    x0_long = LongitudinalState.from_full_state(result.state)
+    u0 = LateralInput.from_full_input(result.inputs)
+
+    x0_flat, unravel_x = arc.tree.ravel(x0)
+    u0_flat, unravel_u = arc.tree.ravel(u0)
+
+    def unravel_stab(x_flat, u_flat):
+        x_stab = StabilityState(long=x0_long, lat=unravel_x(x_flat))
+        u_stab = unravel_u(u_flat)
+        x_full = x_stab.as_full_state(rpy_attitude=True)
+        u_full = u_stab.as_full_input()
+        return x_full, u_full
+
+
+    def dynamics(t, x_flat, u_flat, x0_dot_flat=None):
+        x_full, u_full = unravel_stab(x_flat, u_flat)
+        x_dot_full = model.dynamics(t, x_full, u_full)
+
+        x_dot = StabilityState.from_full_derivative(x_full, x_dot_full)
+
+        x_dot_flat, _ = arc.tree.ravel(x_dot.lat)
+        if x0_dot_flat is not None:
+            x_dot_flat -= x0_dot_flat
+
+        return x_dot_flat
+
+
+    x0_dot_flat = dynamics(0.0, x0_flat, u0_flat)
+    A = arc.jac(dynamics, argnums=(1))(0.0, x0_flat, u0_flat, x0_dot_flat)
+
+    # Example 3.8-1 in Stevens, Lewis, Johnson
+    A_ex = np.array([
+        [-0.32200, 0.064032, 0.038904, -0.99156],
+        [0.0, 0.0, 1.0, 0.039385],
+        [-30.919, 0.0, -3.6730, 0.67425],
+        [9.4724, 0, -0.026358, -0.49849],
+    ])
+    npt.assert_allclose(A, A_ex, rtol=1e-3, atol=1e-4)
+
+    evals, evecs = np.linalg.eig(A)
+
+    dutch_idx = np.where(evals.imag != 0)[0][0]
+    spiral_idx = np.argmax(evals.real)
+    roll_idx = np.argmin(evals.real)
+
+    # Stevens, Lewis, Johnson values:
+    slj_dutch = -0.4399 + 3.220j
+    slj_spiral = -0.0128
+    slj_roll = -3.601
+
+    print(f"Dutch roll mode:\t{evals[dutch_idx].real:.4f} ± {evals[dutch_idx].imag:.4f}j")
+    print(f"Spiral mode:\t\t{evals[spiral_idx].real:.4f}")
+    print(f"Roll subsidence mode:\t{evals[roll_idx].real:.4f}")
+
+    assert np.allclose(evals[dutch_idx], slj_dutch, rtol=1e-3)
+    assert np.allclose(evals[spiral_idx], slj_spiral, rtol=5e-3)
+    assert np.allclose(evals[roll_idx], slj_roll, rtol=1e-3)
+
+    v_spiral = evecs[:, spiral_idx].real
+    npt.assert_allclose(
+        v_spiral,
+        np.array([0.0032, 1, -0.015, 0.063]),
+        rtol=2e-2,
+    )
+
+    v_roll = evecs[:, roll_idx].real
+    npt.assert_allclose(
+        v_roll,
+        np.array([0.002, 0.28, -1, -0.015]),
+        rtol=1e-1,
+    )
+
+    v_dutch = evecs[:, dutch_idx]
+    if np.any(v_dutch.imag < 0):
+        v_dutch = v_dutch.conj()  # Make imaginary part positive for comparison
+    npt.assert_allclose(
+        v_dutch,
+        np.array([-0.11 + 0.097j, -0.037 + 0.3j, 1.0, -0.29 - 0.33j]),
+        rtol=2e-1,
+        atol=2e-1,
+    )
