@@ -148,7 +148,7 @@ def g(x):
     g2 = x[0] + x[1] - 2
     return np.array([g1, g2], like=x)
 
-x_opt = arc.minimize(f, constr=g, x0=[2.0, 0.0], constr_bounds=(-np.inf, 0))
+result = arc.minimize(f, constr=g, x0=[2.0, 0.0], constr_bounds=(-np.inf, 0))
 ```
 
 As with the `integrator`, we can also define an `nlp_solver` function for efficient repeated optimization solves (in model-predictive control applications, for instance):

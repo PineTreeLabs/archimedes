@@ -194,6 +194,37 @@ class SubsonicF16:
             w_B=rb_derivs.w_B,
             engine_power=engine_deriv,
         )
+    
+    def trim(
+        self,
+        vt: float,  # True airspeed [ft/s]
+        alt: float = 0.0,  # Altitude [ft]
+        gamma: float = 0.0,  # Flight path angle [deg]
+        roll_rate: float = 0.0,  # Roll rate [rad/s]
+        pitch_rate: float = 0.0,  # Pitch rate [rad/s]
+        turn_rate: float = 0.0,  # Turn rate [rad/s]
+    ) -> TrimPoint:
+        """Trim the aircraft for steady flight conditions
+
+        Args:
+            vt: True airspeed [ft/s]
+            alt: Altitude [ft]
+            gamma: Flight path angle [deg]
+            roll_rate: Roll rate [rad/s]
+            pitch_rate: Pitch rate [rad/s]
+            turn_rate: Turn rate [rad/s]
+        Returns:
+            TrimPoint: trimmed state, inputs, and variables
+        """
+        return trim(
+            model=self,
+            vt=vt,
+            alt=alt,
+            gamma=gamma,
+            roll_rate=roll_rate,
+            pitch_rate=pitch_rate,
+            turn_rate=turn_rate,
+        )
 
 
 @struct
