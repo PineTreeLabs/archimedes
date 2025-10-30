@@ -8,7 +8,7 @@ import numpy.testing as npt
 import archimedes as arc
 from archimedes.spatial import Rotation, RigidBody, euler_kinematics
 
-from f16 import SubsonicF16, GRAV_FTS2, trim
+from f16 import SubsonicF16, GRAV_FTS2
 from stability import (
     LongitudinalState,
     LongitudinalInput,
@@ -173,7 +173,7 @@ def test_trim(trim_cases):
         print(case["description"])
 
         f16 = SubsonicF16(xcg=case["xcg"])
-        result = trim(f16, **case["condition"])
+        result = f16.trim(**case["condition"])
 
         # Check that the residuals (v_B and w_B) are small
         assert np.linalg.norm(result.residuals) < 1e-8
@@ -194,7 +194,7 @@ def test_linearization(trim_cases):
 
     rigid_body = RigidBody(rpy_attitude=True)
     f16 = SubsonicF16(rigid_body=rigid_body, xcg=case["xcg"])
-    result = trim(f16, **case["condition"])
+    result = f16.trim(**case["condition"])
         
     x0 = StabilityState.from_full_state(result.state)
     u0 = StabilityInput.from_full_input(result.inputs)
@@ -339,7 +339,7 @@ def test_lon_stability():
     # Steady pitch-up
     rigid_body = RigidBody(rpy_attitude=True)
     model = SubsonicF16(rigid_body=rigid_body, xcg=0.3)
-    result = trim(model, vt=502, pitch_rate=0.0)
+    result = model.trim(vt=502, pitch_rate=0.0)
 
     x0 = LongitudinalState.from_full_state(result.state)
     x0_lat = LateralState.from_full_state(result.state)
@@ -435,7 +435,7 @@ def test_lat_stability():
     # Steady pitch-up
     rigid_body = RigidBody(rpy_attitude=True)
     model = SubsonicF16(rigid_body=rigid_body, xcg=0.3)
-    result = trim(model, vt=502, pitch_rate=0.0)
+    result = model.trim(vt=502, pitch_rate=0.0)
 
     vt = result.condition.vt
 

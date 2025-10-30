@@ -8,7 +8,7 @@ import archimedes as arc
 from archimedes import struct
 from archimedes.spatial import Rotation, euler_kinematics
 
-from f16 import SubsonicF16, GRAV_FTS2, TrimPoint
+from f16 import SubsonicF16, GRAV_FTS2
 from engine import F16Engine
 
 @struct

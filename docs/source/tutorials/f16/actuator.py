@@ -61,6 +61,7 @@ class IdealActuatorConfig(StructConfig, type="ideal"):
 
 @struct
 class RateLimitedActuator(Actuator):
+    tau: float
     rate_limit: float | None = field(static=True)
     pos_limit: tuple[float, float] | None = field(static=True)
 
@@ -71,7 +72,7 @@ class RateLimitedActuator(Actuator):
     def dynamics(self, t: float, x: State, u: Actuator.Input) -> State:
         # Compute desired rate
         cmd, pos = u.command, x.position
-        rate = cmd - pos
+        rate = (cmd - pos) / self.tau
 
         # Apply rate limit
         if self.rate_limit is not None:
@@ -101,8 +102,9 @@ class RateLimitedActuator(Actuator):
     
 
 class RateLimitedActuatorConfig(StructConfig, type="rate_limited"):
-    rate_limit: float | None = field(default=None)
-    pos_limit: tuple[float, float] | None = field(default=None)
+    tau: float  # Time constant [sec]
+    rate_limit: float | None = field(default=None)  # Rate limit [units/sec]
+    pos_limit: tuple[float, float] | None = field(default=None)  # Position limits [units]
 
     def build(self) -> RateLimitedActuator:
         return RateLimitedActuator(
