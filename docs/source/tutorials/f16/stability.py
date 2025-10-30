@@ -9,6 +9,7 @@ from archimedes import struct
 from archimedes.spatial import Rotation, euler_kinematics
 
 from f16 import SubsonicF16, GRAV_FTS2, TrimPoint
+from engine import F16Engine
 
 @struct
 class LongitudinalState:
@@ -16,7 +17,7 @@ class LongitudinalState:
     alpha: float
     theta: float
     q: float
-    pow: float
+    eng: F16Engine.State
 
     @classmethod
     def from_full_state(
@@ -35,7 +36,7 @@ class LongitudinalState:
             alpha=alpha,
             theta=x.att[1],
             q=x.w_B[1],
-            pow=x.engine_power,
+            eng=x.eng,
         )
 
     def as_full_state(self, rpy_attitude=True) -> SubsonicF16.State:
@@ -60,7 +61,7 @@ class LongitudinalState:
             att=att,
             v_B=v_B,
             w_B=w_B,
-            engine_power=self.pow,
+            eng=self.eng,
         )
 
 @struct
@@ -177,7 +178,7 @@ class StabilityState:
             att=att,
             v_B=v_B,
             w_B=w_B,
-            engine_power=self.long.pow,
+            eng=self.long.eng,
         )
 
 

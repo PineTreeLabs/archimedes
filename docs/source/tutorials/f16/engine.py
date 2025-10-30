@@ -1,7 +1,10 @@
+from __future__ import annotations
+import abc
+
 import numpy as np
 
 import archimedes as arc
-from archimedes import struct
+from archimedes import struct, StructConfig, UnionConfig
 
 
 #
@@ -139,12 +142,24 @@ Tmax_interpolant = arc.interpolant([alt_vector, mach_vector], Tmax_data)
 
 
 @struct
-class F16Engine:
+class F16Engine(metaclass=abc.ABCMeta):
     lo_gear: float = 64.94  # Low gear throttle slope
     hi_gear: float = 217.38  # High gear throttle slope
     throttle_breakpoint: float = 0.77  # Switch between linear throttle models
-    rtau_min: float = 0.1  # Minimum inv time constant for engine response [1/s]
-    rtau_max: float = 1.0  # Maximum inv time constant for engine response [1/s]
+
+    @struct
+    class Input:
+        throttle: float  # Throttle position [0-1]
+        alt: float  # Altitude [ft]
+        mach: float  # Mach number
+
+    @struct
+    class Output:
+        thrust: np.ndarray  # Thrust magnitude [lbf]
+
+    @struct
+    class State:
+        pass  # No state by default
 
     def tgear(self, thtl):
         c_hi = (self.hi_gear - self.lo_gear) * self.throttle_breakpoint
@@ -154,6 +169,73 @@ class F16Engine:
             self.hi_gear * thtl - c_hi,
         )
 
+    def dynamics(self, t: float, x: State, u: Input) -> State:
+        """Time derivative of engine model state"""
+        return x  # No dynamics by default
+    
+    @abc.abstractmethod
+    def output(self, t: float, x: State, u: Input) -> Output:
+        """Calculate engine thrust output"""
+        pass
+
+    @abc.abstractmethod
+    def trim(self, throttle: float) -> State:
+        """Calculate trim conditions for the engine model"""
+        pass
+
+
+class EngineConfigBase(StructConfig):
+    lo_gear: float = 64.94  # Low gear throttle slope
+    hi_gear: float = 217.38  # High gear throttle slope
+    throttle_breakpoint: float = 0.77  # Switch between linear throttle models
+
+
+@struct
+class TabulatedEngine(F16Engine):
+    """Simple tabulated engine model with zero dynamics"""
+
+    def _calc_thrust(self, power: float, alt: float, mach: float) -> np.ndarray:
+        """Calculate body-frame thrust vector from engine power"""
+        T_mil = Tmil_interpolant(alt, mach)
+        T_idl = Tidl_interpolant(alt, mach)
+        T_max = Tmax_interpolant(alt, mach)
+
+        return np.where(
+            power < 50.0,
+            T_idl + (T_mil - T_idl) * power * 0.02,
+            T_mil + (T_max - T_mil) * (power - 50.0) * 0.02,
+        )
+
+    def output(
+        self, t: float, x: F16Engine.State, u: F16Engine.Input
+    ) -> F16Engine.Output:
+        power = self.tgear(u.throttle)
+        thrust = self._calc_thrust(power, u.alt, u.mach)
+        return F16Engine.Output(thrust=thrust)
+
+    def trim(self, throttle: float) -> F16Engine.State:
+        return F16Engine.State()  # No state to trim
+
+
+class TabulatedEngineConfig(EngineConfigBase, type="tabulated"):
+    def build(self) -> TabulatedEngine:
+        return TabulatedEngine(
+            lo_gear=self.lo_gear,
+            hi_gear=self.hi_gear,
+            throttle_breakpoint=self.throttle_breakpoint,
+        )
+
+
+@struct
+class LagEngine(TabulatedEngine):
+    """Tabulated engine model with first-order lag dynamics"""
+    rtau_min: float = 0.1  # Minimum inv time constant for engine response [1/s]
+    rtau_max: float = 1.0  # Maximum inv time constant for engine response [1/s]
+
+    @struct
+    class State(F16Engine.State):
+        power: float  # Engine power
+
     def _rtau(self, dP):
         """Inverse time constant for engine response"""
         return np.where(
@@ -162,10 +244,12 @@ class F16Engine:
             np.where(dP >= 50, self.rtau_min, 1.9 - 0.036 * dP),
         )
 
-    def dynamics(self, t, x, u):
-        """Time derivative of engine model (power variable)"""
-        P = x  # Engine power
-        thtl = u  # Throttle position
+    def dynamics(
+        self, t: float, x: LagEngine.State, u: F16Engine.Input
+    ) -> LagEngine.State:
+        """Time derivative of engine model state"""
+        P = x.power  # Engine power
+        thtl = u.throttle  # Throttle position
 
         cpow = self.tgear(thtl)  # Command power
         P2 = np.where(
@@ -177,19 +261,82 @@ class F16Engine:
         # 1/tau
         rtau = np.where(P >= 50.0, 5.0, self._rtau(P2 - P))
 
-        return rtau * (P2 - P)
+        dP_dt = rtau * (P2 - P)
+        return LagEngine.State(power=dP_dt)
 
-    def calc_thrust(self, x, alt, rmach):
-        P = x  # Engine power
+    def output(
+        self, t: float, x: LagEngine.State, u: F16Engine.Input
+    ) -> F16Engine.Output:
+        thrust = self._calc_thrust(x.power, u.alt, u.mach)
+        return F16Engine.Output(thrust=thrust)
 
-        T_mil = Tmil_interpolant(alt, rmach)
-        T_idl = Tidl_interpolant(alt, rmach)
-        T_max = Tmax_interpolant(alt, rmach)
+    def trim(self, throttle: float) -> LagEngine.State:
+        power = self.tgear(throttle)
+        return LagEngine.State(power=power)
 
-        Tx_B = np.where(
-            P < 50.0,
-            T_idl + (T_mil - T_idl) * P * 0.02,
-            T_mil + (T_max - T_mil) * (P - 50.0) * 0.02,
+
+class LagEngineConfig(EngineConfigBase, type="lag"):
+    rtau_min: float = 0.1  # Minimum inv time constant for engine response [1/s]
+    rtau_max: float = 1.0  # Maximum inv time constant for engine response [1/s]
+
+    def build(self) -> LagEngine:
+        return LagEngine(
+            lo_gear=self.lo_gear,
+            hi_gear=self.hi_gear,
+            throttle_breakpoint=self.throttle_breakpoint,
+            rtau_min=self.rtau_min,
+            rtau_max=self.rtau_max,
         )
 
-        return np.stack([Tx_B, 0.0, 0.0])
+F16EngineConfig = UnionConfig[
+    TabulatedEngineConfig,
+    LagEngineConfig,
+]
+
+# @struct
+# class TabulatedEngine:
+#     lo_gear: float = 64.94  # Low gear throttle slope
+#     hi_gear: float = 217.38  # High gear throttle slope
+#     throttle_breakpoint: float = 0.77  # Switch between linear throttle models
+#     rtau_min: float = 0.1  # Minimum inv time constant for engine response [1/s]
+#     rtau_max: float = 1.0  # Maximum inv time constant for engine response [1/s]
+
+#     def _rtau(self, dP):
+#         """Inverse time constant for engine response"""
+#         return np.where(
+#             dP <= 25,
+#             self.rtau_max,
+#             np.where(dP >= 50, self.rtau_min, 1.9 - 0.036 * dP),
+#         )
+
+#     def dynamics(self, t, x, u):
+#         """Time derivative of engine model (power variable)"""
+#         P = x  # Engine power
+#         thtl = u  # Throttle position
+
+#         cpow = self.tgear(thtl)  # Command power
+#         P2 = np.where(
+#             cpow >= 50.0,
+#             np.where(P >= 50.0, cpow, 60.0),
+#             np.where(P >= 50.0, 40.0, cpow),
+#         )
+
+#         # 1/tau
+#         rtau = np.where(P >= 50.0, 5.0, self._rtau(P2 - P))
+
+#         return rtau * (P2 - P)
+
+#     def calc_thrust(self, x, alt, rmach):
+#         P = x  # Engine power
+
+#         T_mil = Tmil_interpolant(alt, rmach)
+#         T_idl = Tidl_interpolant(alt, rmach)
+#         T_max = Tmax_interpolant(alt, rmach)
+
+#         Tx_B = np.where(
+#             P < 50.0,
+#             T_idl + (T_mil - T_idl) * P * 0.02,
+#             T_mil + (T_max - T_mil) * (P - 50.0) * 0.02,
+#         )
+
+#         return np.stack([Tx_B, 0.0, 0.0])

@@ -11,7 +11,7 @@ from archimedes.spatial import (
 from archimedes.experimental import aero
 from archimedes.experimental.aero import GravityModel
 
-from engine import F16Engine
+from engine import F16Engine, F16EngineConfig, LagEngine
 from aero import F16Aerodynamics
 
 
@@ -74,11 +74,21 @@ class AtmosphereModel:
 
 
 @arc.struct
+class FlightCondition:
+    alt: float  # Altitude [ft]
+    vt: float  # True airspeed [ft/s]
+    alpha: float  # Angle of attack [rad]
+    beta: float  # Sideslip angle [rad]
+    mach: float  # Mach number
+    qbar: float  # Dynamic pressure [lbf/ft²]
+
+
+@arc.struct
 class SubsonicF16:
     rigid_body: RigidBody = arc.field(default_factory=RigidBody)
     gravity: GravityModel = arc.field(default_factory=ConstantGravity)
     atmos: AtmosphereModel = arc.field(default_factory=AtmosphereModel)
-    engine: F16Engine = arc.field(default_factory=F16Engine)
+    engine: F16Engine = arc.field(default_factory=LagEngine)
     aero: F16Aerodynamics = arc.field(default_factory=F16Aerodynamics)
 
     # NOTE: The weight in the textbook is 25,000 lbs, but this
@@ -98,7 +108,7 @@ class SubsonicF16:
 
     @arc.struct
     class State(RigidBody.State):
-        engine_power: np.ndarray  # Engine power state [0-1]
+        eng: F16Engine.State
 
     @arc.struct
     class Input:
@@ -115,8 +125,23 @@ class SubsonicF16:
             F_grav_B = x.att.apply(F_grav_N, inverse=True)
         return F_grav_B
 
+    def flight_condition(self, x: RigidBody.State) -> FlightCondition:
+        vt, alpha, beta = aero.wind_frame(x.v_B)
 
-    def net_forces(self, t, x: State, u: Input):
+        # Atmosphere model
+        alt = -x.p_N[2]
+        mach, qbar = self.atmos(vt, alt)
+
+        return FlightCondition(
+            vt=vt,
+            alpha=alpha,
+            beta=beta,
+            mach=mach,
+            qbar=qbar,
+            alt=alt,
+        )
+
+    def net_forces(self, t, x: State, u: Input, z: FlightCondition | None = None):
         """Net forces and moments in body frame B, plus any extra state derivatives
 
         Args:
@@ -129,25 +154,27 @@ class SubsonicF16:
             M_B: net moments in body frame B
             aux_state_derivs: time derivatives of auxiliary state variables
         """
-
-        vt, alpha, beta = aero.wind_frame(x.v_B)
-
-        # Atmosphere model
-        alt = -x.p_N[2]
-        amach, qbar = self.atmos(vt, alt)
+        if z is None:
+            z = self.flight_condition(x)
 
         # Engine thrust model
-        pow = x.engine_power
-        F_eng_B = self.engine.calc_thrust(pow, alt, amach)
+        u_eng = self.engine.Input(
+            throttle=u.throttle,
+            alt=z.alt,
+            mach=z.mach,
+        )
+        print(x.eng)
+        y_eng = self.engine.output(t, x.eng, u_eng)
+        F_eng_B = np.hstack([y_eng.thrust, 0.0, 0.0])
 
         force_coeffs, moment_coeffs = self.aero(
-            vt, alpha, beta, x.w_B, u.elevator, u.aileron, u.rudder, self
+            z.vt, z.alpha, z.beta, x.w_B, u.elevator, u.aileron, u.rudder, self
         )
         cxt, cyt, czt = force_coeffs
         clt, cmt, cnt = moment_coeffs
 
         F_grav_B = self.calc_gravity(x)
-        F_aero_B = qbar * self.S * np.stack([cxt, cyt, czt])
+        F_aero_B = z.qbar * self.S * np.stack([cxt, cyt, czt])
 
         F_B = F_aero_B + F_eng_B + F_grav_B
 
@@ -155,15 +182,11 @@ class SubsonicF16:
         p, q, r = x.w_B  # Angular velocity in body frame (ω_B)
         Meng_B = self.hx * np.hstack([0.0, -r, q])
         Maero_B = (
-            qbar * self.S * np.hstack([self.b * clt, self.cbar * cmt, self.b * cnt])
+            z.qbar * self.S * np.hstack([self.b * clt, self.cbar * cmt, self.b * cnt])
         )
         M_B = Meng_B + Maero_B
 
-        # Dynamic component of engine state (auxiliary state)
-        pow_t = self.engine.dynamics(t, pow, u.throttle)
-
-        pow_t = np.atleast_1d(pow_t)
-        return F_B, M_B, pow_t
+        return F_B, M_B
 
     def dynamics(self, t, x: State, u: Input) -> State:
         """Compute time derivative of the state
@@ -176,8 +199,10 @@ class SubsonicF16:
         Returns:
             x_dot: time derivative of the state
         """
+        z = self.flight_condition(x)
+
         # Compute the net forces
-        F_B, M_B, engine_deriv = self.net_forces(t, x, u)
+        F_B, M_B = self.net_forces(t, x, u, z)
 
         rb_input = RigidBody.Input(
             F_B=F_B,
@@ -185,14 +210,21 @@ class SubsonicF16:
             m=self.m,
             J_B=self.J_B,
         )
-        rb_derivs = self.rigid_body.dynamics(t, x, rb_input)
+        rb_deriv = self.rigid_body.dynamics(t, x, rb_input)
+
+        eng_input = self.engine.Input(
+            throttle=u.throttle,
+            alt=z.alt,
+            mach=z.mach,
+        )
+        eng_deriv = self.engine.dynamics(t, x.eng, eng_input)
 
         return self.State(
-            p_N=rb_derivs.p_N,
-            att=rb_derivs.att,
-            v_B=rb_derivs.v_B,
-            w_B=rb_derivs.w_B,
-            engine_power=engine_deriv,
+            p_N=rb_deriv.p_N,
+            att=rb_deriv.att,
+            v_B=rb_deriv.v_B,
+            w_B=rb_deriv.w_B,
+            eng=eng_deriv,
         )
     
     def trim(
@@ -322,7 +354,7 @@ def trim_state(
         att=att,
         v_B=v_B,
         w_B=w_B,
-        engine_power=model.engine.tgear(params.throttle)
+        eng=model.engine.trim(params.throttle)
     )
 
 

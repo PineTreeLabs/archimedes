@@ -56,8 +56,8 @@ def test_352(f16: SubsonicF16):
     w_B = np.array([0.7, -0.8, 0.9])  # Angular velocity in body frame
 
     att = Rotation.from_euler("xyz", rpy)
-    pow = 90.0  # Engine power
-    x = f16.State(p_N, att, v_B, w_B, pow)
+    x_eng = f16.engine.State(90.0)  # Engine power
+    x = f16.State(p_N, att, v_B, w_B, x_eng)
 
     # NOTE: There is a typo in the chapter 3 code implementation of the DCM,
     # leading to a sign change for yaw rate xd[11].  Hence, Table 3.5-2 has
@@ -118,8 +118,8 @@ def test_362(f16: SubsonicF16):
     )  # Angular velocity in body frame
 
     att = Rotation.from_euler("xyz", rpy)
-    pow = 6.412363e1  # Engine power
-    x = f16.State(p_N, att, v_B, w_B, pow)
+    x_eng = f16.engine.State(6.412363e1)  # Engine power
+    x = f16.State(p_N, att, v_B, w_B, x_eng)
 
     u = f16.Input(
         throttle=8.349601e-1,
@@ -231,7 +231,7 @@ def test_linearization(trim_cases):
         alpha = np.rad2deg(x_stab.long.alpha)  # Angle of attack [deg]
 
         # Normal acceleration [g's]
-        F_net_B, _, _ = f16.net_forces(t, x_full, u_full)
+        F_net_B, _ = f16.net_forces(t, x_full, u_full)
         F_grav_B = f16.calc_gravity(x_full)
         a_n = -(F_net_B[2] - F_grav_B[2]) / (f16.m * GRAV_FTS2)
 
@@ -250,7 +250,7 @@ def test_linearization(trim_cases):
             alpha=0.0,
             theta=case["condition"]["pitch_rate"],
             q=0.0,
-            pow=0.0,
+            eng=f16.engine.State(0.0),
         ),
         lat=LateralState(
             beta=0.0,
@@ -378,7 +378,7 @@ def test_lon_stability():
         alpha = np.rad2deg(x_stab.alpha)  # Angle of attack [deg]
 
         # Normal acceleration [g's]
-        F_net_B, _, _ = model.net_forces(t, x_full, u_full)
+        F_net_B, _ = model.net_forces(t, x_full, u_full)
         F_grav_B = model.calc_gravity(x_full)
         a_n = -(F_net_B[2] - F_grav_B[2]) / (model.m * GRAV_FTS2)
 
