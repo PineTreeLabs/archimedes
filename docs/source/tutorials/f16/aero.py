@@ -363,10 +363,9 @@ class F16Aero(metaclass=abc.ABCMeta):
         """Compute aerodynamic force and moment coefficients"""
         pass
 
-    @classmethod
-    def trim(cls) -> State:
+    def trim(self) -> State:
         """Return a steady aerodynamic state (empty by default)"""
-        return cls.State()
+        return self.State()
 
 
 class TabulatedAero(F16Aero):

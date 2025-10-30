@@ -4,7 +4,7 @@ import numpy as np
 
 import archimedes as arc
 
-from archimedes import struct
+from archimedes import struct, field
 from archimedes.spatial import (
     RigidBody, Rotation, euler_kinematics, dcm_from_euler
 )
@@ -13,6 +13,7 @@ from archimedes.experimental.aero import GravityModel
 
 from engine import F16Engine, F16EngineConfig, LagEngine
 from aero import F16Aero, TabulatedAero
+from actuator import Actuator, RateLimitedActuator, IdealActuator, ActuatorConfig
 
 
 GRAV_FTS2 = 32.17  # ft/s^2
@@ -93,28 +94,35 @@ class F16Geometry:
 
 @arc.struct
 class SubsonicF16:
-    rigid_body: RigidBody = arc.field(default_factory=RigidBody)
-    gravity: GravityModel = arc.field(default_factory=ConstantGravity)
-    atmos: AtmosphereModel = arc.field(default_factory=AtmosphereModel)
-    engine: F16Engine = arc.field(default_factory=LagEngine)
-    aero: F16Aero = arc.field(default_factory=TabulatedAero)
-    geometry: F16Geometry = arc.field(default_factory=F16Geometry)
+    rigid_body: RigidBody = field(default_factory=RigidBody)
+    gravity: GravityModel = field(default_factory=ConstantGravity)
+    atmos: AtmosphereModel = field(default_factory=AtmosphereModel)
+    engine: F16Engine = field(default_factory=LagEngine)
+    aero: F16Aero = field(default_factory=TabulatedAero)
+    geometry: F16Geometry = field(default_factory=F16Geometry)
+
+    # Control surface actuators
+    elevator: Actuator = field(default_factory=IdealActuator)
+    aileron: Actuator = field(default_factory=IdealActuator)
+    rudder: Actuator = field(default_factory=IdealActuator)
 
     # NOTE: The weight in the textbook is 25,000 lbs, but this
     # does not give consistent values - the default value here
     # matches the values given in the tables
     m: float = default_mass  # Vehicle mass [slug]
     # Vehicle inertia matrix [slug·ft²]
-    J_B: np.ndarray = arc.field(default_factory=lambda: default_J_B)
+    J_B: np.ndarray = field(default_factory=lambda: default_J_B)
 
     xcg: float = 0.35  # CG location (% of cbar)
-
     hx: float = 160.0  # Engine angular momentum (assumed constant)
 
     @arc.struct
     class State(RigidBody.State):
         eng: F16Engine.State
-        aero: F16Aero.State = arc.field(default_factory=TabulatedAero.trim)
+        aero: F16Aero.State = field(default_factory=TabulatedAero.State)
+        elevator: Actuator.State = field(default_factory=IdealActuator.State)
+        aileron: Actuator.State = field(default_factory=IdealActuator.State)
+        rudder: Actuator.State = field(default_factory=IdealActuator.State)
 
     @arc.struct
     class Input:
@@ -172,13 +180,24 @@ class SubsonicF16:
         y_eng = self.engine.output(t, x.eng, u_eng)
         F_eng_B = np.hstack([y_eng.thrust, 0.0, 0.0])
 
+        # Control surface actuator positions
+        u_elev = Actuator.Input(command=u.elevator)
+        y_elev = self.elevator.output(t, x.elevator, u_elev)
+        el = y_elev.position
+        u_ail = Actuator.Input(command=u.aileron)
+        y_ail = self.aileron.output(t, x.aileron, u_ail)
+        ail = y_ail.position
+        u_rud = Actuator.Input(command=u.rudder)
+        y_rud = self.rudder.output(t, x.rudder, u_rud)
+        rud = y_rud.position
+
         # Aerodynamic model
         u_aero = self.aero.Input(
             condition=z,
             w_B=x.w_B,
-            elevator=u.elevator,
-            aileron=u.aileron,
-            rudder=u.rudder,
+            elevator=el,
+            aileron=ail,
+            rudder=rud,
             xcg=self.xcg,
         )
         y_aero = self.aero.output(t, x.aero, u_aero, self.geometry)
@@ -225,6 +244,7 @@ class SubsonicF16:
         )
         rb_deriv = self.rigid_body.dynamics(t, x, rb_input)
 
+        # Engine dynamics
         eng_input = self.engine.Input(
             throttle=u.throttle,
             alt=z.alt,
@@ -232,6 +252,7 @@ class SubsonicF16:
         )
         eng_deriv = self.engine.dynamics(t, x.eng, eng_input)
 
+        # Unsteady aero
         aero_input = self.aero.Input(
             condition=z,
             w_B=x.w_B,
@@ -242,6 +263,14 @@ class SubsonicF16:
         )
         aero_deriv = self.aero.dynamics(t, x.aero, aero_input, self.geometry)
 
+        # Actuator dynamics
+        elev_input = Actuator.Input(command=u.elevator)
+        elev_deriv = self.elevator.dynamics(t, x.elevator, elev_input)
+        ail_input = Actuator.Input(command=u.aileron)
+        ail_deriv = self.aileron.dynamics(t, x.aileron, ail_input)
+        rud_input = Actuator.Input(command=u.rudder)
+        rud_deriv = self.rudder.dynamics(t, x.rudder, rud_input)
+
         return self.State(
             p_N=rb_deriv.p_N,
             att=rb_deriv.att,
@@ -249,6 +278,9 @@ class SubsonicF16:
             w_B=rb_deriv.w_B,
             eng=eng_deriv,
             aero=aero_deriv,
+            elevator=elev_deriv,
+            aileron=ail_deriv,
+            rudder=rud_deriv,
         )
     
     def trim(
@@ -380,6 +412,9 @@ def trim_state(
         w_B=w_B,
         eng=model.engine.trim(params.throttle),
         aero=model.aero.trim(),
+        elevator=model.elevator.trim(params.elevator),
+        aileron=model.aileron.trim(params.aileron),
+        rudder=model.rudder.trim(params.rudder),
     )
 
 
