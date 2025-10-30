@@ -1,4 +1,5 @@
 from __future__ import annotations
+import abc
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -7,7 +8,7 @@ import archimedes as arc
 from archimedes import struct
 
 if TYPE_CHECKING:
-    from f16 import SubsonicF16
+    from f16 import F16Geometry, FlightCondition
 
 #
 # Aerodynamics lookup tables
@@ -330,40 +331,67 @@ def calc_damping(alpha):
         ]
     )
 
-    # return np.stack(
-    #     [
-    #         np.interp(alpha, alpha_vector, Cxq_data),
-    #         np.interp(alpha, alpha_vector, Cyr_data),
-    #         np.interp(alpha, alpha_vector, Cyp_data),
-    #         np.interp(alpha, alpha_vector, Czq_data),
-    #         np.interp(alpha, alpha_vector, Clr_data),
-    #         np.interp(alpha, alpha_vector, Clp_data),
-    #         np.interp(alpha, alpha_vector, Cmq_data),
-    #         np.interp(alpha, alpha_vector, Cnr_data),
-    #         np.interp(alpha, alpha_vector, Cnp_data),
-    #     ]
-    # )
+
+class F16Aero(metaclass=abc.ABCMeta):
+    @struct
+    class Input:
+        condition: FlightCondition  # Flight condition
+        w_B: np.ndarray  # Angular velocity in body frame (ω_B) [rad/s]
+        elevator: float  # Elevator deflection [deg]
+        aileron: float  # Aileron deflection [deg]
+        rudder: float  # Rudder deflection [deg]
+        xcg: float  # Longitudinal center of gravity [% of cbar]
+
+    @struct
+    class Output:
+        CF_B: np.ndarray  # Aerodynamic force coefficients in body frame
+        CM_B: np.ndarray  # Aerodynamic moment coefficients in body frame
+
+    @struct
+    class State:
+        pass  # No unsteady aerodynamics by default
+
+    def dynamics(
+        self, t: float, x: State, u: Input, vehicle: F16Geometry
+    ) -> State:
+        return x
+    
+    @abc.abstractmethod
+    def output(
+        self, t: float, x: State, u: Input, vehicle: F16Geometry
+    ) -> Output:
+        """Compute aerodynamic force and moment coefficients"""
+        pass
+
+    @classmethod
+    def trim(cls) -> State:
+        """Return a steady aerodynamic state (empty by default)"""
+        return cls.State()
 
 
-@struct
-class F16Aerodynamics:
-    def __call__(self, vt, alpha, beta, w_B, el, ail, rdr, vehicle: SubsonicF16):
-        p, q, r = w_B  # Angular velocity in body frame (ω_B)
+class TabulatedAero(F16Aero):
+    def output(
+        self, t: float, x: F16Aero.State, u: F16Aero.Input, vehicle: F16Geometry,
+    ) -> F16Aero.Output:
+        vt = u.condition.vt  # True airspeed [ft/s]
+        alpha = u.condition.alpha  # Angle of attack [rad]
+        beta = u.condition.beta  # Sideslip angle [rad]
+        p, q, r = u.w_B  # Angular velocity in body frame (ω_B)
 
         # Lookup tables and component buildup
         alpha_deg = np.rad2deg(alpha)
         beta_deg = np.rad2deg(beta)
-        cxt = self._calc_cx(alpha_deg, el)
-        cyt = self._calc_cy(beta_deg, ail, rdr)
-        czt = self._calc_cz(alpha_deg, beta_deg, el)
-        dail = ail / 20.0
-        drdr = rdr / 30.0
+        cxt = self._calc_cx(alpha_deg, u.elevator)
+        cyt = self._calc_cy(beta_deg, u.aileron, u.rudder)
+        czt = self._calc_cz(alpha_deg, beta_deg, u.elevator)
+        dail = u.aileron / 20.0
+        drdr = u.rudder / 30.0
         clt = (
             self._calc_cl(alpha_deg, beta_deg)
             + dlda(alpha_deg, beta_deg) * dail
             + dldr(alpha_deg, beta_deg) * drdr
         )
-        cmt = self._calc_cm(alpha_deg, el)
+        cmt = self._calc_cm(alpha_deg, u.elevator)
         cnt = (
             self._calc_cn(alpha_deg, beta_deg)
             + dnda(alpha_deg, beta_deg) * dail
@@ -380,16 +408,16 @@ class F16Aerodynamics:
         czt = czt + cq * d[3]
 
         clt = clt + b2v * (d[4] * r + d[5] * p)
-        cmt = cmt + cq * d[6] + czt * (vehicle.xcgr - vehicle.xcg)
+        cmt = cmt + cq * d[6] + czt * (vehicle.xcgr - u.xcg)
         cnt = (
             cnt
             + b2v * (d[7] * r + d[8] * p)
-            - cyt * (vehicle.xcgr - vehicle.xcg) * vehicle.cbar / vehicle.b
+            - cyt * (vehicle.xcgr - u.xcg) * vehicle.cbar / vehicle.b
         )
 
-        force_coeffs = np.hstack([cxt, cyt, czt])
-        moment_coeffs = np.hstack([clt, cmt, cnt])
-        return force_coeffs, moment_coeffs
+        CF_B = np.hstack([cxt, cyt, czt])
+        CM_B = np.hstack([clt, cmt, cnt])
+        return self.Output(CF_B=CF_B, CM_B=CM_B)
 
     def _calc_cx(self, alpha, el):
         return cx_interpolant(alpha, el)

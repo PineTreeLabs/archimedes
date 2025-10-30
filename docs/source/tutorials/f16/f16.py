@@ -12,7 +12,7 @@ from archimedes.experimental import aero
 from archimedes.experimental.aero import GravityModel
 
 from engine import F16Engine, F16EngineConfig, LagEngine
-from aero import F16Aerodynamics
+from aero import F16Aero, TabulatedAero
 
 
 GRAV_FTS2 = 32.17  # ft/s^2
@@ -84,12 +84,21 @@ class FlightCondition:
 
 
 @arc.struct
+class F16Geometry:
+    S: float = 300.0  # Planform area
+    b: float = 30.0  # Span
+    cbar: float = 11.32  # Mean aerodynamic chord
+    xcgr: float = 0.35  # Reference CG location (% of cbar)
+
+
+@arc.struct
 class SubsonicF16:
     rigid_body: RigidBody = arc.field(default_factory=RigidBody)
     gravity: GravityModel = arc.field(default_factory=ConstantGravity)
     atmos: AtmosphereModel = arc.field(default_factory=AtmosphereModel)
     engine: F16Engine = arc.field(default_factory=LagEngine)
-    aero: F16Aerodynamics = arc.field(default_factory=F16Aerodynamics)
+    aero: F16Aero = arc.field(default_factory=TabulatedAero)
+    geometry: F16Geometry = arc.field(default_factory=F16Geometry)
 
     # NOTE: The weight in the textbook is 25,000 lbs, but this
     # does not give consistent values - the default value here
@@ -100,15 +109,12 @@ class SubsonicF16:
 
     xcg: float = 0.35  # CG location (% of cbar)
 
-    S: float = 300.0  # Planform area
-    b: float = 30.0  # Span
-    cbar: float = 11.32  # Mean aerodynamic chord
-    xcgr: float = 0.35  # Reference CG location (% of cbar)
     hx: float = 160.0  # Engine angular momentum (assumed constant)
 
     @arc.struct
     class State(RigidBody.State):
         eng: F16Engine.State
+        aero: F16Aero.State = arc.field(default_factory=TabulatedAero.trim)
 
     @arc.struct
     class Input:
@@ -163,28 +169,35 @@ class SubsonicF16:
             alt=z.alt,
             mach=z.mach,
         )
-        print(x.eng)
         y_eng = self.engine.output(t, x.eng, u_eng)
         F_eng_B = np.hstack([y_eng.thrust, 0.0, 0.0])
 
-        force_coeffs, moment_coeffs = self.aero(
-            z.vt, z.alpha, z.beta, x.w_B, u.elevator, u.aileron, u.rudder, self
+        # Aerodynamic model
+        u_aero = self.aero.Input(
+            condition=z,
+            w_B=x.w_B,
+            elevator=u.elevator,
+            aileron=u.aileron,
+            rudder=u.rudder,
+            xcg=self.xcg,
         )
-        cxt, cyt, czt = force_coeffs
-        clt, cmt, cnt = moment_coeffs
+        y_aero = self.aero.output(t, x.aero, u_aero, self.geometry)
+        cxt, cyt, czt = y_aero.CF_B
+        clt, cmt, cnt = y_aero.CM_B
 
         F_grav_B = self.calc_gravity(x)
-        F_aero_B = z.qbar * self.S * np.stack([cxt, cyt, czt])
+        S = self.geometry.S
+        b = self.geometry.b
+        cbar = self.geometry.cbar
+        F_aero_B = z.qbar * S * np.stack([cxt, cyt, czt])
 
         F_B = F_aero_B + F_eng_B + F_grav_B
 
         # Moments
         p, q, r = x.w_B  # Angular velocity in body frame (ω_B)
-        Meng_B = self.hx * np.hstack([0.0, -r, q])
-        Maero_B = (
-            z.qbar * self.S * np.hstack([self.b * clt, self.cbar * cmt, self.b * cnt])
-        )
-        M_B = Meng_B + Maero_B
+        M_eng_B = self.hx * np.hstack([0.0, -r, q])
+        M_aero_B = z.qbar * S * np.hstack([b * clt, cbar * cmt, b * cnt])
+        M_B = M_eng_B + M_aero_B
 
         return F_B, M_B
 
@@ -219,12 +232,23 @@ class SubsonicF16:
         )
         eng_deriv = self.engine.dynamics(t, x.eng, eng_input)
 
+        aero_input = self.aero.Input(
+            condition=z,
+            w_B=x.w_B,
+            elevator=u.elevator,
+            aileron=u.aileron,
+            rudder=u.rudder,
+            xcg=self.xcg,
+        )
+        aero_deriv = self.aero.dynamics(t, x.aero, aero_input, self.geometry)
+
         return self.State(
             p_N=rb_deriv.p_N,
             att=rb_deriv.att,
             v_B=rb_deriv.v_B,
             w_B=rb_deriv.w_B,
             eng=eng_deriv,
+            aero=aero_deriv,
         )
     
     def trim(
@@ -354,7 +378,8 @@ def trim_state(
         att=att,
         v_B=v_B,
         w_B=w_B,
-        eng=model.engine.trim(params.throttle)
+        eng=model.engine.trim(params.throttle),
+        aero=model.aero.trim(),
     )
 
 
