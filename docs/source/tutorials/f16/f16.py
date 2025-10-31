@@ -1,5 +1,7 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING
+import yaml
+from pathlib import Path
 
 import numpy as np
 
@@ -146,7 +148,7 @@ class SubsonicF16:
     def net_forces(
         self, t, x: State, u: Input, z: FlightCondition | None = None
     ) -> tuple[np.ndarray, np.ndarray]:
-        """Net forces and moments in body frame B, plus any extra state derivatives
+        """Net forces and moments in body frame B
 
         Args:
             t: time
@@ -286,8 +288,8 @@ class SubsonicF16:
         Returns:
             TrimPoint: trimmed state, inputs, and variables
         """
-        from trim import _trim  # Avoid circular import
-        return _trim(
+        from trim import trim  # Avoid circular import
+        return trim(
             model=self,
             vt=vt,
             alt=alt,
@@ -296,6 +298,19 @@ class SubsonicF16:
             pitch_rate=pitch_rate,
             turn_rate=turn_rate,
         )
+
+    @classmethod
+    def from_yaml(cls, path: str | Path, key: str | None = None) -> SubsonicF16:
+        """Load SubsonicF16 configuration from a YAML file"""
+        path = Path(path)
+        with open(path, "r") as f:
+            config_dict = yaml.safe_load(f)
+
+        if key is not None:
+            config_dict = config_dict[key]
+
+        config = SubsonicF16Config.model_validate(config_dict)
+        return config.build()
 
 
 class SubsonicF16Config(StructConfig):

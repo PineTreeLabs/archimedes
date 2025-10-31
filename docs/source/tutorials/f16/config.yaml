@@ -1,5 +1,7 @@
 stability:
   xcg: 0.3
+  rigid_body:
+    rpy_attitude: true
   engine:
     type: tabulated
   elevator:

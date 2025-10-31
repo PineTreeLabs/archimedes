@@ -209,20 +209,17 @@ def test_linearization(trim_cases):
         u_full = u_stab.as_full_input()
         return x_full, u_full
 
-    def dynamics(t, x_flat, u_flat, x0_dot_flat=None):
+    def dynamics(t, x_flat, u_flat):
         x_full, u_full = unravel_stab(x_flat, u_flat)
         x_dot_full = f16.dynamics(t, x_full, u_full)
 
         x_dot = StabilityState.from_full_derivative(x_full, x_dot_full)
-
         x_dot_flat, _ = arc.tree.ravel(x_dot)
-        if x0_dot_flat is not None:
-            x_dot_flat -= x0_dot_flat
 
         return x_dot_flat
 
 
-    def output(t, x_flat, u_flat, y0_flat=None):
+    def output(t, x_flat, u_flat):
         # Output normal acceleration, pitch rate, and angle of attack
         x_full, u_full = unravel_stab(x_flat, u_flat)
 
@@ -235,12 +232,7 @@ def test_linearization(trim_cases):
         F_grav_B = f16.calc_gravity(x_full)
         a_n = -(F_net_B[2] - F_grav_B[2]) / (f16.m * GRAV_FTS2)
 
-        y = np.hstack([a_n, q, alpha])
-
-        if y0_flat is not None:
-            y -= y0_flat
-
-        return y
+        return np.hstack([a_n, q, alpha])
 
 
     x0_dot_flat = dynamics(0.0, x0_flat, u0_flat)
@@ -269,8 +261,8 @@ def test_linearization(trim_cases):
     y0_expected = np.array([5.4267, 0.3, 17.2208])
     assert np.allclose(y0, y0_expected, atol=1e-3)
 
-    A, B = arc.jac(dynamics, argnums=(1, 2))(0.0, x0_flat, u0_flat, x0_dot_flat)
-    C, D = arc.jac(output, argnums=(1, 2))(0.0, x0_flat, u0_flat, y0)
+    A, B = arc.jac(dynamics, argnums=(1, 2))(0.0, x0_flat, u0_flat)
+    C, D = arc.jac(output, argnums=(1, 2))(0.0, x0_flat, u0_flat)
 
     A_long_ex = np.array([
         [-0.127, -235, -32.2, -9.51, 0.314],
@@ -356,44 +348,16 @@ def test_lon_stability():
         u_full = u_stab.as_full_input()
         return x_full, u_full
 
-    def dynamics(t, x_flat, u_flat, x0_dot_flat=None):
+    def dynamics(t, x_flat, u_flat):
         x_full, u_full = unravel_stab(x_flat, u_flat)
         x_dot_full = model.dynamics(t, x_full, u_full)
 
         x_dot = StabilityState.from_full_derivative(x_full, x_dot_full)
-
         x_dot_flat, _ = arc.tree.ravel(x_dot.long)
-        if x0_dot_flat is not None:
-            x_dot_flat -= x0_dot_flat
-
         return x_dot_flat
 
 
-    def output(t, x_flat, u_flat, y0_flat=None):
-        # Output normal acceleration, pitch rate, and angle of attack
-        x_full, u_full = unravel_stab(x_flat, u_flat)
-
-        x_stab = unravel_x(x_flat)
-        q = x_stab.q
-        alpha = np.rad2deg(x_stab.alpha)  # Angle of attack [deg]
-
-        # Normal acceleration [g's]
-        F_net_B, _ = model.net_forces(t, x_full, u_full)
-        F_grav_B = model.calc_gravity(x_full)
-        a_n = -(F_net_B[2] - F_grav_B[2]) / (model.m * GRAV_FTS2)
-
-        y = np.hstack([a_n, q, alpha])
-
-        if y0_flat is not None:
-            y -= y0_flat
-
-        return y
-
-
-    x0_dot_flat = dynamics(0.0, x0_flat, u0_flat)
-    y0 = output(0.0, x0_flat, u0_flat)
-
-    A = arc.jac(dynamics, argnums=(1,))(0.0, x0_flat, u0_flat, x0_dot_flat)
+    A = arc.jac(dynamics, argnums=(1,))(0.0, x0_flat, u0_flat)
     evals, evecs = np.linalg.eig(A)
 
     phugoid_idx = np.argmax(evals.real)
@@ -454,21 +418,17 @@ def test_lat_stability():
         return x_full, u_full
 
 
-    def dynamics(t, x_flat, u_flat, x0_dot_flat=None):
+    def dynamics(t, x_flat, u_flat):
         x_full, u_full = unravel_stab(x_flat, u_flat)
         x_dot_full = model.dynamics(t, x_full, u_full)
 
         x_dot = StabilityState.from_full_derivative(x_full, x_dot_full)
-
         x_dot_flat, _ = arc.tree.ravel(x_dot.lat)
-        if x0_dot_flat is not None:
-            x_dot_flat -= x0_dot_flat
 
         return x_dot_flat
 
 
-    x0_dot_flat = dynamics(0.0, x0_flat, u0_flat)
-    A = arc.jac(dynamics, argnums=(1))(0.0, x0_flat, u0_flat, x0_dot_flat)
+    A = arc.jac(dynamics, argnums=(1))(0.0, x0_flat, u0_flat)
 
     # Example 3.8-1 in Stevens, Lewis, Johnson
     A_ex = np.array([

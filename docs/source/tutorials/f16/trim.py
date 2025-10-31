@@ -125,7 +125,7 @@ def trim_residual(
     return np.hstack([x_t.v_B, x_t.w_B])
 
 
-def _trim(
+def trim(
     model: SubsonicF16,
     vt: float,  # True airspeed [ft/s]
     alt: float = 0.0,  # Altitude [ft]
