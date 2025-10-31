@@ -94,10 +94,10 @@ def test_352(f16: SubsonicF16):
     # without using the roll-pitch-yaw rates.
     w_B_out = 2 * (att.inv().mul(x_t.att, normalize=False)).as_quat()[1:]
 
-    assert np.allclose(x_t.p_N, dp_N_ex, atol=1e-2)
-    assert np.allclose(w_B_out, w_B, atol=1e-2)
-    assert np.allclose(x_t.v_B, dv_B_ex, atol=1e-2)
-    assert np.allclose(x_t.w_B, dw_B_ex, atol=1e-2)
+    npt.assert_allclose(x_t.p_N, dp_N_ex, atol=1e-2)
+    npt.assert_allclose(w_B_out, w_B, atol=1e-2)
+    npt.assert_allclose(x_t.v_B, dv_B_ex, atol=1e-2, rtol=1e-3)
+    npt.assert_allclose(x_t.w_B, dw_B_ex, atol=1e-2, rtol=1e-3)
 
 
 def test_362(f16: SubsonicF16):

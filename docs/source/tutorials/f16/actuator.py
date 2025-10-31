@@ -23,20 +23,12 @@ class Actuator(metaclass=abc.ABCMeta):
     class State:
         pass  # No state by default
 
-    @struct
-    class Input:
-        command: float
-
-    @struct
-    class Output:
-        position: float
-
-    def dynamics(self, t: float, x: State, u: Input) -> State:
+    def dynamics(self, t: float, x: State, u: float) -> State:
         """Compute the actuator state derivative."""
         return x
     
     @abc.abstractmethod
-    def output(self, t: float, x: State, u: Input) -> Output:
+    def output(self, t: float, x: State, u: float) -> float:
         """Compute the actuator output."""
         pass
 
@@ -47,32 +39,34 @@ class Actuator(metaclass=abc.ABCMeta):
 
 class IdealActuator(Actuator):
     """Ideal actuator with no rate or position limits."""
+    gain: float = 1.0
 
-    def output(
-        self, t: float, x: Actuator.State, u: Actuator.Input
-    ) -> Actuator.Output:
-        return Actuator.Output(position=u.command)
-    
+    def output(self, t: float, x: Actuator.State, u: float) -> float:
+        return self.gain * u
+
 
 class IdealActuatorConfig(StructConfig, type="ideal"):
+    gain: float = 1.0
+
     def build(self) -> IdealActuator:
-        return IdealActuator()
+        return IdealActuator(self.gain)
     
 
 @struct
-class RateLimitedActuator(Actuator):
+class LagActuator(Actuator):
     tau: float
-    rate_limit: float | None = field(static=True)
-    pos_limit: tuple[float, float] | None = field(static=True)
+    gain: float = 1.0
+    rate_limit: float | None = field(static=True, default=None)
+    pos_limit: tuple[float, float] | None = field(static=True, default=None)
 
     @struct
     class State(Actuator.State):
         position: float = 0.0
 
-    def dynamics(self, t: float, x: State, u: Actuator.Input) -> State:
+    def dynamics(self, t: float, x: State, u: float) -> State:
         # Compute desired rate
-        cmd, pos = u.command, x.position
-        rate = (cmd - pos) / self.tau
+        cmd, pos = u, x.position
+        rate = (self.gain * cmd - pos) / self.tau
 
         # Apply rate limit
         if self.rate_limit is not None:
@@ -86,13 +80,13 @@ class RateLimitedActuator(Actuator):
 
         return self.State(rate)
     
-    def output(self, t: float, x: State, u: Actuator.Input) -> Actuator.Output:
+    def output(self, t: float, x: State, u: float) -> float:
         pos = x.position
         if self.pos_limit is not None:
             min_pos, max_pos = self.pos_limit
             pos = np.clip(pos, min_pos, max_pos)
-        return Actuator.Output(position=pos)
-    
+        return pos
+
     def trim(self, command: float) -> State:
         pos = command
         if self.pos_limit is not None:
@@ -101,18 +95,21 @@ class RateLimitedActuator(Actuator):
         return self.State(position=pos)
     
 
-class RateLimitedActuatorConfig(StructConfig, type="rate_limited"):
+class LagActuatorConfig(StructConfig, type="lag"):
     tau: float  # Time constant [sec]
+    gain: float = field(default=1.0)
     rate_limit: float | None = field(default=None)  # Rate limit [units/sec]
     pos_limit: tuple[float, float] | None = field(default=None)  # Position limits [units]
 
-    def build(self) -> RateLimitedActuator:
-        return RateLimitedActuator(
+    def build(self) -> LagActuator:
+        return LagActuator(
+            tau=self.tau,
+            gain=self.gain,
             rate_limit=self.rate_limit,
             pos_limit=self.pos_limit,
         )
     
 ActuatorConfig = UnionConfig[
     IdealActuatorConfig,
-    RateLimitedActuatorConfig,
+    LagActuatorConfig,
 ]

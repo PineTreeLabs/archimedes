@@ -1,20 +1,18 @@
 from __future__ import annotations
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Protocol
 
 import numpy as np
 
 import archimedes as arc
 
 from archimedes import struct, field
-from archimedes.spatial import (
-    RigidBody, Rotation, euler_kinematics, dcm_from_euler
-)
+from archimedes.spatial import RigidBody, dcm_from_euler
 from archimedes.experimental import aero
 from archimedes.experimental.aero import GravityModel
 
 from engine import F16Engine, F16EngineConfig, LagEngine
 from aero import F16Aero, TabulatedAero
-from actuator import Actuator, RateLimitedActuator, IdealActuator, ActuatorConfig
+from actuator import Actuator, IdealActuator, ActuatorConfig
 
 if TYPE_CHECKING:
     from trim import TrimPoint
@@ -55,8 +53,27 @@ class ConstantGravity:
         return np.hstack([0, 0, self.g0])
 
 
+class AtmosphereModel(Protocol):
+    def __call__(self, Vt: float, alt: float) -> tuple[float, float]:
+        """Compute Mach number and dynamic pressure at given altitude and velocity.
+        
+        Args:
+            Vt: true airspeed [ft/s]
+            alt: altitude [ft]
+            
+        Returns:
+            mach: Mach number [-]
+            qbar: dynamic pressure [lbf/ft²]
+        """
+
 @struct
-class AtmosphereModel:
+class LinearAtmosphere:
+    """
+    Linear temperature gradient atmosphere model using barometric formula.
+    
+    Density varies as ρ = ρ₀(T/T₀)^n where n = g/(R·L) - 1
+    for a linear temperature profile T = T₀(1 - βz).
+    """
     R0: float = 2.377e-3  # Density scale [slug/ft^3]
     gamma: float = 1.4  # Adiabatic index for air [-]
     Rs: float = 1716.3  # Specific gas constant for air [ft·lbf/slug-R]
@@ -66,15 +83,14 @@ class AtmosphereModel:
     max_alt: float = 35000.0  # Maximum altitude [ft]
 
     def __call__(self, Vt, alt):
+        L = self.Tmax * self.dTdz  # Temperature gradient [°R/ft]
+        n = GRAV_FTS2 / (self.Rs * L) - 1  # Density exponent [-]
         Tfac = 1 - self.dTdz * alt  # Temperature factor [-]
-
         T = np.where(alt >= self.max_alt, self.Tmin, self.Tmax * Tfac)
-
-        rho = self.R0 * Tfac**4.14
-        amach = Vt / np.sqrt(self.gamma * self.Rs * T)
+        rho = self.R0 * Tfac ** n
+        mach = Vt / np.sqrt(self.gamma * self.Rs * T)
         qbar = 0.5 * rho * Vt**2
-
-        return amach, qbar
+        return mach, qbar
 
 
 @struct
@@ -99,7 +115,7 @@ class F16Geometry:
 class SubsonicF16:
     rigid_body: RigidBody = field(default_factory=RigidBody)
     gravity: GravityModel = field(default_factory=ConstantGravity)
-    atmos: AtmosphereModel = field(default_factory=AtmosphereModel)
+    atmos: AtmosphereModel = field(default_factory=LinearAtmosphere)
     engine: F16Engine = field(default_factory=LagEngine)
     aero: F16Aero = field(default_factory=TabulatedAero)
     geometry: F16Geometry = field(default_factory=F16Geometry)
@@ -174,7 +190,7 @@ class SubsonicF16:
         if z is None:
             z = self.flight_condition(x)
 
-        # Engine thrust model
+        # === Engine ===
         u_eng = self.engine.Input(
             throttle=u.throttle,
             alt=z.alt,
@@ -182,19 +198,15 @@ class SubsonicF16:
         )
         y_eng = self.engine.output(t, x.eng, u_eng)
         F_eng_B = np.hstack([y_eng.thrust, 0.0, 0.0])
+        p, q, r = x.w_B  # Angular velocity in body frame (ω_B)
+        M_eng_B = self.hx * np.hstack([0.0, -r, q])
 
-        # Control surface actuator positions
-        u_elev = Actuator.Input(command=u.elevator)
-        y_elev = self.elevator.output(t, x.elevator, u_elev)
-        el = y_elev.position
-        u_ail = Actuator.Input(command=u.aileron)
-        y_ail = self.aileron.output(t, x.aileron, u_ail)
-        ail = y_ail.position
-        u_rud = Actuator.Input(command=u.rudder)
-        y_rud = self.rudder.output(t, x.rudder, u_rud)
-        rud = y_rud.position
+        # === Control surface actuators ===
+        el = self.elevator.output(t, x.elevator, u.elevator)
+        ail = self.aileron.output(t, x.aileron, u.aileron)
+        rud = self.rudder.output(t, x.rudder, u.rudder)
 
-        # Aerodynamic model
+        # === Aerodynamics ===
         u_aero = self.aero.Input(
             condition=z,
             w_B=x.w_B,
@@ -207,18 +219,17 @@ class SubsonicF16:
         cxt, cyt, czt = y_aero.CF_B
         clt, cmt, cnt = y_aero.CM_B
 
-        F_grav_B = self.calc_gravity(x)
         S = self.geometry.S
         b = self.geometry.b
         cbar = self.geometry.cbar
         F_aero_B = z.qbar * S * np.stack([cxt, cyt, czt])
-
-        F_B = F_aero_B + F_eng_B + F_grav_B
-
-        # Moments
-        p, q, r = x.w_B  # Angular velocity in body frame (ω_B)
-        M_eng_B = self.hx * np.hstack([0.0, -r, q])
         M_aero_B = z.qbar * S * np.hstack([b * clt, cbar * cmt, b * cnt])
+
+        # === Gravity ===
+        F_grav_B = self.calc_gravity(x)
+
+        # === Net forces and moments ===
+        F_B = F_aero_B + F_eng_B + F_grav_B
         M_B = M_eng_B + M_aero_B
 
         return F_B, M_B
@@ -267,12 +278,9 @@ class SubsonicF16:
         aero_deriv = self.aero.dynamics(t, x.aero, aero_input, self.geometry)
 
         # Actuator dynamics
-        elev_input = Actuator.Input(command=u.elevator)
-        elev_deriv = self.elevator.dynamics(t, x.elevator, elev_input)
-        ail_input = Actuator.Input(command=u.aileron)
-        ail_deriv = self.aileron.dynamics(t, x.aileron, ail_input)
-        rud_input = Actuator.Input(command=u.rudder)
-        rud_deriv = self.rudder.dynamics(t, x.rudder, rud_input)
+        elev_deriv = self.elevator.dynamics(t, x.elevator, u.elevator)
+        ail_deriv = self.aileron.dynamics(t, x.aileron, u.aileron)
+        rud_deriv = self.rudder.dynamics(t, x.rudder, u.rudder)
 
         return self.State(
             p_N=rb_deriv.p_N,
