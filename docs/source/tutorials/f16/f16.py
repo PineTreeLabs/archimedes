@@ -1,18 +1,39 @@
 from __future__ import annotations
-from typing import TYPE_CHECKING, Protocol
+from typing import TYPE_CHECKING
 
 import numpy as np
 
 import archimedes as arc
 
-from archimedes import struct, field
-from archimedes.spatial import RigidBody, dcm_from_euler
+from archimedes import struct, field, StructConfig
+from archimedes.spatial import RigidBody, RigidBodyConfig, dcm_from_euler
 from archimedes.experimental import aero
-from archimedes.experimental.aero import GravityModel
+from archimedes.experimental.aero import (
+    GravityModel,
+    ConstantGravity,
+    GravityConfig,
+    ConstantGravityConfig,
+)
 
-from engine import F16Engine, F16EngineConfig, LagEngine
+from atmosphere import (
+    AtmosphereModel,
+    LinearAtmosphere,
+    LinearAtmosphereConfig,
+    AtmosphereConfig,
+)
+from engine import (
+    F16Engine,
+    F16EngineConfig,
+    NASAEngine,
+    NASAEngineConfig,
+)
 from aero import F16Aero, TabulatedAero
-from actuator import Actuator, IdealActuator, ActuatorConfig
+from actuator import (
+    Actuator,
+    IdealActuator,
+    ActuatorConfig,
+    IdealActuatorConfig,
+)
 
 if TYPE_CHECKING:
     from trim import TrimPoint
@@ -39,58 +60,6 @@ default_J_B = np.array(
 )
 
 
-@struct
-class ConstantGravity:
-    """Constant gravitational acceleration model
-
-    This model assumes a constant gravitational acceleration vector
-    in the +z direction (e.g. for a NED frame with "flat Earth" approximation)
-    """
-
-    g0: float = GRAV_FTS2  # ft/s^2
-
-    def __call__(self, p_E):
-        return np.hstack([0, 0, self.g0])
-
-
-class AtmosphereModel(Protocol):
-    def __call__(self, Vt: float, alt: float) -> tuple[float, float]:
-        """Compute Mach number and dynamic pressure at given altitude and velocity.
-        
-        Args:
-            Vt: true airspeed [ft/s]
-            alt: altitude [ft]
-            
-        Returns:
-            mach: Mach number [-]
-            qbar: dynamic pressure [lbf/ft²]
-        """
-
-@struct
-class LinearAtmosphere:
-    """
-    Linear temperature gradient atmosphere model using barometric formula.
-    
-    Density varies as ρ = ρ₀(T/T₀)^n where n = g/(R·L) - 1
-    for a linear temperature profile T = T₀(1 - βz).
-    """
-    R0: float = 2.377e-3  # Density scale [slug/ft^3]
-    gamma: float = 1.4  # Adiabatic index for air [-]
-    Rs: float = 1716.3  # Specific gas constant for air [ft·lbf/slug-R]
-    dTdz: float = 0.703e-5  # Temperature gradient scale [1/ft]
-    Tmin: float = 390.0  # Minimum temperature [R]
-    Tmax: float = 519.0  # Maximum temperature [R]
-    max_alt: float = 35000.0  # Maximum altitude [ft]
-
-    def __call__(self, Vt, alt):
-        L = self.Tmax * self.dTdz  # Temperature gradient [°R/ft]
-        n = GRAV_FTS2 / (self.Rs * L) - 1  # Density exponent [-]
-        Tfac = 1 - self.dTdz * alt  # Temperature factor [-]
-        T = np.where(alt >= self.max_alt, self.Tmin, self.Tmax * Tfac)
-        rho = self.R0 * Tfac ** n
-        mach = Vt / np.sqrt(self.gamma * self.Rs * T)
-        qbar = 0.5 * rho * Vt**2
-        return mach, qbar
 
 
 @struct
@@ -114,9 +83,9 @@ class F16Geometry:
 @struct
 class SubsonicF16:
     rigid_body: RigidBody = field(default_factory=RigidBody)
-    gravity: GravityModel = field(default_factory=ConstantGravity)
+    gravity: GravityModel = field(default_factory=lambda: ConstantGravity(GRAV_FTS2))
     atmos: AtmosphereModel = field(default_factory=LinearAtmosphere)
-    engine: F16Engine = field(default_factory=LagEngine)
+    engine: F16Engine = field(default_factory=NASAEngine)
     aero: F16Aero = field(default_factory=TabulatedAero)
     geometry: F16Geometry = field(default_factory=F16Geometry)
 
@@ -174,18 +143,20 @@ class SubsonicF16:
             alt=alt,
         )
 
-    def net_forces(self, t, x: State, u: Input, z: FlightCondition | None = None):
+    def net_forces(
+        self, t, x: State, u: Input, z: FlightCondition | None = None
+    ) -> tuple[np.ndarray, np.ndarray]:
         """Net forces and moments in body frame B, plus any extra state derivatives
 
         Args:
             t: time
-            x: state: (p_N, att, v_B, w_B, aux)
-            u: (throttle, elevator, aileron, rudder) control inputs
+            x: state
+            u: control inputs
+            z: flight condition (optional, will be computed if not provided)
 
         Returns:
             F_B: net forces in body frame B
             M_B: net moments in body frame B
-            aux_state_derivs: time derivatives of auxiliary state variables
         """
         if z is None:
             z = self.flight_condition(x)
@@ -239,8 +210,8 @@ class SubsonicF16:
 
         Args:
             t: time
-            x: state: (p_N, att, v_B, w_B, engine_power)
-            u: (throttle, elevator, aileron, rudder) control inputs
+            x: state
+            u: control inputs
 
         Returns:
             x_dot: time derivative of the state
@@ -324,4 +295,46 @@ class SubsonicF16:
             roll_rate=roll_rate,
             pitch_rate=pitch_rate,
             turn_rate=turn_rate,
+        )
+
+
+class SubsonicF16Config(StructConfig):
+    rigid_body: RigidBodyConfig = field(default_factory=RigidBodyConfig)
+    gravity: GravityConfig = field(
+        default_factory=lambda: ConstantGravityConfig(g0=GRAV_FTS2)
+    )
+    atmos: AtmosphereConfig = field(
+        default_factory=lambda: LinearAtmosphereConfig(g0=GRAV_FTS2)
+    )
+    engine: F16EngineConfig = field(default_factory=NASAEngineConfig)
+    # Skip aero: only one model and no configuration needed
+    geometry: F16Geometry = field(default_factory=F16Geometry)
+
+    # Control surface actuators
+    elevator: ActuatorConfig = field(default_factory=IdealActuatorConfig)
+    aileron: ActuatorConfig = field(default_factory=IdealActuatorConfig)
+    rudder: ActuatorConfig = field(default_factory=IdealActuatorConfig)
+
+    m: float = default_mass  # Vehicle mass [slug]
+    # Vehicle inertia matrix [slug·ft²]
+    J_B: np.ndarray = field(default_factory=lambda: default_J_B)
+
+    xcg: float = 0.35  # CG location (% of cbar)
+    hx: float = 160.0  # Engine angular momentum (assumed constant)
+
+    def build(self) -> SubsonicF16:
+        return SubsonicF16(
+            rigid_body=self.rigid_body.build(),
+            gravity=self.gravity.build(),
+            atmos=self.atmos.build(),
+            engine=self.engine.build(),
+            aero=TabulatedAero(),
+            geometry=self.geometry,
+            elevator=self.elevator.build(),
+            aileron=self.aileron.build(),
+            rudder=self.rudder.build(),
+            m=self.m,
+            J_B=self.J_B,
+            xcg=self.xcg,
+            hx=self.hx,
         )

@@ -6,6 +6,14 @@ import numpy as np
 import archimedes as arc
 from archimedes import struct, StructConfig, UnionConfig
 
+__all__ = [
+    "F16Engine",
+    "F16EngineConfig",
+    "TabulatedEngine",
+    "TabulatedEngineConfig",
+    "NASAEngine",
+    "NASAEngineConfig",
+]
 
 #
 # Engine lookup tables
@@ -227,8 +235,8 @@ class TabulatedEngineConfig(EngineConfigBase, type="tabulated"):
 
 
 @struct
-class LagEngine(TabulatedEngine):
-    """Tabulated engine model with first-order lag dynamics"""
+class NASAEngine(TabulatedEngine):
+    """Tabulated engine model with first-order lag dynamics based on NASA model"""
     rtau_min: float = 0.1  # Minimum inv time constant for engine response [1/s]
     rtau_max: float = 1.0  # Maximum inv time constant for engine response [1/s]
 
@@ -245,8 +253,8 @@ class LagEngine(TabulatedEngine):
         )
 
     def dynamics(
-        self, t: float, x: LagEngine.State, u: F16Engine.Input
-    ) -> LagEngine.State:
+        self, t: float, x: NASAEngine.State, u: F16Engine.Input
+    ) -> NASAEngine.State:
         """Time derivative of engine model state"""
         P = x.power  # Engine power
         thtl = u.throttle  # Throttle position
@@ -262,25 +270,25 @@ class LagEngine(TabulatedEngine):
         rtau = np.where(P >= 50.0, 5.0, self._rtau(P2 - P))
 
         dP_dt = rtau * (P2 - P)
-        return LagEngine.State(power=dP_dt)
+        return NASAEngine.State(power=dP_dt)
 
     def output(
-        self, t: float, x: LagEngine.State, u: F16Engine.Input
+        self, t: float, x: NASAEngine.State, u: F16Engine.Input
     ) -> F16Engine.Output:
         thrust = self._calc_thrust(x.power, u.alt, u.mach)
         return F16Engine.Output(thrust=thrust)
 
-    def trim(self, throttle: float) -> LagEngine.State:
+    def trim(self, throttle: float) -> NASAEngine.State:
         power = self.tgear(throttle)
-        return LagEngine.State(power=power)
+        return NASAEngine.State(power=power)
 
 
-class LagEngineConfig(EngineConfigBase, type="lag"):
+class NASAEngineConfig(EngineConfigBase, type="nasa"):
     rtau_min: float = 0.1  # Minimum inv time constant for engine response [1/s]
     rtau_max: float = 1.0  # Maximum inv time constant for engine response [1/s]
 
-    def build(self) -> LagEngine:
-        return LagEngine(
+    def build(self) -> NASAEngine:
+        return NASAEngine(
             lo_gear=self.lo_gear,
             hi_gear=self.hi_gear,
             throttle_breakpoint=self.throttle_breakpoint,
@@ -290,53 +298,5 @@ class LagEngineConfig(EngineConfigBase, type="lag"):
 
 F16EngineConfig = UnionConfig[
     TabulatedEngineConfig,
-    LagEngineConfig,
+    NASAEngineConfig,
 ]
-
-# @struct
-# class TabulatedEngine:
-#     lo_gear: float = 64.94  # Low gear throttle slope
-#     hi_gear: float = 217.38  # High gear throttle slope
-#     throttle_breakpoint: float = 0.77  # Switch between linear throttle models
-#     rtau_min: float = 0.1  # Minimum inv time constant for engine response [1/s]
-#     rtau_max: float = 1.0  # Maximum inv time constant for engine response [1/s]
-
-#     def _rtau(self, dP):
-#         """Inverse time constant for engine response"""
-#         return np.where(
-#             dP <= 25,
-#             self.rtau_max,
-#             np.where(dP >= 50, self.rtau_min, 1.9 - 0.036 * dP),
-#         )
-
-#     def dynamics(self, t, x, u):
-#         """Time derivative of engine model (power variable)"""
-#         P = x  # Engine power
-#         thtl = u  # Throttle position
-
-#         cpow = self.tgear(thtl)  # Command power
-#         P2 = np.where(
-#             cpow >= 50.0,
-#             np.where(P >= 50.0, cpow, 60.0),
-#             np.where(P >= 50.0, 40.0, cpow),
-#         )
-
-#         # 1/tau
-#         rtau = np.where(P >= 50.0, 5.0, self._rtau(P2 - P))
-
-#         return rtau * (P2 - P)
-
-#     def calc_thrust(self, x, alt, rmach):
-#         P = x  # Engine power
-
-#         T_mil = Tmil_interpolant(alt, rmach)
-#         T_idl = Tidl_interpolant(alt, rmach)
-#         T_max = Tmax_interpolant(alt, rmach)
-
-#         Tx_B = np.where(
-#             P < 50.0,
-#             T_idl + (T_mil - T_idl) * P * 0.02,
-#             T_mil + (T_max - T_mil) * (P - 50.0) * 0.02,
-#         )
-
-#         return np.stack([Tx_B, 0.0, 0.0])

@@ -1,0 +1,30 @@
+stability:
+  xcg: 0.3
+  engine:
+    type: tabulated
+  elevator:
+    type: ideal
+  aileron:
+    type: ideal
+  rudder:
+    type: ideal
+
+full:
+  xcg: 0.3
+  engine:
+    type: nasa
+  elevator:
+    type: lag
+    tau: 0.0495  # s
+    rate_limit: 60.0  # deg/s
+    pos_limits: [-25.0, 25.0]  # deg
+  aileron:
+    type: lag
+    tau: 0.0495  # s
+    rate_limit: 80.0  # deg/s
+    pos_limits: [-21.5, 21.5]  # deg
+  rudder:
+    type: lag
+    tau: 0.0495  # s
+    rate_limit: 120.0  # deg/s
+    pos_limits: [-30.0, 30.0]  # deg
