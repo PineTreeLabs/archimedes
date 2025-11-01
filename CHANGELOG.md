@@ -63,3 +63,6 @@ New version tag for release to PyPI (previous "Archimedes" project tagged with v
 - Bugfix for `Rotation.as_euler` for rotations with odd permutations
 - Move `RigidBody` and related functionality to `spatial` module
 - Move `spatial` module out of `experimental` (+codecov, documentation)
+
+## [0.3.2]
+- Bump pip to 25.3 to resolve vulnerability ([Issue #103](https://github.com/PineTreeLabs/archimedes/issues/103))
