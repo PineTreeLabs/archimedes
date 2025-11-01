@@ -5,19 +5,19 @@ https://www.printables.com/model/840061-low-poly-f-16-falcon-aka-viper-jet-fight
 
 For additional dependencies: `uv pip install meshio`
 """
+
 from __future__ import annotations
+
 from pprint import pprint
 
 import matplotlib.pyplot as plt
+import meshio
 import numpy as np
-
-import archimedes as arc
-
+from f16 import SubsonicF16
 from matplotlib.animation import FuncAnimation, PillowWriter
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection
-import meshio
 
-from f16 import SubsonicF16
+import archimedes as arc
 
 
 def traj_data(xs_flat, unravel, stride=5):
@@ -25,7 +25,7 @@ def traj_data(xs_flat, unravel, stride=5):
 
     positions = xs.p_N.copy()
     positions[:, 2] *= -1  # Use altitude as Z for visualization
-    positions *= 1/1000  # Scale to kft
+    positions *= 1 / 1000  # Scale to kft
 
     orientations = []
     for i in range(len(ts)):
@@ -35,7 +35,7 @@ def traj_data(xs_flat, unravel, stride=5):
 
     def att_as_rpy(x_flat):
         x = unravel(x_flat)
-        rpy = np.mod(x.att.as_euler("xyz"), 2*np.pi)
+        rpy = np.mod(x.att.as_euler("xyz"), 2 * np.pi)
         return np.rad2deg(rpy)
 
     rpy = arc.vmap(att_as_rpy, in_axes=1)(xs_flat)
@@ -48,14 +48,13 @@ def traj_data(xs_flat, unravel, stride=5):
     }
 
 
-
 def plot_f16_trajectory(traj_data, mesh_file):
     positions = traj_data["positions"]
     orientations = traj_data["orientations"]
     rpy = traj_data["rpy"]
 
-    fig = plt.figure(figsize=(10, 8), layout='constrained')
-    ax = fig.add_subplot(111, projection='3d')
+    fig = plt.figure(figsize=(10, 8), layout="constrained")
+    ax = fig.add_subplot(111, projection="3d")
 
     # Read the surface mesh
     mesh = meshio.read(mesh_file)
@@ -87,24 +86,24 @@ def plot_f16_trajectory(traj_data, mesh_file):
     ax.set_xlim(x_min - x_pad, x_max + x_pad)
     ax.set_ylim(y_min - y_pad, y_max + y_pad)
     ax.set_zlim(z_min - z_pad, z_max + z_pad)
-    ax.set_xlabel('N [kft]')
-    ax.set_ylabel('E [kft]')
-    ax.set_zlabel('alt [kft]')
-    ax.set_aspect('equal')
+    ax.set_xlabel("N [kft]")
+    ax.set_ylabel("E [kft]")
+    ax.set_zlabel("alt [kft]")
+    ax.set_aspect("equal")
 
     # Trail line
-    trail_line, = ax.plot([], [], [], linewidth=2)
+    (trail_line,) = ax.plot([], [], [], linewidth=2)
 
     # Text
     time_text = ax.text2D(0.05, 0.75, "", transform=ax.transAxes)
 
-    limits = np.array([getattr(ax, f'get_{axis}lim')() for axis in 'xyz'])
+    limits = np.array([getattr(ax, f"get_{axis}lim")() for axis in "xyz"])
     ax.set_box_aspect(np.ptp(limits, axis=1))
 
     def update(frame):
         for coll in ax.collections:
             coll.remove()
-        
+
         # Transform vertices
         transformed = vertices @ orientations[frame].T
         transformed[:, 2] *= -1  # Flip z back to altitude coordinates
@@ -113,23 +112,23 @@ def plot_f16_trajectory(traj_data, mesh_file):
         # Add aircraft mesh
         mesh = Poly3DCollection(
             transformed[faces],
-            alpha=0.8, 
-            facecolor='dimgray',
-            edgecolor='k',
+            alpha=0.8,
+            facecolor="dimgray",
+            edgecolor="k",
             linewidth=0.2,
         )
         ax.add_collection3d(mesh)
 
         # Update trail
-        trail_line.set_data(positions[:frame+1, 0], positions[:frame+1, 1])
-        trail_line.set_3d_properties(positions[:frame+1, 2])
+        trail_line.set_data(positions[: frame + 1, 0], positions[: frame + 1, 1])
+        trail_line.set_3d_properties(positions[: frame + 1, 2])
         # trail_line.set_color()
-        
+
         # Update text
         time_text.set_text(
             f"Roll: {rpy[frame, 0]:.1f}°\nPitch: {rpy[frame, 1]:.1f}°\nYaw: {rpy[frame, 2]:.1f}°"
         )
-        
+
         return mesh, trail_line, time_text
 
     anim = FuncAnimation(
@@ -144,7 +143,6 @@ def plot_f16_trajectory(traj_data, mesh_file):
 
 
 if __name__ == "__main__":
-
     # Steady turn rate
     model = SubsonicF16(xcg=0.3)
     result = model.trim(vt=500, turn_rate=0.1, alt=10000.0, gamma=0.0)
@@ -170,4 +168,4 @@ if __name__ == "__main__":
     for mode in ("light", "dark"):
         arc.theme.set_theme(mode)
         anim = plot_f16_trajectory(data, "_static/f16.stl")
-        anim.save(f'_static/f16_turn_{mode}.gif', writer=PillowWriter(fps=20))
+        anim.save(f"_static/f16_turn_{mode}.gif", writer=PillowWriter(fps=20))

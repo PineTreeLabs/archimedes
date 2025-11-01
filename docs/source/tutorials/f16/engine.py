@@ -1,10 +1,11 @@
 from __future__ import annotations
+
 import abc
 
 import numpy as np
 
 import archimedes as arc
-from archimedes import struct, StructConfig, UnionConfig
+from archimedes import StructConfig, UnionConfig, struct
 
 __all__ = [
     "F16Engine",
@@ -180,7 +181,7 @@ class F16Engine(metaclass=abc.ABCMeta):
     def dynamics(self, t: float, x: State, u: Input) -> State:
         """Time derivative of engine model state"""
         return x  # No dynamics by default
-    
+
     @abc.abstractmethod
     def output(self, t: float, x: State, u: Input) -> Output:
         """Calculate engine thrust output"""
@@ -237,6 +238,7 @@ class TabulatedEngineConfig(EngineConfigBase, type="tabulated"):
 @struct
 class NASAEngine(TabulatedEngine):
     """Tabulated engine model with first-order lag dynamics based on NASA model"""
+
     rtau_min: float = 0.1  # Minimum inv time constant for engine response [1/s]
     rtau_max: float = 1.0  # Maximum inv time constant for engine response [1/s]
 
@@ -295,6 +297,7 @@ class NASAEngineConfig(EngineConfigBase, type="nasa"):
             rtau_min=self.rtau_min,
             rtau_max=self.rtau_max,
         )
+
 
 F16EngineConfig = UnionConfig[
     TabulatedEngineConfig,

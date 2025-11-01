@@ -330,6 +330,75 @@ for theme in {"light", "dark"}:
 :class: only-dark
 ```
 
+## [Advanced]: Derived Quantities
+
+One situation that commonly arises in complex systems are intermediate values that are reused in multiple places and are relatively expensive to compute.
+For example, the dynamic pressure and Mach number calculation in flight dynamics requires querying an atmosphere model, and these quantities are often used by both the aerodynamic and propulsion subsystems.
+This also comes up when modeling thermal fluids, where an equation of state model is used to calculate various thermodynamic properties based on primitive state variables, and these derived properties might be re-used in several places.
+
+These derived quantities are not part of the dynamic state, and so the obvious solutions are:
+
+1. Recalculate the derived values anywhere they're needed
+2. Calculate once and pass as arguments to other functions/subsystems
+
+The first option is obviously not ideal, since it requires duplicate computation.
+The second choice is workable, but requires manually keeping track of all such derived quantities.
+
+You can handle this situation in several ways, but one relatively clean approach is to create an extra `struct` to hold all of these, and then pass the entire container around as needed.
+For example, in the [Subsonic F-16 example](../f16/f16_02.md), the derived quantities are kept in a `FlightCondition` struct.
+
+It works something like this:
+
+```python
+@struct
+class FlightCondition:
+    alt: float  # Altitude
+    vt: float  # True airspeed
+    alpha: float  # Angle of attack
+    beta: float  # Sideslip angle
+    mach: float  # Mach number
+    qbar: float  # Dynamic pressure
+
+
+@struct
+class SubsonicF16:
+
+    @struct
+    class State(RigidBody.State):
+        ...
+
+    @struct
+    class Input:
+        ...
+
+    def flight_condition(self, x: RigidBody.State) -> FlightCondition:
+        ...  # Compute TAS, AoA, etc.
+
+    def net_forces(
+        self, t, x: State, u: Input, condition: FlightCondition | None = None
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """Calculate forces and moments in body frame"""
+        if condition is None:
+            condition = self.flight_condition(x)
+
+        ...
+
+    def dynamics(self, t, x: State, u: Input) -> State:
+        """Compute time derivative of the state"""
+        condition = self.flight_condition(x)
+
+        # Compute the net forces
+        F_B, M_B = self.net_forces(t, x, u, condition)
+
+        ...
+
+```
+
+This works well because it's scalable to any amount of derived data without changing the function interfaces.
+It also provides a pattern where methods like `net_forces` can be called for offline analysis without calculating the derived quantities, but for simulation or other "online" work there's no duplicate calculation.
+
+This situation doesn't come up in every model, so there's no need to shoehorn this pattern in where it doesn't belong.
+But keep it in mind as a convenient way to handle this kind of intermediate "derived" data.
 
 ## Summary
 

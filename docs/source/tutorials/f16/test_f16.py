@@ -1,22 +1,22 @@
-import pytest
+# ruff: noqa: N806
 from pathlib import Path
-import yaml
 
 import numpy as np
 import numpy.testing as npt
+import pytest
+import yaml
+from f16 import GRAV_FTS2, SubsonicF16
+from stability import (
+    LateralInput,
+    LateralState,
+    LongitudinalInput,
+    LongitudinalState,
+    StabilityInput,
+    StabilityState,
+)
 
 import archimedes as arc
-from archimedes.spatial import Rotation, RigidBody, euler_kinematics
-
-from f16 import SubsonicF16, GRAV_FTS2
-from stability import (
-    LongitudinalState,
-    LongitudinalInput,
-    LateralState,
-    LateralInput,
-    StabilityState,
-    StabilityInput,
-)
+from archimedes.spatial import RigidBody, Rotation, euler_kinematics
 
 CURRENT_PATH = Path(__file__).parent
 
@@ -195,7 +195,7 @@ def test_linearization(trim_cases):
     rigid_body = RigidBody(rpy_attitude=True)
     f16 = SubsonicF16(rigid_body=rigid_body, xcg=case["xcg"])
     result = f16.trim(**case["condition"])
-        
+
     x0 = StabilityState.from_full_state(result.state)
     u0 = StabilityInput.from_full_input(result.inputs)
 
@@ -218,14 +218,13 @@ def test_linearization(trim_cases):
 
         return x_dot_flat
 
-
     def output(t, x_flat, u_flat):
         # Output normal acceleration, pitch rate, and angle of attack
         x_full, u_full = unravel_stab(x_flat, u_flat)
 
         x_stab = unravel_x(x_flat)
-        q = x_stab.long.q
-        alpha = np.rad2deg(x_stab.long.alpha)  # Angle of attack [deg]
+        q = x_stab.lon.q
+        alpha = np.rad2deg(x_stab.lon.alpha)  # Angle of attack [deg]
 
         # Normal acceleration [g's]
         F_net_B, _ = f16.net_forces(t, x_full, u_full)
@@ -234,10 +233,9 @@ def test_linearization(trim_cases):
 
         return np.hstack([a_n, q, alpha])
 
-
     x0_dot_flat = dynamics(0.0, x0_flat, u0_flat)
     x0_dot_expected = StabilityState(
-        long=LongitudinalState(
+        lon=LongitudinalState(
             vt=0.0,
             alpha=0.0,
             theta=case["condition"]["pitch_rate"],
@@ -264,65 +262,79 @@ def test_linearization(trim_cases):
     A, B = arc.jac(dynamics, argnums=(1, 2))(0.0, x0_flat, u0_flat)
     C, D = arc.jac(output, argnums=(1, 2))(0.0, x0_flat, u0_flat)
 
-    A_long_ex = np.array([
-        [-0.127, -235, -32.2, -9.51, 0.314],
-        [-7e-4, -0.969, 0, 0.908, -2e-4],
-        [0, 0, 0, 1, 0],
-        [9e-4, -4.56, 0, -1.58, 0],
-        [0, 0, 0, 0, -5]
-    ])
-    npt.assert_allclose(A[:5, :5], A_long_ex, rtol=1e-2, atol=1e-3)
+    A_lon_ex = np.array(
+        [
+            [-0.127, -235, -32.2, -9.51, 0.314],
+            [-7e-4, -0.969, 0, 0.908, -2e-4],
+            [0, 0, 0, 1, 0],
+            [9e-4, -4.56, 0, -1.58, 0],
+            [0, 0, 0, 0, -5],
+        ]
+    )
+    npt.assert_allclose(A[:5, :5], A_lon_ex, rtol=1e-2, atol=1e-3)
 
-    A_lat_ex = np.array([
-        [-0.322, 0.0612, 0.298, -0.948],
-        [0, 0.093, 1.0, 0.310],
-        [-62.5, 0, -3.0, 1.99],
-        [7.67, 0, -0.262, -0.629],
-    ])
+    A_lat_ex = np.array(
+        [
+            [-0.322, 0.0612, 0.298, -0.948],
+            [0, 0.093, 1.0, 0.310],
+            [-62.5, 0, -3.0, 1.99],
+            [7.67, 0, -0.262, -0.629],
+        ]
+    )
     npt.assert_allclose(A[5:, 5:], A_lat_ex, rtol=0.05, atol=1e-3)
 
-    A_mix_ex = np.array([
-        [-0.0028, 0.00126, 5e-5, 2e-4],
-        [1.5e-5, 0, -4e-5, -1e-5],
-        [0, 0, 0, 0],
-        [9.2e-5, 0, 0, -0.00287],
-        [0, 0, 0, 0],
-    ])
+    A_mix_ex = np.array(
+        [
+            [-0.0028, 0.00126, 5e-5, 2e-4],
+            [1.5e-5, 0, -4e-5, -1e-5],
+            [0, 0, 0, 0],
+            [9.2e-5, 0, 0, -0.00287],
+            [0, 0, 0, 0],
+        ]
+    )
     npt.assert_allclose(A[:5, 5:], A_mix_ex, rtol=0.1, atol=1e-2)
 
-    A_mix_ex = np.array([
-        [1e-8, 2e-5, 3e-6, 8e-7, -3e-8],
-        [0, 0, 0, 0, 0],
-        [-3e-7, -0.00248, 0, 3e-4, 0],
-        [-3e-6, -0.00188, 0, 0.00254, 0],
-    ])
+    A_mix_ex = np.array(
+        [
+            [1e-8, 2e-5, 3e-6, 8e-7, -3e-8],
+            [0, 0, 0, 0, 0],
+            [-3e-7, -0.00248, 0, 3e-4, 0],
+            [-3e-6, -0.00188, 0, 0.00254, 0],
+        ]
+    )
     npt.assert_allclose(A[5:, :5], A_mix_ex, rtol=0.1, atol=1e-2)
 
-    B_ex = np.array([
-        [0, -0.244, 6e-6, 2e-5],
-        [0, -0.00209, 0, 0],
-        [0, 0, 0, 0],
-        [0, -0.199, 0, 0],
-        [1087, 0, 0, 0],
-        [0, 2e-8, 3e-4, 8e-4],
-        [0, 0, 0, 0],
-        [0, 0, -0.645, 0.126],
-        [0, 0, -0.018, -0.0657],
-    ])
+    B_ex = np.array(
+        [
+            [0, -0.244, 6e-6, 2e-5],
+            [0, -0.00209, 0, 0],
+            [0, 0, 0, 0],
+            [0, -0.199, 0, 0],
+            [1087, 0, 0, 0],
+            [0, 2e-8, 3e-4, 8e-4],
+            [0, 0, 0, 0],
+            [0, 0, -0.645, 0.126],
+            [0, 0, -0.018, -0.0657],
+        ]
+    )
     npt.assert_allclose(B, B_ex, rtol=1e-3, atol=1e-3)
 
-    C_ex = np.array([
-        [0.0208, 15.2, 0, 1.45, 0, -4.5e-4, 0, 0, 0],
-        [0, 0, 0, 1, 0, 0, 0, 0, 0],
-        [0, 57.3, 0, 0, 0, 0, 0, 0, 0],
-    ])
+    C_ex = np.array(
+        [
+            [0.0208, 15.2, 0, 1.45, 0, -4.5e-4, 0, 0, 0],
+            [0, 0, 0, 1, 0, 0, 0, 0, 0],
+            [0, 57.3, 0, 0, 0, 0, 0, 0, 0],
+        ]
+    )
     npt.assert_allclose(C, C_ex, rtol=1e-2, atol=1e-3)
 
-    D_ex = np.array([
-        [0, 0.0333, 0, 0],
-        [0, 0, 0, 0],
-        [0, 0, 0, 0],
-    ])
+    D_ex = np.array(
+        [
+            [0, 0.0333, 0, 0],
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+        ]
+    )
     npt.assert_allclose(D, D_ex, rtol=1e-3, atol=1e-3)
 
 
@@ -340,9 +352,8 @@ def test_lon_stability():
     x0_flat, unravel_x = arc.tree.ravel(x0)
     u0_flat, unravel_u = arc.tree.ravel(u0)
 
-
     def unravel_stab(x_flat, u_flat):
-        x_stab = StabilityState(long=unravel_x(x_flat), lat=x0_lat)
+        x_stab = StabilityState(lon=unravel_x(x_flat), lat=x0_lat)
         u_stab = unravel_u(u_flat)
         x_full = x_stab.as_full_state(rpy_attitude=True)
         u_full = u_stab.as_full_input()
@@ -353,9 +364,8 @@ def test_lon_stability():
         x_dot_full = model.dynamics(t, x_full, u_full)
 
         x_dot = StabilityState.from_full_derivative(x_full, x_dot_full)
-        x_dot_flat, _ = arc.tree.ravel(x_dot.long)
+        x_dot_flat, _ = arc.tree.ravel(x_dot.lon)
         return x_dot_flat
-
 
     A = arc.jac(dynamics, argnums=(1,))(0.0, x0_flat, u0_flat)
     evals, evecs = np.linalg.eig(A)
@@ -364,11 +374,15 @@ def test_lon_stability():
     short_idx = np.argmax(evals.imag)
 
     # Stevens, Lewis, Johnson values:
-    slj_phugoid = -0.0087  + 0.0739j
+    slj_phugoid = -0.0087 + 0.0739j
     slj_short = -1.2039 + 1.4922j
 
-    print(f"Phugoid mode:\t\t{evals[phugoid_idx].real:.4f} ± {evals[phugoid_idx].imag:.4f}j")
-    print(f"Short period mode:\t{evals[short_idx].real:.4f} ± {evals[short_idx].imag:.4f}j")
+    print(
+        f"Phugoid mode:\t\t{evals[phugoid_idx].real:.4f} ± {evals[phugoid_idx].imag:.4f}j"
+    )
+    print(
+        f"Short period mode:\t{evals[short_idx].real:.4f} ± {evals[short_idx].imag:.4f}j"
+    )
 
     assert np.allclose(evals[phugoid_idx], slj_phugoid, rtol=1e-3)
     assert np.allclose(evals[short_idx], slj_short, rtol=1e-3)
@@ -401,22 +415,19 @@ def test_lat_stability():
     model = SubsonicF16(rigid_body=rigid_body, xcg=0.3)
     result = model.trim(vt=502, pitch_rate=0.0)
 
-    vt = result.condition.vt
-
     x0 = LateralState.from_full_state(result.state)
-    x0_long = LongitudinalState.from_full_state(result.state)
+    x0_lon = LongitudinalState.from_full_state(result.state)
     u0 = LateralInput.from_full_input(result.inputs)
 
     x0_flat, unravel_x = arc.tree.ravel(x0)
     u0_flat, unravel_u = arc.tree.ravel(u0)
 
     def unravel_stab(x_flat, u_flat):
-        x_stab = StabilityState(long=x0_long, lat=unravel_x(x_flat))
+        x_stab = StabilityState(lon=x0_lon, lat=unravel_x(x_flat))
         u_stab = unravel_u(u_flat)
         x_full = x_stab.as_full_state(rpy_attitude=True)
         u_full = u_stab.as_full_input()
         return x_full, u_full
-
 
     def dynamics(t, x_flat, u_flat):
         x_full, u_full = unravel_stab(x_flat, u_flat)
@@ -427,16 +438,17 @@ def test_lat_stability():
 
         return x_dot_flat
 
-
     A = arc.jac(dynamics, argnums=(1))(0.0, x0_flat, u0_flat)
 
     # Example 3.8-1 in Stevens, Lewis, Johnson
-    A_ex = np.array([
-        [-0.32200, 0.064032, 0.038904, -0.99156],
-        [0.0, 0.0, 1.0, 0.039385],
-        [-30.919, 0.0, -3.6730, 0.67425],
-        [9.4724, 0, -0.026358, -0.49849],
-    ])
+    A_ex = np.array(
+        [
+            [-0.32200, 0.064032, 0.038904, -0.99156],
+            [0.0, 0.0, 1.0, 0.039385],
+            [-30.919, 0.0, -3.6730, 0.67425],
+            [9.4724, 0, -0.026358, -0.49849],
+        ]
+    )
     npt.assert_allclose(A, A_ex, rtol=1e-3, atol=1e-4)
 
     evals, evecs = np.linalg.eig(A)
@@ -450,7 +462,9 @@ def test_lat_stability():
     slj_spiral = -0.0128
     slj_roll = -3.601
 
-    print(f"Dutch roll mode:\t{evals[dutch_idx].real:.4f} ± {evals[dutch_idx].imag:.4f}j")
+    print(
+        f"Dutch roll mode:\t{evals[dutch_idx].real:.4f} ± {evals[dutch_idx].imag:.4f}j"
+    )
     print(f"Spiral mode:\t\t{evals[spiral_idx].real:.4f}")
     print(f"Roll subsidence mode:\t{evals[roll_idx].real:.4f}")
 

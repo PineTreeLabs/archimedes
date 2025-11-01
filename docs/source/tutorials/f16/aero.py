@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 import abc
 from typing import TYPE_CHECKING
 
@@ -351,15 +352,11 @@ class F16Aero(metaclass=abc.ABCMeta):
     class State:
         pass  # No unsteady aerodynamics by default
 
-    def dynamics(
-        self, t: float, x: State, u: Input, vehicle: F16Geometry
-    ) -> State:
+    def dynamics(self, t: float, x: State, u: Input, vehicle: F16Geometry) -> State:
         return x
-    
+
     @abc.abstractmethod
-    def output(
-        self, t: float, x: State, u: Input, vehicle: F16Geometry
-    ) -> Output:
+    def output(self, t: float, x: State, u: Input, vehicle: F16Geometry) -> Output:
         """Compute aerodynamic force and moment coefficients"""
         pass
 
@@ -370,7 +367,11 @@ class F16Aero(metaclass=abc.ABCMeta):
 
 class TabulatedAero(F16Aero):
     def output(
-        self, t: float, x: F16Aero.State, u: F16Aero.Input, vehicle: F16Geometry,
+        self,
+        t: float,
+        x: F16Aero.State,
+        u: F16Aero.Input,
+        vehicle: F16Geometry,
     ) -> F16Aero.Output:
         vt = u.condition.vt  # True airspeed [ft/s]
         alpha = u.condition.alpha  # Angle of attack [rad]

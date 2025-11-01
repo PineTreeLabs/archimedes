@@ -1,27 +1,22 @@
 from __future__ import annotations
-from typing import TYPE_CHECKING
-import yaml
+
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import numpy as np
-
-import archimedes as arc
-
-from archimedes import struct, field, StructConfig
-from archimedes.spatial import RigidBody, RigidBodyConfig, dcm_from_euler
-from archimedes.experimental import aero
-from archimedes.experimental.aero import (
-    GravityModel,
-    ConstantGravity,
-    GravityConfig,
-    ConstantGravityConfig,
+import yaml
+from actuator import (
+    Actuator,
+    ActuatorConfig,
+    IdealActuator,
+    IdealActuatorConfig,
 )
-
+from aero import F16Aero, TabulatedAero
 from atmosphere import (
+    AtmosphereConfig,
     AtmosphereModel,
     LinearAtmosphere,
     LinearAtmosphereConfig,
-    AtmosphereConfig,
 )
 from engine import (
     F16Engine,
@@ -29,13 +24,16 @@ from engine import (
     NASAEngine,
     NASAEngineConfig,
 )
-from aero import F16Aero, TabulatedAero
-from actuator import (
-    Actuator,
-    IdealActuator,
-    ActuatorConfig,
-    IdealActuatorConfig,
+
+from archimedes import StructConfig, field, struct
+from archimedes.experimental import aero
+from archimedes.experimental.aero import (
+    ConstantGravity,
+    ConstantGravityConfig,
+    GravityConfig,
+    GravityModel,
 )
+from archimedes.spatial import RigidBody, RigidBodyConfig, dcm_from_euler
 
 if TYPE_CHECKING:
     from trim import TrimPoint
@@ -60,8 +58,6 @@ default_J_B = np.array(
         [Axz, 0.0, Azz],
     ]
 )
-
-
 
 
 @struct
@@ -146,7 +142,7 @@ class SubsonicF16:
         )
 
     def net_forces(
-        self, t, x: State, u: Input, z: FlightCondition | None = None
+        self, t, x: State, u: Input, condition: FlightCondition | None = None
     ) -> tuple[np.ndarray, np.ndarray]:
         """Net forces and moments in body frame B
 
@@ -160,14 +156,14 @@ class SubsonicF16:
             F_B: net forces in body frame B
             M_B: net moments in body frame B
         """
-        if z is None:
-            z = self.flight_condition(x)
+        if condition is None:
+            condition = self.flight_condition(x)
 
         # === Engine ===
         u_eng = self.engine.Input(
             throttle=u.throttle,
-            alt=z.alt,
-            mach=z.mach,
+            alt=condition.alt,
+            mach=condition.mach,
         )
         y_eng = self.engine.output(t, x.eng, u_eng)
         F_eng_B = np.hstack([y_eng.thrust, 0.0, 0.0])
@@ -181,7 +177,7 @@ class SubsonicF16:
 
         # === Aerodynamics ===
         u_aero = self.aero.Input(
-            condition=z,
+            condition=condition,
             w_B=x.w_B,
             elevator=el,
             aileron=ail,
@@ -195,8 +191,8 @@ class SubsonicF16:
         S = self.geometry.S
         b = self.geometry.b
         cbar = self.geometry.cbar
-        F_aero_B = z.qbar * S * np.stack([cxt, cyt, czt])
-        M_aero_B = z.qbar * S * np.hstack([b * clt, cbar * cmt, b * cnt])
+        F_aero_B = condition.qbar * S * np.stack([cxt, cyt, czt])
+        M_aero_B = condition.qbar * S * np.hstack([b * clt, cbar * cmt, b * cnt])
 
         # === Gravity ===
         F_grav_B = self.calc_gravity(x)
@@ -218,10 +214,10 @@ class SubsonicF16:
         Returns:
             x_dot: time derivative of the state
         """
-        z = self.flight_condition(x)
+        condition = self.flight_condition(x)
 
         # Compute the net forces
-        F_B, M_B = self.net_forces(t, x, u, z)
+        F_B, M_B = self.net_forces(t, x, u, condition)
 
         rb_input = RigidBody.Input(
             F_B=F_B,
@@ -234,14 +230,14 @@ class SubsonicF16:
         # Engine dynamics
         eng_input = self.engine.Input(
             throttle=u.throttle,
-            alt=z.alt,
-            mach=z.mach,
+            alt=condition.alt,
+            mach=condition.mach,
         )
         eng_deriv = self.engine.dynamics(t, x.eng, eng_input)
 
         # Unsteady aero
         aero_input = self.aero.Input(
-            condition=z,
+            condition=condition,
             w_B=x.w_B,
             elevator=u.elevator,
             aileron=u.aileron,
@@ -266,7 +262,7 @@ class SubsonicF16:
             aileron=ail_deriv,
             rudder=rud_deriv,
         )
-    
+
     def trim(
         self,
         vt: float,  # True airspeed [ft/s]
@@ -289,6 +285,7 @@ class SubsonicF16:
             TrimPoint: trimmed state, inputs, and variables
         """
         from trim import trim  # Avoid circular import
+
         return trim(
             model=self,
             vt=vt,

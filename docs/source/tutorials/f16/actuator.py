@@ -1,10 +1,10 @@
 from __future__ import annotations
+
 import abc
 
 import numpy as np
 
-from archimedes import struct, field, StructConfig, UnionConfig
-
+from archimedes import StructConfig, UnionConfig, field, struct
 
 __all__ = [
     "Actuator",
@@ -17,7 +17,7 @@ __all__ = [
 
 
 class Actuator(metaclass=abc.ABCMeta):
-    """Abstract base class for aircraft actuators with rate and position limits."""
+    """Abstract base class for SISO actuator components."""
 
     @struct
     class State:
@@ -26,7 +26,7 @@ class Actuator(metaclass=abc.ABCMeta):
     def dynamics(self, t: float, x: State, u: float) -> State:
         """Compute the actuator state derivative."""
         return x
-    
+
     @abc.abstractmethod
     def output(self, t: float, x: State, u: float) -> float:
         """Compute the actuator output."""
@@ -39,7 +39,8 @@ class Actuator(metaclass=abc.ABCMeta):
 
 @struct
 class IdealActuator(Actuator):
-    """Ideal actuator with no rate or position limits."""
+    """Ideal actuator with instantaneous linear response."""
+
     gain: float = 1.0
 
     def output(self, t: float, x: Actuator.State, u: float) -> float:
@@ -51,7 +52,7 @@ class IdealActuatorConfig(StructConfig, type="ideal"):
 
     def build(self) -> IdealActuator:
         return IdealActuator(self.gain)
-    
+
 
 @struct
 class LagActuator(Actuator):
@@ -80,7 +81,7 @@ class LagActuator(Actuator):
             rate = np.where((pos >= max_pos) * (rate > 0.0), 0.0, rate)
 
         return self.State(rate)
-    
+
     def output(self, t: float, x: State, u: float) -> float:
         pos = x.position
         if self.pos_limits is not None:
@@ -94,13 +95,15 @@ class LagActuator(Actuator):
             min_pos, max_pos = self.pos_limits
             pos = np.clip(pos, min_pos, max_pos)
         return self.State(position=pos)
-    
+
 
 class LagActuatorConfig(StructConfig, type="lag"):
     tau: float  # Time constant [sec]
     gain: float = field(default=1.0)
     rate_limit: float | None = field(default=None)  # Rate limit [units/sec]
-    pos_limits: tuple[float, float] | None = field(default=None)  # Position limits [units]
+    pos_limits: tuple[float, float] | None = field(
+        default=None
+    )  # Position limits [units]
 
     def build(self) -> LagActuator:
         return LagActuator(
@@ -109,7 +112,8 @@ class LagActuatorConfig(StructConfig, type="lag"):
             rate_limit=self.rate_limit,
             pos_limits=self.pos_limits,
         )
-    
+
+
 ActuatorConfig = UnionConfig[
     IdealActuatorConfig,
     LagActuatorConfig,

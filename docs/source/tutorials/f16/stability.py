@@ -1,15 +1,12 @@
 from __future__ import annotations
 
 import numpy as np
-
-import control
-
-import archimedes as arc
-from archimedes import struct
-from archimedes.spatial import Rotation, euler_kinematics
-
-from f16 import SubsonicF16, GRAV_FTS2
 from engine import F16Engine
+from f16 import SubsonicF16
+
+from archimedes import struct
+from archimedes.spatial import Rotation
+
 
 @struct
 class LongitudinalState:
@@ -21,10 +18,7 @@ class LongitudinalState:
 
     @classmethod
     def from_full_state(
-        cls,
-        x: SubsonicF16.State,
-        vt: float = None,
-        alpha: float = None
+        cls, x: SubsonicF16.State, vt: float = None, alpha: float = None
     ) -> LongitudinalState:
         if vt is None:
             vt = np.sqrt(np.dot(x.v_B, x.v_B))
@@ -42,11 +36,13 @@ class LongitudinalState:
     def as_full_state(self, rpy_attitude=True) -> SubsonicF16.State:
         # Assume zero sideslip, zero lateral states
 
-        v_B = np.hstack([
-            self.vt * np.cos(self.alpha),
-            0.0,
-            self.vt * np.sin(self.alpha),
-        ])
+        v_B = np.hstack(
+            [
+                self.vt * np.cos(self.alpha),
+                0.0,
+                self.vt * np.sin(self.alpha),
+            ]
+        )
 
         rpy = np.hstack([0.0, self.theta, 0.0])
         if rpy_attitude:
@@ -63,6 +59,7 @@ class LongitudinalState:
             w_B=w_B,
             eng=self.eng,
         )
+
 
 @struct
 class LongitudinalInput:
@@ -83,6 +80,7 @@ class LongitudinalInput:
             aileron=0.0,
             rudder=0.0,
         )
+
 
 @struct
 class LateralState:
@@ -106,6 +104,7 @@ class LateralState:
             p=x.w_B[0],
             r=x.w_B[2],
         )
+
 
 @struct
 class LateralInput:
@@ -131,18 +130,19 @@ class LateralInput:
             throttle=throttle,
         )
 
+
 @struct
 class StabilityState:
-    long: LongitudinalState
+    lon: LongitudinalState
     lat: LateralState
 
     @classmethod
     def from_full_state(cls, x: SubsonicF16.State) -> StabilityState:
         return cls(
-            long=LongitudinalState.from_full_state(x),
+            lon=LongitudinalState.from_full_state(x),
             lat=LateralState.from_full_state(x),
         )
-    
+
     @classmethod
     def from_full_derivative(
         cls, x: SubsonicF16.State, x_dot: SubsonicF16.State
@@ -155,19 +155,19 @@ class StabilityState:
         alpha_dot = (x.v_B[0] * x_dot.v_B[2] - x.v_B[2] * x_dot.v_B[0]) / dum
         beta_dot = (vt * x_dot.v_B[1] - x.v_B[1] * vt_dot) / (vt**2 * np.cos(beta))
         return cls(
-            long=LongitudinalState.from_full_state(x_dot, vt=vt_dot, alpha=alpha_dot),
+            lon=LongitudinalState.from_full_state(x_dot, vt=vt_dot, alpha=alpha_dot),
             lat=LateralState.from_full_state(x_dot, beta=beta_dot),
         )
 
     def as_full_state(self, rpy_attitude=True) -> SubsonicF16.State:
         p_N = np.zeros(3)
 
-        v_W = np.hstack([self.long.vt, 0.0, 0.0])
-        R_WB = Rotation.from_euler("zy", [-self.lat.beta, self.long.alpha])
+        v_W = np.hstack([self.lon.vt, 0.0, 0.0])
+        R_WB = Rotation.from_euler("zy", [-self.lat.beta, self.lon.alpha])
         v_B = R_WB.apply(v_W, inverse=True)
-        w_B = np.hstack([self.lat.p, self.long.q, self.lat.r])
+        w_B = np.hstack([self.lat.p, self.lon.q, self.lat.r])
 
-        rpy = np.hstack([self.lat.phi, self.long.theta, 0.0])
+        rpy = np.hstack([self.lat.phi, self.lon.theta, 0.0])
         if rpy_attitude:
             att = rpy
         else:
@@ -178,27 +178,26 @@ class StabilityState:
             att=att,
             v_B=v_B,
             w_B=w_B,
-            eng=self.long.eng,
+            eng=self.lon.eng,
         )
 
 
 @struct
 class StabilityInput:
-    long: LongitudinalInput
+    lon: LongitudinalInput
     lat: LateralInput
 
     @classmethod
     def from_full_input(cls, u: SubsonicF16.Input):
         return cls(
-            long=LongitudinalInput.from_full_input(u),
+            lon=LongitudinalInput.from_full_input(u),
             lat=LateralInput.from_full_input(u),
         )
 
     def as_full_input(self) -> SubsonicF16.Input:
         return SubsonicF16.Input(
-            elevator=self.long.elevator,
+            elevator=self.lon.elevator,
             aileron=self.lat.aileron,
             rudder=self.lat.rudder,
-            throttle=self.long.throttle,
+            throttle=self.lon.throttle,
         )
-
