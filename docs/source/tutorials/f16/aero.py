@@ -1,4 +1,7 @@
+# ruff: noqa: N803, N806, N815, N816
 from __future__ import annotations
+
+import abc
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -7,7 +10,7 @@ import archimedes as arc
 from archimedes import struct
 
 if TYPE_CHECKING:
-    from f16_plant import SubsonicF16
+    from f16 import F16Geometry, FlightCondition
 
 #
 # Aerodynamics lookup tables
@@ -57,7 +60,6 @@ cz_data = [
 ]
 
 # Cl(alpha, beta)
-# TODO: Should be able to use the textbook numbers here
 cl_data = np.array(
     [
         [0.0, -0.001, -0.003, -0.001, 0.0, 0.007, 0.009],
@@ -74,6 +76,14 @@ cl_data = np.array(
         [0.0, -0.015, -0.019, -0.027, -0.035, -0.059, -0.076],
     ]
 )  # Textbook data
+
+# # aerobench modifications
+# # TODO: Should be able to use the textbook numbers here
+# cl_data[5:8] = np.array([
+#     [0.0, -0.022, -0.041, -0.054, -0.060, -0.063, -0.068],
+#     [0.0, -0.022, -0.045, -0.057, -0.069, -0.081, -0.089],
+#     [0.0, -0.021, -0.040, -0.054, -0.067, -0.079, -0.088],
+# ])
 
 # Cm(alpha, ele)
 cm_data = np.array(
@@ -112,6 +122,7 @@ cn_data = np.array(
 )
 
 cx_interpolant = arc.interpolant([alpha_vector, ele_vector], cx_data)
+cz_interpolant = arc.interpolant([alpha_vector], cz_data)
 cl_interpolant = arc.interpolant([alpha_vector, beta_vector], cl_data)
 cm_interpolant = arc.interpolant([alpha_vector, ele_vector], cm_data)
 cn_interpolant = arc.interpolant([alpha_vector, beta_vector], cn_data)
@@ -197,25 +208,191 @@ dnda = arc.interpolant([alpha_vector, beta_vector], dnda_data)
 dndr = arc.interpolant([alpha_vector, beta_vector], dndr_data)
 
 
-@struct
-class F16Aerodynamics:
-    def __call__(self, vt, alpha, beta, w_B, el, ail, rdr, vehicle: SubsonicF16):
-        p, q, r = w_B  # Angular velocity in body frame (ω_B)
+#
+# Aerodynamic damping derivatives
+#
+
+cxq_data = np.array(
+    [-0.267, 0.110, 0.308, 1.34, 2.08, 2.91, 2.76, 2.05, 1.5, 1.49, 1.83, 1.21]
+)
+cyr_data = np.array(
+    [0.882, 0.852, 0.876, 0.958, 0.962, 0.974, 0.819, 0.483, 0.590, 1.21, 0.493, -1.04]
+)
+cyp_data = np.array(
+    [
+        -0.108,
+        -0.108,
+        -0.188,
+        0.110,
+        0.258,
+        0.226,
+        0.344,
+        0.362,
+        0.611,
+        0.529,
+        0.298,
+        -2.27,
+    ]
+)
+czq_data = np.array(
+    [-8.8, -25.8, -28.9, -31.4, -31.2, -30.7, -27.7, -28.2, -29, -29.8, -38.3, -35.3]
+)
+
+clr_data = np.array(
+    [
+        -0.126,
+        -0.026,
+        0.063,
+        0.113,
+        0.208,
+        0.230,
+        0.319,
+        0.437,
+        0.680,
+        0.1,
+        0.447,
+        -0.330,
+    ]
+)
+clp_data = np.array(
+    [
+        -0.36,
+        -0.359,
+        -0.443,
+        -0.42,
+        -0.383,
+        -0.375,
+        -0.329,
+        -0.294,
+        -0.23,
+        -0.21,
+        -0.12,
+        -0.1,
+    ]
+)
+# NOTE: Second entry is listed as -0.540 in Appendix A.8 - typo??
+cmq_data = np.array(
+    [-7.21, -0.54, -5.23, -5.26, -6.11, -6.64, -5.69, -6, -6.2, -6.4, -6.6, -6]
+)
+cnr_data = np.array(
+    [
+        -0.38,
+        -0.363,
+        -0.378,
+        -0.386,
+        -0.37,
+        -0.453,
+        -0.55,
+        -0.582,
+        -0.595,
+        -0.637,
+        -1.02,
+        -0.84,
+    ]
+)
+cnp_data = np.array(
+    [
+        0.061,
+        0.052,
+        0.052,
+        -0.012,
+        -0.013,
+        -0.024,
+        0.05,
+        0.15,
+        0.13,
+        0.158,
+        0.24,
+        0.15,
+    ]
+)
+
+cxq_interpolant = arc.interpolant([alpha_vector], cxq_data)
+cyr_interpolant = arc.interpolant([alpha_vector], cyr_data)
+cyp_interpolant = arc.interpolant([alpha_vector], cyp_data)
+czq_interpolant = arc.interpolant([alpha_vector], czq_data)
+clr_interpolant = arc.interpolant([alpha_vector], clr_data)
+clp_interpolant = arc.interpolant([alpha_vector], clp_data)
+cmq_interpolant = arc.interpolant([alpha_vector], cmq_data)
+cnr_interpolant = arc.interpolant([alpha_vector], cnr_data)
+cnp_interpolant = arc.interpolant([alpha_vector], cnp_data)
+
+
+def calc_damping(alpha):
+    return np.stack(
+        [
+            cxq_interpolant(alpha),
+            cyr_interpolant(alpha),
+            cyp_interpolant(alpha),
+            czq_interpolant(alpha),
+            clr_interpolant(alpha),
+            clp_interpolant(alpha),
+            cmq_interpolant(alpha),
+            cnr_interpolant(alpha),
+            cnp_interpolant(alpha),
+        ]
+    )
+
+
+class F16Aero(metaclass=abc.ABCMeta):
+    @struct
+    class Input:
+        condition: FlightCondition  # Flight condition
+        w_B: np.ndarray  # Angular velocity in body frame (ω_B) [rad/s]
+        elevator: float  # Elevator deflection [deg]
+        aileron: float  # Aileron deflection [deg]
+        rudder: float  # Rudder deflection [deg]
+        xcg: float  # Longitudinal center of gravity [% of cbar]
+
+    @struct
+    class Output:
+        CF_B: np.ndarray  # Aerodynamic force coefficients in body frame
+        CM_B: np.ndarray  # Aerodynamic moment coefficients in body frame
+
+    @struct
+    class State:
+        pass  # No unsteady aerodynamics by default
+
+    def dynamics(self, t: float, x: State, u: Input, vehicle: F16Geometry) -> State:
+        return x
+
+    @abc.abstractmethod
+    def output(self, t: float, x: State, u: Input, vehicle: F16Geometry) -> Output:
+        """Compute aerodynamic force and moment coefficients"""
+        pass
+
+    def trim(self) -> State:
+        """Return a steady aerodynamic state (empty by default)"""
+        return self.State()
+
+
+class TabulatedAero(F16Aero):
+    def output(
+        self,
+        t: float,
+        x: F16Aero.State,
+        u: F16Aero.Input,
+        vehicle: F16Geometry,
+    ) -> F16Aero.Output:
+        vt = u.condition.vt  # True airspeed [ft/s]
+        alpha = u.condition.alpha  # Angle of attack [rad]
+        beta = u.condition.beta  # Sideslip angle [rad]
+        p, q, r = u.w_B  # Angular velocity in body frame (ω_B)
 
         # Lookup tables and component buildup
         alpha_deg = np.rad2deg(alpha)
         beta_deg = np.rad2deg(beta)
-        cxt = self._calc_cx(alpha_deg, el)
-        cyt = self._calc_cy(beta_deg, ail, rdr)
-        czt = self._calc_cz(alpha_deg, beta_deg, el)
-        dail = ail / 20.0
-        drdr = rdr / 30.0
+        cxt = self._calc_cx(alpha_deg, u.elevator)
+        cyt = self._calc_cy(beta_deg, u.aileron, u.rudder)
+        czt = self._calc_cz(alpha_deg, beta_deg, u.elevator)
+        dail = u.aileron / 20.0
+        drdr = u.rudder / 30.0
         clt = (
             self._calc_cl(alpha_deg, beta_deg)
             + dlda(alpha_deg, beta_deg) * dail
             + dldr(alpha_deg, beta_deg) * drdr
         )
-        cmt = self._calc_cm(alpha_deg, el)
+        cmt = self._calc_cm(alpha_deg, u.elevator)
         cnt = (
             self._calc_cn(alpha_deg, beta_deg)
             + dnda(alpha_deg, beta_deg) * dail
@@ -226,22 +403,22 @@ class F16Aerodynamics:
         tvt = 0.5 / vt
         b2v = vehicle.b * tvt
         cq = vehicle.cbar * q * tvt
-        d = self._calc_damp(alpha_deg)
+        d = calc_damping(alpha_deg)
         cxt = cxt + cq * d[0]
         cyt = cyt + b2v * (d[1] * r + d[2] * p)
         czt = czt + cq * d[3]
 
         clt = clt + b2v * (d[4] * r + d[5] * p)
-        cmt = cmt + cq * d[6] + czt * (vehicle.xcgr - vehicle.xcg)
+        cmt = cmt + cq * d[6] + czt * (vehicle.xcgr - u.xcg)
         cnt = (
             cnt
             + b2v * (d[7] * r + d[8] * p)
-            - cyt * (vehicle.xcgr - vehicle.xcg) * vehicle.cbar / vehicle.b
+            - cyt * (vehicle.xcgr - u.xcg) * vehicle.cbar / vehicle.b
         )
 
-        force_coeffs = np.hstack([cxt, cyt, czt])
-        moment_coeffs = np.hstack([clt, cmt, cnt])
-        return force_coeffs, moment_coeffs
+        CF_B = np.hstack([cxt, cyt, czt])
+        CM_B = np.hstack([clt, cmt, cnt])
+        return self.Output(CF_B=CF_B, CM_B=CM_B)
 
     def _calc_cx(self, alpha, el):
         return cx_interpolant(alpha, el)
@@ -250,149 +427,26 @@ class F16Aerodynamics:
         return -0.02 * beta + 0.021 * (ail / 20) + 0.086 * (rdr / 30)
 
     def _calc_cz(self, alpha, beta, el):
-        cz_lookup = np.interp(alpha, alpha_vector, cz_data)
+        cz_lookup = cz_interpolant(alpha)
         return (-0.19 / 25) * el + cz_lookup * (1.0 - (beta / 57.3) ** 2)
 
     def _calc_cl(self, alpha, beta):
-        return np.sign(beta) * cl_interpolant(alpha, np.abs(beta))
+        # NOTE: Cl is antisymmetric in beta
+        # A more intuitive way to do this would be sign(beta) * cl(alpha, abs(beta))
+        # but that causes problems with autodiff
+        return np.where(
+            beta >= 0,
+            cl_interpolant(alpha, beta),
+            -cl_interpolant(alpha, -beta),
+        )
 
     def _calc_cm(self, alpha, el):
         return cm_interpolant(alpha, el)
 
     def _calc_cn(self, alpha, beta):
-        return np.sign(beta) * cn_interpolant(alpha, np.abs(beta))
-
-    def _calc_damp(self, alpha):
-        Cxq_data = np.array(
-            [-0.267, 0.110, 0.308, 1.34, 2.08, 2.91, 2.76, 2.05, 1.5, 1.49, 1.83, 1.21]
-        )
-        Cyr_data = np.array(
-            [
-                0.882,
-                0.852,
-                0.876,
-                0.958,
-                0.962,
-                0.974,
-                0.819,
-                0.483,
-                0.590,
-                1.21,
-                -0.493,
-                -1.04,
-            ]
-        )
-        Cyp_data = np.array(
-            [
-                -0.108,
-                -0.108,
-                -0.188,
-                0.110,
-                0.258,
-                0.226,
-                0.344,
-                0.362,
-                0.611,
-                0.529,
-                0.298,
-                -2.27,
-            ]
-        )
-        Czq_data = np.array(
-            [
-                -8.8,
-                -25.8,
-                -28.9,
-                -31.4,
-                -31.2,
-                -30.7,
-                -27.7,
-                -28.2,
-                -29,
-                -29.8,
-                -38.3,
-                -35.3,
-            ]
-        )
-
-        Clr_data = np.array(
-            [
-                -0.126,
-                -0.026,
-                0.063,
-                0.113,
-                0.208,
-                0.230,
-                0.319,
-                0.437,
-                0.680,
-                0.1,
-                0.447,
-                -0.330,
-            ]
-        )
-        Clp_data = np.array(
-            [
-                -0.36,
-                -0.359,
-                -0.443,
-                -0.42,
-                -0.383,
-                -0.375,
-                -0.329,
-                -0.294,
-                -0.23,
-                -0.21,
-                -0.12,
-                -0.1,
-            ]
-        )
-        Cmq_data = np.array(
-            [-7.21, -0.54, -5.23, -5.26, -6.11, -6.64, -5.69, -6, -6.2, -6.4, -6.6, -6]
-        )
-        Cnr_data = np.array(
-            [
-                -0.38,
-                -0.363,
-                -0.378,
-                -0.386,
-                -0.37,
-                -0.453,
-                -0.55,
-                -0.582,
-                -0.595,
-                -0.637,
-                -1.02,
-                -0.84,
-            ]
-        )
-        Cnp_data = np.array(
-            [
-                0.061,
-                0.052,
-                0.052,
-                -0.012,
-                -0.013,
-                -0.024,
-                0.05,
-                0.15,
-                0.13,
-                0.158,
-                0.24,
-                0.15,
-            ]
-        )
-
-        return np.stack(
-            [
-                np.interp(alpha, alpha_vector, Cxq_data),
-                np.interp(alpha, alpha_vector, Cyr_data),
-                np.interp(alpha, alpha_vector, Cyp_data),
-                np.interp(alpha, alpha_vector, Czq_data),
-                np.interp(alpha, alpha_vector, Clr_data),
-                np.interp(alpha, alpha_vector, Clp_data),
-                np.interp(alpha, alpha_vector, Cmq_data),
-                np.interp(alpha, alpha_vector, Cnr_data),
-                np.interp(alpha, alpha_vector, Cnp_data),
-            ]
+        # See note about autodiff in _calc_cl
+        return np.where(
+            beta >= 0,
+            cn_interpolant(alpha, beta),
+            -cn_interpolant(alpha, -beta),
         )

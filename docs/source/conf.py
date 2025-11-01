@@ -57,6 +57,7 @@ nb_execution_cache_path = ".jupyter_cache"
 nb_execution_allow_errors = False  # Fail build on exceptions
 nb_execution_raise_on_error = True  # Raise immediately on error
 nb_execution_excludepatterns = [
+    "**/*.ipynb",  # Exclude all notebooks by default
     "experimental/*",  # Skip WIP content
     "benchmarks/*",  # Skip long-running benchmarks
 ]
