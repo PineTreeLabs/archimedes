@@ -6,6 +6,7 @@ https://www.printables.com/model/840061-low-poly-f-16-falcon-aka-viper-jet-fight
 For additional dependencies: `uv pip install meshio`
 """
 
+# ruff: noqa: N803, N806, N816
 from __future__ import annotations
 
 from pprint import pprint
@@ -126,7 +127,8 @@ def plot_f16_trajectory(traj_data, mesh_file):
 
         # Update text
         time_text.set_text(
-            f"Roll: {rpy[frame, 0]:.1f}°\nPitch: {rpy[frame, 1]:.1f}°\nYaw: {rpy[frame, 2]:.1f}°"
+            f"Roll: {rpy[frame, 0]:.1f}°\nPitch: {rpy[frame, 1]:.1f}°\n"
+            f"Yaw: {rpy[frame, 2]:.1f}°"
         )
 
         return mesh, trail_line, time_text

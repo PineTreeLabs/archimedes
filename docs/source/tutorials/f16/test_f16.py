@@ -378,10 +378,12 @@ def test_lon_stability():
     slj_short = -1.2039 + 1.4922j
 
     print(
-        f"Phugoid mode:\t\t{evals[phugoid_idx].real:.4f} ± {evals[phugoid_idx].imag:.4f}j"
+        f"Phugoid mode:\t\t{evals[phugoid_idx].real:.4f} ± "
+        f"{evals[phugoid_idx].imag:.4f}j"
     )
     print(
-        f"Short period mode:\t{evals[short_idx].real:.4f} ± {evals[short_idx].imag:.4f}j"
+        f"Short period mode:\t{evals[short_idx].real:.4f} ± "
+        f"{evals[short_idx].imag:.4f}j"
     )
 
     assert np.allclose(evals[phugoid_idx], slj_phugoid, rtol=1e-3)

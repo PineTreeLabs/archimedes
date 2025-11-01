@@ -10,8 +10,8 @@ __all__ = [
     "Actuator",
     "IdealActuator",
     "IdealActuatorConfig",
-    "RateLimitedActuator",
-    "RateLimitedActuatorConfig",
+    "LagActuator",
+    "LagActuatorConfig",
     "ActuatorConfig",
 ]
 

@@ -1,3 +1,4 @@
+# ruff: noqa: N803, N806, N815, N816
 from __future__ import annotations
 
 from typing import Protocol
