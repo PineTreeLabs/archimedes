@@ -1,0 +1,91 @@
+# Table 3.6-3 from Stevens, Lewis, Johnson
+
+- name: level_35
+  description: Nominal level flight, xcg=0.35
+  xcg: 0.35  # cg location [-]
+  condition:
+    vt: 502.0  # ft/s
+    alt: 0.0  # ft
+    gamma: 0.0  # deg
+    roll_rate: 0.0  # rad/s
+    pitch_rate: 0.0  # rad/s
+    turn_rate: 0.0  # rad/s
+  variables:
+    alpha: 0.03691  # angle of attack [rad]
+    beta: -4e-9  # sideslip angle [rad]
+    throttle: 0.1385  # throttle [0-1]
+    elevator: -0.7588  # elevator [deg]
+    aileron: -1.2e-7  # aileron [deg]
+    rudder: -6.2e-7  # rudder [deg]
+
+- name: level_30
+  description: Level flight, xcg=0.3
+  xcg: 0.3  # cg location [-]
+  condition:
+    vt: 502.0  # ft/s
+    alt: 0.0  # ft
+    gamma: 0.0  # deg
+    roll_rate: 0.0  # rad/s
+    pitch_rate: 0.0  # rad/s
+    turn_rate: 0.0  # rad/s
+  variables:
+    alpha: 0.03936  # angle of attack [rad]
+    beta: 4.1e-9  # sideslip angle [rad]
+    throttle: 0.1485  # throttle [0-1]
+    elevator: -1.931  # elevator [deg]
+    aileron: -7e-8  # aileron [deg]
+    rudder: -8.3e-7  # rudder [deg]
+
+- name: level_38
+  description: Level flight, xcg=0.38
+  xcg: 0.38  # cg location [-]
+  condition:
+    vt: 502.0  # ft/s
+    alt: 0.0  # ft
+    gamma: 0.0  # deg
+    roll_rate: 0.0  # rad/s
+    pitch_rate: 0.0  # rad/s
+    turn_rate: 0.0  # rad/s
+  variables:
+    alpha: 0.03544  # angle of attack [rad]
+    beta: 3.1e-8  # sideslip angle [rad]
+    throttle: 0.1325  # throttle [0-1]
+    elevator: -0.0559  # elevator [deg]
+    aileron: -5.1e-7  # aileron [deg]
+    rudder: 4.3e-6  # rudder [deg]
+
+- name: turn
+  description: Coordinated turn, 0.3 rad/s, xcg=0.3
+  xcg: 0.3  # cg location [-]
+  condition:
+    vt: 502.0  # ft/s
+    alt: 0.0  # ft
+    gamma: 0.0  # deg
+    roll_rate: 0.0  # rad/s
+    pitch_rate: 0.0  # rad/s
+    turn_rate: 0.3  # rad/s
+  variables:
+    alpha: 0.2485  # angle of attack [rad]
+    beta: 4.8e-4  # sideslip angle [rad]
+    throttle: 0.8499  # throttle [0-1]
+    elevator: -6.256  # elevator [deg]
+    aileron: 0.09891  # aileron [deg]
+    rudder: -0.4218  # rudder [deg]
+
+- name: pull_up
+  description: Pull-up, 0.3 rad/s, xcg=0.3
+  xcg: 0.3  # cg location [-]
+  condition:
+    vt: 502.0  # ft/s
+    alt: 0.0  # ft
+    gamma: 0.0  # deg
+    roll_rate: 0.0  # rad/s
+    pitch_rate: 0.3  # rad/s
+    turn_rate: 0.0  # rad/s
+  variables:
+    throttle: 1.023  # throttle [0-1]
+    elevator: -7.082  # elevator [deg]
+    alpha: 0.3006  # angle of attack [rad]
+    aileron: -6.2e-4  # aileron [deg]
+    rudder: 0.01655  # rudder [deg]
+    beta: 4.1e-5  # sideslip angle [rad]

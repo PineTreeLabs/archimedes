@@ -34,7 +34,17 @@ All of this becomes increasingly difficult to maintain as models grow in depth a
 The recommended solution to this in Archimedes is to put this configuration logic in a separate class that inherits from [`StructConfig`](#archimedes.StructConfig).
 This is basically a [Pydantic](https://docs.pydantic.dev/latest/) `BaseModel` tailored for use with [`@struct`](#archimedes.struct)-decorated classes.
 
-Here's what this looks like, reusing the `Oscillator` example from Part 1:
+This gives you two paths to creating your struct - directly in code, or by loading a config file (YAML is easy, JSON or something else if you prefer).
+
+```{image} ../hierarchical/_static/config_lifecycle_light.png
+:class: only-light
+```
+
+```{image} ../hierarchical/_static/config_lifecycle_dark.png
+:class: only-dark
+```
+
+Here's what it looks like, reusing the `Oscillator` example from Part 1:
 
 ```{code-cell} python
 :tags: [hide-cell]

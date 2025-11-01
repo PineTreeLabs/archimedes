@@ -401,7 +401,8 @@ For `spatial` itself, the next priorities are _spatial transformations_ (transfo
 Beyond `spatial`, we'll be adding some common functionality for different classes of vehicle models, such as reference gravitational and atmospheric models like WGS84 and USSA1976.
 Tools for detailed propulsion systems modeling are more niche and thus farther out on the roadmap, but there are proof of concept demos already, so feel free to reach out if you're interested in that.
 
-Finally, some detailed application examples will be released soon to provide full reference implementations of different classes of vehicle dynamics models (particularly aerospace-related, but also reach out if there's something else you'd like to see).
+Finally, to see this module in action check out the [Subsonic F-16 series](../../tutorials/f16/f16_00.md), where we implement the NASA F-16 benchmark from scratch, relying heavily on `spatial` for attitude representations and 6dof dynamics.
+More detailed application examples will be released soon to provide full reference implementations of different classes of vehicle dynamics models (particularly aerospace-related, but also reach out if there's something else you'd like to see).
 
 Speaking of getting in touch, if you're interested in this topic or Archimedes more generally, be sure to:
 
