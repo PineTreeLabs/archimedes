@@ -6,7 +6,8 @@ from typing import cast
 import numpy as np
 
 from ..tree import StructConfig, field, struct
-from ._attitude import Rotation, euler_to_dcm, euler_kinematics
+from ._euler import euler_to_dcm, euler_kinematics
+from ._rotation import Rotation
 
 __all__ = [
     "RigidBody",

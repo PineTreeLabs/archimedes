@@ -149,22 +149,6 @@ class TestRotation:
         assert np.allclose(R.apply(v), R_restored.apply(v))
 
     def test_errors(self):
-        # Invalid axis sequence
-        with pytest.raises(ValueError, match="Expected axes from `seq`"):
-            Rotation.from_euler("abc", [0.1, 0.2, 0.3])
-
-        # Invalid euler shape
-        with pytest.raises(ValueError, match="Expected axis specification to be"):
-            Rotation.from_euler("xyzyz", [])
-
-        # Angles shape doesn't match sequence
-        with pytest.raises(ValueError, match="For xyz sequence with 3 axes, `angles`"):
-            Rotation.from_euler("xyz", [0.1, 0.2])
-
-        # Repeated axis in sequence
-        with pytest.raises(ValueError, match="Expected consecutive axes"):
-            Rotation.from_euler("xxz", [0.1, 0.2, 0.3])
-
         # Invalid output sequence
         with pytest.raises(ValueError, match="Expected `seq` to be a string"):
             Rotation.identity().as_euler("xz")

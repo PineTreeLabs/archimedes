@@ -17,6 +17,13 @@ __all__ = [
 ]
 
 def _check_seq(seq: str) -> bool:
+    num_axes = len(seq)
+    if num_axes < 1 or num_axes > 3:
+        raise ValueError(
+            "Expected axis specification to be a non-empty "
+            "string of upto 3 characters, got {}".format(seq)
+        )
+    
     # The following checks are verbatim from:
     # https://github.com/scipy/scipy/blob/3ead2b543df7c7c78619e20f0cb6139e344a8866/scipy/spatial/transform/_rotation_cy.pyx#L461-L476  # ruff: noqa: E501
     intrinsic = re.match(r"^[XYZ]{1,3}$", seq) is not None
@@ -33,6 +40,22 @@ def _check_seq(seq: str) -> bool:
         )
 
     return intrinsic
+
+
+def _check_angles(angles: np.ndarray, seq: str) -> np.ndarray:
+    num_axes = len(seq)
+
+    if isinstance(angles, (list, tuple)):
+        angles = np.hstack(angles)
+
+    angles = np.atleast_1d(angles)
+    if angles.shape not in [(num_axes,), (1, num_axes), (num_axes, 1)]:
+        raise ValueError(
+            f"For {seq} sequence with {num_axes} axes, `angles` must have shape "
+            f"({num_axes},), (1, {num_axes}), or ({num_axes}, 1). Got "
+            f"{angles.shape}"
+        )
+    return angles
 
 
 def _rot_x(angle: float) -> np.ndarray:
@@ -128,8 +151,9 @@ def euler_to_dcm(angles: np.ndarray, seq: str = "xyz") -> np.ndarray:
 
     # Validate angle sequence
     intrinsic = _check_seq(seq)
-    seq = seq.lower()
+    angles = _check_angles(angles, seq)
 
+    seq = seq.lower()
     if intrinsic:
         seq = seq[::-1]  # Reverse for intrinsic rotations
         angles = angles[::-1]

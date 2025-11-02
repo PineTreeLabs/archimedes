@@ -5,7 +5,7 @@ from typing import cast
 
 import numpy as np
 
-from ... import array, field, struct
+from .. import array, field, struct
 from ._quaternion import (
     dcm_to_quaternion,
     euler_to_quaternion,

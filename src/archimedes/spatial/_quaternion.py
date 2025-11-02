@@ -10,8 +10,8 @@ from typing import cast
 
 import numpy as np
 
-from ... import array
-from ._euler import _check_seq
+from .. import array
+from ._euler import _check_seq, _check_angles
 
 __all__ = [
     "euler_to_quaternion",
@@ -219,25 +219,8 @@ def euler_to_quaternion(angles: np.ndarray, seq: str = "xyz") -> np.ndarray:
         If `seq` is not a valid sequence of axes, or if the shape of `angles` does
         not match the length of `seq`.
     """
-    num_axes = len(seq)
-    if num_axes < 1 or num_axes > 3:
-        raise ValueError(
-            "Expected axis specification to be a non-empty "
-            "string of upto 3 characters, got {}".format(seq)
-        )
-
     intrinsic = _check_seq(seq)
-
-    if isinstance(angles, (list, tuple)):
-        angles = np.hstack(angles)
-
-    angles = np.atleast_1d(angles)
-    if angles.shape not in [(num_axes,), (1, num_axes), (num_axes, 1)]:
-        raise ValueError(
-            f"For {seq} sequence with {num_axes} axes, `angles` must have shape "
-            f"({num_axes},), (1, {num_axes}), or ({num_axes}, 1). Got "
-            f"{angles.shape}"
-        )
+    angles = _check_angles(angles, seq)
 
     seq = seq.lower()
     angles = angles.flatten()
