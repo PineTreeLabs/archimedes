@@ -7,6 +7,7 @@ import numpy as np
 
 from ... import array, field, struct
 from ._quaternion import (
+    dcm_to_quaternion,
     euler_to_quaternion,
     quaternion_inverse,
     quaternion_kinematics,
@@ -204,71 +205,11 @@ class Rotation:
         Rotation
             A new Rotation instance.
 
-        References
-        ----------
-        .. [1] F. Landis Markley, "Unit Quaternion from Rotation Matrix",
-               Journal of guidance, control, and dynamics vol. 31.2, pp.
-               440-442, 2008.
+        See Also
+        --------
+        dcm_to_quaternion : Low-level direction cosine matrix to quaternion conversion
         """
-        matrix = cast(np.ndarray, array(matrix))
-        if matrix.shape != (3, 3):
-            raise ValueError("Rotation matrix must be 3x3")
-
-        t = np.linalg.trace(matrix)
-
-        # If matrix[0, 0] is the largest diagonal element
-        q0 = np.hstack(
-            [
-                1 - t + 2 * matrix[0, 0],
-                matrix[0, 1] + matrix[1, 0],
-                matrix[0, 2] + matrix[2, 0],
-                matrix[2, 1] - matrix[1, 2],
-            ]
-        )
-
-        # If matrix[1, 1] is the largest diagonal element
-        q1 = np.hstack(
-            [
-                1 - t + 2 * matrix[1, 1],
-                matrix[2, 1] + matrix[1, 2],
-                matrix[0, 1] + matrix[1, 0],
-                matrix[0, 2] - matrix[2, 0],
-            ]
-        )
-
-        # If matrix[2, 2] is the largest diagonal element
-        q2 = np.hstack(
-            [
-                1 - t + 2 * matrix[2, 2],
-                matrix[0, 2] + matrix[2, 0],
-                matrix[2, 1] + matrix[1, 2],
-                matrix[1, 0] - matrix[0, 1],
-            ]
-        )
-
-        # If t is the largest diagonal element
-        q3 = np.hstack(
-            [
-                matrix[2, 1] - matrix[1, 2],
-                matrix[0, 2] - matrix[2, 0],
-                matrix[1, 0] - matrix[0, 1],
-                1 + t,
-            ]
-        )
-
-        quat = q0
-        max_val = matrix[0, 0]
-
-        quat = np.where(matrix[1, 1] >= max_val, q1, quat)
-        max_val = np.where(matrix[1, 1] >= max_val, matrix[1, 1], max_val)
-
-        quat = np.where(matrix[2, 2] >= max_val, q2, quat)
-        max_val = np.where(matrix[2, 2] >= max_val, matrix[2, 2], max_val)
-
-        quat = np.where(t >= max_val, q3, quat)
-        quat = quat / np.linalg.norm(quat)
-
-        quat = np.roll(quat, 1)  # Convert to scalar-first format
+        quat = dcm_to_quaternion(matrix)
         return cls(quat=quat, scalar_first=True)
 
     @classmethod

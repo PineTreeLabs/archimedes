@@ -6,8 +6,11 @@ arrays rather than higher-level wrapper classes.
 # ruff: noqa: N806, N803, N815
 from __future__ import annotations
 
+from typing import cast
+
 import numpy as np
 
+from ... import array
 from ._euler import _check_seq
 
 __all__ = [
@@ -91,6 +94,93 @@ def _elementary_quat_compose(
             q = quaternion_multiply(qi, q)
 
     return q
+
+
+def dcm_to_quaternion(matrix: np.ndarray) -> np.ndarray:
+    """Create a Rotation from a rotation matrix.
+
+    Note that for the sake of symbolic computation, this method assumes that
+    the input is a valid rotation matrix (orthogonal and determinant +1).
+
+    Implementation based on SciPy and reference [1]_.
+
+    Parameters
+    ----------
+    matrix : array_like, shape (3, 3)
+        Rotation matrix.
+
+    Returns
+    -------
+    np.ndarray, shape (4,)
+        Unit quaternion [q0, q1, q2, q3] corresponding to the rotation matrix,
+        where q0 is the scalar part.
+
+    References
+    ----------
+    .. [1] F. Landis Markley, "Unit Quaternion from Rotation Matrix",
+            Journal of guidance, control, and dynamics vol. 31.2, pp.
+            440-442, 2008.
+    """
+    matrix = cast(np.ndarray, array(matrix))
+    if matrix.shape != (3, 3):
+        raise ValueError("Rotation matrix must be 3x3")
+
+    t = np.linalg.trace(matrix)
+
+    # If matrix[0, 0] is the largest diagonal element
+    q0 = np.hstack(
+        [
+            1 - t + 2 * matrix[0, 0],
+            matrix[0, 1] + matrix[1, 0],
+            matrix[0, 2] + matrix[2, 0],
+            matrix[2, 1] - matrix[1, 2],
+        ]
+    )
+
+    # If matrix[1, 1] is the largest diagonal element
+    q1 = np.hstack(
+        [
+            1 - t + 2 * matrix[1, 1],
+            matrix[2, 1] + matrix[1, 2],
+            matrix[0, 1] + matrix[1, 0],
+            matrix[0, 2] - matrix[2, 0],
+        ]
+    )
+
+    # If matrix[2, 2] is the largest diagonal element
+    q2 = np.hstack(
+        [
+            1 - t + 2 * matrix[2, 2],
+            matrix[0, 2] + matrix[2, 0],
+            matrix[2, 1] + matrix[1, 2],
+            matrix[1, 0] - matrix[0, 1],
+        ]
+    )
+
+    # If t is the largest diagonal element
+    q3 = np.hstack(
+        [
+            matrix[2, 1] - matrix[1, 2],
+            matrix[0, 2] - matrix[2, 0],
+            matrix[1, 0] - matrix[0, 1],
+            1 + t,
+        ]
+    )
+
+    quat = q0
+    max_val = matrix[0, 0]
+
+    quat = np.where(matrix[1, 1] >= max_val, q1, quat)
+    max_val = np.where(matrix[1, 1] >= max_val, matrix[1, 1], max_val)
+
+    quat = np.where(matrix[2, 2] >= max_val, q2, quat)
+    max_val = np.where(matrix[2, 2] >= max_val, matrix[2, 2], max_val)
+
+    quat = np.where(t >= max_val, q3, quat)
+    quat = quat / np.linalg.norm(quat)
+
+    quat = np.roll(quat, 1)  # Convert to scalar-first format
+    return quat
 
 
 def euler_to_quaternion(angles: np.ndarray, seq: str = "xyz") -> np.ndarray:
