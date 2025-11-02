@@ -6,11 +6,11 @@ from typing import cast
 import numpy as np
 
 from ... import array, field, struct
-from ._euler import _check_seq
 from ._quaternion import (
-    _elementary_basis_index,
     euler_to_quaternion,
     quaternion_multiply,
+    quaternion_to_dcm,
+    quaternion_to_euler,
 )
 
 __all__ = ["Rotation"]
@@ -329,104 +329,19 @@ class Rotation:
         np.ndarray
             The rotation matrix as a 3x3 numpy array.
         """
-        w, x, y, z = self.quat
-        x2 = x * x
-        y2 = y * y
-        z2 = z * z
-        w2 = w * w
-        xy = x * y
-        xz = x * z
-        xw = x * w
-        yz = y * z
-        yw = y * w
-        zw = z * w
+        return quaternion_to_dcm(self.quat)
 
-        return np.array(
-            [
-                [w2 + x2 - y2 - z2, 2 * (xy - zw), 2 * (xz + yw)],
-                [2 * (xy + zw), w2 - x2 + y2 - z2, 2 * (yz - xw)],
-                [2 * (xz - yw), 2 * (yz + xw), w2 - x2 - y2 + z2],
-            ],
-            like=self.quat,
-        )
-
-    # See: https://github.com/scipy/scipy/blob/3ead2b543df7c7c78619e20f0cb6139e344a8866/scipy/spatial/transform/_rotation_cy.pyx#L774-L851  # ruff: noqa: E501
     def as_euler(self, seq: str, degrees: bool = False) -> np.ndarray:
         """Return the Euler angles from the rotation
 
         This method uses the same notation and conventions as the SciPy Rotation class.
         See the SciPy documentation and ``from_euler`` for more details.
 
-        References
-        ----------
-        .. [1] Bernardes E, Viollet S (2022) Quaternion to Euler angles
-               conversion: A direct, general and computationally efficient
-               method. PLoS ONE 17(11): e0276302.
-               https://doi.org/10.1371/journal.pone.0276302
+        See Also
+        --------
+        quaternion_to_euler : Low-level quaternion to Euler conversion function
         """
-        if len(seq) != 3:
-            raise ValueError("Expected `seq` to be a string of 3 characters")
-
-        intrinsic = _check_seq(seq)
-        seq = seq.lower()
-
-        if intrinsic:
-            seq = seq[::-1]
-
-        # Note: the sequence is "static" from a symbolic computation point of view,
-        # meaning that the indices are known at "compile-time" and all logic on indices
-        # will be evaluated in standard Python.
-        i, j, k = (_elementary_basis_index(axis) for axis in seq)
-
-        symmetric = i == k
-        if symmetric:
-            k = 6 - i - j
-
-        # 0. Check if permutation is odd or even
-        sign = (i - j) * (j - k) * (k - i) // 2
-
-        # 1. Permute quaternion components
-        q = self.as_quat(scalar_first=True)
-        if symmetric:
-            a, b, c, d = (q[0], q[i], q[j], q[k] * sign)
-        else:
-            a, b, c, d = (
-                q[0] - q[j],
-                q[i] + q[k] * sign,
-                q[j] + q[0],
-                q[k] * sign - q[i],
-            )
-
-        # 2. Compute second angle
-        angles = np.zeros(3, like=q)
-        angles[1] = 2 * np.arctan2(np.hypot(c, d), np.hypot(a, b))
-
-        # 3. Compute first and third angles
-        half_sum = np.arctan2(b, a)
-        half_diff = np.arctan2(d, c)
-
-        angles[0] = half_sum - half_diff
-        angles[2] = half_sum + half_diff
-
-        # Handle singularities
-        s_zero = abs(angles[1]) <= 1e-7
-        s_pi = abs(angles[1] - np.pi) <= 1e-7
-
-        angles[0] = np.where(s_zero, 2 * half_sum, angles[0])
-        angles[2] = np.where(s_zero, 0.0, angles[2])
-
-        angles[0] = np.where(s_pi, -2 * half_diff, angles[0])
-        angles[2] = np.where(s_pi, 0.0, angles[2])
-
-        # Tait-Bryan/asymmetric sequences
-        if not symmetric:
-            angles[2] *= sign
-            angles[1] -= np.pi / 2
-
-        if intrinsic:
-            angles = angles[::-1]
-
-        angles = (angles + np.pi) % (2 * np.pi) - np.pi
+        angles = quaternion_to_euler(self.quat, seq=seq)
 
         if degrees:
             angles = np.rad2deg(angles)

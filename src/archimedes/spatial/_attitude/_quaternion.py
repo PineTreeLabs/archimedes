@@ -7,7 +7,6 @@ arrays rather than higher-level wrapper classes.
 from __future__ import annotations
 
 import numpy as np
-from archimedes import array
 
 from ._euler import _check_seq
 
@@ -159,6 +158,9 @@ def quaternion_to_dcm(quat: np.ndarray) -> np.ndarray:
     The inverse transformation can be obtained by transposing this matrix:
     ``R_BA = R_AB.T``.
 
+    Note that this function assumes the scalar-first convention, and assumes the
+    quaternion is normalized.
+
     Parameters
     ----------
     quat : array_like, shape (4,)
@@ -170,36 +172,40 @@ def quaternion_to_dcm(quat: np.ndarray) -> np.ndarray:
     np.ndarray, shape (3, 3)
         Direction cosine matrix R_AB that transforms vectors from frame B to frame A.
     """
-    q0, q1, q2, q3 = quat
+    w, x, y, z = quat
+    x2 = x * x
+    y2 = y * y
+    z2 = z * z
+    w2 = w * w
+    xy = x * y
+    xz = x * z
+    xw = x * w
+    yz = y * z
+    yw = y * w
+    zw = z * w
 
-    R = array(
+    return np.array(
         [
-            [
-                1 - 2 * (q2**2 + q3**2),
-                2 * (q1 * q2 - q0 * q3),
-                2 * (q1 * q3 + q0 * q2),
-            ],
-            [
-                2 * (q1 * q2 + q0 * q3),
-                1 - 2 * (q1**2 + q3**2),
-                2 * (q2 * q3 - q0 * q1),
-            ],
-            [
-                2 * (q1 * q3 - q0 * q2),
-                2 * (q2 * q3 + q0 * q1),
-                1 - 2 * (q1**2 + q2**2),
-            ],
-        ]
+            [w2 + x2 - y2 - z2, 2 * (xy - zw), 2 * (xz + yw)],
+            [2 * (xy + zw), w2 - x2 + y2 - z2, 2 * (yz - xw)],
+            [2 * (xz - yw), 2 * (yz + xw), w2 - x2 - y2 + z2],
+        ],
+        like=quat,
     )
-    return R
 
 
-def quaternion_to_euler(quat: np.ndarray, seq: str = "xyz") -> np.ndarray:
+# See: https://github.com/scipy/scipy/blob/3ead2b543df7c7c78619e20f0cb6139e344a8866/scipy/spatial/transform/_rotation_cy.pyx#L774-L851  # ruff: noqa: E501
+def quaternion_to_euler(q: np.ndarray, seq: str = "xyz") -> np.ndarray:
     """Convert unit quaternion to roll-pitch-yaw Euler angles.
+
+    This method uses the same notation and conventions as the SciPy Rotation class.
+    See the SciPy documentation and :py:func:`euler_to_quaternion` for more details.
+
+    The algorithm is based on the method described in [1]_ as implemented in SciPy.
 
     Parameters
     ----------
-    quat : array_like, shape (4,)
+    q : array_like, shape (4,)
         Unit quaternion representing rotation, in the format [q0, q1, q2, q3]
         where q0 is the scalar part.
     seq : str, optional
@@ -208,9 +214,79 @@ def quaternion_to_euler(quat: np.ndarray, seq: str = "xyz") -> np.ndarray:
     Returns
     -------
     np.ndarray, shape (3,)
-        Roll-pitch-yaw Euler angles corresponding to the quaternion.
+        Euler angle sequence corresponding to the quaternion.
+
+    References
+    ----------
+    .. [1] Bernardes E, Viollet S (2022) Quaternion to Euler angles
+            conversion: A direct, general and computationally efficient
+            method. PLoS ONE 17(11): e0276302.
+            https://doi.org/10.1371/journal.pone.0276302
     """
-    raise NotImplementedError("quat_to_euler is not yet implemented.")
+    if len(seq) != 3:
+        raise ValueError("Expected `seq` to be a string of 3 characters")
+
+    intrinsic = _check_seq(seq)
+    seq = seq.lower()
+
+    if intrinsic:
+        seq = seq[::-1]
+
+    # Note: the sequence is "static" from a symbolic computation point of view,
+    # meaning that the indices are known at "compile-time" and all logic on indices
+    # will be evaluated in standard Python.
+    i, j, k = (_elementary_basis_index(axis) for axis in seq)
+
+    symmetric = i == k
+    if symmetric:
+        k = 6 - i - j
+
+    # 0. Check if permutation is odd or even
+    sign = (i - j) * (j - k) * (k - i) // 2
+
+    # 1. Permute quaternion components
+    if symmetric:
+        a, b, c, d = (q[0], q[i], q[j], q[k] * sign)
+    else:
+        a, b, c, d = (
+            q[0] - q[j],
+            q[i] + q[k] * sign,
+            q[j] + q[0],
+            q[k] * sign - q[i],
+        )
+
+    # 2. Compute second angle
+    angles = np.zeros(3, like=q)
+    angles[1] = 2 * np.arctan2(np.hypot(c, d), np.hypot(a, b))
+
+    # 3. Compute first and third angles
+    half_sum = np.arctan2(b, a)
+    half_diff = np.arctan2(d, c)
+
+    angles[0] = half_sum - half_diff
+    angles[2] = half_sum + half_diff
+
+    # Handle singularities
+    s_zero = abs(angles[1]) <= 1e-7
+    s_pi = abs(angles[1] - np.pi) <= 1e-7
+
+    angles[0] = np.where(s_zero, 2 * half_sum, angles[0])
+    angles[2] = np.where(s_zero, 0.0, angles[2])
+
+    angles[0] = np.where(s_pi, -2 * half_diff, angles[0])
+    angles[2] = np.where(s_pi, 0.0, angles[2])
+
+    # Tait-Bryan/asymmetric sequences
+    if not symmetric:
+        angles[2] *= sign
+        angles[1] -= np.pi / 2
+
+    if intrinsic:
+        angles = angles[::-1]
+
+    angles = (angles + np.pi) % (2 * np.pi) - np.pi
+
+    return angles
 
 
 def quaternion_kinematics(quat: np.ndarray, omega: np.ndarray) -> np.ndarray:
