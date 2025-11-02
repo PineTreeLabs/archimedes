@@ -11,8 +11,9 @@ from ._euler import (
 from ._quaternion import (
     dcm_to_quaternion,
     euler_to_quaternion,
-    quaternion_multiply,
+    quaternion_inverse,
     quaternion_kinematics,
+    quaternion_multiply,
     quaternion_to_dcm,
     quaternion_to_euler,
 )
@@ -23,6 +24,7 @@ __all__ = [
     "euler_kinematics",
     "euler_to_dcm",
     "euler_to_quaternion",
+    "quaternion_inverse",
     "quaternion_kinematics",
     "quaternion_multiply",
     "quaternion_to_dcm",
