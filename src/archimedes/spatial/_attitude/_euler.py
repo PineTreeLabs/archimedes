@@ -14,7 +14,6 @@ from archimedes import array
 __all__ = [
     "euler_kinematics",
     "euler_to_dcm",
-    "euler_to_quat",
 ]
 
 def _check_seq(seq: str) -> bool:
@@ -152,25 +151,6 @@ def euler_to_dcm(angles: np.ndarray, seq: str = "xyz") -> np.ndarray:
                 R = _rot_z(angle) @ R
 
     return R
-
-
-def euler_to_quat(angles: np.ndarray, seq: str = "xyz") -> np.ndarray:
-    """Convert Euler angles to quaternion.
-
-    Parameters
-    ----------
-    angles : array_like
-        Euler angles in radians. Shape must match the length of ``seq``.
-    seq : str, optional
-        Sequence of axes for Euler angles (up to length 3).  Each character must be one
-        of 'x', 'y', 'z' (extrinsic) or 'X', 'Y', 'Z' (intrinsic).  Default is 'xyz'.
-
-    Returns
-    -------
-    np.ndarray, shape (4,)
-        Quaternion [w, x, y, z] representing the same rotation as the input Euler angles.
-    """
-    raise NotImplementedError("euler_to_quat is not yet implemented.")
 
 
 def euler_kinematics(rpy: np.ndarray, inverse: bool = False) -> np.ndarray:

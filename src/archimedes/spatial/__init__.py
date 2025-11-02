@@ -8,14 +8,22 @@ from ._attitude import (
     Rotation,
     euler_kinematics,
     euler_to_dcm,
-    quat_to_dcm,
+    euler_to_quat,
+    quaternion_kinematics,
+    quaternion_multiply,
+    quaternion_to_dcm,
+    quaternion_to_euler,
 )
 
 
 __all__ = [
     "euler_kinematics",
     "euler_to_dcm",
-    "quat_to_dcm",
+    "euler_to_quat",
+    "quaternion_kinematics",
+    "quaternion_multiply",
+    "quaternion_to_dcm",
+    "quaternion_to_euler",
     "Rotation",
     "RigidBody",
     "RigidBodyConfig",

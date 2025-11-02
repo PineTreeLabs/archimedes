@@ -7,62 +7,13 @@ import numpy as np
 
 from ... import array, field, struct
 from ._euler import _check_seq
+from ._quaternion import (
+    _elementary_basis_index,
+    euler_to_quaternion,
+    quaternion_multiply,
+)
 
 __all__ = ["Rotation"]
-
-
-def _normalize(q):
-    return q / np.linalg.norm(q)
-
-
-def _compose_quat(q1, q2):
-    """
-    Multiply two quaternions q1 = [w1, x1, y1, z1] and q2 = [w2, x2, y2, z2]
-    """
-    w1, x1, y1, z1 = q1
-    w2, x2, y2, z2 = q2
-
-    return np.array(
-        [
-            w1 * w2 - x1 * x2 - y1 * y2 - z1 * z2,
-            w1 * x2 + x1 * w2 + y1 * z2 - z1 * y2,
-            w1 * y2 - x1 * z2 + y1 * w2 + z1 * x2,
-            w1 * z2 + x1 * y2 - y1 * x2 + z1 * w2,
-        ],
-        like=q1,
-    )
-
-
-def _elementary_basis_index(axis: str) -> int:
-    return {"x": 1, "y": 2, "z": 3}[axis.lower()]
-
-
-# See https://github.com/scipy/scipy/blob/3ead2b543df7c7c78619e20f0cb6139e344a8866/scipy/spatial/transform/_rotation_cy.pyx#L358-L372  # ruff: noqa: E501
-def _make_elementary_quat(axis: str, angle: float) -> np.ndarray:
-    """Create a quaternion representing a rotation about a principal axis."""
-
-    quat = np.hstack([np.cos(angle / 2), np.zeros(3)])
-    axis_idx = _elementary_basis_index(axis)
-    quat[axis_idx] = np.sin(angle / 2)
-
-    return quat
-
-
-# See https://github.com/scipy/scipy/blob/3ead2b543df7c7c78619e20f0cb6139e344a8866/scipy/spatial/transform/_rotation_cy.pyx#L376-L391  # ruff: noqa: E501
-def _elementary_quat_compose(
-    seq: str, angles: np.ndarray, intrinsic: bool
-) -> np.ndarray:
-    """Create a quaternion from a sequence of elementary rotations."""
-    q = _make_elementary_quat(seq[0], angles[0])
-
-    for idx in range(1, len(seq)):
-        qi = _make_elementary_quat(seq[idx], angles[idx])
-        if intrinsic:
-            q = _compose_quat(q, qi)
-        else:
-            q = _compose_quat(qi, q)
-
-    return q
 
 
 @struct
@@ -231,7 +182,7 @@ class Rotation:
             raise ValueError("Quaternion must have shape (4,), (1, 4), or (4, 1)")
         quat = quat.flatten()
         if normalize:
-            quat = _normalize(quat)
+            quat = quat / np.linalg.norm(quat)
         return cls(quat=quat, scalar_first=scalar_first)
 
     @classmethod
@@ -313,7 +264,7 @@ class Rotation:
         max_val = np.where(matrix[2, 2] >= max_val, matrix[2, 2], max_val)
 
         quat = np.where(t >= max_val, q3, quat)
-        quat = _normalize(quat)
+        quat = quat / np.linalg.norm(quat)
 
         quat = np.roll(quat, 1)  # Convert to scalar-first format
         return cls(quat=quat, scalar_first=True)
@@ -323,15 +274,6 @@ class Rotation:
         cls, seq: str, angles: np.ndarray, degrees: bool = False
     ) -> Rotation:
         """Create a Rotation from Euler angles.
-
-        This method uses the same notation and conventions as the SciPy Rotation class.
-        See the SciPy documentation for more details.  Some common examples:
-
-        - 'xyz': Extrinsic rotations about x, then y, then z axes (classical roll,
-          pitch, yaw sequence)
-        - 'ZXZ': Rotation from perifocal (Ω, i, ω) frame (right ascension of ascending
-          node, inclination, argument of perigee) used by Kepler orbital elements to
-          ECI (Earth-Centered Inertial) frame
 
         Parameters
         ----------
@@ -352,40 +294,14 @@ class Rotation:
         Rotation
             A new Rotation instance.
 
-        Raises
-        ------
-        ValueError
-            If `seq` is not a valid sequence of axes, or if the shape of `angles` does
-            not match the length of `seq`.
+        See Also
+        --------
+        euler_to_quaternion : Low-level Euler to quaternion conversion function
         """
-        num_axes = len(seq)
-        if num_axes < 1 or num_axes > 3:
-            raise ValueError(
-                "Expected axis specification to be a non-empty "
-                "string of upto 3 characters, got {}".format(seq)
-            )
-
-        intrinsic = _check_seq(seq)
-
-        if isinstance(angles, (list, tuple)):
-            angles = np.hstack(angles)
-
-        angles = np.atleast_1d(angles)
-        if angles.shape not in [(num_axes,), (1, num_axes), (num_axes, 1)]:
-            raise ValueError(
-                f"For {seq} sequence with {num_axes} axes, `angles` must have shape "
-                f"({num_axes},), (1, {num_axes}), or ({num_axes}, 1). Got "
-                f"{angles.shape}"
-            )
-
-        seq = seq.lower()
-        angles = angles.flatten()
-
         if degrees:
             angles = np.deg2rad(angles)
-
-        quat = _elementary_quat_compose(seq, angles, intrinsic=intrinsic)
-        return cls(quat=quat, scalar_first=True)
+        quat = euler_to_quaternion(angles, seq=seq)
+        return cls.from_quat(quat, scalar_first=True)
 
     def as_quat(self, scalar_first: bool = True) -> np.ndarray:
         """Return the quaternion as a numpy array.
@@ -558,7 +474,7 @@ class Rotation:
         """Compose this rotation with another rotation"""
         q1 = self.as_quat(scalar_first=True)
         q2 = other.as_quat(scalar_first=True)
-        q = _compose_quat(q1, q2)
+        q = quaternion_multiply(q1, q2)
         return Rotation.from_quat(q, scalar_first=True, normalize=normalize)
 
     def __mul__(self, other: Rotation) -> Rotation:
@@ -601,7 +517,7 @@ class Rotation:
         """
         q = self.as_quat(scalar_first=True)
         omega = np.array([0, *w], like=q)
-        q_dot = 0.5 * _compose_quat(q, omega)
+        q_dot = 0.5 * quaternion_multiply(q, omega)
 
         # Baumgarte stabilization to enforce unit norm constraint
         if baumgarte > 0:
