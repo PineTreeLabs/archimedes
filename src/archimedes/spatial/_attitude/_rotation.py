@@ -8,6 +8,8 @@ import numpy as np
 from ... import array, field, struct
 from ._quaternion import (
     euler_to_quaternion,
+    quaternion_inverse,
+    quaternion_kinematics,
     quaternion_multiply,
     quaternion_to_dcm,
     quaternion_to_euler,
@@ -382,7 +384,7 @@ class Rotation:
     def inv(self) -> Rotation:
         """Return the inverse rotation"""
         q = self.as_quat(scalar_first=True)
-        q_inv = np.array([q[0], -q[1], -q[2], -q[3]], like=q)
+        q_inv = quaternion_inverse(q)
         return Rotation.from_quat(q_inv, scalar_first=True)
 
     def mul(self, other: Rotation, normalize: bool = False) -> Rotation:
@@ -396,7 +398,7 @@ class Rotation:
         """Compose this rotation with another rotation"""
         return self.mul(other, normalize=True)
 
-    def derivative(self, w: np.ndarray, baumgarte: float = 0.0) -> Rotation:
+    def derivative(self, w: np.ndarray, baumgarte: float | None = None) -> Rotation:
         """Return the time derivative of the rotation given angular velocity w.
 
         Note that if the rotation represents the attitude of a body B relative to a
@@ -431,11 +433,5 @@ class Rotation:
             The time derivative of the rotation represented as a Rotation instance.
         """
         q = self.as_quat(scalar_first=True)
-        omega = np.array([0, *w], like=q)
-        q_dot = 0.5 * quaternion_multiply(q, omega)
-
-        # Baumgarte stabilization to enforce unit norm constraint
-        if baumgarte > 0:
-            q_dot -= baumgarte * (np.dot(q, q) - 1) * q
-
+        q_dot = quaternion_kinematics(q, w, baumgarte=baumgarte)
         return Rotation.from_quat(q_dot, scalar_first=True, normalize=False)

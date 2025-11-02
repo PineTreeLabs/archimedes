@@ -11,11 +11,20 @@ import numpy as np
 from ._euler import _check_seq
 
 __all__ = [
+    "euler_to_quaternion",
+    "quaternion_inverse",
     "quaternion_kinematics",
     "quaternion_multiply",
     "quaternion_to_dcm",
     "quaternion_to_euler",
 ]
+
+
+def quaternion_inverse(q):
+    """
+    Inverse of a quaternion q = [w, x, y, z]
+    """
+    return np.array([q[0], -q[1], -q[2], -q[3]], like=q)
 
 
 def quaternion_multiply(q1: np.ndarray, q2: np.ndarray) -> np.ndarray:
@@ -289,20 +298,44 @@ def quaternion_to_euler(q: np.ndarray, seq: str = "xyz") -> np.ndarray:
     return angles
 
 
-def quaternion_kinematics(quat: np.ndarray, omega: np.ndarray) -> np.ndarray:
+def quaternion_kinematics(
+    q: np.ndarray, w: np.ndarray, baumgarte: float | None = None
+) -> np.ndarray:
     """Quaternion kinematical equations
+
+    If the rotation represents the attitude of a body B relative to a
+    frame A, then w should be the body relative angular velocity, i.e. ω_B.
+
+    The derivative is computed using quaternion kinematics:
+        dq/dt = 0.5 * q ⊗ [0, ω]
+    where ⊗ is the quaternion multiplication operator.
+
+    The method optionally support Baumgarte stabilization to preserve
+    unit normalization.  For a stabilization factor λ, the full
+    time derivative is:
+        dq/dt = 0.5 * q ⊗ [0, ω] - λ * (||q||² - 1) * q
 
     Parameters
     ----------
-    quat : array_like, shape (4,)
+    q : array_like, shape (4,)
         Unit quaternion representing rotation, in the format [q0, q1, q2, q3]
         where q0 is the scalar part.
-    omega : array_like, shape (3,)
-        Angular velocity vector [P, Q, R] in body frame.
+    w : array_like, shape (3,)
+        Angular velocity vector in body frame.
+    baumgarte : float, optional
+        Baumgarte stabilization factor. If not None, Baumgarte stabilization is
+        applied to enforce unit norm constraint. Default is None (no stabilization).
 
     Returns
     -------
     np.ndarray, shape (4,)
         Time derivative of the quaternion.
     """
-    raise NotImplementedError("quat_kinematics is not yet implemented.")
+    omega = np.array([0, *w], like=q)
+    q_dot = 0.5 * quaternion_multiply(q, omega)
+
+    # Baumgarte stabilization to enforce unit norm constraint
+    if baumgarte is not None:
+        q_dot -= baumgarte * (np.dot(q, q) - 1) * q
+
+    return q_dot
