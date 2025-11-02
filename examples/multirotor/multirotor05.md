@@ -512,7 +512,7 @@ phi_trim = p_trim[0]
 theta_trim = p_trim[1]
 u_trim = p_trim[2:]
 
-R_BN = euler_to_dcm(np.array([phi_trim, theta_trim, 0.0]))
+R_BN = euler_to_dcm(np.array([phi_trim, theta_trim, 0.0])).T
 v_B_trim = R_BN @ v_N
 
 print(f"roll: {np.rad2deg(phi_trim):.2f} deg")

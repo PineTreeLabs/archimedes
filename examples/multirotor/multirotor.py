@@ -351,7 +351,7 @@ class MultiRotorVehicle:
     def state(self, pos, rpy, vel, w_B, aux=None, inertial_velocity=False) -> State:
         if self.rigid_body.rpy_attitude:
             att = rpy
-            R_BN = euler_to_dcm(rpy)
+            R_BN = euler_to_dcm(rpy).T
         else:
             att = Rotation.from_euler("xyz", rpy)
             R_BN = att.as_matrix().T
@@ -400,7 +400,7 @@ class MultiRotorVehicle:
         Fdrag_B, Mdrag_B = self.drag_model(t, x)
 
         if self.rigid_body.rpy_attitude:
-            R_BN = euler_to_dcm(x.att)
+            R_BN = euler_to_dcm(x.att).T
             Fgravity_B = R_BN @ Fgravity_N
 
         else:

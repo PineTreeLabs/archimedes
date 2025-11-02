@@ -6,7 +6,7 @@ from typing import cast
 import numpy as np
 
 from ... import array, field, struct
-from ._lowlevel import _check_euler_seq
+from ._euler import _check_seq
 
 __all__ = ["Rotation"]
 
@@ -365,7 +365,7 @@ class Rotation:
                 "string of upto 3 characters, got {}".format(seq)
             )
 
-        intrinsic = _check_euler_seq(seq)
+        intrinsic = _check_seq(seq)
 
         if isinstance(angles, (list, tuple)):
             angles = np.hstack(angles)
@@ -451,7 +451,7 @@ class Rotation:
         if len(seq) != 3:
             raise ValueError("Expected `seq` to be a string of 3 characters")
 
-        intrinsic = _check_euler_seq(seq)
+        intrinsic = _check_seq(seq)
         seq = seq.lower()
 
         if intrinsic:

@@ -6,15 +6,17 @@ from ._rigid_body import (
 )
 from ._attitude import (
     Rotation,
-    euler_to_dcm,
     euler_kinematics,
+    euler_to_dcm,
+    quat_to_dcm,
 )
 
 
 __all__ = [
+    "euler_kinematics",
+    "euler_to_dcm",
+    "quat_to_dcm",
     "Rotation",
     "RigidBody",
     "RigidBodyConfig",
-    "euler_kinematics",
-    "euler_to_dcm",
 ]

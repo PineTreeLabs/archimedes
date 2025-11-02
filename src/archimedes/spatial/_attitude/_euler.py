@@ -1,4 +1,4 @@
-"""Low-level utilities for rotation representations.
+"""Low-level functions for Euler angles.
 
 These functions are for conversions and kinematics and operate directly on
 arrays rather than higher-level wrapper classes.
@@ -11,8 +11,13 @@ import re
 import numpy as np
 from archimedes import array
 
+__all__ = [
+    "euler_kinematics",
+    "euler_to_dcm",
+    "euler_to_quat",
+]
 
-def _check_euler_seq(seq: str) -> bool:
+def _check_seq(seq: str) -> bool:
     # The following checks are verbatim from:
     # https://github.com/scipy/scipy/blob/3ead2b543df7c7c78619e20f0cb6139e344a8866/scipy/spatial/transform/_rotation_cy.pyx#L461-L476  # ruff: noqa: E501
     intrinsic = re.match(r"^[XYZ]{1,3}$", seq) is not None
@@ -39,8 +44,8 @@ def _rot_x(angle: float) -> np.ndarray:
     R = array(
         [
             [1.0, 0.0, 0.0],
-            [0.0, c, s],
-            [0.0, -s, c],
+            [0.0, c, -s],
+            [0.0, s, c],
         ]
     )
     return R
@@ -53,9 +58,9 @@ def _rot_y(angle: float) -> np.ndarray:
 
     R = array(
         [
-            [c, 0.0, -s],
+            [c, 0.0, s],
             [0.0, 1.0, 0.0],
-            [s, 0.0, c],
+            [-s, 0.0, c],
         ]
     )
     return R
@@ -68,23 +73,31 @@ def _rot_z(angle: float) -> np.ndarray:
 
     R = array(
         [
-            [c, s, 0.0],
-            [-s, c, 0.0],
+            [c, -s, 0.0],
+            [s, c, 0.0],
             [0.0, 0.0, 1.0],
         ]
     )
     return R
 
 
-def euler_to_dcm(
-    rpy: np.ndarray, seq: str = "xyz", transpose: bool = False
-) -> np.ndarray:
-    """Returns matrix to transform from inertial to body frame (R_BN).
+def euler_to_dcm(angles: np.ndarray, seq: str = "xyz") -> np.ndarray:
+    """Direction cosine matrix from Euler angles
 
-    If transpose=True, returns matrix to transform from body to inertial frame (R_NB).
+    If the Euler angles represent the attitude of a body B relative to a frame A,
+    then this function by default returns the matrix R_AB that transforms vectors from
+    frame B to frame A.  Specifically, for a vector v_B expressed in frame B,
+    the corresponding vector in frame A is given by ``v_A = R_AB @ v_B``.
+    
+    The inverse transformation can be obtained by transposing this matrix:
+    ``R_BA = R_AB.T``.
 
-    This is the direction cosine matrix (DCM) corresponding to the given
-    roll-pitch-yaw (rpy) angles.  This follows the standard aerospace
+    By default, the Euler angle sequence is assumed to follow the standard aerospace
+    convention of an extrinsic roll-pitch-yaw sequence ("xyz").  However, it supports
+    arbitrary sequences of non-repeating axes up to length 3. Both intrinsic
+    (uppercase letters) and extrinsic (lowercase letters) sequences are supported.
+    
+    This follows the standard aerospace
     convention and corresponds to the "xyz" sequence when using the
     :py:class:`Rotation` class.  However, by default this function returns the inverse
     of the rotation implemented by :py:meth:`Rotation.apply`.  Specifically, the
@@ -92,8 +105,8 @@ def euler_to_dcm(
 
     .. code-block:: python
 
-        R_BN = euler_to_dcm(rpy)
-        R_BN = Rotation.from_euler('xyz', rpy).inv().as_matrix()
+        R_NB = euler_to_dcm(rpy, seq='xyz')
+        R_NB = Rotation.from_euler('xyz', rpy).as_matrix()
 
     In general, the ``Rotation`` class should be preferred over Euler representations,
     although Euler angles are used in some special cases (e.g. stability analysis).
@@ -102,24 +115,25 @@ def euler_to_dcm(
 
     Parameters
     ----------
-    rpy : array_like, shape (3,)
-        Roll, pitch, yaw angles in radians.
-    transpose : bool, optional
-        If True, returns the transpose of the DCM.  Default is False.
+    angles : array_like
+        Euler angles in radians. Shape must match the length of ``seq``.
+    seq : str, optional
+        Sequence of axes for Euler angles (up to length 3).  Each character must be one
+        of 'x', 'y', 'z' (extrinsic) or 'X', 'Y', 'Z' (intrinsic).  Default is 'xyz'.
 
     Returns
     -------
     np.ndarray, shape (3, 3)
-        Direction cosine matrix R_BN (or R_NB if transpose=True).
+        Direction cosine matrix R_AB that transforms vectors from frame B to frame A.
     """
-    r, p, y = rpy[0], rpy[1], rpy[2]
 
     # Validate angle sequence
-    intrinsic = _check_euler_seq(seq)
+    intrinsic = _check_seq(seq)
     seq = seq.lower()
 
     if intrinsic:
         seq = seq[::-1]  # Reverse for intrinsic rotations
+        angles = angles[::-1]
 
     # Note that this approach of building the DCM by composing
     # elemental rotations is usually slower than the direct formula,
@@ -127,20 +141,36 @@ def euler_to_dcm(
     # symbolic arrays there is no difference in speed because the
     # multiplications are not actually carried out until after the
     # full matrix is built.
-    R = np.eye(3, like=rpy)
-    for char in seq:
+    R = np.eye(3, like=angles)
+    for (char, angle) in zip(seq, angles):
         match char:
             case "x":
-                R = R @ _rot_x(r)
+                R = _rot_x(angle) @ R
             case "y":
-                R = R @ _rot_y(p)
+                R = _rot_y(angle) @ R
             case "z":
-                R = R @ _rot_z(y)
-
-    if transpose:
-        R = R.T
+                R = _rot_z(angle) @ R
 
     return R
+
+
+def euler_to_quat(angles: np.ndarray, seq: str = "xyz") -> np.ndarray:
+    """Convert Euler angles to quaternion.
+
+    Parameters
+    ----------
+    angles : array_like
+        Euler angles in radians. Shape must match the length of ``seq``.
+    seq : str, optional
+        Sequence of axes for Euler angles (up to length 3).  Each character must be one
+        of 'x', 'y', 'z' (extrinsic) or 'X', 'Y', 'Z' (intrinsic).  Default is 'xyz'.
+
+    Returns
+    -------
+    np.ndarray, shape (4,)
+        Quaternion [w, x, y, z] representing the same rotation as the input Euler angles.
+    """
+    raise NotImplementedError("euler_to_quat is not yet implemented.")
 
 
 def euler_kinematics(rpy: np.ndarray, inverse: bool = False) -> np.ndarray:
@@ -153,6 +183,8 @@ def euler_kinematics(rpy: np.ndarray, inverse: bool = False) -> np.ndarray:
 
     If inverse=True, it returns a matrix H(𝚽)^-1 such that
         ω = H(𝚽)^-1 * d𝚽/dt.
+
+    This function supports _only_ the extrinsic roll-pitch-yaw sequence ("xyz").
 
     Parameters
     ----------

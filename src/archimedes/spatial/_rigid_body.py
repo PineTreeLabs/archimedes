@@ -159,8 +159,8 @@ class RigidBody:
             rpy = cast(np.ndarray, x.att)
 
             # Convert roll-pitch-yaw (rpy) orientation to the direction cosine matrix.
-            # R_BN rotates from the Newtonian frame N to the body frame B.
-            R_BN = euler_to_dcm(rpy)
+            # R_NB rotates from the body frame B to the Newtonian frame N.
+            R_NB = euler_to_dcm(rpy)
 
             # Transform roll-pitch-yaw rates in the body frame to time derivatives of
             # Euler angles - Euler kinematic equations
@@ -170,7 +170,7 @@ class RigidBody:
             att_deriv = H @ x.w_B
 
             # Time derivative of position in Newtonian frame N
-            dp_N = R_BN.T @ x.v_B
+            dp_N = R_NB.T @ x.v_B
 
         else:
             att = cast(Rotation, x.att)

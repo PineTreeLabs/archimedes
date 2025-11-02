@@ -121,7 +121,7 @@ class SubsonicF16:
     def calc_gravity(self, x: State):
         F_grav_N = self.m * self.gravity(x.p_N)
         if self.rigid_body.rpy_attitude:
-            F_grav_B = euler_to_dcm(x.att) @ F_grav_N
+            F_grav_B = euler_to_dcm(x.att).T @ F_grav_N
         else:
             F_grav_B = x.att.apply(F_grav_N, inverse=True)
         return F_grav_B

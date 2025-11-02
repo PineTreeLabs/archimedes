@@ -92,7 +92,7 @@ class TestVehicleDynamics:
         att = Rotation.from_euler("xyz", rpy)
 
         # Could do att.apply(v_B) but this tests euler_to_dcm
-        R_NB = euler_to_dcm(rpy, transpose=True)
+        R_NB = euler_to_dcm(rpy)
         v_N = R_NB @ v_B
 
         t = 0
