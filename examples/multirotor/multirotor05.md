@@ -308,7 +308,7 @@ import numpy as np
 
 import archimedes as arc
 from archimedes.spatial import (
-    Rotation, euler_kinematics, dcm_from_euler
+    Rotation, euler_kinematics, euler_to_dcm
 )
 ```
 
@@ -512,7 +512,7 @@ phi_trim = p_trim[0]
 theta_trim = p_trim[1]
 u_trim = p_trim[2:]
 
-R_BN = dcm_from_euler(np.array([phi_trim, theta_trim, 0.0]))
+R_BN = euler_to_dcm(np.array([phi_trim, theta_trim, 0.0]))
 v_B_trim = R_BN @ v_N
 
 print(f"roll: {np.rad2deg(phi_trim):.2f} deg")

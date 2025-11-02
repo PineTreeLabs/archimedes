@@ -12,7 +12,7 @@ from multirotor import (
 )
 
 import archimedes as arc
-from archimedes.spatial import RigidBody, euler_kinematics, dcm_from_euler
+from archimedes.spatial import RigidBody, euler_kinematics, euler_to_dcm
 
 m = 1.7  # Arbitrary mass
 g0 = 9.81
@@ -441,7 +441,7 @@ class TestTrimStability:
         npt.assert_allclose(theta_trim, 0.0, atol=1e-6)
         npt.assert_allclose(u_trim, u_trim_ex, atol=1e-6)
 
-        R_BN = dcm_from_euler(np.array([phi_trim, theta_trim, 0.0]))
+        R_BN = euler_to_dcm(np.array([phi_trim, theta_trim, 0.0]))
         v_B_trim = R_BN @ v_N
 
         #

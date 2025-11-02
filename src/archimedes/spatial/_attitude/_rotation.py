@@ -1,12 +1,12 @@
 # ruff: noqa: N806, N803
 from __future__ import annotations
 
-import re
 from typing import cast
 
 import numpy as np
 
-from .. import array, field, struct
+from ... import array, field, struct
+from ._lowlevel import _check_euler_seq
 
 __all__ = ["Rotation"]
 
@@ -31,25 +31,6 @@ def _compose_quat(q1, q2):
         ],
         like=q1,
     )
-
-
-def _check_seq(seq: str) -> bool:
-    # The following checks are verbatim from:
-    # https://github.com/scipy/scipy/blob/3ead2b543df7c7c78619e20f0cb6139e344a8866/scipy/spatial/transform/_rotation_cy.pyx#L461-L476  # ruff: noqa: E501
-    intrinsic = re.match(r"^[XYZ]{1,3}$", seq) is not None
-    extrinsic = re.match(r"^[xyz]{1,3}$", seq) is not None
-    if not (intrinsic or extrinsic):
-        raise ValueError(
-            "Expected axes from `seq` to be from ['x', 'y', "
-            "'z'] or ['X', 'Y', 'Z'], got {}".format(seq)
-        )
-
-    if any(seq[i] == seq[i + 1] for i in range(len(seq) - 1)):
-        raise ValueError(
-            "Expected consecutive axes to be different, got {}".format(seq)
-        )
-
-    return intrinsic
 
 
 def _elementary_basis_index(axis: str) -> int:
@@ -213,7 +194,7 @@ class Rotation:
     --------
     scipy.spatial.transform.Rotation : Similar class in SciPy
     RigidBody : Rigid body dynamics using this Rotation class
-    dcm_from_euler : Directly calculate rotation matrix from roll-pitch-yaw angles
+    euler_to_dcm : Directly calculate rotation matrix from roll-pitch-yaw angles
     euler_kinematics : Transform roll-pitch-yaw rates to body-frame angular velocity
 
     """
@@ -384,7 +365,7 @@ class Rotation:
                 "string of upto 3 characters, got {}".format(seq)
             )
 
-        intrinsic = _check_seq(seq)
+        intrinsic = _check_euler_seq(seq)
 
         if isinstance(angles, (list, tuple)):
             angles = np.hstack(angles)
@@ -470,7 +451,7 @@ class Rotation:
         if len(seq) != 3:
             raise ValueError("Expected `seq` to be a string of 3 characters")
 
-        intrinsic = _check_seq(seq)
+        intrinsic = _check_euler_seq(seq)
         seq = seq.lower()
 
         if intrinsic:

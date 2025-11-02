@@ -8,7 +8,7 @@ from archimedes.spatial import (
     RigidBody,
     RigidBodyConfig,
     Rotation,
-    dcm_from_euler,
+    euler_to_dcm,
     euler_kinematics,
 )
 
@@ -91,8 +91,8 @@ class TestVehicleDynamics:
 
         att = Rotation.from_euler("xyz", rpy)
 
-        # Could do att.apply(v_B) but this tests dcm_from_euler
-        R_NB = dcm_from_euler(rpy, transpose=True)
+        # Could do att.apply(v_B) but this tests euler_to_dcm
+        R_NB = euler_to_dcm(rpy, transpose=True)
         v_N = R_NB @ v_B
 
         t = 0

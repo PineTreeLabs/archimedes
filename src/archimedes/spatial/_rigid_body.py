@@ -6,139 +6,12 @@ from typing import cast
 import numpy as np
 
 from ..tree import StructConfig, field, struct
-from ._rotation import Rotation
+from ._attitude import Rotation, euler_to_dcm, euler_kinematics
 
 __all__ = [
     "RigidBody",
     "RigidBodyConfig",
-    "euler_kinematics",
-    "dcm_from_euler",
 ]
-
-
-def dcm_from_euler(rpy: np.ndarray, transpose: bool = False) -> np.ndarray:
-    """Returns matrix to transform from inertial to body frame (R_BN).
-
-    If transpose=True, returns matrix to transform from body to inertial frame (R_NB).
-
-    This is the direction cosine matrix (DCM) corresponding to the given
-    roll-pitch-yaw (rpy) angles.  This follows the standard aerospace
-    convention and corresponds to the "xyz" sequence when using the
-    :py:class:`Rotation` class.  However, by default this function returns the inverse
-    of the rotation implemented by :py:meth:`Rotation.apply`.  Specifically, the
-    following will generate equivalent DCMs:
-
-    .. code-block:: python
-
-        R_BN = dcm_from_euler(rpy)
-        R_BN = Rotation.from_euler('xyz', rpy).inv().as_matrix()
-
-    In general, the ``Rotation`` class should be preferred over Euler representations,
-    although Euler angles are used in some special cases (e.g. stability analysis).
-    In these cases, this function gives a more direct calculation of the
-    transformation matrix without converting to the intermediate quaternion.
-
-    Parameters
-    ----------
-    rpy : array_like, shape (3,)
-        Roll, pitch, yaw angles in radians.
-    transpose : bool, optional
-        If True, returns the transpose of the DCM.  Default is False.
-
-    Returns
-    -------
-    np.ndarray, shape (3, 3)
-        Direction cosine matrix R_BN (or R_NB if transpose=True).
-    """
-    φ, θ, ψ = rpy[0], rpy[1], rpy[2]
-
-    sφ, cφ = np.sin(φ), np.cos(φ)
-    sθ, cθ = np.sin(θ), np.cos(θ)
-    sψ, cψ = np.sin(ψ), np.cos(ψ)
-
-    R = np.array(
-        [
-            [cθ * cψ, cθ * sψ, -sθ],
-            [sφ * sθ * cψ - cφ * sψ, sφ * sθ * sψ + cφ * cψ, sφ * cθ],
-            [cφ * sθ * cψ + sφ * sψ, cφ * sθ * sψ - sφ * cψ, cφ * cθ],
-        ],
-        like=rpy,
-    )
-
-    if transpose:
-        R = R.T
-
-    return R
-
-
-def euler_kinematics(rpy: np.ndarray, inverse: bool = False) -> np.ndarray:
-    """Euler kinematical equations
-
-    Defining 𝚽 = [phi, theta, psi] == Euler angles for roll, pitch, yaw
-    attitude representation, this function returns a matrix H(𝚽) such
-    that
-        d𝚽/dt = H(𝚽) * ω.
-
-    If inverse=True, it returns a matrix H(𝚽)^-1 such that
-        ω = H(𝚽)^-1 * d𝚽/dt.
-
-    Parameters
-    ----------
-    rpy : array_like, shape (3,)
-        Roll, pitch, yaw angles in radians.
-    inverse : bool, optional
-        If True, returns the inverse matrix H(𝚽)^-1. Default is False.
-
-    Returns
-    -------
-    np.ndarray, shape (3, 3)
-        The transformation matrix H(𝚽) or its inverse.
-
-    Notes
-    -----
-
-    Typical rigid body dynamics calculations provide the body-frame angular velocity
-    ω_B, but this is _not_ the time derivative of the Euler angles.  Instead, one
-    can define a matrix H(𝚽) such that d𝚽/dt = H(𝚽) * ω_B.
-
-    This matrix H(𝚽) has a singularity at θ = ±π/2 (gimbal lock).
-
-    Note that the ``RigidBody`` class by default uses quaternions (via the
-    ``Rotation`` class) for attitude representation.
-    In general this is preferred due to the gimbal lock singularity, but
-    special cases like stability analysis may use Euler angle kinematics.
-    """
-
-    φ, θ = rpy[0], rpy[1]  # Roll, pitch
-
-    sφ, cφ = np.sin(φ), np.cos(φ)
-    sθ, cθ = np.sin(θ), np.cos(θ)
-    tθ = np.tan(θ)
-
-    _1 = np.ones_like(φ)
-    _0 = np.zeros_like(φ)
-
-    if inverse:
-        Hinv = np.array(
-            [
-                [_1, _0, -sθ],
-                [_0, cφ, cθ * sφ],
-                [_0, -sφ, cθ * cφ],
-            ],
-            like=rpy,
-        )
-        return Hinv
-
-    else:
-        H = np.array(
-            [
-                [_1, sφ * tθ, cφ * tθ],
-                [_0, cφ, -sφ],
-                [_0, sφ / cθ, cφ / cθ],
-            ],
-            like=rpy,
-        )
-        return H
 
 
 @struct
@@ -287,7 +160,7 @@ class RigidBody:
 
             # Convert roll-pitch-yaw (rpy) orientation to the direction cosine matrix.
             # R_BN rotates from the Newtonian frame N to the body frame B.
-            R_BN = dcm_from_euler(rpy)
+            R_BN = euler_to_dcm(rpy)
 
             # Transform roll-pitch-yaw rates in the body frame to time derivatives of
             # Euler angles - Euler kinematic equations
