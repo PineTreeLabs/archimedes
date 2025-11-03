@@ -31,6 +31,28 @@ class Attitude(Protocol):
         """
         ...
 
+    def rotate(self, vectors: np.ndarray, inverse: bool = False) -> np.ndarray:
+        """Rotate vectors by the attitude.
+
+        If the attitude represents the orientation of a body B relative to a frame A,
+        this method rotates vectors between the two frames. Specifically, for a vector v_B
+        expressed in frame B, the corresponding vector in frame A is given by
+        ``v_A = R_AB @ v_B``, where R_AB is the DCM obtained from `as_matrix()`.
+
+        Parameters
+        ----------
+        vectors : np.ndarray
+            A 1D array of shape (3,) or 2D array of shape (3, N) representing
+            N vectors to rotate.
+        inverse : bool
+            If True, rotate the vectors in the opposite direction.
+
+        Returns
+        -------
+            An array representing the rotated vectors.
+        """
+        ...
+
     def inv(self) -> Attitude:
         """Compute the inverse (conjugate) of the attitude.
 

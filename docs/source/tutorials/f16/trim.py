@@ -98,7 +98,7 @@ def trim_state(
     # Body-frame velocity (rotate from wind frame)
     v_W = np.array([condition.vt, 0.0, 0.0])  # Wind-frame velocity [ft/s]
     R_WB = Quaternion.from_euler("zy", [-beta, alpha])
-    v_B = R_WB.apply(v_W, inverse=True)
+    v_B = R_WB.rotate(v_W, inverse=True)
 
     if model.rigid_body.rpy_attitude:
         att = rpy

@@ -165,7 +165,7 @@ class StabilityState:
 
         v_W = np.hstack([self.lon.vt, 0.0, 0.0])
         R_WB = Quaternion.from_euler("zy", [-self.lat.beta, self.lon.alpha])
-        v_B = R_WB.apply(v_W, inverse=True)
+        v_B = R_WB.rotate(v_W, inverse=True)
         w_B = np.hstack([self.lat.p, self.lon.q, self.lat.r])
 
         rpy = np.hstack([self.lat.phi, self.lon.theta, 0.0])

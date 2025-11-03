@@ -404,7 +404,7 @@ class MultiRotorVehicle:
             Fgravity_B = R_BN @ Fgravity_N
 
         else:
-            Fgravity_B = x.att.apply(Fgravity_N, inverse=True)
+            Fgravity_B = x.att.rotate(Fgravity_N, inverse=True)
 
         F_B = Frotor_B + Fdrag_B + Fgravity_B
 

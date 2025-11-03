@@ -83,7 +83,7 @@ from archimedes.spatial import RigidBody, Rotation
 # attitude is given by (roll, pitch, yaw) Euler angles rpy
 def to_inertial(rpy, v_B):
     att = Rotation.from_euler("xyz", rpy)
-    return att.apply(v_B)
+    return att.rotate(v_B)
 
 
 rpy = np.array([0.1, 0.2, 0.3])
@@ -315,7 +315,7 @@ class Aircraft(RigidBody):
 
         # Use the state attitude to calculate gravity in body axes
         F_grav_N = self.m * np.hstack([0, 0, 9.81])
-        F_grav_B = x.att.apply(F_grav_N, inverse=True)
+        F_grav_B = x.att.rotate(F_grav_N, inverse=True)
 
         # Net forces/moments
         F_B = F_aero_B + F_eng_B + F_grav_B
@@ -370,7 +370,7 @@ class Aircraft:
 
         # Use the state attitude to calculate gravity in body axes
         F_grav_N = self.gravity(x.rigid_body.p_N)
-        F_grav_B = x.rigid_body.att.apply(F_grav_N, inverse=True)
+        F_grav_B = x.rigid_body.att.rotate(F_grav_N, inverse=True)
 
         # Net forces/moments
         F_B = F_aero_B + F_prop_B + F_grav_B

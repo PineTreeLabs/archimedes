@@ -41,7 +41,7 @@ class RigidBody:
     - ``w_B`` = angular velocity in body frame (ω_B)
 
     Note that the attitude is implemented using the :py:class:`Quaternion` class.
-    The transformation implemented by ``Quaternion.apply`` with this attitude
+    The transformation implemented by ``Quaternion.rotate`` with this attitude
     represents ``R_NB``, the rotation from the body frame B to the inertial frame N.
 
     The equations of motion are given by
@@ -175,7 +175,7 @@ class RigidBody:
 
         else:
             att = cast(Quaternion, x.att)
-            dp_N = att.apply(x.v_B)
+            dp_N = att.rotate(x.v_B)
             att_deriv = att.derivative(x.w_B, baumgarte=self.baumgarte)
 
         return dp_N, att_deriv

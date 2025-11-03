@@ -119,15 +119,11 @@ def euler_to_dcm(angles: np.ndarray, seq: str = "xyz") -> np.ndarray:
     arbitrary sequences of non-repeating axes up to length 3. Both intrinsic
     (uppercase letters) and extrinsic (lowercase letters) sequences are supported.
     
-    This follows the standard aerospace
-    convention and corresponds to the "xyz" sequence when using the
-    :py:class:`Quaternion` class.  However, by default this function returns the inverse
-    of the rotation implemented by :py:meth:`Quaternion.apply`.  Specifically, the
-    following will generate equivalent DCMs:
+    Specifically, the following will generate equivalent DCMs:
 
     .. code-block:: python
 
-        R_AB = euler_to_dcm(rpy, seq='xyz')
+        R_AB = euler_to_dcm(rpy)
         R_AB = Quaternion.from_euler('xyz', rpy).as_matrix()
 
     In general, the ``Quaternion`` class should be preferred over Euler representations,

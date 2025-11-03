@@ -123,7 +123,7 @@ class SubsonicF16:
         if self.rigid_body.rpy_attitude:
             F_grav_B = euler_to_dcm(x.att).T @ F_grav_N
         else:
-            F_grav_B = x.att.apply(F_grav_N, inverse=True)
+            F_grav_B = x.att.rotate(F_grav_N, inverse=True)
         return F_grav_B
 
     def flight_condition(self, x: RigidBody.State) -> FlightCondition:

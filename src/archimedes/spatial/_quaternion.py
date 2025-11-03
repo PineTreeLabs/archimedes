@@ -457,7 +457,7 @@ class Quaternion:
     as_matrix
     as_euler
     identity
-    apply
+    rotate
     inv
     mul
     derivative
@@ -501,10 +501,15 @@ class Quaternion:
 
     >>> q = Quaternion.from_euler('z', 90, degrees=True)
 
-    The ``apply`` method can be used to rotate vectors:
+    The ``rotate`` method can be used to rotate vectors:
 
-    >>> q.apply([1, 0, 0])
+    >>> q.rotate([1, 0, 0])
     array([2.22045e-16, 1, 0])
+
+    If the quaternion represents the attitude of a body B relative to a frame A,
+    then this method transforms a vector v_A expressed in frame A to the same
+    vector expressed in frame B, v_B = R * v_A. If `inverse` is True, the inverse
+    rotation is applied, transforming v_B to v_A.
 
     The ``kinematics`` method can be used to compute the time derivative of the
     quaternion as an attitude representation given the angular velocity in the
@@ -644,8 +649,8 @@ class Quaternion:
         """Return a quaternion representing the identity rotation."""
         return cls(np.array([1.0, 0.0, 0.0, 0.0]))
 
-    def apply(self, vectors: np.ndarray, inverse: bool = False) -> np.ndarray:
-        """Apply the rotation to a one or more vectors
+    def rotate(self, vectors: np.ndarray, inverse: bool = False) -> np.ndarray:
+        """Rotate one or more vectors
 
         If the quaternion represents the attitude of a body B relative to a frame A,
         then this method transforms a vector v_A expressed in frame A to the same
