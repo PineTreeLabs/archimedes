@@ -7,7 +7,7 @@ import numpy as np
 
 from ..tree import StructConfig, field, struct
 from ._euler import euler_to_dcm, euler_kinematics
-from ._rotation import Rotation
+from ._quaternion import Quaternion
 
 __all__ = [
     "RigidBody",
@@ -40,8 +40,8 @@ class RigidBody:
     - ``v_B`` = velocity of the center of mass in body frame B
     - ``w_B`` = angular velocity in body frame (ω_B)
 
-    Note that the attitude is implemented using the :py:class:`Rotation` class.
-    The transformation implemented by ``Rotation.apply`` with this attitude
+    Note that the attitude is implemented using the :py:class:`Quaternion` class.
+    The transformation implemented by ``Quaternion.apply`` with this attitude
     represents ``R_NB``, the rotation from the body frame B to the inertial frame N.
 
     The equations of motion are given by
@@ -83,12 +83,12 @@ class RigidBody:
     Examples
     --------
     >>> import archimedes as arc
-    >>> from archimedes.spatial import RigidBody, Rotation
+    >>> from archimedes.spatial import RigidBody, Quaternion
     >>> import numpy as np
     >>> rigid_body = RigidBody()
     >>> t = 0
     >>> v_B = np.array([1, 0, 0])  # Constant velocity in x-direction
-    >>> att = Rotation.from_quat([1, 0, 0, 0])  # No rotation
+    >>> att = Quaternion.from_quat([1, 0, 0, 0])  # No rotation
     >>> x = rigid_body.State(
     ...     p_N=np.zeros(3),
     ...     att=att,
@@ -103,7 +103,7 @@ class RigidBody:
     ... )
     >>> rigid_body.dynamics(t, x, u)
     State(p_N=array([1., 0., 0.]),
-      att=Rotation(quat=array([0., 0., 0., 0.]), scalar_first=True),
+      att=Quaternion(quat=array([0., 0., 0., 0.]), scalar_first=True),
       v_B=array([ 0.   ,  0.   , -4.905]),
       w_B=array([0., 0., 0.]))
 
@@ -119,7 +119,7 @@ class RigidBody:
     @struct
     class State:
         p_N: np.ndarray  # Position of the center of mass in the Newtonian frame N
-        att: Rotation | np.ndarray  # Attitude (orientation) of the vehicle
+        att: Quaternion | np.ndarray  # Attitude (orientation) of the vehicle
         v_B: np.ndarray  # Velocity of the center of mass in body frame B
         w_B: np.ndarray  # Angular velocity in body frame (ω_B)
 
@@ -133,7 +133,7 @@ class RigidBody:
         # inertia rate of change [kg·m²/s]
         dJ_dt: np.ndarray = field(default_factory=lambda: np.zeros((3, 3)))  # type: ignore
 
-    def calc_kinematics(self, x: State) -> tuple[np.ndarray, Rotation | np.ndarray]:
+    def calc_kinematics(self, x: State) -> tuple[np.ndarray, Quaternion | np.ndarray]:
         """Calculate kinematics (position and attitude derivatives)
 
         Parameters
@@ -145,7 +145,7 @@ class RigidBody:
         -------
         dp_N : np.ndarray
             Time derivative of position in Newtonian frame N.
-        att_deriv : Rotation or np.ndarray
+        att_deriv : Quaternion or np.ndarray
             Time derivative of attitude (quaternion derivative or roll-pitch-yaw rates).
 
         Notes
@@ -174,7 +174,7 @@ class RigidBody:
             dp_N = R_NB.T @ x.v_B
 
         else:
-            att = cast(Rotation, x.att)
+            att = cast(Quaternion, x.att)
             dp_N = att.apply(x.v_B)
             att_deriv = att.derivative(x.w_B, baumgarte=self.baumgarte)
 

@@ -26,7 +26,7 @@ from scipy.optimize import root
 
 import archimedes as arc
 from archimedes.spatial import (
-    Rotation, euler_to_dcm, euler_kinematics
+    Quaternion, euler_to_dcm, euler_kinematics
 )
 ```
 

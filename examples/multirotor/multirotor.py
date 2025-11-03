@@ -8,7 +8,7 @@ from scipy.special import roots_legendre
 
 import archimedes as arc
 from archimedes.spatial import (
-    Rotation,
+    Quaternion,
     RigidBody,
     euler_to_dcm,
 )
@@ -131,7 +131,7 @@ class RotorGeometry:
 
     @cached_property
     def R_BH(self):
-        """Rotation matrix from the hub frame H to the body frame B"""
+        """Quaternion matrix from the hub frame H to the body frame B"""
         x, y, z = self.offset
 
         # Torsional cant angle rotation (Rχ)
@@ -263,7 +263,7 @@ class RotorModel(metaclass=abc.ABCMeta):
         # effect and the wind angle is undefined (+/- 90 degrees will also work).
         psi_w = np.where(abs(v_H[0]) < 1e-6, np.sign(v_H[1]) * np.pi / 2, psi_w)
 
-        R_WH = Rotation.from_euler("z", psi_w).as_matrix().T
+        R_WH = Quaternion.from_euler("z", psi_w).as_matrix().T
 
         v_W = R_WH @ v_H  # Rotate velocity to wind frame
         w_W = R_WH @ w_H  # Rotate angular velocity to wind frame
@@ -353,7 +353,7 @@ class MultiRotorVehicle:
             att = rpy
             R_BN = euler_to_dcm(rpy).T
         else:
-            att = Rotation.from_euler("xyz", rpy)
+            att = Quaternion.from_euler("xyz", rpy)
             R_BN = att.as_matrix().T
         if inertial_velocity:
             vel = R_BN @ vel

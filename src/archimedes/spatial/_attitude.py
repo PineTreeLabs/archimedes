@@ -31,6 +31,16 @@ class Attitude(Protocol):
         """
         ...
 
+    def inv(self) -> Attitude:
+        """Compute the inverse (conjugate) of the attitude.
+
+        Returns
+        -------
+        Attitude
+            A new attitude instance representing the inverse rotation.
+        """
+        ...
+
     def kinematics(self, w_B: np.ndarray) -> Attitude:
         """Compute the time derivative of the attitude given angular velocity.
 

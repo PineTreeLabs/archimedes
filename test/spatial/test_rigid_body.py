@@ -7,7 +7,7 @@ import archimedes as arc
 from archimedes.spatial import (
     RigidBody,
     RigidBodyConfig,
-    Rotation,
+    Quaternion,
     euler_to_dcm,
     euler_kinematics,
 )
@@ -23,8 +23,8 @@ def test_euler_kinematics():
     # Given roll-pitch-yaw rates, compute the body-frame angular velocity
     # using the rotation matrices directly.
     pqr = np.array([0.4, 0.5, 0.6])  # Roll, pitch, yaw rates
-    C_roll = Rotation.from_euler("x", rpy[0]).as_matrix().T  # C_φ
-    C_pitch = Rotation.from_euler("y", rpy[1]).as_matrix().T  # C_θ
+    C_roll = Quaternion.from_euler("x", rpy[0]).as_matrix().T  # C_φ
+    C_pitch = Quaternion.from_euler("y", rpy[1]).as_matrix().T  # C_θ
     # Successively transform each rate into the body frame
     w_B_ex = np.array([pqr[0], 0.0, 0.0]) + C_roll @ (
         np.array([0.0, pqr[1], 0.0]) + C_pitch @ np.array([0.0, 0.0, pqr[2]])
@@ -57,7 +57,7 @@ class TestVehicleDynamics:
         rigid_body = RigidBody()
         t = 0
         v_B = np.array([1, 0, 0])  # Constant velocity in x-direction
-        att = Rotation.from_quat([1, 0, 0, 0])  # No rotation
+        att = Quaternion.from_quat([1, 0, 0, 0])  # No rotation
         x = rigid_body.State(
             p_N=np.zeros(3),
             att=att,
@@ -89,7 +89,7 @@ class TestVehicleDynamics:
         rpy = np.array([0.1, 0.2, 0.3])
         v_B = np.array([1, 2, 3])
 
-        att = Rotation.from_euler("xyz", rpy)
+        att = Quaternion.from_euler("xyz", rpy)
 
         # Could do att.apply(v_B) but this tests euler_to_dcm
         R_NB = euler_to_dcm(rpy)
@@ -120,7 +120,7 @@ class TestVehicleDynamics:
 
     def test_constant_force(self):
         rigid_body = RigidBody()
-        att = Rotation.from_quat([1, 0, 0, 0])  # No rotation
+        att = Quaternion.from_quat([1, 0, 0, 0])  # No rotation
 
         # Test that constant acceleration leads to correct velocity changes
         t = 0
@@ -148,7 +148,7 @@ class TestVehicleDynamics:
     def test_constant_angular_velocity(self):
         rigid_body = RigidBody()
 
-        att = Rotation.from_quat([1, 0, 0, 0])  # No rotation
+        att = Quaternion.from_quat([1, 0, 0, 0])  # No rotation
 
         t = 0
         x = rigid_body.State(
@@ -173,7 +173,7 @@ class TestVehicleDynamics:
 
     def test_constant_moment(self):
         rigid_body = RigidBody()
-        att = Rotation.from_quat([1, 0, 0, 0])  # No rotation
+        att = Quaternion.from_quat([1, 0, 0, 0])  # No rotation
 
         # Test that constant moment results in expected angular velocity changes
         t = 0
@@ -202,7 +202,7 @@ class TestVehicleDynamics:
 
         t = 0
         p_N = np.array([0, 0, 0])
-        att = Rotation.from_quat([1, 0, 0, 0])  # No rotation
+        att = Quaternion.from_quat([1, 0, 0, 0])  # No rotation
         v_B = np.array([1, 0, 0])  # Initial velocity in x-direction
         w_B = np.array([0, 0.1, 0])  # Angular velocity around y-axis
         x = rigid_body.State(p_N, att, v_B, w_B)
@@ -234,7 +234,7 @@ class TestVehicleDynamics:
         # Test that quaternion remains normalized under dynamics
         t = 0
         rpy = np.array([np.pi / 6, np.pi / 4, np.pi / 3])
-        att = Rotation.from_euler("xyz", rpy)
+        att = Quaternion.from_euler("xyz", rpy)
 
         x = np.zeros(13)
         p_N = np.array([0, 0, 0])

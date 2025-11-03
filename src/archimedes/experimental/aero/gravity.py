@@ -61,7 +61,7 @@ def lla2eci(
 
     Returns:
         p_EN: Cartesian coordinates [m]
-        R_EN: Rotation matrix from NED to E
+        R_EN: Quaternion matrix from NED to E
     """
     r = RE + alt  # Radius from Earth center [m]
     lat = np.deg2rad(lat)
@@ -95,7 +95,7 @@ class PointGravity:
     """
 
     p_EN: np.ndarray  # Relative position of N with respect to E (measured in E) [m]
-    R_EN: np.ndarray  # Rotation from N to E
+    R_EN: np.ndarray  # Quaternion from N to E
     mu: float = 3.986e14  # m^3/s^2
 
     def __call__(self, p_N):
@@ -113,7 +113,7 @@ class PointGravityConfig(StructConfig):
 
 class PointGravityCartesianConfig(PointGravityConfig, type="point_cartesian"):
     p_EN: np.ndarray  # Relative position of N with respect to E (measured in E) [m]
-    R_EN: np.ndarray  # Rotation from N to E
+    R_EN: np.ndarray  # Quaternion from N to E
 
     def build(self) -> PointGravity:
         return PointGravity(self.p_EN, self.R_EN, mu=self.mu)

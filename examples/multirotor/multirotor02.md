@@ -249,7 +249,7 @@ class RotorGeometry:
 
     @cached_property
     def R_BH(self):
-        """Rotation matrix from the hub frame H to the body frame B"""
+        """Quaternion matrix from the hub frame H to the body frame B"""
         # ...
     
     @property

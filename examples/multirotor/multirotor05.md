@@ -308,7 +308,7 @@ import numpy as np
 
 import archimedes as arc
 from archimedes.spatial import (
-    Rotation, euler_kinematics, euler_to_dcm
+    Quaternion, euler_kinematics, euler_to_dcm
 )
 ```
 

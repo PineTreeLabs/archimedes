@@ -107,7 +107,7 @@ def euler_to_dcm(angles: np.ndarray, seq: str = "xyz") -> np.ndarray:
     """Direction cosine matrix from Euler angles
 
     If the Euler angles represent the attitude of a body B relative to a frame A,
-    then this function by default returns the matrix R_AB that transforms vectors from
+    then this function returns the matrix R_AB that transforms vectors from
     frame B to frame A.  Specifically, for a vector v_B expressed in frame B,
     the corresponding vector in frame A is given by ``v_A = R_AB @ v_B``.
     
@@ -121,16 +121,16 @@ def euler_to_dcm(angles: np.ndarray, seq: str = "xyz") -> np.ndarray:
     
     This follows the standard aerospace
     convention and corresponds to the "xyz" sequence when using the
-    :py:class:`Rotation` class.  However, by default this function returns the inverse
-    of the rotation implemented by :py:meth:`Rotation.apply`.  Specifically, the
+    :py:class:`Quaternion` class.  However, by default this function returns the inverse
+    of the rotation implemented by :py:meth:`Quaternion.apply`.  Specifically, the
     following will generate equivalent DCMs:
 
     .. code-block:: python
 
-        R_NB = euler_to_dcm(rpy, seq='xyz')
-        R_NB = Rotation.from_euler('xyz', rpy).as_matrix()
+        R_AB = euler_to_dcm(rpy, seq='xyz')
+        R_AB = Quaternion.from_euler('xyz', rpy).as_matrix()
 
-    In general, the ``Rotation`` class should be preferred over Euler representations,
+    In general, the ``Quaternion`` class should be preferred over Euler representations,
     although Euler angles are used in some special cases (e.g. stability analysis).
     In these cases, this function gives a more direct calculation of the
     transformation matrix without converting to the intermediate quaternion.
@@ -212,7 +212,7 @@ def euler_kinematics(rpy: np.ndarray, inverse: bool = False) -> np.ndarray:
     This matrix H(𝚽) has a singularity at θ = ±π/2 (gimbal lock).
 
     Note that the ``RigidBody`` class by default uses quaternions (via the
-    ``Rotation`` class) for attitude representation.
+    ``Quaternion`` class) for attitude representation.
     In general this is preferred due to the gimbal lock singularity, but
     special cases like stability analysis may use Euler angle kinematics.
     """
