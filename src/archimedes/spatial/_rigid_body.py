@@ -176,7 +176,7 @@ class RigidBody:
         else:
             att = cast(Quaternion, x.att)
             dp_N = att.rotate(x.v_B)
-            att_deriv = att.derivative(x.w_B, baumgarte=self.baumgarte)
+            att_deriv = att.kinematics(x.w_B, baumgarte=self.baumgarte)
 
         return dp_N, att_deriv
 

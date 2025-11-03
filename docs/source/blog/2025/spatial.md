@@ -126,14 +126,14 @@ A factor of $\lambda = 1$ is a good default (and is the default in `RigidBody` a
 ```{code-cell} python
 att = Rotation.from_euler("xyz", rpy)
 w_B = np.array([0.0, 0.1, 0.0])  # 0.1 rad/sec pitch-up
-att.derivative(w_B, baumgarte=1.0)
+att.kinematics(w_B, baumgarte=1.0)
 ```
 
 :::{caution}
-The `derivative` method returns the time derivative of the `Rotation` as a new `Rotation` instance.
+The `kinematics` method returns the time derivative of the `Rotation` as a new `Rotation` instance.
 This is convenient for working with ODE solvers and other algorithms that expect the output to have the same structure as the input state.
 However, keep in mind that the time derivative $\dot{\mathbf{q}}$ is _not_ itself a valid rotation.
-Hence, you CANNOT use `att.derivative(w_B).as_euler("xyz")` to get the Euler angle rates (instead use [`euler_kinematics`](#archimedes.spatial.euler_kinematics) if you need this).
+Hence, you CANNOT use `att.kinematics(w_B).as_euler("xyz")` to get the Euler angle rates (instead use [`euler_kinematics`](#archimedes.spatial.euler_kinematics) if you need this).
 :::
 
 This attitude kinematics calculation comes in particularly handy for the second major functionality released with `spatial`: 6dof rigid body dynamics modeling.

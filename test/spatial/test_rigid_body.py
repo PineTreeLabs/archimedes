@@ -221,7 +221,7 @@ class TestVehicleDynamics:
         npt.assert_allclose(x_dot.v_B[0], 1 / m)  # Acceleration in x-direction
 
         # Check quaternion derivative
-        att_deriv = x.att.derivative(x.w_B, baumgarte=rigid_body.baumgarte)
+        att_deriv = x.att.kinematics(x.w_B, baumgarte=rigid_body.baumgarte)
         npt.assert_allclose(x_dot.att.array, att_deriv.array)
 
         # Check Coriolis effect

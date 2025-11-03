@@ -1,8 +1,10 @@
 """Protocol for attitude representations."""
 from __future__ import annotations
-from typing import Protocol
+from typing import Protocol, cast
 
 import numpy as np
+
+from archimedes import array
 
 
 class Attitude(Protocol):
@@ -83,3 +85,22 @@ class Attitude(Protocol):
             The time derivative of the attitude representation.
         """
         ...
+
+
+def _rotate(att: Attitude, v: np.ndarray, inverse: bool = False) -> np.ndarray:
+    matrix = att.as_matrix()
+    if inverse:
+        matrix = matrix.T
+
+    v = cast(np.ndarray, array(v))
+    if v.ndim == 1:
+        if v.shape != (3,):
+            raise ValueError("For 1D input, `vectors` must have shape (3,)")
+        result = matrix @ v
+
+    else:
+        if v.shape[1] != 3:
+            raise ValueError("For 2D input, `vectors` must have shape (N, 3)")
+        result = v @ matrix.T
+
+    return cast(np.ndarray, result)

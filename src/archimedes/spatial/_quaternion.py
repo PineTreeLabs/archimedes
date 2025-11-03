@@ -11,10 +11,12 @@ from typing import cast
 import numpy as np
 
 from .. import array, tree
+from ._attitude import _rotate
 from ._euler import _check_seq, _check_angles
 
 __all__ = [
     "euler_to_quaternion",
+    "Quaternion",
     "quaternion_inverse",
     "quaternion_kinematics",
     "quaternion_multiply",
@@ -459,7 +461,7 @@ class Quaternion:
     rotate
     inv
     mul
-    derivative
+    kinematics
 
     Examples
     --------
@@ -568,34 +570,18 @@ class Quaternion:
         The method supports both single vectors of shape (3,) and multiple vectors
         of shape (N, 3).
         """
-
-        matrix = self.as_matrix()
-        if inverse:
-            matrix = matrix.T
-
-        vectors = cast(np.ndarray, array(vectors))
-        if vectors.ndim == 1:
-            if vectors.shape != (3,):
-                raise ValueError("For 1D input, `vectors` must have shape (3,)")
-            result = matrix @ vectors
-
-        else:
-            if vectors.shape[1] != 3:
-                raise ValueError("For 2D input, `vectors` must have shape (N, 3)")
-            result = vectors @ matrix.T
-
-        return cast(np.ndarray, result)
+        return _rotate(self, vectors, inverse=inverse)
 
     def inv(self) -> Quaternion:
         """Return the inverse of the quaternion"""
         q_inv = quaternion_inverse(self.array)   
         return Quaternion(q_inv)
 
-    def derivative(self, w: np.ndarray, baumgarte: float | None = None) -> Quaternion:
+    def kinematics(self, w: np.ndarray, baumgarte: float | None = None) -> Quaternion:
         """Return the time derivative of the quaternion given angular velocity w.
 
-        Note that if the quaternion represents the attitude of a body B relative to a
-        frame A, then w should be the body relative angular velocity, i.e. ω_B.
+        If the quaternion represents the attitude of a body B, then w_B should be
+        the body relative angular velocity ω_B.
 
         The derivative is computed using quaternion kinematics:
             dq/dt = 0.5 * q ⊗ [0, ω]
