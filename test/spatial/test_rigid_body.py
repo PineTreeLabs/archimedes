@@ -44,14 +44,9 @@ def test_euler_kinematics():
 
 class TestVehicleDynamics:
     def test_build_from_config(self):
-        config = {
-            "baumgarte": 0.5,
-            "rpy_attitude": False,
-        }
+        config = {}
         rb = RigidBodyConfig(**config).build()
         assert isinstance(rb, RigidBody)
-        assert rb.baumgarte == 0.5
-        assert rb.rpy_attitude is False
 
     def test_constant_velocity_no_orientation(self):
         rigid_body = RigidBody()
@@ -221,7 +216,7 @@ class TestVehicleDynamics:
         npt.assert_allclose(x_dot.v_B[0], 1 / m)  # Acceleration in x-direction
 
         # Check quaternion derivative
-        att_deriv = x.att.kinematics(x.w_B, baumgarte=rigid_body.baumgarte)
+        att_deriv = x.att.kinematics(x.w_B)
         npt.assert_allclose(x_dot.att.array, att_deriv.array)
 
         # Check Coriolis effect

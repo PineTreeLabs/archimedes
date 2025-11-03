@@ -6,7 +6,7 @@ from f16 import GRAV_FTS2, SubsonicF16
 
 import archimedes as arc
 from archimedes import struct
-from archimedes.spatial import Quaternion, euler_kinematics
+from archimedes.spatial import EulerAngles, euler_kinematics
 
 __all__ = ["trim", "TrimPoint", "TrimCondition", "TrimVariables"]
 
@@ -97,13 +97,10 @@ def trim_state(
 
     # Body-frame velocity (rotate from wind frame)
     v_W = np.array([condition.vt, 0.0, 0.0])  # Wind-frame velocity [ft/s]
-    R_WB = Quaternion.from_euler([-beta, alpha], "zy")
+    R_WB = EulerAngles([-beta, alpha], "zy")
     v_B = R_WB.rotate(v_W, inverse=True)
 
-    if model.rigid_body.rpy_attitude:
-        att = rpy
-    else:
-        att = Quaternion.from_euler(rpy)
+    att = EulerAngles(rpy)
 
     return model.State(
         p_N=np.hstack([0.0, 0.0, -condition.alt]),

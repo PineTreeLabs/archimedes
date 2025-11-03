@@ -1,13 +1,10 @@
 # ruff: noqa: N806, N803, N815
 from __future__ import annotations
 
-from typing import cast
-
 import numpy as np
 
 from ..tree import StructConfig, field, struct
-from ._euler import euler_to_dcm, euler_kinematics
-from ._attitude import Quaternion
+from ._attitude import Attitude
 
 __all__ = [
     "RigidBody",
@@ -36,15 +33,16 @@ class RigidBody:
     where
 
     - ``p_N`` = position of the center of mass in the Newtonian frame N
-    - ``q`` = attitude (orientation) of the vehicle as a unit quaternion
+    - ``q`` = attitude (orientation) of the vehicle
     - ``v_B`` = velocity of the center of mass in body frame B
     - ``w_B`` = angular velocity in body frame (ω_B)
 
-    Note that the attitude is implemented using the :py:class:`Quaternion` class.
-    The transformation implemented by ``Quaternion.rotate`` with this attitude
-    represents ``R_NB``, the rotation from the body frame B to the inertial frame N.
+    Note that the attitude can be any object implementing the :py:class:`Attitude`
+    protocol, commonly :py:class:`Quaternion` or :py:class:`EulerAngles`.
+    The transformation implemented by ``rotate`` with this attitude represents
+    ``R_NB``, the rotation from the body frame B to the inertial frame N.
 
-    The equations of motion are given by
+    The equations of motion for a quaternion attitude are given by
 
     .. math::
         \\dot{\\mathbf{p}}_N &= \\mathbf{R}_{BN}^T(\\mathbf{q}) \\mathbf{v}_B \\\\
@@ -69,16 +67,6 @@ class RigidBody:
     the time derivatives of the mass and inertia are zero unless specified
     in the input struct.
 
-    Parameters
-    ----------
-    rpy_attitude : bool, optional
-        If True, use roll-pitch-yaw angles for attitude representation instead
-        of quaternions.  Default is False.  Note that using roll-pitch-yaw angles
-        introduces a singularity (gimbal lock) and are not recommended for general use.
-    baumgarte : float, optional
-        Baumgarte stabilization factor for quaternion kinematics.  Default is 1.0.
-        This adds a correction term to the quaternion kinematics to help maintain
-        the unit norm constraint.
 
     Examples
     --------
@@ -113,13 +101,10 @@ class RigidBody:
             Aircraft Control and Simulation. Wiley.
     """
 
-    rpy_attitude: bool = False  # If True, use roll-pitch-yaw for attitude
-    baumgarte: float = 1.0  # Baumgarte stabilization factor for quaternion kinematics
-
     @struct
     class State:
         p_N: np.ndarray  # Position of the center of mass in the Newtonian frame N
-        att: Quaternion | np.ndarray  # Attitude (orientation) of the vehicle
+        att: Attitude  # Attitude (orientation) of the vehicle
         v_B: np.ndarray  # Velocity of the center of mass in body frame B
         w_B: np.ndarray  # Angular velocity in body frame (ω_B)
 
@@ -133,7 +118,8 @@ class RigidBody:
         # inertia rate of change [kg·m²/s]
         dJ_dt: np.ndarray = field(default_factory=lambda: np.zeros((3, 3)))  # type: ignore
 
-    def calc_kinematics(self, x: State) -> tuple[np.ndarray, Quaternion | np.ndarray]:
+    @classmethod
+    def calc_kinematics(cls, x: State) -> tuple[np.ndarray, Attitude]:
         """Calculate kinematics (position and attitude derivatives)
 
         Parameters
@@ -145,8 +131,8 @@ class RigidBody:
         -------
         dp_N : np.ndarray
             Time derivative of position in Newtonian frame N.
-        att_deriv : Quaternion or np.ndarray
-            Time derivative of attitude (quaternion derivative or roll-pitch-yaw rates).
+        att_deriv : Attitude
+            Time derivative of attitude (e.g. quaternion derivative or Euler rates).
 
         Notes
         -----
@@ -156,31 +142,14 @@ class RigidBody:
         Typically this does not need to be called directly, but is available
         separately for special analysis or testing.
         """
-        if self.rpy_attitude:
-            rpy = cast(np.ndarray, x.att)
 
-            # Convert roll-pitch-yaw (rpy) orientation to the direction cosine matrix.
-            # R_NB rotates from the body frame B to the Newtonian frame N.
-            R_NB = euler_to_dcm(rpy)
-
-            # Transform roll-pitch-yaw rates in the body frame to time derivatives of
-            # Euler angles - Euler kinematic equations
-            H = euler_kinematics(rpy)
-
-            # Time derivatives of roll-pitch-yaw (rpy) orientation
-            att_deriv = H @ x.w_B
-
-            # Time derivative of position in Newtonian frame N
-            dp_N = R_NB.T @ x.v_B
-
-        else:
-            att = cast(Quaternion, x.att)
-            dp_N = att.rotate(x.v_B)
-            att_deriv = att.kinematics(x.w_B, baumgarte=self.baumgarte)
+        dp_N = x.att.rotate(x.v_B)
+        att_deriv = x.att.kinematics(x.w_B)
 
         return dp_N, att_deriv
 
-    def calc_dynamics(self, x: State, u: Input) -> tuple[np.ndarray, np.ndarray]:
+    @classmethod
+    def calc_dynamics(cls, x: State, u: Input) -> tuple[np.ndarray, np.ndarray]:
         """Calculate dynamics (velocity and angular velocity derivatives)
 
         Parameters
@@ -221,7 +190,8 @@ class RigidBody:
 
         return dv_B, dw_B
 
-    def dynamics(self, t: float, x: State, u: Input) -> State:
+    @classmethod
+    def dynamics(cls, t: float, x: State, u: Input) -> State:
         """Calculate 6-dof dynamics
 
         Args:
@@ -232,11 +202,11 @@ class RigidBody:
         Returns:
             xdot: time derivative of the state vector
         """
-        dp_N, att_deriv = self.calc_kinematics(x)
-        dv_B, dw_B = self.calc_dynamics(x, u)
+        dp_N, att_deriv = cls.calc_kinematics(x)
+        dv_B, dw_B = cls.calc_dynamics(x, u)
 
         # Pack the state derivatives
-        return self.State(
+        return cls.State(
             p_N=dp_N,
             att=att_deriv,
             v_B=dv_B,
@@ -247,9 +217,6 @@ class RigidBody:
 class RigidBodyConfig(StructConfig):
     """Configuration for ``RigidBody`` model."""
 
-    baumgarte: float = 1.0  # Baumgarte stabilization factor
-    rpy_attitude: bool = False  # If True, use roll-pitch-yaw for attitude
-
     def build(self) -> RigidBody:
         """Build and return a RigidBody instance."""
-        return RigidBody(baumgarte=self.baumgarte, rpy_attitude=self.rpy_attitude)
+        return RigidBody()

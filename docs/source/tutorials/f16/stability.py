@@ -6,7 +6,7 @@ from engine import F16Engine
 from f16 import SubsonicF16
 
 from archimedes import struct
-from archimedes.spatial import Quaternion
+from archimedes.spatial import Quaternion, EulerAngles
 
 
 @struct
@@ -160,7 +160,7 @@ class StabilityState:
             lat=LateralState.from_full_state(x_dot, beta=beta_dot),
         )
 
-    def as_full_state(self, rpy_attitude=True) -> SubsonicF16.State:
+    def as_full_state(self) -> SubsonicF16.State:
         p_N = np.zeros(3)
 
         v_W = np.hstack([self.lon.vt, 0.0, 0.0])
@@ -169,14 +169,10 @@ class StabilityState:
         w_B = np.hstack([self.lat.p, self.lon.q, self.lat.r])
 
         rpy = np.hstack([self.lat.phi, self.lon.theta, 0.0])
-        if rpy_attitude:
-            att = rpy
-        else:
-            att = Quaternion.from_euler(rpy)
 
         return SubsonicF16.State(
             p_N=p_N,
-            att=att,
+            att=EulerAngles(rpy),
             v_B=v_B,
             w_B=w_B,
             eng=self.lon.eng,

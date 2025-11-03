@@ -253,6 +253,12 @@ class EulerAngles:
         """Return the number of Euler angles (length of sequence)."""
         return len(self.seq)
 
+    def __getitem__(self, index: int) -> float:
+        return self.array[index]
+
+    def __iter__(self):
+        return iter(self.array)
+
     @classmethod
     def from_quat(cls, quat: Quaternion | np.ndarray, seq: str = "xyz") -> EulerAngles:
         """Create EulerAngles from a Quaternion.
@@ -525,8 +531,17 @@ class Quaternion:
 
     # === Other methods ===
 
+    def __repr__(self):
+        return f"Quaternion({self.array})"
+
     def __len__(self):
         return len(self.array)
+
+    def __getitem__(self, index: int) -> float:
+        return self.array[index]
+
+    def __iter__(self):
+        return iter(self.array)
 
     @classmethod
     def from_quat(cls, quat: Quaternion) -> Quaternion:

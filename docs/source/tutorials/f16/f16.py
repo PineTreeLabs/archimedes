@@ -81,7 +81,6 @@ class F16Geometry:
 
 @struct
 class SubsonicF16:
-    rigid_body: RigidBody = field(default_factory=RigidBody)
     gravity: GravityModel = field(default_factory=lambda: ConstantGravity(GRAV_FTS2))
     atmos: AtmosphereModel = field(default_factory=LinearAtmosphere)
     engine: F16Engine = field(default_factory=NASAEngine)
@@ -120,10 +119,7 @@ class SubsonicF16:
 
     def calc_gravity(self, x: State):
         F_grav_N = self.m * self.gravity(x.p_N)
-        if self.rigid_body.rpy_attitude:
-            F_grav_B = euler_to_dcm(x.att).T @ F_grav_N
-        else:
-            F_grav_B = x.att.rotate(F_grav_N, inverse=True)
+        F_grav_B = x.att.rotate(F_grav_N, inverse=True)
         return F_grav_B
 
     def flight_condition(self, x: RigidBody.State) -> FlightCondition:
@@ -226,7 +222,7 @@ class SubsonicF16:
             m=self.m,
             J_B=self.J_B,
         )
-        rb_deriv = self.rigid_body.dynamics(t, x, rb_input)
+        rb_deriv = RigidBody.dynamics(t, x, rb_input)
 
         # Engine dynamics
         eng_input = self.engine.Input(
@@ -312,7 +308,6 @@ class SubsonicF16:
 
 
 class SubsonicF16Config(StructConfig):
-    rigid_body: RigidBodyConfig = field(default_factory=RigidBodyConfig)
     gravity: GravityConfig = field(
         default_factory=lambda: ConstantGravityConfig(g0=GRAV_FTS2)
     )
@@ -337,7 +332,6 @@ class SubsonicF16Config(StructConfig):
 
     def build(self) -> SubsonicF16:
         return SubsonicF16(
-            rigid_body=self.rigid_body.build(),
             gravity=self.gravity.build(),
             atmos=self.atmos.build(),
             engine=self.engine.build(),

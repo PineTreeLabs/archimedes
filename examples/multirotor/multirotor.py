@@ -10,7 +10,6 @@ import archimedes as arc
 from archimedes.spatial import (
     Quaternion,
     RigidBody,
-    euler_to_dcm,
 )
 
 __all__ = [
@@ -316,7 +315,6 @@ class QuadraticRotorModel(RotorModel):
 
 @arc.struct
 class MultiRotorVehicle:
-    rigid_body: RigidBody = arc.field(default_factory=RigidBody)
     rotors: list[RotorGeometry] = arc.field(default_factory=list)
     rotor_model: RotorModel = arc.field(default_factory=QuadraticRotorModel)
     drag_model: VehicleDragModel = arc.field(default_factory=QuadraticDragModel)
@@ -328,37 +326,19 @@ class MultiRotorVehicle:
     )  # inertia matrix [kg·m²]
 
     @arc.struct
-    class State:
-        rigid_body: RigidBody.State
-        aux: np.ndarray = None  # auxiliary state variables for rotors
+    class State(RigidBody.State):
+        aux: np.ndarray = None  # rotor auxiliary states
 
-        @property
-        def p_N(self):
-            return self.rigid_body.p_N
-
-        @property
-        def att(self):
-            return self.rigid_body.att
-
-        @property
-        def v_B(self):
-            return self.rigid_body.v_B
-
-        @property
-        def w_B(self):
-            return self.rigid_body.w_B
-
-    def state(self, pos, rpy, vel, w_B, aux=None, inertial_velocity=False) -> State:
-        if self.rigid_body.rpy_attitude:
-            att = rpy
-            R_BN = euler_to_dcm(rpy).T
-        else:
-            att = Quaternion.from_euler(rpy)
-            R_BN = att.as_matrix().T
+    def state(self, pos, att, vel, w_B, inertial_velocity=False) -> State:
         if inertial_velocity:
+            R_BN = att.as_matrix().T
             vel = R_BN @ vel
-        rb_state = self.rigid_body.State(pos, att, vel, w_B)
-        return self.State(rb_state, aux)
+        return self.State(
+            p_N=pos,
+            att=att,
+            v_B=vel,
+            w_B=w_B,
+        )
 
     def net_forces(self, t, x: State, u):
         p_N = x.p_N  # Position of the center of mass in inertial frame N
@@ -399,12 +379,7 @@ class MultiRotorVehicle:
         # Calculate drag forces and moments in body frame B
         Fdrag_B, Mdrag_B = self.drag_model(t, x)
 
-        if self.rigid_body.rpy_attitude:
-            R_BN = euler_to_dcm(x.att).T
-            Fgravity_B = R_BN @ Fgravity_N
-
-        else:
-            Fgravity_B = x.att.rotate(Fgravity_N, inverse=True)
+        Fgravity_B = x.att.rotate(Fgravity_N, inverse=True)
 
         F_B = Frotor_B + Fdrag_B + Fgravity_B
 
@@ -433,11 +408,13 @@ class MultiRotorVehicle:
             m=self.m,
             J_B=self.J_B,
         )
-        rb_derivs = self.rigid_body.dynamics(t, x.rigid_body, rb_input)
+        rb_derivs = RigidBody.dynamics(t, x, rb_input)
 
         return self.State(
-            rigid_body=rb_derivs,
-            aux=aux_state_derivs,
+            p_N=rb_derivs.p_N,
+            att=rb_derivs.att,
+            v_B=rb_derivs.v_B,
+            w_B=rb_derivs.w_B,
         )
 
 
