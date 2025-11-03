@@ -7,7 +7,7 @@ import numpy as np
 
 from ..tree import StructConfig, field, struct
 from ._euler import euler_to_dcm, euler_kinematics
-from ._quaternion import Quaternion
+from ._attitude import Quaternion
 
 __all__ = [
     "RigidBody",

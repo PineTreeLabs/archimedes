@@ -15,17 +15,11 @@ def __getattr__(name):
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
-from ._attitude import Attitude
-from ._rigid_body import (
-    RigidBody,
-    RigidBodyConfig,
-)
 from ._euler import (
     euler_kinematics,
     euler_to_dcm,
 )
 from ._quaternion import (
-    Quaternion,
     dcm_to_quaternion,
     euler_to_quaternion,
     quaternion_inverse,
@@ -35,12 +29,23 @@ from ._quaternion import (
     quaternion_to_euler,
 )
 
+from ._attitude import (
+    Attitude,
+    EulerAngles,
+    Quaternion,
+)
+from ._rigid_body import (
+    RigidBody,
+    RigidBodyConfig,
+)
+
 __all__ = [
     "Attitude",
     "dcm_to_quaternion",
     "euler_kinematics",
     "euler_to_dcm",
     "euler_to_quaternion",
+    "EulerAngles",
     "Quaternion",
     "quaternion_inverse",
     "quaternion_kinematics",
