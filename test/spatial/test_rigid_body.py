@@ -57,7 +57,7 @@ class TestVehicleDynamics:
         rigid_body = RigidBody()
         t = 0
         v_B = np.array([1, 0, 0])  # Constant velocity in x-direction
-        att = Quaternion.from_quat([1, 0, 0, 0])  # No rotation
+        att = Quaternion([1, 0, 0, 0])  # No rotation
         x = rigid_body.State(
             p_N=np.zeros(3),
             att=att,
@@ -73,11 +73,11 @@ class TestVehicleDynamics:
 
         dynamics = arc.compile(rigid_body.dynamics)
         x_dot = dynamics(t, x, u)
-        q_dot = x_dot.att.as_quat()
+        q_dot = x_dot.att
 
         dp_N_ex = np.array([1, 0, 0])  # Velocity in x-direction
         npt.assert_allclose(x_dot.p_N, dp_N_ex, atol=1e-8)
-        npt.assert_allclose(q_dot, np.zeros(4), atol=1e-8)
+        npt.assert_allclose(q_dot.array, np.zeros(4), atol=1e-8)
         npt.assert_allclose(x_dot.v_B, np.zeros(3), atol=1e-8)
         npt.assert_allclose(x_dot.w_B, np.zeros(3), atol=1e-8)
 
@@ -114,13 +114,13 @@ class TestVehicleDynamics:
 
         dp_N_ex = v_N
         npt.assert_allclose(x_dot.p_N, dp_N_ex, atol=1e-8)
-        npt.assert_allclose(x_dot.att.as_quat(), np.zeros(4), atol=1e-8)
+        npt.assert_allclose(x_dot.att.array, np.zeros(4), atol=1e-8)
         npt.assert_allclose(x_dot.v_B, np.zeros(3), atol=1e-8)
         npt.assert_allclose(x_dot.w_B, np.zeros(3), atol=1e-8)
 
     def test_constant_force(self):
         rigid_body = RigidBody()
-        att = Quaternion.from_quat([1, 0, 0, 0])  # No rotation
+        att = Quaternion([1, 0, 0, 0])  # No rotation
 
         # Test that constant acceleration leads to correct velocity changes
         t = 0
@@ -148,7 +148,7 @@ class TestVehicleDynamics:
     def test_constant_angular_velocity(self):
         rigid_body = RigidBody()
 
-        att = Quaternion.from_quat([1, 0, 0, 0])  # No rotation
+        att = Quaternion([1, 0, 0, 0])  # No rotation
 
         t = 0
         x = rigid_body.State(
@@ -169,11 +169,11 @@ class TestVehicleDynamics:
 
         # Check quaternion derivative
         expected_qdot = np.array([0, 0.5, 0, 0])  # From quaternion kinematics
-        npt.assert_allclose(x_dot.att.as_quat(), expected_qdot)
+        npt.assert_allclose(x_dot.att.array, expected_qdot)
 
     def test_constant_moment(self):
         rigid_body = RigidBody()
-        att = Quaternion.from_quat([1, 0, 0, 0])  # No rotation
+        att = Quaternion([1, 0, 0, 0])  # No rotation
 
         # Test that constant moment results in expected angular velocity changes
         t = 0
@@ -202,7 +202,7 @@ class TestVehicleDynamics:
 
         t = 0
         p_N = np.array([0, 0, 0])
-        att = Quaternion.from_quat([1, 0, 0, 0])  # No rotation
+        att = Quaternion([1, 0, 0, 0])  # No rotation
         v_B = np.array([1, 0, 0])  # Initial velocity in x-direction
         w_B = np.array([0, 0.1, 0])  # Angular velocity around y-axis
         x = rigid_body.State(p_N, att, v_B, w_B)
@@ -222,7 +222,7 @@ class TestVehicleDynamics:
 
         # Check quaternion derivative
         att_deriv = x.att.derivative(x.w_B, baumgarte=rigid_body.baumgarte)
-        npt.assert_allclose(x_dot.att.as_quat(), att_deriv.as_quat())
+        npt.assert_allclose(x_dot.att.array, att_deriv.array)
 
         # Check Coriolis effect
         expected_z_velocity = 0.1  # ω_y * v_x
@@ -253,6 +253,6 @@ class TestVehicleDynamics:
 
         # Verify that quaternion derivative maintains unit norm
         # q·q̇ should be zero for unit quaternion
-        q = x.att.as_quat()
-        q_dot = x_dot.att.as_quat()
+        q = x.att.array
+        q_dot = x_dot.att.array
         npt.assert_allclose(np.dot(q, q_dot), 0, atol=1e-10)

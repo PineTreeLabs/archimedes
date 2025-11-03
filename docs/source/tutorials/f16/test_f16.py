@@ -92,7 +92,7 @@ def test_352(f16: SubsonicF16):
     # => ω_B = 2 * q⁻¹ ⊗ q_t
     # This gives a check on the quaternion derivative calculation
     # without using the roll-pitch-yaw rates.
-    w_B_out = 2 * (att.inv().mul(x_t.att, normalize=False)).as_quat()[1:]
+    w_B_out = 2 * (att.inv().mul(x_t.att, normalize=False)).array[1:]
 
     npt.assert_allclose(x_t.p_N, dp_N_ex, atol=1e-2)
     npt.assert_allclose(w_B_out, w_B, atol=1e-2)
@@ -140,7 +140,7 @@ def test_362(f16: SubsonicF16):
 
     # Second, convert the quaternion derivative to angular momentum
     # See notes above on this conversion
-    w_B_out = 2 * (att.inv().mul(x_t.att, normalize=False)).as_quat()[1:]
+    w_B_out = 2 * (att.inv().mul(x_t.att, normalize=False)).array[1:]
     assert np.allclose(w_B_out, w_B_expected, atol=1e-4)
 
     # Turn coordination when flight path angle is zero

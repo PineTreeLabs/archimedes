@@ -21,7 +21,7 @@ def random_quat(wrapper=False):
     rand_quat = np.random.randn(4)
     rand_quat /= np.linalg.norm(rand_quat)
     if wrapper:
-        rand_quat = Quaternion.from_quat(rand_quat)
+        rand_quat = Quaternion(rand_quat)
     return rand_quat
 
 
@@ -64,39 +64,35 @@ class TestQuaternionWrapper:
         assert np.allclose(R.apply(v), v)
 
     def test_multiplication(self):
-        R1, R2 = random_quat(True), random_quat(True)
-        q1 = (R1 * R2).as_quat()
-        R1_scipy = ScipyRotation.from_quat(R1.as_quat(), scalar_first=True)
-        R2_scipy = ScipyRotation.from_quat(R2.as_quat(), scalar_first=True)
-        q2 = (R1_scipy * R2_scipy).as_quat(scalar_first=True)
-        assert np.allclose(q1, q2)
+        q1, q2 = random_quat(True), random_quat(True)
+        q3 = q1 * q2
+        R1_scipy = ScipyRotation.from_quat(q1.array, scalar_first=True)
+        R2_scipy = ScipyRotation.from_quat(q2.array, scalar_first=True)
+        q3_scipy = (R1_scipy * R2_scipy).as_quat(scalar_first=True)
+        assert np.allclose(q3.array, q3_scipy)
 
     def test_composition_associativity(self):
         R1, R2, R3 = [random_quat(True) for _ in range(3)]
-        q1 = ((R1 * R2) * R3).as_quat()
-        q2 = (R1 * (R2 * R3)).as_quat()
-        assert np.allclose(q1, q2)
+        q1 = ((R1 * R2) * R3)
+        q2 = (R1 * (R2 * R3))
+        assert np.allclose(q1.array, q2.array)
 
     def test_inverse(self):
-        R = random_quat(True)
-        q0 = Quaternion.identity().as_quat()
-        q1 = (R * R.inv()).as_quat()
-        q2 = (R.inv() * R).as_quat()
-        assert np.allclose(q1, q0)
-        assert np.allclose(q2, q0)
-
-        # Check the roll if scalar_first=False
-        q0_nsf = Quaternion.identity().as_quat(scalar_first=False)
-        assert np.allclose(q0_nsf, np.array([0, 0, 0, 1]))
+        q = random_quat(True)
+        q0 = Quaternion.identity()
+        q1 = (q * q.inv())
+        q2 = (q.inv() * q)
+        assert np.allclose(q1.array, q0.array)
+        assert np.allclose(q2.array, q0.array)
 
     def _quat_roundtrip(self, euler_orig, seq, debug=False):
-        R = Quaternion.from_euler(seq, euler_orig)
-        assert len(R) == 4
-        euler2 = R.as_euler(seq)
+        q = Quaternion.from_euler(seq, euler_orig)
+        assert len(q) == 4
+        euler2 = q.as_euler(seq)
 
         if debug:
             R2 = ScipyRotation.from_euler(seq, euler_orig)
-            print(f"quat:       {R.as_quat(scalar_first=True)}")
+            print(f"quat:       {q.array}")
             print(f"SciPy quat: {R2.as_quat(scalar_first=True)}")
 
             print(f"euler:       {euler2}")
@@ -106,29 +102,19 @@ class TestQuaternionWrapper:
 
     def _dcm_roundtrip(self, euler_orig, seq, debug=False):
         # Euler -> matrix -> quat -> matrix -> euler
-        R1 = Quaternion.from_euler(seq, euler_orig)
-        R2 = Quaternion.from_matrix(R1.as_matrix())
-        euler2 = R2.as_euler(seq, degrees=True)
+        q1 = Quaternion.from_euler(seq, euler_orig)
+        q2 = Quaternion.from_matrix(q1.as_matrix())
+        euler2 = q2.as_euler(seq, degrees=True)
         euler2 = np.deg2rad(euler2)
 
         if debug:
             R1_scipy = ScipyRotation.from_euler(seq, euler_orig)
-            R2_scipy = ScipyRotation.from_matrix(R1.as_matrix())
-            print(f"quat:       {R1.as_quat(scalar_first=True)}")
+            R2_scipy = ScipyRotation.from_matrix(q1.as_matrix())
+            print(f"quat:       {q1.array}")
             print(f"SciPy quat: {R1_scipy.as_quat(scalar_first=True)}")
 
             print(f"euler:       {euler2}")
             print(f"SciPy euler: {R2_scipy.as_euler(seq)}")
-
-        assert np.allclose(euler2, euler_orig)
-
-    def _mixed_roundtrip(self, euler_orig, seq, debug=False):
-        # Euler -> matrix -> quat -> euler
-
-        R1 = Quaternion.from_euler(seq, euler_orig)
-        q = R1.as_quat(scalar_first=True)
-        R3 = Quaternion.from_quat(q, scalar_first=True)
-        euler2 = R3.as_euler(seq)
 
         assert np.allclose(euler2, euler_orig)
 
@@ -145,7 +131,6 @@ class TestQuaternionWrapper:
     def test_roundtrip(self, seq):
         euler_orig = np.array([0.1, 0.2, 0.3])
         self._quat_roundtrip(euler_orig, seq)
-        self._mixed_roundtrip(euler_orig, seq)
         self._dcm_roundtrip(euler_orig, seq)
 
     @pytest.mark.parametrize(
@@ -195,7 +180,7 @@ class TestQuaternionWrapper:
 
         # Invalid quat shape
         with pytest.raises(ValueError, match="Quaternion must have shape"):
-            Quaternion.from_quat(np.array([1.0, 2.0, 3.0]))
+            Quaternion(np.array([1.0, 2.0, 3.0]))
 
         # Invalid matrix shape
         with pytest.raises(ValueError, match="Rotation matrix must be 3x3"):

@@ -10,7 +10,7 @@ from typing import cast
 
 import numpy as np
 
-from .. import array, field, struct
+from .. import array, tree
 from ._euler import _check_seq, _check_angles
 
 __all__ = [
@@ -414,8 +414,6 @@ def quaternion_kinematics(
     return q_dot
 
 
-
-@struct
 class Quaternion:
     """Quaternion representation of a rotation in 3 dimensions.
 
@@ -442,14 +440,12 @@ class Quaternion:
     Parameters
     ----------
     quat : array_like, shape (4,)
-        Quaternion representing the rotation. By default, this is in scalar-first
-        format (i.e. [w, x, y, z]). See `scalar_first` parameter.  Typically, the
-        class should not be constructed directly, but instead initialized with one of
-        the class methods like `from_quat`, `from_matrix`, or `from_euler`.
-    scalar_first : bool, optional
-        If True, the quaternion is in scalar-first format (i.e. [w, x, y, z]).
-        If False, the quaternion is in scalar-last format (i.e. [x, y, z, w]).
-        Default is True.
+        Quaternion representing the rotation in scalar-first format (w, x, y, z).
+
+    Attributes
+    ----------
+    array : np.ndarray, shape (4,)
+        Underlying numpy array representing the quaternion.
 
     Methods
     -------
@@ -478,56 +474,44 @@ class Quaternion:
     Consider a counter-clockwise rotation of 90 degrees about the z-axis. This
     corresponds to the following quaternion (in scalar-first format):
 
-    >>> R = Quaternion.from_quat([np.cos(np.pi/4), 0, 0, np.sin(np.pi/4)])
+    >>> q = Quaternion([np.cos(np.pi/4), 0, 0, np.sin(np.pi/4)])
 
-    The rotation can be expressed in any of the other formats:
+    The quaternion can be expressed in any of the other formats:
 
-    >>> R.as_matrix()
+    >>> q.as_matrix()
     array([[ 2.22044605e-16, -1.00000000e+00,  0.00000000e+00],
     [ 1.00000000e+00,  2.22044605e-16,  0.00000000e+00],
     [ 0.00000000e+00,  0.00000000e+00,  1.00000000e+00]])
-    >>> R.as_euler('zyx', degrees=True)
+    >>> q.as_euler('zyx', degrees=True)
     array([90.,  0.,  0.])
 
-    The same rotation can be initialized using a rotation matrix:
+    The same quaternion can be initialized using a rotation matrix:
 
-    >>> R = Quaternion.from_matrix([[0, -1, 0],
+    >>> q = Quaternion.from_matrix([[0, -1, 0],
     ...                    [1, 0, 0],
     ...                    [0, 0, 1]])
 
     Representation in other formats:
 
-    >>> R.as_quat()
-    array([0.70710678, 0.        , 0.        , 0.70710678])
-    >>> R.as_euler('zyx', degrees=True)
+    >>> q.as_euler('zyx', degrees=True)
     array([90.,  0.,  0.])
 
     The ``from_euler`` method is quite flexible in the range of input formats
-    it supports. Here we initialize a single rotation about a single axis:
+    it supports. Here we initialize a quaternion about a single axis:
 
-    >>> R = Quaternion.from_euler('z', 90, degrees=True)
-
-    Again, the object is representation independent and can be converted to any
-    other format:
-
-    >>> R.as_quat()
-    array([0.70710678, 0.        , 0.        , 0.70710678])
-    >>> R.as_matrix()
-    array([[ 2.22044605e-16, -1.00000000e+00,  0.00000000e+00],
-           [ 1.00000000e+00,  2.22044605e-16,  0.00000000e+00],
-           [ 0.00000000e+00,  0.00000000e+00,  1.00000000e+00]])
+    >>> q = Quaternion.from_euler('z', 90, degrees=True)
 
     The ``apply`` method can be used to rotate vectors:
 
-    >>> R.apply([1, 0, 0])
+    >>> q.apply([1, 0, 0])
     array([2.22045e-16, 1, 0])
 
-    The ``derivative`` method can be used to compute the time derivative of the
-    rotation as an attitude representation given the angular velocity in the
+    The ``kinematics`` method can be used to compute the time derivative of the
+    quaternion as an attitude representation given the angular velocity in the
     body frame using quaternion kinematics:
 
     >>> w_B = np.array([0, 0, np.pi/2])  # 90 deg/s about z-axis
-    >>> R.derivative(w_B)
+    >>> q.kinematics(w_B)
     array([-0.55536037,  0.        ,  0.        ,  0.55536037])
 
     See Also
@@ -536,43 +520,39 @@ class Quaternion:
     RigidBody : Rigid body dynamics supporting ``Quaternion`` attitude representation
     euler_to_dcm : Directly calculate rotation matrix from roll-pitch-yaw angles
     euler_kinematics : Transform roll-pitch-yaw rates to body-frame angular velocity
-
+    quaternion_kinematics : Low-level quaternion kinematics function
     """
 
-    quat: np.ndarray
-    scalar_first: bool = field(default=True, static=True)  # type: ignore
-
-    def __len__(self):
-        return len(self.quat)
-
-    @classmethod
-    def from_quat(
-        cls, quat: np.ndarray, scalar_first: bool = True, normalize: bool = True
-    ) -> Quaternion:
-        """Create a Quaternion from a quaternion.
-
-        Parameters
-        ----------
-        quat : array_like, shape (4,)
-            Quaternion in scalar-first (w, x, y, z) or scalar-last (x, y, z, w) format.
-        scalar_first : bool, optional
-            If True, the quaternion is assumed to be in scalar-first format.
-            If False, scalar-last format is assumed. Default is True.
-        normalize : bool, optional
-            If True, the quaternion will be normalized to unit length. Default is True.
-
-        Returns
-        -------
-        Quaternion
-            A new Quaternion instance.
-        """
+    def __init__(self, quat: np.ndarray):
         quat = np.hstack(quat)  # type: ignore
         if quat.shape not in [(4,), (1, 4), (4, 1)]:
             raise ValueError("Quaternion must have shape (4,), (1, 4), or (4, 1)")
         quat = quat.flatten()
-        if normalize:
-            quat = quat / np.linalg.norm(quat)
-        return cls(quat=quat, scalar_first=scalar_first)
+        self.array = quat
+
+    def __len__(self):
+        return len(self.array)
+
+    @classmethod
+    def from_quat(cls, quat: Quaternion) -> Quaternion:
+        """Returns a copy of the Quaternion object - dummy method for API consistency.
+
+        Returns
+        -------
+        Quaternion
+            A copy of the input Quaternion instance.
+        """
+        return cls(quat=quat.array)
+
+    def as_quat(self) -> np.ndarray:
+        """Return the same object - dummy method for API consistency.
+
+        Returns
+        -------
+        Quaternion
+            The same Quaternion instance.
+        """
+        return self
 
     @classmethod
     def from_matrix(cls, matrix: np.ndarray) -> Quaternion:
@@ -596,7 +576,7 @@ class Quaternion:
         dcm_to_quaternion : Low-level direction cosine matrix to quaternion conversion
         """
         quat = dcm_to_quaternion(matrix)
-        return cls(quat=quat, scalar_first=True)
+        return cls(quat=quat)
 
     @classmethod
     def from_euler(
@@ -630,38 +610,20 @@ class Quaternion:
         if degrees:
             angles = np.deg2rad(angles)
         quat = euler_to_quaternion(angles, seq=seq)
-        return cls.from_quat(quat, scalar_first=True)
-
-    def as_quat(self, scalar_first: bool = True) -> np.ndarray:
-        """Return the quaternion as a numpy array.
-
-        Parameters
-        ----------
-        scalar_first : bool, optional
-            If True, the quaternion is returned in scalar-first format (w, x, y, z).
-            If False, scalar-last format (x, y, z, w) is returned. Default is True.
-
-        Returns
-        -------
-        np.ndarray
-            The quaternion as a numpy array.
-        """
-        if scalar_first:
-            return self.quat
-        return np.roll(self.quat, -1)
+        return cls(quat)
 
     def as_matrix(self) -> np.ndarray:
-        """Return the rotation as a rotation matrix.
+        """Return the quaternion as a rotation matrix.
 
         Returns
         -------
         np.ndarray
             The rotation matrix as a 3x3 numpy array.
         """
-        return quaternion_to_dcm(self.quat)
+        return quaternion_to_dcm(self.array)
 
     def as_euler(self, seq: str, degrees: bool = False) -> np.ndarray:
-        """Return the Euler angles from the rotation
+        """Return the Euler angles from the quaternion
 
         This method uses the same notation and conventions as the SciPy Rotation class.
         See the SciPy documentation and ``from_euler`` for more details.
@@ -670,7 +632,7 @@ class Quaternion:
         --------
         quaternion_to_euler : Low-level quaternion to Euler conversion function
         """
-        angles = quaternion_to_euler(self.quat, seq=seq)
+        angles = quaternion_to_euler(self.array, seq=seq)
 
         if degrees:
             angles = np.rad2deg(angles)
@@ -679,16 +641,30 @@ class Quaternion:
 
     @classmethod
     def identity(cls) -> Quaternion:
-        """Return the identity rotation"""
-        return cls.from_quat(np.array([1.0, 0.0, 0.0, 0.0]), scalar_first=True)
+        """Return a quaternion representing the identity rotation."""
+        return cls(np.array([1.0, 0.0, 0.0, 0.0]))
 
     def apply(self, vectors: np.ndarray, inverse: bool = False) -> np.ndarray:
-        """Apply the rotation to a set of vectors
+        """Apply the rotation to a one or more vectors
 
-        If the rotation represents the attitude of a body B relative to a frame A,
+        If the quaternion represents the attitude of a body B relative to a frame A,
         then this method transforms a vector v_A expressed in frame A to the same
         vector expressed in frame B, v_B = R * v_A. If `inverse` is True, the inverse
         rotation is applied, transforming v_B to v_A.
+
+        This method is computationally and mathematically equivalent to:
+
+        ... code-block:: python
+            R_AB = q.as_matrix()
+            v_B = R_AB @ v_A
+
+        or, for the inverse:
+
+        ... code-block:: python
+            v_A = R_AB.T @ v_B
+
+        The method supports both single vectors of shape (3,) and multiple vectors
+        of shape (N, 3).
         """
 
         matrix = self.as_matrix()
@@ -709,26 +685,27 @@ class Quaternion:
         return cast(np.ndarray, result)
 
     def inv(self) -> Quaternion:
-        """Return the inverse rotation"""
-        q = self.as_quat(scalar_first=True)
-        q_inv = quaternion_inverse(q)
-        return Quaternion.from_quat(q_inv, scalar_first=True)
+        """Return the inverse of the quaternion"""
+        q_inv = quaternion_inverse(self.array)   
+        return Quaternion(q_inv)
 
     def mul(self, other: Quaternion, normalize: bool = False) -> Quaternion:
-        """Compose this rotation with another rotation"""
-        q1 = self.as_quat(scalar_first=True)
-        q2 = other.as_quat(scalar_first=True)
+        """Compose (multiply) this quaternion with another"""
+        q1 = self.array
+        q2 = other.array
         q = quaternion_multiply(q1, q2)
-        return Quaternion.from_quat(q, scalar_first=True, normalize=normalize)
+        if normalize:
+            q = q / np.linalg.norm(q)
+        return Quaternion(q)
 
     def __mul__(self, other: Quaternion) -> Quaternion:
-        """Compose this rotation with another rotation"""
+        """Compose (multiply) this quaternion with another and normalize the result"""
         return self.mul(other, normalize=True)
 
     def derivative(self, w: np.ndarray, baumgarte: float | None = None) -> Quaternion:
-        """Return the time derivative of the rotation given angular velocity w.
+        """Return the time derivative of the quaternion given angular velocity w.
 
-        Note that if the rotation represents the attitude of a body B relative to a
+        Note that if the quaternion represents the attitude of a body B relative to a
         frame A, then w should be the body relative angular velocity, i.e. ω_B.
 
         The derivative is computed using quaternion kinematics:
@@ -740,11 +717,12 @@ class Quaternion:
         time derivative is:
             dq/dt = 0.5 * q ⊗ [0, ω] - λ * (||q||² - 1) * q
 
-        **CAUTION**: This method returns the time derivative of the rotation,
+        **CAUTION**: This method returns the time derivative of the quaternion,
         which is represented with the same data structure for consistency with
-        ODE solving - but this return is not itself a valid rotation until
-        integrated in time.  Hence, methods such as ``as_euler`` should never
-        be used on the time derivative, since they will not produce meaningful results.
+        ODE solving - but this return is not itself a valid rotation representation
+        until integrated in time - in particular, it is not unit norm.  Hence,
+        methods such as ``as_euler`` should never be used on the time derivative, 
+        since they will not produce meaningful results.
 
         Parameters
         ----------
@@ -757,8 +735,22 @@ class Quaternion:
         Returns
         -------
         Quaternion
-            The time derivative of the rotation represented as a Quaternion instance.
+            The time derivative represented as a Quaternion instance.
         """
-        q = self.as_quat(scalar_first=True)
-        q_dot = quaternion_kinematics(q, w, baumgarte=baumgarte)
-        return Quaternion.from_quat(q_dot, scalar_first=True, normalize=False)
+        q_dot = quaternion_kinematics(self.array, w, baumgarte=baumgarte)
+        return Quaternion(q_dot)
+
+
+# === Struct registration ===
+def to_iter(quat: Quaternion):
+    children = (quat.array,)
+    aux_data = None  # No static metadata
+    return children, aux_data
+
+
+def from_iter(aux_data, children) -> Quaternion:
+    quat, = children
+    return Quaternion(quat=quat)
+
+
+tree.register_struct(Quaternion, to_iter, from_iter)

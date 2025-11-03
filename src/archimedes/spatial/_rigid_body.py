@@ -88,7 +88,7 @@ class RigidBody:
     >>> rigid_body = RigidBody()
     >>> t = 0
     >>> v_B = np.array([1, 0, 0])  # Constant velocity in x-direction
-    >>> att = Quaternion.from_quat([1, 0, 0, 0])  # No rotation
+    >>> att = Quaternion([1, 0, 0, 0])  # No rotation
     >>> x = rigid_body.State(
     ...     p_N=np.zeros(3),
     ...     att=att,
@@ -103,7 +103,7 @@ class RigidBody:
     ... )
     >>> rigid_body.dynamics(t, x, u)
     State(p_N=array([1., 0., 0.]),
-      att=Quaternion(quat=array([0., 0., 0., 0.]), scalar_first=True),
+      att=Quaternion([0., 0., 0., 0.]),
       v_B=array([ 0.   ,  0.   , -4.905]),
       w_B=array([0., 0., 0.]))
 
