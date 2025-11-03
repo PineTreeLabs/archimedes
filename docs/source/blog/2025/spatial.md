@@ -82,7 +82,7 @@ from archimedes.spatial import RigidBody, Rotation
 # Rotate a vector from the body frame B to an inertial reference frame N if the body
 # attitude is given by (roll, pitch, yaw) Euler angles rpy
 def to_inertial(rpy, v_B):
-    att = Rotation.from_euler("xyz", rpy)
+    att = Rotation.from_euler(rpy, "xyz")
     return att.rotate(v_B)
 
 

@@ -86,7 +86,7 @@ class TestQuaternionWrapper:
         assert np.allclose(q2.array, q0.array)
 
     def _quat_roundtrip(self, euler_orig, seq, debug=False):
-        q = Quaternion.from_euler(seq, euler_orig)
+        q = Quaternion.from_euler(euler_orig, seq)
         assert len(q) == 4
         euler2 = q.as_euler(seq)
 
@@ -102,10 +102,9 @@ class TestQuaternionWrapper:
 
     def _dcm_roundtrip(self, euler_orig, seq, debug=False):
         # Euler -> matrix -> quat -> matrix -> euler
-        q1 = Quaternion.from_euler(seq, euler_orig)
+        q1 = Quaternion.from_euler(euler_orig, seq)
         q2 = Quaternion.from_matrix(q1.as_matrix())
-        euler2 = q2.as_euler(seq, degrees=True)
-        euler2 = np.deg2rad(euler2)
+        euler2 = q2.as_euler(seq)
 
         if debug:
             R1_scipy = ScipyRotation.from_euler(seq, euler_orig)
@@ -147,7 +146,7 @@ class TestQuaternionWrapper:
 
         # Both libraries should give same results
         R_scipy = ScipyRotation.from_euler(seq, angles)
-        q = Quaternion.from_euler(seq, angles)
+        q = Quaternion.from_euler(angles, seq)
 
         test_vector = np.array([1, 2, 3])
         assert np.allclose(q.rotate(test_vector), R_scipy.apply(test_vector))
@@ -157,7 +156,7 @@ class TestQuaternionWrapper:
         def rotate_vector(q, v):
             return q.rotate(v)
 
-        q = Quaternion.from_euler("xyz", [0.1, 0.2, 0.3], degrees=True)
+        q = Quaternion.from_euler([0.1, 0.2, 0.3], "xyz")
         v = np.array([1, 2, 3])
 
         result = rotate_vector(q, v)
@@ -165,7 +164,7 @@ class TestQuaternionWrapper:
         assert np.allclose(result, q.rotate(v))
 
     def test_tree_ops(self):
-        q = Quaternion.from_euler("xyz", [0.1, 0.2, 0.3])
+        q = Quaternion.from_euler([0.1, 0.2, 0.3], "xyz")
         flat, unflatten = arc.tree.ravel(q)
         q_restored = unflatten(flat)
 

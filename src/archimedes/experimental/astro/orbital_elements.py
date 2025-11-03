@@ -99,7 +99,7 @@ def kepler_to_cartesian(
     )
 
     # Quaternion matrix from perifocal to ECI frame.
-    R = Quaternion.from_euler("ZXZ", [Ω, i, ω]).as_matrix()
+    R = Quaternion.from_euler([Ω, i, ω], "ZXZ").as_matrix()
     r_ECI = R @ r_PQW
     v_ECI = R @ v_PQW
     return CartesianState(r_ECI, v_ECI)

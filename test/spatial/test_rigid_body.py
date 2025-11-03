@@ -23,8 +23,8 @@ def test_euler_kinematics():
     # Given roll-pitch-yaw rates, compute the body-frame angular velocity
     # using the rotation matrices directly.
     pqr = np.array([0.4, 0.5, 0.6])  # Roll, pitch, yaw rates
-    C_roll = Quaternion.from_euler("x", rpy[0]).as_matrix().T  # C_φ
-    C_pitch = Quaternion.from_euler("y", rpy[1]).as_matrix().T  # C_θ
+    C_roll = Quaternion.from_euler(rpy[0], "x").as_matrix().T  # C_φ
+    C_pitch = Quaternion.from_euler(rpy[1], "y").as_matrix().T  # C_θ
     # Successively transform each rate into the body frame
     w_B_ex = np.array([pqr[0], 0.0, 0.0]) + C_roll @ (
         np.array([0.0, pqr[1], 0.0]) + C_pitch @ np.array([0.0, 0.0, pqr[2]])
@@ -89,7 +89,7 @@ class TestVehicleDynamics:
         rpy = np.array([0.1, 0.2, 0.3])
         v_B = np.array([1, 2, 3])
 
-        att = Quaternion.from_euler("xyz", rpy)
+        att = Quaternion.from_euler(rpy)
 
         # Could do att.rotate(v_B) but this tests euler_to_dcm
         R_NB = euler_to_dcm(rpy)
@@ -234,7 +234,7 @@ class TestVehicleDynamics:
         # Test that quaternion remains normalized under dynamics
         t = 0
         rpy = np.array([np.pi / 6, np.pi / 4, np.pi / 3])
-        att = Quaternion.from_euler("xyz", rpy)
+        att = Quaternion.from_euler(rpy)
 
         x = np.zeros(13)
         p_N = np.array([0, 0, 0])

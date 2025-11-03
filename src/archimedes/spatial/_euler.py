@@ -124,7 +124,7 @@ def euler_to_dcm(angles: np.ndarray, seq: str = "xyz") -> np.ndarray:
     .. code-block:: python
 
         R_AB = euler_to_dcm(rpy)
-        R_AB = Quaternion.from_euler('xyz', rpy).as_matrix()
+        R_AB = Quaternion.from_euler(rpy, 'xyz').as_matrix()
 
     In general, the ``Quaternion`` class should be preferred over Euler representations,
     although Euler angles are used in some special cases (e.g. stability analysis).

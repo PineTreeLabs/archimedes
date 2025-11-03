@@ -55,7 +55,7 @@ def test_352(f16: SubsonicF16):
     v_B = np.array([430.0447, -99.3347, 234.9345])  # Velocity in body frame
     w_B = np.array([0.7, -0.8, 0.9])  # Angular velocity in body frame
 
-    att = Quaternion.from_euler("xyz", rpy)
+    att = Quaternion.from_euler(rpy)
     x_eng = f16.engine.State(90.0)  # Engine power
     x = f16.State(p_N, att, v_B, w_B, x_eng)
 
@@ -117,7 +117,7 @@ def test_362(f16: SubsonicF16):
         [-1.499617e-2, 2.933811e-1, 6.084932e-2]
     )  # Angular velocity in body frame
 
-    att = Quaternion.from_euler("xyz", rpy)
+    att = Quaternion.from_euler(rpy)
     x_eng = f16.engine.State(6.412363e1)  # Engine power
     x = f16.State(p_N, att, v_B, w_B, x_eng)
 

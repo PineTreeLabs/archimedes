@@ -198,8 +198,7 @@ def euler_to_quaternion(angles: np.ndarray, seq: str = "xyz") -> np.ndarray:
     Parameters
     ----------
     angles : array_like, shape (N,) or (1, N) or (N, 1)
-        Euler angles in radians (or degrees if `degrees` is True). The number of
-        angles must match the length of `seq`.
+        Euler angles in radians. The number of angles must match the length of `seq`.
     seq : str
         Specifies sequence of axes for rotations. Up to 3 characters belonging to
         the set {'x', 'y', 'z'} or {'X', 'Y', 'Z'}. Lowercase characters
@@ -482,7 +481,7 @@ class Quaternion:
     array([[ 2.22044605e-16, -1.00000000e+00,  0.00000000e+00],
     [ 1.00000000e+00,  2.22044605e-16,  0.00000000e+00],
     [ 0.00000000e+00,  0.00000000e+00,  1.00000000e+00]])
-    >>> q.as_euler('zyx', degrees=True)
+    >>> np.rad2deg(q.as_euler('zyx'))
     array([90.,  0.,  0.])
 
     The same quaternion can be initialized using a rotation matrix:
@@ -493,13 +492,13 @@ class Quaternion:
 
     Representation in other formats:
 
-    >>> q.as_euler('zyx', degrees=True)
+    >>> np.rad2deg(q.as_euler('zyx'))
     array([90.,  0.,  0.])
 
-    The ``from_euler`` method is quite flexible in the range of input formats
+    The ``from_euler`` method is flexible in the range of input formats
     it supports. Here we initialize a quaternion about a single axis:
 
-    >>> q = Quaternion.from_euler('z', 90, degrees=True)
+    >>> q = Quaternion.from_euler(np.deg2rad(90), 'z')
 
     The ``rotate`` method can be used to rotate vectors:
 
@@ -534,6 +533,103 @@ class Quaternion:
             raise ValueError("Quaternion must have shape (4,), (1, 4), or (4, 1)")
         quat = quat.flatten()
         self.array = quat
+
+    # === Methods for implementing Attitude protocol ===
+
+    def as_matrix(self) -> np.ndarray:
+        """Return the quaternion as a rotation matrix.
+
+        Returns
+        -------
+        np.ndarray
+            The rotation matrix as a 3x3 numpy array.
+        """
+        return quaternion_to_dcm(self.array)
+
+    def rotate(self, vectors: np.ndarray, inverse: bool = False) -> np.ndarray:
+        """Rotate one or more vectors
+
+        If the quaternion represents the attitude of a body B relative to a frame A,
+        then this method transforms a vector v_A expressed in frame A to the same
+        vector expressed in frame B, v_B = R * v_A. If `inverse` is True, the inverse
+        rotation is applied, transforming v_B to v_A.
+
+        This method is computationally and mathematically equivalent to:
+
+        ... code-block:: python
+            R_AB = q.as_matrix()
+            v_B = R_AB @ v_A
+
+        or, for the inverse:
+
+        ... code-block:: python
+            v_A = R_AB.T @ v_B
+
+        The method supports both single vectors of shape (3,) and multiple vectors
+        of shape (N, 3).
+        """
+
+        matrix = self.as_matrix()
+        if inverse:
+            matrix = matrix.T
+
+        vectors = cast(np.ndarray, array(vectors))
+        if vectors.ndim == 1:
+            if vectors.shape != (3,):
+                raise ValueError("For 1D input, `vectors` must have shape (3,)")
+            result = matrix @ vectors
+
+        else:
+            if vectors.shape[1] != 3:
+                raise ValueError("For 2D input, `vectors` must have shape (N, 3)")
+            result = vectors @ matrix.T
+
+        return cast(np.ndarray, result)
+
+    def inv(self) -> Quaternion:
+        """Return the inverse of the quaternion"""
+        q_inv = quaternion_inverse(self.array)   
+        return Quaternion(q_inv)
+
+    def derivative(self, w: np.ndarray, baumgarte: float | None = None) -> Quaternion:
+        """Return the time derivative of the quaternion given angular velocity w.
+
+        Note that if the quaternion represents the attitude of a body B relative to a
+        frame A, then w should be the body relative angular velocity, i.e. ω_B.
+
+        The derivative is computed using quaternion kinematics:
+            dq/dt = 0.5 * q ⊗ [0, ω]
+        where ⊗ is the quaternion multiplication operator.
+
+        The method optionally support Baumgarte stabilization to preserve
+        unit normalization.  For a stabilization factor λ, the full
+        time derivative is:
+            dq/dt = 0.5 * q ⊗ [0, ω] - λ * (||q||² - 1) * q
+
+        **CAUTION**: This method returns the time derivative of the quaternion,
+        which is represented with the same data structure for consistency with
+        ODE solving - but this return is not itself a valid rotation representation
+        until integrated in time - in particular, it is not unit norm.  Hence,
+        methods such as ``as_euler`` should never be used on the time derivative, 
+        since they will not produce meaningful results.
+
+        Parameters
+        ----------
+        w : array_like, shape (3,)
+            Angular velocity vector in the body frame.
+        baumgarte : float, optional
+            Baumgarte stabilization factor. If > 0, Baumgarte stabilization is
+            applied to enforce unit norm constraint. Default is 0 (no stabilization).
+
+        Returns
+        -------
+        Quaternion
+            The time derivative represented as a Quaternion instance.
+        """
+        q_dot = quaternion_kinematics(self.array, w, baumgarte=baumgarte)
+        return Quaternion(q_dot)
+
+    # === Other methods ===
 
     def __len__(self):
         return len(self.array)
@@ -584,24 +680,21 @@ class Quaternion:
         return cls(quat=quat)
 
     @classmethod
-    def from_euler(
-        cls, seq: str, angles: np.ndarray, degrees: bool = False
-    ) -> Quaternion:
+    def from_euler(cls, angles: np.ndarray, seq: str = "xyz") -> Quaternion:
         """Create a Quaternion from Euler angles.
 
         Parameters
         ----------
+        angles : array_like, shape (N,) or (1, N) or (N, 1)
+            Euler angles in radians. The number of angles must match the length of `seq`. 
+            angles must match the length of `seq`.
         seq : str
             Specifies sequence of axes for rotations. Up to 3 characters belonging to
             the set {'x', 'y', 'z'} or {'X', 'Y', 'Z'}. Lowercase characters
             correspond to extrinsic rotations about the fixed axes, while uppercase
             characters correspond to intrinsic rotations about the rotating axes.
-            Examples include 'xyz', 'ZYX', 'xzx', etc.
-        angles : array_like, shape (N,) or (1, N) or (N, 1)
-            Euler angles in radians (or degrees if `degrees` is True). The number of
-            angles must match the length of `seq`.
-        degrees : bool, optional
-            If True, the angles are assumed to be in degrees. Default is False (radians).
+            Examples include 'xyz', 'ZYX', 'xzx', etc. Default is 'xyz' (standard
+            roll-pitch-yaw sequence).
 
         Returns
         -------
@@ -612,87 +705,25 @@ class Quaternion:
         --------
         euler_to_quaternion : Low-level Euler to quaternion conversion function
         """
-        if degrees:
-            angles = np.deg2rad(angles)
         quat = euler_to_quaternion(angles, seq=seq)
         return cls(quat)
 
-    def as_matrix(self) -> np.ndarray:
-        """Return the quaternion as a rotation matrix.
-
-        Returns
-        -------
-        np.ndarray
-            The rotation matrix as a 3x3 numpy array.
-        """
-        return quaternion_to_dcm(self.array)
-
-    def as_euler(self, seq: str, degrees: bool = False) -> np.ndarray:
+    def as_euler(self, seq: str) -> np.ndarray:
         """Return the Euler angles from the quaternion
 
         This method uses the same notation and conventions as the SciPy Rotation class.
-        See the SciPy documentation and ``from_euler`` for more details.
+        See the SciPy documentation and :py:meth:``from_euler`` for more details.
 
         See Also
         --------
         quaternion_to_euler : Low-level quaternion to Euler conversion function
         """
-        angles = quaternion_to_euler(self.array, seq=seq)
-
-        if degrees:
-            angles = np.rad2deg(angles)
-
-        return angles
+        return quaternion_to_euler(self.array, seq=seq)
 
     @classmethod
     def identity(cls) -> Quaternion:
         """Return a quaternion representing the identity rotation."""
         return cls(np.array([1.0, 0.0, 0.0, 0.0]))
-
-    def rotate(self, vectors: np.ndarray, inverse: bool = False) -> np.ndarray:
-        """Rotate one or more vectors
-
-        If the quaternion represents the attitude of a body B relative to a frame A,
-        then this method transforms a vector v_A expressed in frame A to the same
-        vector expressed in frame B, v_B = R * v_A. If `inverse` is True, the inverse
-        rotation is applied, transforming v_B to v_A.
-
-        This method is computationally and mathematically equivalent to:
-
-        ... code-block:: python
-            R_AB = q.as_matrix()
-            v_B = R_AB @ v_A
-
-        or, for the inverse:
-
-        ... code-block:: python
-            v_A = R_AB.T @ v_B
-
-        The method supports both single vectors of shape (3,) and multiple vectors
-        of shape (N, 3).
-        """
-
-        matrix = self.as_matrix()
-        if inverse:
-            matrix = matrix.T
-
-        vectors = cast(np.ndarray, array(vectors))
-        if vectors.ndim == 1:
-            if vectors.shape != (3,):
-                raise ValueError("For 1D input, `vectors` must have shape (3,)")
-            result = matrix @ vectors
-
-        else:
-            if vectors.shape[1] != 3:
-                raise ValueError("For 2D input, `vectors` must have shape (N, 3)")
-            result = vectors @ matrix.T
-
-        return cast(np.ndarray, result)
-
-    def inv(self) -> Quaternion:
-        """Return the inverse of the quaternion"""
-        q_inv = quaternion_inverse(self.array)   
-        return Quaternion(q_inv)
 
     def mul(self, other: Quaternion, normalize: bool = False) -> Quaternion:
         """Compose (multiply) this quaternion with another"""
@@ -706,44 +737,6 @@ class Quaternion:
     def __mul__(self, other: Quaternion) -> Quaternion:
         """Compose (multiply) this quaternion with another and normalize the result"""
         return self.mul(other, normalize=True)
-
-    def derivative(self, w: np.ndarray, baumgarte: float | None = None) -> Quaternion:
-        """Return the time derivative of the quaternion given angular velocity w.
-
-        Note that if the quaternion represents the attitude of a body B relative to a
-        frame A, then w should be the body relative angular velocity, i.e. ω_B.
-
-        The derivative is computed using quaternion kinematics:
-            dq/dt = 0.5 * q ⊗ [0, ω]
-        where ⊗ is the quaternion multiplication operator.
-
-        The method optionally support Baumgarte stabilization to preserve
-        unit normalization.  For a stabilization factor λ, the full
-        time derivative is:
-            dq/dt = 0.5 * q ⊗ [0, ω] - λ * (||q||² - 1) * q
-
-        **CAUTION**: This method returns the time derivative of the quaternion,
-        which is represented with the same data structure for consistency with
-        ODE solving - but this return is not itself a valid rotation representation
-        until integrated in time - in particular, it is not unit norm.  Hence,
-        methods such as ``as_euler`` should never be used on the time derivative, 
-        since they will not produce meaningful results.
-
-        Parameters
-        ----------
-        w : array_like, shape (3,)
-            Angular velocity vector in the body frame.
-        baumgarte : float, optional
-            Baumgarte stabilization factor. If > 0, Baumgarte stabilization is
-            applied to enforce unit norm constraint. Default is 0 (no stabilization).
-
-        Returns
-        -------
-        Quaternion
-            The time derivative represented as a Quaternion instance.
-        """
-        q_dot = quaternion_kinematics(self.array, w, baumgarte=baumgarte)
-        return Quaternion(q_dot)
 
 
 # === Struct registration ===
