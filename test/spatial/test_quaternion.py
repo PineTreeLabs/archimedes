@@ -98,7 +98,7 @@ class TestQuaternionWrapper:
             print(f"euler:       {euler2}")
             print(f"SciPy euler: {R2.as_euler(seq)}")
 
-        assert np.allclose(euler2, euler_orig)
+        assert np.allclose(euler2.array, euler_orig)
 
     def _dcm_roundtrip(self, euler_orig, seq, debug=False):
         # Euler -> matrix -> quat -> matrix -> euler
@@ -115,7 +115,7 @@ class TestQuaternionWrapper:
             print(f"euler:       {euler2}")
             print(f"SciPy euler: {R2_scipy.as_euler(seq)}")
 
-        assert np.allclose(euler2, euler_orig)
+        assert np.allclose(euler2.array, euler_orig)
 
     @pytest.mark.parametrize(
         "seq",

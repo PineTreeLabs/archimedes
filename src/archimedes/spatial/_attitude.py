@@ -168,11 +168,10 @@ class EulerAngles:
     """
 
     def __init__(self, angles: np.ndarray, seq: str = "xyz"):
-        angles = np.hstack(angles)
         _check_seq(seq)
         _check_angles(angles, seq)
 
-        self.array = angles.flatten()
+        self.array = angles
         self.seq = seq
 
 
@@ -255,12 +254,12 @@ class EulerAngles:
         return len(self.seq)
 
     @classmethod
-    def from_quat(cls, quat: Quaternion, seq: str = "xyz") -> EulerAngles:
+    def from_quat(cls, quat: Quaternion | np.ndarray, seq: str = "xyz") -> EulerAngles:
         """Create EulerAngles from a Quaternion.
 
         Parameters
         ----------
-        quat : Quaternion
+        quat : Quaternion or array_like 
             Quaternion representing the rotation.
 
         Returns
@@ -268,7 +267,9 @@ class EulerAngles:
         EulerAngles
             New EulerAngles instance representing the same rotation.
         """
-        angles = quat.as_euler(seq)
+        if isinstance(quat, Quaternion):
+            quat = quat.array
+        angles = quaternion_to_euler(quat, seq=seq)
         return cls(angles=angles, seq=seq)
 
     def as_quat(self) -> Quaternion:
@@ -279,7 +280,8 @@ class EulerAngles:
         Quaternion
             The equivalent Quaternion representation of this rotation.
         """
-        return Quaternion.from_euler(self, self.seq)
+        quat = euler_to_quaternion(self.array, seq=self.seq)
+        return Quaternion(quat)
 
     @classmethod
     def from_euler(cls, euler: EulerAngles, seq: str = "xyz") -> EulerAngles:
@@ -290,8 +292,7 @@ class EulerAngles:
         if seq == euler.seq:
             return cls(angles=euler.array, seq=seq)
 
-        quat = euler.as_quat()
-        return quat.as_euler(seq)
+        return euler.as_euler(seq)
 
     def as_euler(self, seq: str = "xyz") -> EulerAngles:
         """Return the Euler angles in a different sequence of axes.
@@ -301,9 +302,7 @@ class EulerAngles:
         if seq == self.seq:
             return self
 
-        quat = self.as_quat()
-        euler_new = quat.as_euler(seq)
-        return euler_new
+        return self.as_quat().as_euler(seq)
     
     @classmethod
     def identity(cls, seq: str = "xyz") -> EulerAngles:
@@ -575,21 +574,19 @@ class Quaternion:
         return cls(quat=quat)
 
     @classmethod
-    def from_euler(cls, angles: np.ndarray, seq: str = "xyz") -> Quaternion:
+    def from_euler(
+        cls, euler: EulerAngles | np.ndarray, seq: str | None = None
+    ) -> Quaternion:
         """Create a Quaternion from Euler angles.
 
         Parameters
         ----------
-        angles : array_like, shape (N,) or (1, N) or (N, 1)
-            Euler angles in radians. The number of angles must match the length of `seq`. 
-            angles must match the length of `seq`.
-        seq : str
-            Specifies sequence of axes for rotations. Up to 3 characters belonging to
-            the set {'x', 'y', 'z'} or {'X', 'Y', 'Z'}. Lowercase characters
-            correspond to extrinsic rotations about the fixed axes, while uppercase
-            characters correspond to intrinsic rotations about the rotating axes.
-            Examples include 'xyz', 'ZYX', 'xzx', etc. Default is 'xyz' (standard
-            roll-pitch-yaw sequence).
+        euler : EulerAngles or array_like
+            Euler angles instance or array of Euler angles in radians.
+        seq : str, optional
+            Sequence of axes for Euler angles (up to length 3).  Each character must be one
+            of 'x', 'y', 'z' (extrinsic) or 'X', 'Y', 'Z' (intrinsic).  Default is 'xyz'.
+            Should not be specified if `euler` is an EulerAngles instance.
 
         Returns
         -------
@@ -600,10 +597,20 @@ class Quaternion:
         --------
         euler_to_quaternion : Low-level Euler to quaternion conversion function
         """
-        quat = euler_to_quaternion(angles, seq=seq)
-        return cls(quat)
 
-    def as_euler(self, seq: str) -> np.ndarray:
+        if isinstance(euler, EulerAngles):
+            if seq is not None:
+                raise ValueError(
+                    "If `euler` is an EulerAngles instance, `seq` should not be passed"
+                )
+        else:
+            if seq is None:
+                seq = "xyz"
+            euler = EulerAngles(angles=euler, seq=seq)
+
+        return euler.as_quat()
+
+    def as_euler(self, seq: str) -> EulerAngles:
         """Return the Euler angles from the quaternion
 
         This method uses the same notation and conventions as the SciPy Rotation class.
@@ -613,7 +620,7 @@ class Quaternion:
         --------
         quaternion_to_euler : Low-level quaternion to Euler conversion function
         """
-        return quaternion_to_euler(self.array, seq=seq)
+        return EulerAngles.from_quat(self, seq=seq)
 
     @classmethod
     def identity(cls) -> Quaternion:
