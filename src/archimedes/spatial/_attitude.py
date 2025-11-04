@@ -140,19 +140,6 @@ class EulerAngles:
     seq : str
         Sequence of axes for Euler angles.
 
-    Methods
-    -------
-    __len__
-    from_quat
-    from_euler
-    as_quat
-    as_matrix
-    as_euler
-    identity
-    rotate
-    inv
-    kinematics
-
     Examples
     --------
     >>> from archimedes.spatial import EulerAngles
@@ -169,8 +156,18 @@ class EulerAngles:
     """
 
     def __init__(self, angles: np.ndarray, seq: str = "xyz"):
-        _check_seq(seq)
-        _check_angles(angles, seq)
+        # Internal implementation: for some analysis (e.g. vmap), the
+        # struct might be initialized with an int instead of an array
+        # for determining axis indices.  In that case we don't want to
+        # do explicit shape validation
+        if not isinstance(angles, int):
+            _check_seq(seq)
+            # Also for vmapping: angles might be passed as a 2D array
+            # This solution isn't ideal, since it could introduce user errors
+            # by inadvertently passing a 2D array.  It might be better to
+            # check the angles when methods are called instead.
+            if not getattr(angles, "ndim", None) == 2:
+                _check_angles(angles, seq)
 
         self.array = angles
         self.seq = seq
@@ -252,6 +249,9 @@ class EulerAngles:
         return EulerAngles(H @ w_B)
 
     # === Other methods ===
+
+    def __repr__(self) -> str:
+        return f"EulerAngles({self.array}, seq='{self.seq}')"
 
     def __len__(self) -> int:
         """Return the number of Euler angles (length of sequence)."""
@@ -364,21 +364,6 @@ class Quaternion:
     array : np.ndarray, shape (4,)
         Underlying numpy array representing the quaternion.
 
-    Methods
-    -------
-    __len__
-    from_quat
-    from_matrix
-    from_euler
-    as_quat
-    as_matrix
-    as_euler
-    identity
-    rotate
-    inv
-    mul
-    kinematics
-
     Examples
     --------
     >>> from archimedes.spatial import Quaternion
@@ -446,10 +431,19 @@ class Quaternion:
     """
 
     def __init__(self, quat: np.ndarray):
-        quat = np.hstack(quat)  # type: ignore
-        if quat.shape not in [(4,), (1, 4), (4, 1)]:
-            raise ValueError("Quaternion must have shape (4,), (1, 4), or (4, 1)")
-        quat = quat.flatten()
+        # Internal implementation: for some analysis (e.g. vmap), the
+        # struct might be initialized with an int instead of an array
+        # for determining axis indices.  In that case we don't want to
+        # do explicit shape validation
+        # Also for vmapping: data might be passed as a 2D array
+        # This solution isn't ideal, since it could introduce user errors
+        # by inadvertently passing a 2D array.  It might be better to
+        # check the angles when methods are called instead.
+        if not (isinstance(quat, int) or getattr(quat, "ndim", None) == 2):
+            quat = np.hstack(quat)  # type: ignore
+            if quat.shape not in [(4,), (1, 4), (4, 1)]:
+                raise ValueError("Quaternion must have shape (4,), (1, 4), or (4, 1)")
+            quat = quat.flatten()
         self.array: np.ndarray = quat
 
     # === Methods for implementing Attitude protocol ===
