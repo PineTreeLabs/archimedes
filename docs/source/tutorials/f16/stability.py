@@ -34,7 +34,7 @@ class LongitudinalState:
             eng=x.eng,
         )
 
-    def as_full_state(self, rpy_attitude=True) -> SubsonicF16.State:
+    def as_full_state(self) -> SubsonicF16.State:
         # Assume zero sideslip, zero lateral states
 
         v_B = np.hstack(
@@ -45,17 +45,12 @@ class LongitudinalState:
             ]
         )
 
-        rpy = np.hstack([0.0, self.theta, 0.0])
-        if rpy_attitude:
-            att = rpy
-        else:
-            att = Quaternion.from_euler([0.0, self.theta, 0.0])
-
+        rpy = Quaternion.from_euler([0.0, self.theta, 0.0])
         w_B = np.hstack([0.0, self.q, 0.0])
 
         return SubsonicF16.State(
             p_N=np.zeros(3),
-            att=att,
+            att=rpy,
             v_B=v_B,
             w_B=w_B,
             eng=self.eng,

@@ -75,15 +75,15 @@ However, by re-implementing it in Archimedes we can ensure that it is compatible
 import numpy as np
 
 import archimedes as arc
-from archimedes.spatial import RigidBody, Rotation
+from archimedes.spatial import RigidBody, Rotation, Quaternion
 ```
 
 ```{code-cell} python
 # Rotate a vector from the body frame B to an inertial reference frame N if the body
 # attitude is given by (roll, pitch, yaw) Euler angles rpy
 def to_inertial(rpy, v_B):
-    att = Rotation.from_euler(rpy, "xyz")
-    return att.rotate(v_B)
+    att = Rotation.from_euler("xyz", rpy)
+    return att.apply(v_B)
 
 
 rpy = np.array([0.1, 0.2, 0.3])
@@ -126,7 +126,7 @@ A factor of $\lambda = 1$ is a good default (and is the default in `RigidBody` a
 ```{code-cell} python
 att = Rotation.from_euler("xyz", rpy)
 w_B = np.array([0.0, 0.1, 0.0])  # 0.1 rad/sec pitch-up
-att.kinematics(w_B, baumgarte=1.0)
+att.derivative(w_B, baumgarte=1.0)
 ```
 
 :::{caution}
@@ -251,11 +251,10 @@ Flux capacitors not included.
 Here's the `RigidBody` class in action:
 
 ```{code-cell} python
-rb = RigidBody()
 
 x = RigidBody.State(
     p_N=np.array([0.0, 0.0, 10.0]),
-    att=Rotation.identity(),
+    att=Quaternion.identity(),
     v_B=np.zeros(3),
     w_B=np.zeros(3),
 )
@@ -267,7 +266,7 @@ u = RigidBody.Input(
     J_B=np.eye(3),
 )
 
-rb.dynamics(0.0, x, u)
+RigidBody.dynamics(0.0, x, u)
 ```
 
 In this simple case, since the body and world axes are aligned (`Rotation.identity()`) and we start out with zero angular velocity, most of the complexity from non-inertial frames in the equations of motion disappears. and we just get $m \dot{\mathbf{v}}_B = \mathbf{F}_B$ and $\mathbf{J}_B \dot{\mathbf{\omega}}_B = \mathbf{M}_B$.
@@ -336,7 +335,6 @@ This can be a more natural way to organize hierarchical state variables:
 class Aircraft:
     gravity: GravityModel
     atmosphere: AtmosphereModel
-    rigid_body: RigidBody
 
     aero: AeroModel
     engine: EngineModel
@@ -345,8 +343,7 @@ class Aircraft:
     J_B: np.ndarray
 
     @struct
-    class State:
-        rigid_body: RigidBody.State
+    class State(RigidBody.State):
         aero: AeroModel.State
         engine: Engine.State
 
@@ -377,10 +374,17 @@ class Aircraft:
         M_B = M_aero_B
 
         # Evaluate the equations of motion
-        u_rb = self.rigid_body.Input(F_B=F_B, M_B=M_B, m=self.m, J_B=self.J_B)
-        x_rb_dot = self.rigid_body.dynamics(x.rigid_body, u_rb)
+        u_rb = RigidBody.Input(F_B=F_B, M_B=M_B, m=self.m, J_B=self.J_B)
+        x_rb_dot = RigidBody.dynamics(x, u_rb)
 
-        return self.State(rigid_body=x_rb_dot, aero=x_aero_dot, engine=x_eng_dot)
+        return self.State(
+            p_N=x_rb_dot.p_N,
+            att=x_rb_dot.att,
+            v_B=x_rb_dot.v_B,
+            w_B=x_rb_dot.w_B,
+            aero=x_aero_dot,
+            engine=x_eng_dot,
+        )
 ```
 
 Now the aerodynamic state can handle lag effects or other unsteady aerodynamic behavior, and the engine can have its own internal dynamics as well.
