@@ -3,12 +3,11 @@ from __future__ import annotations
 
 import numpy as np
 
-from ..tree import StructConfig, field, struct
+from ..tree import struct
 from ._attitude import Attitude
 
 __all__ = [
     "RigidBody",
-    "RigidBodyConfig",
 ]
 
 
@@ -23,7 +22,7 @@ class RigidBody:
     forces, moments, or mass properties.  These must be provided as inputs to the
     dynamics function.
 
-    The model assumes a non-inertial body-fixed reference frame B and a Newtonian
+    The model does assume a non-inertial body-fixed reference frame B and a Newtonian
     inertial reference frame N.  The body frame is assumed to be located at the
     vehicle's center of mass.
 
@@ -494,10 +493,3 @@ class RigidBody:
             w_B=dw_B,
         )
 
-
-class RigidBodyConfig(StructConfig):
-    """Configuration for ``RigidBody`` model."""
-
-    def build(self) -> RigidBody:
-        """Build and return a RigidBody instance."""
-        return RigidBody()

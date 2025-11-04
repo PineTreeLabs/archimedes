@@ -7,7 +7,6 @@ import archimedes as arc
 from archimedes.spatial import (
     Quaternion,
     RigidBody,
-    RigidBodyConfig,
     euler_to_dcm,
 )
 
@@ -17,11 +16,6 @@ J_B_inv = np.linalg.inv(J_B)
 
 
 class TestVehicleDynamics:
-    def test_build_from_config(self):
-        config = {}
-        rb = RigidBodyConfig(**config).build()
-        assert isinstance(rb, RigidBody)
-
     def test_constant_velocity_no_orientation(self):
         rigid_body = RigidBody()
         t = 0

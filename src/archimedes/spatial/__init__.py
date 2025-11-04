@@ -22,11 +22,11 @@ from ._quaternion import (
 )
 from ._rigid_body import (
     RigidBody,
-    RigidBodyConfig,
 )
 
 __all__ = [
     "Attitude",
+    "RigidBody",
     "dcm_to_quaternion",
     "euler_kinematics",
     "euler_to_dcm",
@@ -39,8 +39,6 @@ __all__ = [
     "quaternion_to_dcm",
     "quaternion_to_euler",
     "Quaternion",
-    "RigidBody",
-    "RigidBodyConfig",
 ]
 
 
