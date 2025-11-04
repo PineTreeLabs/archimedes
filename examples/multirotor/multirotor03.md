@@ -90,7 +90,6 @@ vehicle = multirotor.MultiRotorVehicle(
     drag_model=drag_model,
     rotor_model=rotor_model,
     gravity_model=gravity_model,
-    rigid_body=multirotor.RigidBody(),
 )
 ```
 
