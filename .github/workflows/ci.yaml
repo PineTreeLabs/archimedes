@@ -28,8 +28,11 @@ jobs:
         uv sync --all-extras --dev
         python -m ipykernel install --user --name archimedes
 
-    - name: Run tests
-      run: uv run pytest --cov=archimedes --cov-report=xml
+    - name: Run all tests
+      run: uv run pytest
+
+    - name: Run coverage analysis
+      run: uv run pytest test --cov=archimedes --cov-report=xml
 
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v5

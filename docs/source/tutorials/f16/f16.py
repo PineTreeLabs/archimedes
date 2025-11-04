@@ -34,7 +34,7 @@ from archimedes.experimental.aero import (
     GravityConfig,
     GravityModel,
 )
-from archimedes.spatial import RigidBody, RigidBodyConfig, euler_to_dcm
+from archimedes.spatial import RigidBody
 
 if TYPE_CHECKING:
     from trim import TrimPoint

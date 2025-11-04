@@ -16,7 +16,7 @@ from stability import (
 )
 
 import archimedes as arc
-from archimedes.spatial import RigidBody, Quaternion, euler_kinematics
+from archimedes.spatial import Quaternion, euler_kinematics
 
 CURRENT_PATH = Path(__file__).parent
 

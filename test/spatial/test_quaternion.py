@@ -6,11 +6,12 @@ from scipy.spatial.transform import Rotation as ScipyRotation
 
 import archimedes as arc
 from archimedes.spatial import (
+    EulerAngles,
     Quaternion,
-    quaternion_to_euler,
     quaternion_inverse,
     quaternion_multiply,
     quaternion_to_dcm,
+    quaternion_to_euler,
 )
 
 np.random.seed(0)
@@ -37,9 +38,11 @@ class TestQuaternionLowLevel:
     def test_inverse(self):
         q = random_quat()
         q_inv = quaternion_inverse(q)
-        q_inv_scipy = ScipyRotation.from_quat(
-            q, scalar_first=True
-        ).inv().as_quat(scalar_first=True)
+        q_inv_scipy = (
+            ScipyRotation.from_quat(q, scalar_first=True)
+            .inv()
+            .as_quat(scalar_first=True)
+        )
         assert np.allclose(q_inv, q_inv_scipy)
 
     def test_to_dcm(self):
@@ -56,12 +59,40 @@ class TestQuaternionLowLevel:
             np.testing.assert_allclose(euler1, euler2)
 
 
-
 class TestQuaternionWrapper:
+    def test_ops(self):
+        q = Quaternion.identity()
+        assert len(q) == 4
+
+        # __getitem__
+        assert q[0] == 1.0
+
+        # __iter__
+        w, x, y, z = q
+        assert np.allclose(np.array([w, x, y, z]), np.array([1.0, 0.0, 0.0, 0.0]))
+
+        assert q.as_quat() is q
+        np.testing.assert_allclose(Quaternion.from_quat(q).array, q.array)
+
     def test_identity(self):
         q = Quaternion.identity()
         v = np.array([1, 2, 3])
         assert np.allclose(q.rotate(v), v)
+
+    def test_rotate(self):
+        q = random_quat(wrapper=True)
+        v = np.array([0.1, 0.2, 0.3])
+        w = q.rotate(v)
+
+        R_scipy = ScipyRotation.from_quat(q.array, scalar_first=True)
+        w_scipy = R_scipy.apply(v)
+
+        assert np.allclose(w, w_scipy)
+
+        # Inverse apply
+        w = q.rotate(v, inverse=True)
+        w_scipy = R_scipy.apply(v, inverse=True)
+        assert np.allclose(w, w_scipy)
 
     def test_multiplication(self):
         q1, q2 = random_quat(True), random_quat(True)
@@ -73,17 +104,24 @@ class TestQuaternionWrapper:
 
     def test_composition_associativity(self):
         R1, R2, R3 = [random_quat(True) for _ in range(3)]
-        q1 = ((R1 * R2) * R3)
-        q2 = (R1 * (R2 * R3))
+        q1 = (R1 * R2) * R3
+        q2 = R1 * (R2 * R3)
         assert np.allclose(q1.array, q2.array)
 
     def test_inverse(self):
         q = random_quat(True)
         q0 = Quaternion.identity()
-        q1 = (q * q.inv())
-        q2 = (q.inv() * q)
+        q1 = q * q.inv()
+        q2 = q.inv() * q
         assert np.allclose(q1.array, q0.array)
         assert np.allclose(q2.array, q0.array)
+
+    def test_kinematics(self):
+        q = random_quat(wrapper=True)
+        w_B = np.array([0.01, -0.02, 0.03])
+        q_t1 = q.kinematics(w_B, baumgarte=1.0)
+        q_t2 = 0.5 * quaternion_multiply(q.array, np.array([0, *w_B]))
+        assert np.allclose(q_t1.array, q_t2, atol=1e-6)
 
     def _quat_roundtrip(self, euler_orig, seq, debug=False):
         q = Quaternion.from_euler(euler_orig, seq)
@@ -176,6 +214,11 @@ class TestQuaternionWrapper:
         # Invalid output sequence
         with pytest.raises(ValueError, match="Expected `seq` to be a string"):
             Quaternion.identity().as_euler("xz")
+
+        # Pass sequence and Euler angles
+        with pytest.raises(ValueError, match="If `euler` is an EulerAngles"):
+            angles = EulerAngles([0.1, 0.2, 0.3], seq="xyz")
+            Quaternion.from_euler(angles, seq="zyx")
 
         # Invalid quat shape
         with pytest.raises(ValueError, match="Quaternion must have shape"):

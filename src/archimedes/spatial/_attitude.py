@@ -1,11 +1,15 @@
 """High-level wrappers for attitude representations."""
+
+# ruff: noqa: N803, N806
 from __future__ import annotations
+
 from typing import Protocol, cast
 
 import numpy as np
+
 from archimedes import array, tree
 
-from ._euler import euler_kinematics, euler_to_dcm, _check_angles, _check_seq
+from ._euler import _check_angles, _check_seq, euler_kinematics, euler_to_dcm
 from ._quaternion import (
     dcm_to_quaternion,
     euler_to_quaternion,
@@ -21,6 +25,7 @@ __all__ = [
     "EulerAngles",
     "Quaternion",
 ]
+
 
 class Attitude(Protocol):
     """Protocol for attitude representations.
@@ -46,14 +51,13 @@ class Attitude(Protocol):
         -------
             A 3x3 numpy array representing the DCM.
         """
-        ...
 
     def rotate(self, vectors: np.ndarray, inverse: bool = False) -> np.ndarray:
         """Rotate vectors by the attitude.
 
         If the attitude represents the orientation of a body B relative to a frame A,
-        this method rotates vectors between the two frames. Specifically, for a vector v_B
-        expressed in frame B, the corresponding vector in frame A is given by
+        this method rotates vectors between the two frames. Specifically, for a vector
+        v_B expressed in frame B, the corresponding vector in frame A is given by
         ``v_A = R_AB @ v_B``, where R_AB is the DCM obtained from `as_matrix()`.
 
         Parameters
@@ -68,7 +72,6 @@ class Attitude(Protocol):
         -------
             An array representing the rotated vectors.
         """
-        ...
 
     def inv(self) -> Attitude:
         """Compute the inverse (conjugate) of the attitude.
@@ -78,7 +81,6 @@ class Attitude(Protocol):
         Attitude
             A new attitude instance representing the inverse rotation.
         """
-        ...
 
     def kinematics(self, w_B: np.ndarray) -> Attitude:
         """Compute the time derivative of the attitude given angular velocity.
@@ -99,7 +101,6 @@ class Attitude(Protocol):
         Attitude
             The time derivative of the attitude representation.
         """
-        ...
 
 
 def _rotate(att: Attitude, v: np.ndarray, inverse: bool = False) -> np.ndarray:
@@ -174,7 +175,6 @@ class EulerAngles:
         self.array = angles
         self.seq = seq
 
-
     # === Methods for implementing Attitude protocol ===
 
     def as_matrix(self) -> np.ndarray:
@@ -209,7 +209,7 @@ class EulerAngles:
             Rotated vectors with the same shape as input.
         """
         return _rotate(self, vectors, inverse=inverse)
-    
+
     def inv(self) -> EulerAngles:
         """Return the inverse (conjugate) of this Euler angle rotation.
 
@@ -221,7 +221,7 @@ class EulerAngles:
         angles = -self.array[::-1]
         seq = self.seq[::-1]
         return EulerAngles(angles=angles, seq=seq)
-    
+
     def kinematics(self, w_B: np.ndarray) -> EulerAngles:
         """Compute the time derivative of the Euler angles given angular velocity.
 
@@ -244,8 +244,12 @@ class EulerAngles:
         EulerAngles
             Time derivative of the Euler angles.
         """
+        if self.seq != "xyz":
+            raise NotImplementedError(
+                "Euler angle kinematics currently only implemented for 'xyz' sequence"
+            )
         H = euler_kinematics(self.array, inverse=False)
-        return H @ w_B
+        return EulerAngles(H @ w_B)
 
     # === Other methods ===
 
@@ -253,7 +257,7 @@ class EulerAngles:
         """Return the number of Euler angles (length of sequence)."""
         return len(self.seq)
 
-    def __getitem__(self, index: int) -> float:
+    def __getitem__(self, index: int):
         return self.array[index]
 
     def __iter__(self):
@@ -265,7 +269,7 @@ class EulerAngles:
 
         Parameters
         ----------
-        quat : Quaternion or array_like 
+        quat : Quaternion or array_like
             Quaternion representing the rotation.
 
         Returns
@@ -309,7 +313,7 @@ class EulerAngles:
             return self
 
         return self.as_quat().as_euler(seq)
-    
+
     @classmethod
     def identity(cls, seq: str = "xyz") -> EulerAngles:
         """Return the identity EulerAngles (zero rotation).
@@ -340,8 +344,6 @@ class Quaternion:
       (i.e. [w, x, y, z]) instead of scalar-last ([x, y, z, w]).
     - This class is designed for symbolic computation, so some checks (e.g. for valid
       rotation matrices) are omitted, since these cannot be done symbolically.
-    - The class currently does not support some representations like Rodrigues parameters
-      or rotation vectors
     - The class does not support multiple rotations in a single object
     - This implementation supports kinematic calculations
 
@@ -448,7 +450,7 @@ class Quaternion:
         if quat.shape not in [(4,), (1, 4), (4, 1)]:
             raise ValueError("Quaternion must have shape (4,), (1, 4), or (4, 1)")
         quat = quat.flatten()
-        self.array = quat
+        self.array: np.ndarray = quat
 
     # === Methods for implementing Attitude protocol ===
 
@@ -488,7 +490,7 @@ class Quaternion:
 
     def inv(self) -> Quaternion:
         """Return the inverse of the quaternion"""
-        q_inv = quaternion_inverse(self.array)   
+        q_inv = quaternion_inverse(self.array)
         return Quaternion(q_inv)
 
     def kinematics(self, w: np.ndarray, baumgarte: float | None = None) -> Quaternion:
@@ -510,7 +512,7 @@ class Quaternion:
         which is represented with the same data structure for consistency with
         ODE solving - but this return is not itself a valid rotation representation
         until integrated in time - in particular, it is not unit norm.  Hence,
-        methods such as ``as_euler`` should never be used on the time derivative, 
+        methods such as ``as_euler`` should never be used on the time derivative,
         since they will not produce meaningful results.
 
         Parameters
@@ -537,7 +539,7 @@ class Quaternion:
     def __len__(self):
         return len(self.array)
 
-    def __getitem__(self, index: int) -> float:
+    def __getitem__(self, index: int):
         return self.array[index]
 
     def __iter__(self):
@@ -599,9 +601,9 @@ class Quaternion:
         euler : EulerAngles or array_like
             Euler angles instance or array of Euler angles in radians.
         seq : str, optional
-            Sequence of axes for Euler angles (up to length 3).  Each character must be one
-            of 'x', 'y', 'z' (extrinsic) or 'X', 'Y', 'Z' (intrinsic).  Default is 'xyz'.
-            Should not be specified if `euler` is an EulerAngles instance.
+            Sequence of axes for Euler angles (up to length 3).  Each character must
+            be one of 'x', 'y', 'z' (extrinsic) or 'X', 'Y', 'Z' (intrinsic).  Default
+            is 'xyz'. Should not be specified if `euler` is an EulerAngles instance.
 
         Returns
         -------
@@ -658,15 +660,16 @@ class Quaternion:
 
 # === Struct registration ===
 
+
 def euler_to_iter(euler: EulerAngles):
     children = (euler.array,)
-    aux_data = (euler.seq)
+    aux_data = (euler.seq,)
     return children, aux_data
 
 
 def euler_from_iter(aux_data, children) -> EulerAngles:
-    seq, = aux_data
-    angles, = children
+    (seq,) = aux_data
+    (angles,) = children
     return EulerAngles(angles=angles, seq=seq)
 
 
@@ -680,9 +683,8 @@ def quaternion_to_iter(quat: Quaternion):
 
 
 def quaternion_from_iter(aux_data, children) -> Quaternion:
-    quat, = children
+    (quat,) = children
     return Quaternion(quat=quat)
 
 
 tree.register_struct(Quaternion, quaternion_to_iter, quaternion_from_iter)
-

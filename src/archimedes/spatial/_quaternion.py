@@ -3,15 +3,17 @@
 These functions are for conversions and kinematics and operate directly on
 arrays rather than higher-level wrapper classes.
 """
+
 # ruff: noqa: N806, N803, N815
 from __future__ import annotations
+
 from typing import cast
 
 import numpy as np
 
 from archimedes import array
 
-from ._euler import _check_seq, _check_angles
+from ._euler import _check_angles, _check_seq
 
 __all__ = [
     "euler_to_quaternion",
@@ -225,7 +227,7 @@ def euler_to_quaternion(angles: np.ndarray, seq: str = "xyz") -> np.ndarray:
     angles = angles.flatten()
 
     quat = _elementary_quat_compose(seq, angles, intrinsic=intrinsic)
-    return quat / np.linalg.norm(quat)
+    return cast(np.ndarray, quat / np.linalg.norm(quat))
 
 
 def quaternion_to_dcm(quat: np.ndarray) -> np.ndarray:

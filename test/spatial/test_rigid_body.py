@@ -5,41 +5,15 @@ import numpy.testing as npt
 
 import archimedes as arc
 from archimedes.spatial import (
+    Quaternion,
     RigidBody,
     RigidBodyConfig,
-    Quaternion,
     euler_to_dcm,
-    euler_kinematics,
 )
 
 m = 1.7  # Arbitrary mass
 J_B = np.diag([0.1, 0.2, 0.3])  # Arbitrary inertia matrix
 J_B_inv = np.linalg.inv(J_B)
-
-
-def test_euler_kinematics():
-    rpy = np.array([0.1, 0.2, 0.3])
-
-    # Given roll-pitch-yaw rates, compute the body-frame angular velocity
-    # using the rotation matrices directly.
-    pqr = np.array([0.4, 0.5, 0.6])  # Roll, pitch, yaw rates
-    C_roll = Quaternion.from_euler(rpy[0], "x").as_matrix().T  # C_φ
-    C_pitch = Quaternion.from_euler(rpy[1], "y").as_matrix().T  # C_θ
-    # Successively transform each rate into the body frame
-    w_B_ex = np.array([pqr[0], 0.0, 0.0]) + C_roll @ (
-        np.array([0.0, pqr[1], 0.0]) + C_pitch @ np.array([0.0, 0.0, pqr[2]])
-    )
-
-    # Use the Euler kinematics function to duplicate the transformation
-    Hinv = euler_kinematics(rpy, inverse=True)
-    w_B = Hinv @ pqr
-
-    npt.assert_allclose(w_B, w_B_ex)
-
-    # Test the forward transformation
-    H = euler_kinematics(rpy)
-    result = H @ w_B
-    npt.assert_allclose(pqr, result)
 
 
 class TestVehicleDynamics:

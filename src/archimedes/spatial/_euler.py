@@ -3,18 +3,22 @@
 These functions are for conversions and kinematics and operate directly on
 arrays rather than higher-level wrapper classes.
 """
+
 # ruff: noqa: N806, N803, N815
 from __future__ import annotations
 
 import re
+from typing import cast
 
 import numpy as np
+
 from archimedes import array
 
 __all__ = [
     "euler_kinematics",
     "euler_to_dcm",
 ]
+
 
 def _check_seq(seq: str) -> bool:
     num_axes = len(seq)
@@ -23,7 +27,7 @@ def _check_seq(seq: str) -> bool:
             "Expected axis specification to be a non-empty "
             "string of upto 3 characters, got {}".format(seq)
         )
-    
+
     # The following checks are verbatim from:
     # https://github.com/scipy/scipy/blob/3ead2b543df7c7c78619e20f0cb6139e344a8866/scipy/spatial/transform/_rotation_cy.pyx#L461-L476  # ruff: noqa: E501
     intrinsic = re.match(r"^[XYZ]{1,3}$", seq) is not None
@@ -70,7 +74,7 @@ def _rot_x(angle: float) -> np.ndarray:
             [0.0, s, c],
         ]
     )
-    return R
+    return cast(np.ndarray, R)
 
 
 def _rot_y(angle: float) -> np.ndarray:
@@ -85,7 +89,7 @@ def _rot_y(angle: float) -> np.ndarray:
             [-s, 0.0, c],
         ]
     )
-    return R
+    return cast(np.ndarray, R)
 
 
 def _rot_z(angle: float) -> np.ndarray:
@@ -100,7 +104,7 @@ def _rot_z(angle: float) -> np.ndarray:
             [0.0, 0.0, 1.0],
         ]
     )
-    return R
+    return cast(np.ndarray, R)
 
 
 def euler_to_dcm(angles: np.ndarray, seq: str = "xyz") -> np.ndarray:
@@ -110,7 +114,7 @@ def euler_to_dcm(angles: np.ndarray, seq: str = "xyz") -> np.ndarray:
     then this function returns the matrix R_AB that transforms vectors from
     frame B to frame A.  Specifically, for a vector v_B expressed in frame B,
     the corresponding vector in frame A is given by ``v_A = R_AB @ v_B``.
-    
+
     The inverse transformation can be obtained by transposing this matrix:
     ``R_BA = R_AB.T``.
 
@@ -118,7 +122,7 @@ def euler_to_dcm(angles: np.ndarray, seq: str = "xyz") -> np.ndarray:
     convention of an extrinsic roll-pitch-yaw sequence ("xyz").  However, it supports
     arbitrary sequences of non-repeating axes up to length 3. Both intrinsic
     (uppercase letters) and extrinsic (lowercase letters) sequences are supported.
-    
+
     Specifically, the following will generate equivalent DCMs:
 
     .. code-block:: python
@@ -161,7 +165,7 @@ def euler_to_dcm(angles: np.ndarray, seq: str = "xyz") -> np.ndarray:
     # multiplications are not actually carried out until after the
     # full matrix is built.
     R = np.eye(3, like=angles)
-    for (char, angle) in zip(seq, angles):
+    for char, angle in zip(seq, angles):
         match char:
             case "x":
                 R = _rot_x(angle) @ R

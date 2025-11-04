@@ -6,7 +6,7 @@ from engine import F16Engine
 from f16 import SubsonicF16
 
 from archimedes import struct
-from archimedes.spatial import Quaternion, EulerAngles
+from archimedes.spatial import EulerAngles, Quaternion
 
 
 @struct
