@@ -219,7 +219,7 @@ class QuadraticDragModel:
     r_CoP = np.zeros(3)  # Center of pressure offset from body CG [m]
 
     def __call__(self, t, x):
-        v_B = x.v_B  # Velocity of the center of mass in body frame B
+        v_B = x.vel  # Velocity of the center of mass in body frame B
 
         # Velocity magnitude with guard against near-zero values
         v_mag = np.linalg.norm(v_B)
@@ -334,15 +334,15 @@ class MultiRotorVehicle:
             R_BN = att.as_matrix().T
             vel = R_BN @ vel
         return self.State(
-            p_N=pos,
+            pos=pos,
             att=att,
-            v_B=vel,
+            vel=vel,
             w_B=w_B,
         )
 
     def net_forces(self, t, x: State, u):
-        p_N = x.p_N  # Position of the center of mass in inertial frame N
-        v_B = x.v_B  # Velocity of the center of mass in body frame B
+        p_N = x.pos  # Position of the center of mass in inertial frame N
+        v_B = x.vel  # Velocity of the center of mass in body frame B
         w_B = x.w_B  # Roll-pitch-yaw rates in body frame (ω_B)
 
         # Calculate local gravity force on B, expressed in
@@ -411,9 +411,9 @@ class MultiRotorVehicle:
         rb_derivs = RigidBody.dynamics(t, x, rb_input)
 
         return self.State(
-            p_N=rb_derivs.p_N,
+            pos=rb_derivs.pos,
             att=rb_derivs.att,
-            v_B=rb_derivs.v_B,
+            vel=rb_derivs.vel,
             w_B=rb_derivs.w_B,
         )
 

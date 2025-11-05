@@ -257,7 +257,7 @@ class EulerAngles:
         """Return the number of Euler angles (length of sequence)."""
         return len(self.seq)
 
-    def __getitem__(self, index: int):
+    def __getitem__(self, index):
         return self.array[index]
 
     def __iter__(self):

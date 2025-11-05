@@ -127,7 +127,7 @@ def residual(p):
     rpy = np.hstack([phi, theta, 0.0])
     x = vehicle.state(p_N, rpy, v_N, w_B, inertial_velocity=True)
     x_t = vehicle.dynamics(0.0, x, u)
-    return np.hstack([x_t.v_B, x_t.w_B])  # Residuals of dynamics equations only
+    return np.hstack([x_t.vel, x_t.w_B])  # Residuals of dynamics equations only
 
 
 u0 = 2.0  # Initial guess for rotor angular velocity
@@ -196,7 +196,7 @@ def f_lon(x_lon, u):
     v_B = np.hstack([vx, v_B_trim[1], vz])
     x = vehicle.state(np.zeros(3), rpy, v_B, w_B)
     x_t = vehicle.dynamics(0.0, x, u)
-    return np.hstack([rpy_t[1], x_t.v_B[0], x_t.v_B[2], x_t.w_B[1]])
+    return np.hstack([rpy_t[1], x_t.vel[0], x_t.vel[2], x_t.w_B[1]])
 
 
 # Linearized state-space matrices
@@ -291,7 +291,7 @@ def f_lat(x_lat, u):
     v_B = np.hstack([v_B_trim[0], vy, v_B_trim[2]])
     x = vehicle.state(np.zeros(3), rpy, v_B, w_B)
     x_t = vehicle.dynamics(0.0, x, u)
-    return np.hstack([rpy_t[0], x_t.v_B[1], x_t.w_B[0], x_t.w_B[2]])
+    return np.hstack([rpy_t[0], x_t.vel[1], x_t.w_B[0], x_t.w_B[2]])
 
 
 # Linearized state-space matrices

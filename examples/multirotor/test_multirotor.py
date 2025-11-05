@@ -422,7 +422,7 @@ class TestTrimStability:
             x = vehicle.state(p_N, att, v_N, w_B, inertial_velocity=True)
             x_t = vehicle.dynamics(0.0, x, u)
             # Residuals of dynamics equations only
-            return np.hstack([x_t.v_B, x_t.w_B])
+            return np.hstack([x_t.vel, x_t.w_B])
 
         u0 = 500.0
         p0 = np.array([0.0, 0.0, u0, u0, u0, u0])
@@ -461,7 +461,7 @@ class TestTrimStability:
             v_B = np.hstack([vx, v_B_trim[1], vz])
             x = vehicle.state(np.zeros(3), rpy, v_B, w_B)
             x_t = vehicle.dynamics(0.0, x, u)
-            return np.hstack([x_t.att[1], x_t.v_B[0], x_t.v_B[2], x_t.w_B[1]])
+            return np.hstack([x_t.att[1], x_t.vel[0], x_t.vel[2], x_t.w_B[1]])
 
         # Linearized state-space matrices
         A_lon = arc.jac(f_lon, 0)(x_lon_trim, u_trim)
@@ -508,7 +508,7 @@ class TestTrimStability:
             v_B = np.hstack([v_B_trim[0], vy, v_B_trim[2]])
             x = vehicle.state(np.zeros(3), rpy, v_B, w_B)
             x_t = vehicle.dynamics(0.0, x, u)
-            return np.hstack([x_t.att[0], x_t.v_B[1], x_t.w_B[0], x_t.w_B[2]])
+            return np.hstack([x_t.att[0], x_t.vel[1], x_t.w_B[0], x_t.w_B[2]])
 
         # Linearized state-space matrices
         A_lat = arc.jac(f_lat, 0)(x_lat_trim, u_trim)

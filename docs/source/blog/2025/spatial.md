@@ -28,13 +28,13 @@ Jared Callaham • 16 Oct 2025
 Release v0.3.1 marks the graduation of the [`spatial`](#archimedes.spatial) module out of experimental status and into production.
 This module includes core functionality for 3D vehicle dynamics modeling in a range of domains.
 
-In this post we'll introduce the most important members of this module: the [`Rotation`](#archimedes.spatial.Rotation) and [`RigidBody`](#archimedes.spatial.RigidBody) classes.
+In this post we'll introduce the most important members of this module: the [`Attitude`](#archimedes.spatial.Attitude) protocol and [`RigidBody`](#archimedes.spatial.RigidBody) class.
 These let you represent 3D rotations and 6dof rigid body dynamics in a way that's extensible, customizable, and compatible with the rest of Archimedes, including C code generation, autodiff, and tree operations.
 
 We'll cover:
 
 - Why you might want to use the `spatial` module
-- Attitude representations and the `Rotation` class
+- Attitude representations and the `Attitude` protocol
 - 6dof dynamics and the `RigidBody` class
 - Building your own vehicle models
 - What's next for `spatial`
@@ -60,7 +60,7 @@ In short, the current functionality is useful for 3D orientations and when simul
 ## 3D Rotations
 
 Direction cosine matrices, Euler angles, and quaternions are all representations of 3D rotations - how one frame or body is oriented relative to another in space.
-Archimedes represents these rotations using the [`Rotation`](#archimedes.spatial.Rotation) class.
+Archimedes represents these rotations using the [`Attitude`](#archimedes.spatial.Attitude) protocol and classes that implement this abstract interface, most importantly [`EulerAngles`](#archimedes.spatial.EulerAngles) and [`Quaternion`](#archimedes.spatial.Quaternion).
 
 This class is modeled directly on [SciPy's `Rotation` class](https://docs.scipy.org/doc/scipy/reference/generated/scipy.spatial.transform.Rotation.html) and is unit tested directly against the SciPy behavior.
 However, by re-implementing it in Archimedes we can ensure that it is compatible with all of the symbolic-numeric capabilities like autodiff and codegen.
@@ -253,9 +253,9 @@ Here's the `RigidBody` class in action:
 ```{code-cell} python
 
 x = RigidBody.State(
-    p_N=np.array([0.0, 0.0, 10.0]),
+    pos=np.array([0.0, 0.0, 10.0]),
     att=Quaternion.identity(),
-    v_B=np.zeros(3),
+    vel=np.zeros(3),
     w_B=np.zeros(3),
 )
 
@@ -366,7 +366,7 @@ class Aircraft:
         x_eng_dot = self.engine.dynamics(x, u)
 
         # Use the state attitude to calculate gravity in body axes
-        F_grav_N = self.gravity(x.rigid_body.p_N)
+        F_grav_N = self.gravity(x.rigid_body.pos)
         F_grav_B = x.rigid_body.att.rotate(F_grav_N, inverse=True)
 
         # Net forces/moments
@@ -378,9 +378,9 @@ class Aircraft:
         x_rb_dot = RigidBody.dynamics(x, u_rb)
 
         return self.State(
-            p_N=x_rb_dot.p_N,
+            pos=x_rb_dot.pos,
             att=x_rb_dot.att,
-            v_B=x_rb_dot.v_B,
+            vel=x_rb_dot.vel,
             w_B=x_rb_dot.w_B,
             aero=x_aero_dot,
             engine=x_eng_dot,

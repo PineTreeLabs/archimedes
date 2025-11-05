@@ -17,13 +17,13 @@ __all__ = [
 
 class GravityModel(Protocol):
     def __call__(self, p_E: np.ndarray) -> np.ndarray:
-        """Gravitational acceleration at the body CM in the inertial frame E
+        """Gravitational acceleration at the body CM in the earth frame E
 
         Args:
-            p_N position vector relative to the inertial frame N [m]
+            p_E: position vector relative to the earth frame E [m]
 
         Returns:
-            g_N: gravitational acceleration in inertial frame N [m/s^2]
+            g_E: gravitational acceleration in earth frame E [m/s^2]
         """
 
 
@@ -37,7 +37,7 @@ class ConstantGravity:
 
     g0: float = 9.81  # m/s^2
 
-    def __call__(self, p_N: np.ndarray) -> np.ndarray:
+    def __call__(self, p_E: np.ndarray) -> np.ndarray:
         return np.hstack([0, 0, self.g0])
 
 
@@ -98,8 +98,8 @@ class PointGravity:
     R_EN: np.ndarray  # Quaternion from N to E
     mu: float = 3.986e14  # m^3/s^2
 
-    def __call__(self, p_N):
-        r_E = self.p_EN + self.R_EN @ p_N
+    def __call__(self, p_E: np.ndarray):
+        r_E = self.p_EN + self.R_EN @ p_E
         r = np.linalg.norm(r_E)
         g_E = -self.mu * r_E / r**3
         return self.R_EN.T @ g_E

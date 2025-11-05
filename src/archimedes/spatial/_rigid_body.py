@@ -3,7 +3,8 @@ from __future__ import annotations
 
 import numpy as np
 
-from ..tree import struct
+from archimedes import struct
+
 from ._attitude import Attitude
 
 __all__ = [
@@ -27,13 +28,13 @@ class RigidBody:
     vehicle's center of mass.
 
     With these conventions, the state vector is defined as
-        ``x = [p_N, q, v_B, w_B]``
+        ``x = [pos, att, vel, w_B]``
 
     where
 
-    - ``p_N`` = position of the center of mass in the Newtonian frame N
-    - ``q`` = attitude (orientation) of the vehicle
-    - ``v_B`` = velocity of the center of mass in body frame B
+    - ``pos`` = position of the center of mass in the inertial frame
+    - ``att`` = attitude (orientation) of the vehicle
+    - ``vel`` = velocity of the center of mass in body frame B
     - ``w_B`` = angular velocity in body frame (ω_B)
 
     Note that the attitude can be any object implementing the :py:class:`Attitude`
@@ -44,7 +45,7 @@ class RigidBody:
     The equations of motion for a quaternion attitude are given by
 
     .. math::
-        \\dot{\\mathbf{p}}^N &= \\mathbf{R}_{BN}^T(\\mathbf{q}) \\mathbf{v}^B \\\\
+        \\dot{\\mathbf{p}}^N &= \\mathbf{R}_{NB}(\\mathbf{q}) \\mathbf{v}^B \\\\
         \\dot{\\mathbf{q}} &= \\frac{1}{2} \\mathbf{q} \\otimes \\boldsymbol{\\omega}^B
             \\\\
         \\dot{\\mathbf{v}}^B &= \\frac{1}{m}\\mathbf{F}^B
@@ -54,11 +55,11 @@ class RigidBody:
 
     where
 
-    - :math:`R_{BN}(\\mathbf{q})` = direction cosine matrix (DCM)
+    - :math:`\\mathbf{R}_{NB}(\\mathbf{q})` = direction cosine matrix (DCM)
     - :math:`m` = mass of the vehicle
-    - :math:`J^B` = inertia matrix of the vehicle in body axes
-    - :math:`F^B` = net forces acting on the vehicle in body frame B
-    - :math:`M^B` = net moments acting on the vehicle in body frame B
+    - :math:`\\mathbf{J}^B` = inertia matrix of the vehicle in body axes
+    - :math:`\\mathbf{F}^B` = net forces acting on the vehicle in body frame B
+    - :math:`\\mathbf{M}^B` = net moments acting on the vehicle in body frame B
 
     The inputs to the dynamics function are a ``RigidBody.Input`` struct
     containing the forces, moments, mass, and inertia properties.  By default
@@ -86,9 +87,9 @@ class RigidBody:
     >>> v_B = np.array([1, 0, 0])  # Constant velocity in x-direction
     >>> att = Quaternion([1, 0, 0, 0])  # No rotation
     >>> x = RigidBody.State(
-    ...     p_N=np.zeros(3),
+    ...     pos=np.zeros(3),
     ...     att=att,
-    ...     v_B=v_B,
+    ...     vel=v_B,
     ...     w_B=np.zeros(3),
     ... )
     >>> u = RigidBody.Input(
@@ -98,9 +99,9 @@ class RigidBody:
     ...     J_B=np.diag([1.0, 1.0, 1.0]),
     ... )
     >>> RigidBody.dynamics(t, x, u)
-    State(p_N=array([1., 0., 0.]),
+    State(pos=array([1., 0., 0.]),
       att=Quaternion([0., 0., 0., 0.]),
-      v_B=array([ 0.   ,  0.   , -4.905]),
+      vel=array([ 0.   ,  0.   , -4.905]),
       w_B=array([0., 0., 0.]))
 
     A common pattern is to have a vehicle model inherit from ``RigidBody.State``,
@@ -113,17 +114,17 @@ class RigidBody:
     ...     eng: np.ndarray  # engine state
     ...
     >>> state = AircraftState(
-    ...     p_N=np.zeros(3),
+    ...     pos=np.zeros(3),
     ...     att=Quaternion([1, 0, 0, 0]),
-    ...     v_B=np.zeros(3),
+    ...     vel=np.zeros(3),
     ...     w_B=np.zeros(3),
     ...     eng=np.array([0.0]),
     ... )
     >>> x_dot_rb = RigidBody.dynamics(t, state, u)
     >>> x_dot_rb
-    State(p_N=array([0., 0., 0.]),
+    State(pos=array([0., 0., 0.]),
       att=Quaternion([0., 0., 0., 0.]),
-      v_B=array([ 0.   ,  0.   , -4.905]),
+      vel=array([ 0.   ,  0.   , -4.905]),
       w_B=array([0., 0., 0.]))
 
     The ``dynamics`` method returns a ``RigidBody.State`` struct containing only the
@@ -132,21 +133,21 @@ class RigidBody:
     derivatives of the additional states.
 
     >>> x_dot = AircraftState(
-    ...     p_N=x_dot_rb.p_N,
+    ...     pos=x_dot_rb.pos,
     ...     att=x_dot_rb.att,
-    ...     v_B=x_dot_rb.v_B,
+    ...     vel=x_dot_rb.vel,
     ...     w_B=x_dot_rb.w_B,
     ...     eng=np.array([0.1]),  # engine state derivative
     ... )
     >>> x_dot
-    AircraftState(p_N=array([0., 0., 0.]),
+    AircraftState(pos=array([0., 0., 0.]),
       att=Quaternion([0., 0., 0., 0.]),
-      v_B=array([ 0.   ,  0.   , -4.905]),
+      vel=array([ 0.   ,  0.   , -4.905]),
       w_B=array([0., 0., 0.]),
       eng=array([0.1]))
 
     Notes
-    --------------
+    -----
 
     The equations of motion implemented here are technically correct only for the
     case of a rigid body with constant mass, inertia, and center of gravity moving
@@ -295,7 +296,8 @@ class RigidBody:
             \\dot{\\mathbf{p}}^E &= \\mathbf{v}^E \\\\
             \\dot{\\mathbf{q}} &= \\frac{1}{2} \\mathbf{q} \\otimes \\left(
                 \\boldsymbol{\\omega}^B - \\boldsymbol{\\Omega}_{E}^B \\right) \\\\
-            \\dot{\\mathbf{v}}^E &= \\frac{1}{m}\\mathbf{F}^B
+            \\dot{\\mathbf{v}}^E &= \\mathbf{R}_{BE}(\\mathbf{q}) 
+                \\frac{1}{m}\\mathbf{F}^B
                 - 2 \\boldsymbol{\\Omega}_{E}^E \\times \\mathbf{v}^E
                 - \\boldsymbol{\\Omega}_{E}^E \\times
                 (\\boldsymbol{\\Omega}_{E}^E \\times \\mathbf{p}^E)
@@ -312,26 +314,63 @@ class RigidBody:
         velocity must be modified by :math:`-\\boldsymbol{\\Omega}_{E}^B` in the
         attitude kinematics.
 
+        The equations above could be implemented in an ECEF frame with a simple custom
+        rigid body class:
+
+        .. code-block python
+
+            @struct
+            class EarthReferencedBody(RigidBody):
+                rot_earth: float = 7.292e-5
+
+                @classmethod
+                def dynamics(cls, t: float, x: State, u: Input) -> State:
+                    Ω_E = np.hstack([0.0, 0.0, self.rot_earth])
+                    v_E, p_E = x.vel, x.pos  # ECEF position, velocity
+
+                    # Position and attitude kinematics
+                    pos_deriv = v_E
+                    att_deriv = x.att.kinematics(x.w_B - Ω_E)
+
+                    # Force equation with Coriolis and centrifugal effects
+                    F_E = x.att.rotate(u.F_B)
+                    dv_E = (F_E / m) - np.cross(Ω_E, 2 * v_E - np.cross(Ω_E, p_E))
+                    
+                    # Moment equation (same as body-referenced formulation)
+                    dw_B = np.linalg.solve(
+                        u.J_B, u.M_B - np.cross(x.w_B, u.J_B @ x.w_B)
+                    )
+
+                    # Output time derivatives of substates
+                    return RigidBody.State(
+                        pos=pos_deriv, att=att_deriv, vel=dv_E, w_B=dw_B
+                    )
+
+        While this formulation does cover a substantial number of orbtial mechanics
+        applications, it is not one-size-fits all.  Are centrifugal effects accounted
+        for in the gravity model?  Are precession and nutation important?  Is the
+        angular velocity time-varying?  The present design prioritizes _customization_
+        over _comprehensiveness_.
+
         In short, handling of non-inertial frames in Archimedes still needs some
-        design work and is not robustly supported.  Current recommendations are to
-        either model with respect to an inertial frame N and transform to
-        other frames as needed (admittedly cumbersome), or to implement custom
-        rigid body dynamics based on the above equations.  If you would like to see
-        support for non-inertial frames be a higher priority, please feel free to
-        raise the issue in the `Discussions
+        design work and is not robustly supported.  The recommendation is to
+        implement custom rigid body dynamics based on the above equations.  If you
+        would like to see support for non-inertial frames be a higher priority,
+        please feel free to raise the issue in the `Discussions
         <https://github.com/PineTreeLabs/archimedes/discussions>`__ page on GitHub.
 
-    As a combined example, if you have a flight dynamics model where you assume
-    quasi-steady mass and CM location and constant inertia, a typical workflow
-    for computing the rigid body inputs might look like the following:
+    As a combined example of pseudo-force handling, if you have a flight dynamics
+    model with constant inertia and quasi-steady mass and CM location, a typical
+    calculation of the rigid body inputs might look like the following:
 
     .. code-block:: python
 
         @struct
         class FlightVehicle:
             dry_mass: float
+            wet_mass: float
             J_B: np.ndarray  # constant inertia matrix
-            dCM_dm: np.ndarray  # CM location rate w.r.t. mass
+            dCM_dm: np.ndarray  # CM location rate w.r.t. mass [m/kg]
     
             @struct
             class State(RigidBody.State):
@@ -346,10 +385,10 @@ class RigidBody:
             def dynamics(t, x: State, u: Input) -> State:
                 # Compute current mass and CM location
                 m = self.dry_mass + x.fuel_mass
-                r_CM_B = self.dCM_dm * x.fuel_mass  # vector from ref point to CM
+                r_CM_B = self.dCM_dm * (self.wet_mass - m)  # ref point -> CM
 
                 # Velocity at reference point
-                v_ref_B = x.v_B - np.cross(x.w_B, r_CM_B)
+                v_ref_B = x.vel - np.cross(x.w_B, r_CM_B)
 
                 # Aerodynamic forces and moments at body frame origin
                 F_aero_B, M_aero_B = self.aerodynamics(v_ref_B, ...)
@@ -369,9 +408,9 @@ class RigidBody:
 
                 # Combine with other state derivatives (e.g. fuel mass)
                 return Vehicle.State(
-                    p_N=x_dot_rb.p_N,
+                    pos=x_dot_rb.pos,
                     att=x_dot_rb.att,
-                    v_B=x_dot_rb.v_B,
+                    vel=x_dot_rb.vel,
                     w_B=x_dot_rb.w_B,
                     fuel_mass=-self.propulsion.burn_rate(u),
                     ...
@@ -383,92 +422,19 @@ class RigidBody:
     .. [1] Lewis, F. L., Johnson, E. N., & Stevens, B. L. (2015).
             Aircraft Control and Simulation. Wiley.
     """
-
     @struct
     class State:
-        p_N: np.ndarray  # Position of the center of mass in the Newtonian frame N
+        pos: np.ndarray  # Position of the center of mass in the world frame
         att: Attitude  # Attitude (orientation) of the vehicle
-        v_B: np.ndarray  # Velocity of the center of mass in body frame B
+        vel: np.ndarray  # Velocity of the center of mass
         w_B: np.ndarray  # Angular velocity in body frame (ω_B)
 
     @struct
     class Input:
-        F_B: np.ndarray  # Net forces in body frame B
-        M_B: np.ndarray  # Net moments in body frame B
-        m: float  # mass [kg]
-        J_B: np.ndarray  # inertia matrix [kg·m²]
-
-    @classmethod
-    def calc_kinematics(cls, x: State) -> tuple[np.ndarray, Attitude]:
-        """Calculate kinematics (position and attitude derivatives)
-
-        Parameters
-        ----------
-        x : RigidBody.State
-            Current state of the rigid body.
-
-        Returns
-        -------
-        dp_N : np.ndarray
-            Time derivative of position in Newtonian frame N.
-        att_deriv : Attitude
-            Time derivative of attitude (e.g. quaternion derivative or Euler rates).
-
-        Notes
-        -----
-        This function calculates the kinematics (position and attitude derivatives)
-        based on the current state (velocity and angular velocity).
-
-        Typically this does not need to be called directly, but is available
-        separately for special analysis or testing.
-        """
-
-        dp_N = x.att.rotate(x.v_B)
-        att_deriv = x.att.kinematics(x.w_B)
-
-        return dp_N, att_deriv
-
-    @classmethod
-    def calc_dynamics(cls, x: State, u: Input) -> tuple[np.ndarray, np.ndarray]:
-        """Calculate dynamics (velocity and angular velocity derivatives)
-
-        Parameters
-        ----------
-        x : RigidBody.State
-            Current state of the rigid body.
-        u : RigidBody.Input
-            Current inputs (forces, moments, mass properties).
-
-        Returns
-        -------
-        dv_B : np.ndarray
-            Time derivative of velocity in body frame B.
-        dw_B : np.ndarray
-            Time derivative of angular velocity in body frame B.
-
-        Notes
-        -----
-        This function calculates the dynamics (velocity and angular velocity
-        derivatives) based on the current state and inputs (forces, moments,
-        mass properties).
-
-        Typically this does not need to be called directly, but is available
-        separately for special analysis or testing.
-        """
-        # Unpack the state
-        v_B = x.v_B  # Velocity of the center of mass in body frame B
-        w_B = x.w_B  # Angular velocity in body frame (ω_B)
-
-        # Acceleration in body frame
-        dv_B = (u.F_B / u.m) - np.cross(w_B, v_B)
-
-        # Angular acceleration in body frame
-        # solve Euler dynamics equation 𝛕 = I α + ω × (I ω)  for α
-        dw_B = np.linalg.solve(
-            u.J_B, u.M_B - np.cross(w_B, u.J_B @ w_B)
-        )
-
-        return dv_B, dw_B
+        F_B: np.ndarray  # Forces in body frame
+        M_B: np.ndarray  # Moments in body frame
+        m: float  # Mass
+        J_B: np.ndarray  # Inertia matrix in body frame
 
     @classmethod
     def dynamics(cls, t: float, x: State, u: Input) -> State:
@@ -476,20 +442,16 @@ class RigidBody:
 
         Args:
             t: time
-            x: state vector
-            u: input vector containing net forces and moments
+            x: dynamic state
+            u: input struct with net forces and moments
 
         Returns:
-            xdot: time derivative of the state vector
+            x_t: time derivative of the state vector
         """
-        dp_N, att_deriv = cls.calc_kinematics(x)
-        dv_B, dw_B = cls.calc_dynamics(x, u)
-
-        # Pack the state derivatives
-        return cls.State(
-            p_N=dp_N,
-            att=att_deriv,
-            v_B=dv_B,
-            w_B=dw_B,
+        pos_deriv = x.att.rotate(x.vel)
+        att_deriv = x.att.kinematics(x.w_B)
+        dv_B = (u.F_B / u.m) - np.cross(x.w_B, x.vel)
+        dw_B = np.linalg.solve(u.J_B, u.M_B - np.cross(x.w_B, u.J_B @ x.w_B))
+        return RigidBody.State(
+            pos=pos_deriv, att=att_deriv, vel=dv_B, w_B=dw_B
         )
-

@@ -39,6 +39,8 @@ __all__ = [
     "quaternion_to_dcm",
     "quaternion_to_euler",
     "Quaternion",
+    "Velocity",
+    "velocity",
 ]
 
 

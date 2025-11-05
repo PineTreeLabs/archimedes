@@ -24,7 +24,7 @@ import archimedes as arc
 def traj_data(xs_flat, unravel, stride=5):
     xs = arc.vmap(unravel)(xs_flat.T)
 
-    positions = xs.p_N.copy()
+    positions = xs.pos.copy()
     positions[:, 2] *= -1  # Use altitude as Z for visualization
     positions *= 1 / 1000  # Scale to kft
 

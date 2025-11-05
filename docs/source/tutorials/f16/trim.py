@@ -103,9 +103,9 @@ def trim_state(
     att = EulerAngles(rpy)
 
     return model.State(
-        p_N=np.hstack([0.0, 0.0, -condition.alt]),
+        pos=np.hstack([0.0, 0.0, -condition.alt]),
         att=att,
-        v_B=v_B,
+        vel=v_B,
         w_B=w_B,
         eng=model.engine.trim(params.throttle),
         aero=model.aero.trim(),
@@ -123,7 +123,7 @@ def trim_residual(
     x = trim_state(params, condition, model)
     u = params.inputs
     x_t = model.dynamics(0.0, x, u)
-    return np.hstack([x_t.v_B, x_t.w_B])
+    return np.hstack([x_t.vel, x_t.w_B])
 
 
 def trim(

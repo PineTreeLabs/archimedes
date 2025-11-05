@@ -94,9 +94,9 @@ def test_352(f16: SubsonicF16):
     # without using the roll-pitch-yaw rates.
     w_B_out = 2 * (att.inv().mul(x_t.att, normalize=False)).array[1:]
 
-    npt.assert_allclose(x_t.p_N, dp_N_ex, atol=1e-2)
+    npt.assert_allclose(x_t.pos, dp_N_ex, atol=1e-2)
     npt.assert_allclose(w_B_out, w_B, atol=1e-2)
-    npt.assert_allclose(x_t.v_B, dv_B_ex, atol=1e-2, rtol=1e-3)
+    npt.assert_allclose(x_t.vel, dv_B_ex, atol=1e-2, rtol=1e-3)
     npt.assert_allclose(x_t.w_B, dw_B_ex, atol=1e-2, rtol=1e-3)
 
 
@@ -129,7 +129,7 @@ def test_362(f16: SubsonicF16):
     )
 
     x_t = f16.dynamics(0.0, x, u)
-    assert np.allclose(x_t.v_B, 0.0, atol=1e-4)
+    assert np.allclose(x_t.vel, 0.0, atol=1e-4)
     assert np.allclose(x_t.w_B, 0.0, atol=1e-4)
 
     # Check that the angle rates are correct

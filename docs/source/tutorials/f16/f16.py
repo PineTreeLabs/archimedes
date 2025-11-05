@@ -26,7 +26,7 @@ from engine import (
     NASAEngineConfig,
 )
 
-from archimedes import StructConfig, field, struct
+from archimedes import StructConfig, field, struct, spatial
 from archimedes.experimental import aero
 from archimedes.experimental.aero import (
     ConstantGravity,
@@ -118,15 +118,15 @@ class SubsonicF16:
         rudder: float  # Rudder deflection [deg]
 
     def calc_gravity(self, x: State):
-        F_grav_N = self.m * self.gravity(x.p_N)
+        F_grav_N = self.m * self.gravity(x.pos)
         F_grav_B = x.att.rotate(F_grav_N, inverse=True)
         return F_grav_B
 
     def flight_condition(self, x: RigidBody.State) -> FlightCondition:
-        vt, alpha, beta = aero.wind_frame(x.v_B)
+        vt, alpha, beta = aero.wind_frame(x.vel)
 
         # Atmosphere model
-        alt = -x.p_N[2]
+        alt = -x.pos[2]
         mach, qbar = self.atmos(vt, alt)
 
         return FlightCondition(
@@ -249,9 +249,9 @@ class SubsonicF16:
         rud_deriv = self.rudder.dynamics(t, x.rudder, u.rudder)
 
         return self.State(
-            p_N=rb_deriv.p_N,
+            pos=rb_deriv.pos,
             att=rb_deriv.att,
-            v_B=rb_deriv.v_B,
+            vel=rb_deriv.vel,
             w_B=rb_deriv.w_B,
             eng=eng_deriv,
             aero=aero_deriv,
