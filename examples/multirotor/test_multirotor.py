@@ -439,7 +439,7 @@ class TestTrimStability:
         npt.assert_allclose(theta_trim, 0.0, atol=1e-6)
         npt.assert_allclose(u_trim, u_trim_ex, atol=1e-6)
 
-        R_BN = euler_to_dcm(np.array([phi_trim, theta_trim, 0.0])).T
+        R_BN = euler_to_dcm(np.array([phi_trim, theta_trim, 0.0]))
         v_B_trim = R_BN @ v_N
 
         #

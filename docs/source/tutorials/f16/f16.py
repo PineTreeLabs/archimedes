@@ -119,7 +119,7 @@ class SubsonicF16:
 
     def calc_gravity(self, x: State):
         F_grav_N = self.m * self.gravity(x.pos)
-        F_grav_B = x.att.rotate(F_grav_N, inverse=True)
+        F_grav_B = x.att.rotate(F_grav_N)
         return F_grav_B
 
     def flight_condition(self, x: RigidBody.State) -> FlightCondition:

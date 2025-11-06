@@ -262,7 +262,7 @@ class RotorModel(metaclass=abc.ABCMeta):
         # effect and the wind angle is undefined (+/- 90 degrees will also work).
         psi_w = np.where(abs(v_H[0]) < 1e-6, np.sign(v_H[1]) * np.pi / 2, psi_w)
 
-        R_WH = Quaternion.from_euler(psi_w, "z").as_matrix().T
+        R_WH = Quaternion.from_euler(psi_w, "z").as_matrix()
 
         v_W = R_WH @ v_H  # Rotate velocity to wind frame
         w_W = R_WH @ w_H  # Rotate angular velocity to wind frame
@@ -331,8 +331,7 @@ class MultiRotorVehicle:
 
     def state(self, pos, att, vel, w_B, inertial_velocity=False) -> State:
         if inertial_velocity:
-            R_BN = att.as_matrix().T
-            vel = R_BN @ vel
+            vel = att.rotate(vel)
         return self.State(
             pos=pos,
             att=att,
@@ -379,7 +378,7 @@ class MultiRotorVehicle:
         # Calculate drag forces and moments in body frame B
         Fdrag_B, Mdrag_B = self.drag_model(t, x)
 
-        Fgravity_B = x.att.rotate(Fgravity_N, inverse=True)
+        Fgravity_B = x.att.rotate(Fgravity_N)
 
         F_B = Frotor_B + Fdrag_B + Fgravity_B
 

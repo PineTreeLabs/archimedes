@@ -461,7 +461,7 @@ class RigidBody:
         Returns:
             x_t: time derivative of the state vector
         """
-        pos_deriv = x.att.rotate(x.v_B)
+        pos_deriv = x.att.rotate(x.v_B, inverse=True)
         att_deriv = x.att.kinematics(x.w_B)
         dv_B = (u.F_B / u.m) - np.cross(x.w_B, x.v_B)
         dw_B = np.linalg.solve(u.J_B, u.M_B - np.cross(x.w_B, u.J_B @ x.w_B))

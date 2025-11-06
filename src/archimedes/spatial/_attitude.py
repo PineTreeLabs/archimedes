@@ -27,38 +27,24 @@ __all__ = [
 ]
 
 
-class Attitude(Protocol):
-    """Protocol for attitude representations.
-
-    This protocol defines the interface that all attitude representation classes
-    must implement. An attitude representation class encapsulates the orientation
-    of a rigid body in 3D space and provides methods for common operations such
-    as conversion to/from other representations and kinematic models.
-    """
-
-    def as_matrix(self) -> np.ndarray:
-        """Convert the attitude to a direction cosine matrix (DCM).
-
-        If the attitude represents the orientation of a body B relative to a frame A,
-        then this method returns the matrix R_AB that transforms vectors from
-        frame B to frame A.  Specifically, for a vector v_B expressed in frame B,
-        the corresponding vector in frame A is given by ``v_A = R_AB @ v_B``.
+_as_matrix_docstring = """
+        If the attitude represents the orientation of a body A relative to a frame B,
+        then this method returns the matrix R_BA that transforms vectors from
+        frame A to frame B.  Specifically, for a vector v_A expressed in frame A,
+        the corresponding vector in frame B is given by ``v_B = R_BA @ v_A``.
 
         The inverse transformation can be obtained by transposing this matrix:
-        ``R_BA = R_AB.T``.
+        ``R_AB = R_BA.T``.
 
         Returns
         -------
-            A 3x3 numpy array representing the DCM.
-        """
+            A 3x3 numpy array representing the DCM."""
 
-    def rotate(self, vectors: np.ndarray, inverse: bool = False) -> np.ndarray:
-        """Rotate vectors with the transformation represented by the attitude.
-
-        If the attitude represents the orientation of a body B relative to a frame A,
+_rotate_docstring = """
+        If the attitude represents the orientation of a body A relative to a frame B,
         this method rotates vectors between the two frames. Specifically, for a vector
-        v_B expressed in frame B, the corresponding vector in frame A is given by
-        ``v_A = R_AB @ v_B``, where R_AB is the DCM obtained from `as_matrix()`.
+        v_A expressed in frame A, the corresponding vector in frame B is given by
+        ``v_B = R_BA @ v_A``, where R_BA is the DCM obtained from `as_matrix()`.
 
         Parameters
         ----------
@@ -70,8 +56,34 @@ class Attitude(Protocol):
 
         Returns
         -------
-            An array representing the rotated vectors.
+            An array representing the rotated vectors."""
+
+_kinematics_docstring = """
+        **CAUTION**: This method returns the time derivative of the attitude,
+        which is represented with the same data structure for consistency with
+        ODE solving - but this return is not itself a valid rotation representation
+        until integrated in time. Hence, the output of ``kinematics`` should never
+        be converted to a different attitude representation or rotation matrix.
+"""
+
+
+class Attitude(Protocol):
+    """Protocol for attitude representations.
+
+    This protocol defines the interface that all attitude representation classes
+    must implement. An attitude representation class encapsulates the orientation
+    of a rigid body in 3D space and provides methods for common operations such
+    as conversion to/from other representations and kinematic models.
+    """
+
+    def as_matrix(self) -> np.ndarray:
+        f"""Convert the attitude to a direction cosine matrix (DCM).
+        {_as_matrix_docstring}
         """
+
+    def rotate(self, vectors: np.ndarray, inverse: bool = False) -> np.ndarray:
+        f"""Apply the coordinate system transformation represented by the attitude.
+        {_rotate_docstring}"""
 
     def inv(self) -> Attitude:
         """Compute the inverse of the rotation corresponding to the attitude.
@@ -83,13 +95,8 @@ class Attitude(Protocol):
         """
 
     def kinematics(self, w_B: np.ndarray) -> Attitude:
-        """Compute the time derivative of the attitude given angular velocity.
-
-        **CAUTION**: This method returns the time derivative of the attitude,
-        which is represented with the same data structure for consistency with
-        ODE solving - but this return is not itself a valid rotation representation
-        until integrated in time. Hence, the output of ``kinematics`` should never
-        be converted to a different attitude representation or rotation matrix.
+        f"""Compute the time derivative of the attitude given angular velocity.
+        {_kinematics_docstring}
 
         Parameters
         ----------
@@ -145,7 +152,45 @@ class EulerAngles:
     >>> from archimedes.spatial import EulerAngles
     >>> import numpy as np
 
-    TODO: Add examples
+    Consider a right-handed rotation of 90 degrees about the z-axis. This
+    corresponds to a single yaw rotation:
+
+    >>> euler = EulerAngles(np.deg2rad(90), 'z')
+
+    This can be converted to other representations:
+
+    >>> euler.as_matrix()
+    array([[ 6.123234e-17,  1.000000e+00,  0.000000e+00],
+       [-1.000000e+00,  6.123234e-17,  0.000000e+00],
+       [ 0.000000e+00,  0.000000e+00,  1.000000e+00]])
+    >>> np.rad2deg(euler.as_euler('xyx'))  # Roll-pitch-roll sequence
+    array([-90.,  90.,  90.])
+    >>> euler.as_quat()
+    Quaternion([0.70710678 0.         0.         0.70710678])
+
+    The associated rotation matrix can be used to change coordinate systems. If the
+    Euler sequence represents the orientation of a frame B relative to a frame A, then
+    the rotation matrix transforms vectors from frame A to frame B:
+
+    >>> v_A = np.array([1, 0, 0])  # Vector in frame A
+    >>> R_BA = euler.as_matrix()
+    >>> R_BA @ v_A  # Vector in frame B
+    [6.12323e-17, -1, 0]
+
+    The ``kinematics`` method can be used to compute the time derivative of the
+    Euler angles given the angular velocity in the body frame. Note that Euler
+    kinematics are currently only supported for the "xyz" sequence (standard
+    roll-pitch-yaw):
+
+    >>> w_B = np.array([0, 0, np.pi/2])  # 90 deg/s about z-axis
+    >>> rpy = EulerAngles([0.1, 0.2, 0.3], "xyz")
+    >>> rpy.kinematics(w_B)
+    EulerAngles([ 0.31682542 -0.15681796  1.59473746], seq='xyz')
+
+    Be careful with the kinematics output; this is expressed as an ``EulerAngles``
+    instance for consistency with ODE solvers but represents rotation _rates_.
+    Trying to apply this output as a rotation or convert to a DCM will not produce
+    meaningful results.
 
     See Also
     --------
@@ -175,36 +220,12 @@ class EulerAngles:
     # === Methods for implementing Attitude protocol ===
 
     def as_matrix(self) -> np.ndarray:
-        """Return the corresponding rotation matrix.
-
-        Returns
-        -------
-        np.ndarray
-            The rotation matrix as a 3x3 numpy array.
-        """
+        f"""{_as_matrix_docstring}"""
         return euler_to_dcm(self.array, self.seq)
 
     def rotate(self, vectors: np.ndarray, inverse: bool = False) -> np.ndarray:
-        """Rotate vectors using this Euler angle rotation.
-
-        If the Euler angles represent the attitude of a body B relative to a frame A,
-        then this method rotates vectors from frame B to frame A.  Specifically, for a
-        vector v_B expressed in frame B, the corresponding vector in frame A is given by
-        ``v_A = R_AB @ v_B``, where R_AB is the direction cosine matrix obtained from
-        ``self.as_matrix()``.
-
-        Parameters
-        ----------
-        vectors : np.ndarray
-            Vectors to rotate. Shape should be (..., 3).
-        inverse : bool, optional
-            If True, applies the inverse rotation. Default is False.
-
-        Returns
-        -------
-        np.ndarray
-            Rotated vectors with the same shape as input.
-        """
+        f"""Apply the coordinate system transformation represented by the Euler angles.
+        {_rotate_docstring}"""
         return _rotate(self, vectors, inverse=inverse)
 
     def inv(self) -> EulerAngles:
@@ -220,16 +241,9 @@ class EulerAngles:
         return EulerAngles(angles=angles, seq=seq)
 
     def kinematics(self, w_B: np.ndarray) -> EulerAngles:
-        """Compute the time derivative of the Euler angles given angular velocity.
+        f"""Compute the time derivative of the Euler angles given angular velocity.
 
-        If the Euler angles represent the attitude of a body B, then w_B should be
-        the body relative angular velocity ω_B.  See :py:func:`euler_kinematics` for
-        details.
-
-        **CAUTION**: This method returns the time derivative of the Euler angles,
-        which is represented with the same data structure for consistency with
-        ODE solving - but this return is not itself a valid rotation representation
-        until integrated in time.
+        {_kinematics_docstring}
 
         Parameters
         ----------
@@ -369,10 +383,6 @@ class Quaternion:
     >>> from archimedes.spatial import Quaternion
     >>> import numpy as np
 
-    A `Quaternion` instance can be initialized in any of the above formats and
-    converted to any of the others. The underlying object is independent of the
-    representation used for initialization.
-
     Consider a counter-clockwise rotation of 90 degrees about the z-axis. This
     corresponds to the following quaternion (in scalar-first format):
 
@@ -381,16 +391,16 @@ class Quaternion:
     The quaternion can be expressed in any of the other formats:
 
     >>> q.as_matrix()
-    array([[ 2.22044605e-16, -1.00000000e+00,  0.00000000e+00],
-    [ 1.00000000e+00,  2.22044605e-16,  0.00000000e+00],
-    [ 0.00000000e+00,  0.00000000e+00,  1.00000000e+00]])
+    array([[ 2.22044605e-16,  1.00000000e+00,  0.00000000e+00],
+       [-1.00000000e+00,  2.22044605e-16,  0.00000000e+00],
+       [ 0.00000000e+00,  0.00000000e+00,  1.00000000e+00]])
     >>> np.rad2deg(q.as_euler('zyx'))
     array([90.,  0.,  0.])
 
     The same quaternion can be initialized using a rotation matrix:
 
-    >>> q = Quaternion.from_matrix([[0, -1, 0],
-    ...                    [1, 0, 0],
+    >>> q = Quaternion.from_matrix([[0, 1, 0],
+    ...                    [-1, 0, 0],
     ...                    [0, 0, 1]])
 
     Representation in other formats:
@@ -403,15 +413,14 @@ class Quaternion:
 
     >>> q = Quaternion.from_euler(np.deg2rad(90), 'z')
 
-    The ``rotate`` method can be used to rotate vectors:
+    The associated rotation matrix can be used to change coordinate systems. If the
+    quaternion represents the orientation of a frame B relative to a frame A, then the
+    rotation matrix transforms vectors from frame A to frame B:
 
-    >>> q.rotate([1, 0, 0])
-    array([2.22045e-16, 1, 0])
-
-    If the quaternion represents the attitude of a body B relative to a frame A,
-    then this method transforms a vector v_A expressed in frame A to the same
-    vector expressed in frame B, v_B = R * v_A. If `inverse` is True, the inverse
-    rotation is applied, transforming v_B to v_A.
+    >>> v_A = np.array([1, 0, 0])  # Vector in frame A
+    >>> R_BA = q.as_matrix()
+    >>> R_BA @ v_A  # Vector in frame B
+    [6.12323e-17, -1, 0]
 
     The ``kinematics`` method can be used to compute the time derivative of the
     quaternion as an attitude representation given the angular velocity in the
@@ -449,46 +458,29 @@ class Quaternion:
     # === Methods for implementing Attitude protocol ===
 
     def as_matrix(self) -> np.ndarray:
-        """Return the quaternion as a rotation matrix.
-
-        Returns
-        -------
-        np.ndarray
-            The rotation matrix as a 3x3 numpy array.
+        f"""Return the quaternion as a rotation matrix.
+        {_as_matrix_docstring}
         """
         return quaternion_to_dcm(self.array)
 
     def rotate(self, vectors: np.ndarray, inverse: bool = False) -> np.ndarray:
-        """Rotate one or more vectors
-
-        If the quaternion represents the attitude of a body B relative to a frame A,
-        then this method transforms a vector v_A expressed in frame A to the same
-        vector expressed in frame B, v_B = R * v_A. If `inverse` is True, the inverse
-        rotation is applied, transforming v_B to v_A.
-
-        This method is computationally and mathematically equivalent to:
-
-        ... code-block:: python
-            R_AB = q.as_matrix()
-            v_B = R_AB @ v_A
-
-        or, for the inverse:
-
-        ... code-block:: python
-            v_A = R_AB.T @ v_B
-
-        The method supports both single vectors of shape (3,) and multiple vectors
-        of shape (N, 3).
-        """
+        f"""Apply the coordinate system transformation represented by the quaternion.
+        {_rotate_docstring}"""
         return _rotate(self, vectors, inverse=inverse)
 
     def inv(self) -> Quaternion:
-        """Return the inverse of the quaternion"""
+        """Return the inverse of the quaternion
+        
+        Returns
+        -------
+        Quaternion
+            A new Quaternion instance representing the inverse rotation.
+        """
         q_inv = quaternion_inverse(self.array)
         return Quaternion(q_inv)
 
     def kinematics(self, w: np.ndarray, baumgarte: float | None = None) -> Quaternion:
-        """Return the time derivative of the quaternion given angular velocity w.
+        f"""Return the time derivative of the quaternion given angular velocity w.
 
         If the quaternion represents the attitude of a body B, then w_B should be
         the body relative angular velocity ω_B.
@@ -502,12 +494,7 @@ class Quaternion:
         time derivative is:
             dq/dt = 0.5 * q ⊗ [0, ω] - λ * (||q||² - 1) * q
 
-        **CAUTION**: This method returns the time derivative of the quaternion,
-        which is represented with the same data structure for consistency with
-        ODE solving - but this return is not itself a valid rotation representation
-        until integrated in time - in particular, it is not unit norm.  Hence,
-        methods such as ``as_euler`` should never be used on the time derivative,
-        since they will not produce meaningful results.
+       {_kinematics_docstring}
 
         Parameters
         ----------

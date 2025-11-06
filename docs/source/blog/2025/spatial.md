@@ -80,33 +80,33 @@ from archimedes.spatial import Attitude, EulerAngles, Quaternion, RigidBody
 # to inertial earth frame E
 rpy = EulerAngles([0.1, 0.2, 0.3], seq="xyz")
 
-# Convert to a rotation matrix that transforms vectors from frame B to frame E
-R_EB = rpy.as_matrix()
-v_B = np.array([1.0, 0.0, 0.0])
-v_E = R_EB @ v_B
+# Convert to a rotation matrix that transforms vectors from frame E to frame B
+R_BE = rpy.as_matrix()
+v_E = np.array([1.0, 0.0, 0.0])
+v_B = R_BE @ v_E
 
 # Or use the equivalent `.rotate` method
-v_E = rpy.rotate(v_B)
+v_B = rpy.rotate(v_E)
 
 # Inverse transformations (equivalent)
-v_B = R_EB.T @ v_E
-v_B = rpy.rotate(v_E, inverse=True)
+v_E = R_BE.T @ v_B
+v_E = rpy.rotate(v_B, inverse=True)
 
 # Convert between representations
 q = rpy.as_quat()
 
 # Same operations in either representation
-R_EB = q.as_matrix()
-v_E = R_EB @ v_B  # Or q.rotate(v_B)
+R_BE = q.as_matrix()
+v_B = R_BE @ v_E  # Or q.rotate(v_E)
 ```
 
 ```{code-cell} python
 :tags: [remove-cell]
 
-v_E = rpy.as_matrix() @ v_B
-assert np.allclose(v_E, rpy.rotate(v_B))
-assert np.allclose(v_E, q.rotate(v_B))
-assert np.allclose(v_E, q.as_matrix() @ v_B)
+v_B = rpy.as_matrix() @ v_E
+assert np.allclose(v_B, rpy.rotate(v_E))
+assert np.allclose(v_B, q.rotate(v_E))
+assert np.allclose(v_B, q.as_matrix() @ v_E)
 ```
 
 6-dof rigid body dynamics:
@@ -140,7 +140,7 @@ This works because the `Attitude` protocol lets you write type-safe "polymorphic
 def body_frame_kinematics(
     att: Attitude, v_B: np.ndarray, w_B: np.ndarray
 ) -> tuple[np.ndarray, Attitude]:
-    pos_deriv = att.rotate(v_B)  # Time derivative of inertial-frame position
+    pos_deriv = att.rotate(v_B, inverse=True)  # Inertial-frame velocity
     att_deriv = att.kinematics(w_B)  # Attitude kinematics
     return pos_deriv, att_deriv
 
@@ -158,6 +158,70 @@ Direction cosine matrices, Euler angles, and quaternions are all representations
 Archimedes represents these rotations using the [`Attitude`](#archimedes.spatial.Attitude) protocol and classes that implement this abstract interface, most importantly [`EulerAngles`](#archimedes.spatial.EulerAngles) and [`Quaternion`](#archimedes.spatial.Quaternion).
 
 The `Attitude` interface is largely patterned on [SciPy's `Rotation` class](https://docs.scipy.org/doc/scipy/reference/generated/scipy.spatial.transform.Rotation.html), but deviates from SciPy in several ways that make it more convenient for flexible dynamics modeling.
+
+:::{note}
+**Active and Passive Rotations:** Archimedes adopts a passive rotation convention for coordinate frame transformations.
+This differs for example from SciPy's active rotation convention, which rotates vectors in a single coordinate frame.
+The rotation matrices used in either cases are transposes of each other.
+:::
+
+### Active and passive rotations
+
+There are at least three ways to think about a "3D rotation":
+
+1. The orientation of a body B relative to frame A (e.g. the roll-pitch-yaw sequence you would apply to reach the current attitude)
+2. A coordinate transformation from a vector from frame A to frame B
+3. An SO(3) rotation transformation applied to a vector
+
+The first two are mathematically equivalent and are inverse to the third.
+The first two represent a change of coordinates of a fixed "abstract" vector; the numbers in the array change, but they represent the same physical quantity (e.g. a force or velocity).
+This is by convention called a "passive" rotation since the vector itself doesn't change.
+
+The third case represents a transformation of the vector itself in a single coordinate system.
+In this case the vector moves, and so the rotation is called "active".
+
+For example, if we have an aircraft that is at a roll angle $\phi$, we might want to know what the force of gravity is in body-fixed coordinates.
+In the North-East-Down "earth" frame E, gravity is
+
+```{math}
+\mathbf{F}_g^E = mg_0 \begin{bmatrix} 0 & 0 & 1 \end{bmatrix}.
+```
+
+To get the body-frame gravity vector we apply a rotation
+$\mathbf{R}_{BE}$ defined by the attitude of the vehicle:
+
+```{math}
+\mathbf{F}_g^B = \mathbf{R}_{BE}(\phi) \mathbf{F}_g^E = m g_0 \begin{bmatrix} 0 & \sin \phi & \cos \phi \end{bmatrix}.
+```
+
+In code, this looks like:
+
+```python
+F_grav_E = np.array([0, 0, m*g0])
+R_BE = EulerAngles(phi, "x").as_matrix()
+F_grav_B = R_BE @ F_grav_E
+```
+
+This is a _passive_ rotation because the force vector is the same; the coordinates are what rotate.
+This is a more common situation in physics and engineering, where vectors are physical quantities that we express in various convenient coordinate systems.
+**The "passive" interpretation is the default in Archimedes**
+
+On the other hand, suppose we have a mesh with $N$ vertices defined by a `(3, N)` array and we want to visualize this at a roll angle of $\phi$.
+One way to look at this situation is that the vertices are defined in a "body" coordinate system (the original mesh coordinates), and the "earth" coordinate system is what the graphing library will use.
+In this case the transformation we need is $\mathbf{R}_EB = \mathbf{R}_BE^T$, which will go from the body frame B to the world frame E.
+
+Alternatively, we could view this as an "active" rotation of the vertex points to the new orientation; in either case $\mathbf{R}_EB$ is the correct transformation.
+
+In code, this is the inverse transformation:
+
+```python
+R_EB = EulerAngles(phi, "x").as_matrix().T
+p_E = R_EB @ p_B  # (3, N)
+```
+
+This kind of "active" transformation is more common in computer graphics and is taken as the default interpretation of a "rotation" in SciPy, for example.
+**The key thing to remember is that Archimedes treats the vector as a frame-independent physical quantity and rotates the _coordinates_, not the vector itself.**
+However, as seen in the previous code snippet, the "active" behavior can be recovered by simply inverting the transformation.
 
 ### The `Attitude` protocol
 
@@ -193,7 +257,7 @@ For example, the position and attitude kinematics calculation in `RigidBody` loo
 def kinematics(
     att: Attitude, v_B: np.ndarray, w_B: np.ndarray
 ) -> tuple[np.ndarray, Attitude]:
-    pos_deriv = att.rotate(v_B)  # Derivative of inertial position
+    pos_deriv = att.rotate(v_B, inverse=True)  # Inertial-frame velocity
     att_deriv = att.kinematics(w_B)  # Attitude kinematics
     return pos_deriv, att_deriv
 ```
@@ -206,31 +270,31 @@ The [`Quaternion`](#archimedes.spatial.Quaternion) implementation closely follow
 However, by re-implementing it in Archimedes we can ensure that it is compatible with the `Attitude` spec as well as all of the symbolic-numeric capabilities like autodiff and codegen.
 
 ```{code-cell} python
-# Rotate a vector from the body frame B to an inertial reference frame I if the body
+# Rotate a vector from the inertial earth frame E to the body frame B if the body's
 # attitude is given by (roll, pitch, yaw) Euler angles rpy
-def to_inertial(rpy, v_B):
+def to_body(rpy, v_E):
     att = Quaternion.from_euler(rpy, seq="xyz")
-    return att.rotate(v_B)
+    return att.rotate(v_E)
 
 
 rpy = np.array([0.1, 0.2, 0.3])
-v_B = np.array([10.0, 0.0, 0.0])
-print(arc.jac(to_inertial)(rpy, v_B))  # dv_B/drpy
+v_E = np.array([10.0, 0.0, 0.0])
+print(arc.jac(to_body)(rpy, v_E))  # dv_E/drpy
 ```
 
 ```{code-cell} python
 :tags: [remove-cell]
 from scipy.spatial.transform import Rotation as ScipyRotation
 
-v_I_arc = to_inertial(rpy, v_B)
-v_I_sp = ScipyRotation.from_euler("xyz", rpy).apply(v_B)
-assert np.allclose(v_I_sp, v_I_arc)
+v_B_arc = to_body(rpy, v_E)
+v_B_sp = ScipyRotation.from_euler("xyz", rpy).apply(v_E, inverse=True)
+assert np.allclose(v_B_sp, v_B_arc)
 ```
 
 As with the SciPy implementation, a `Quaternion` can be instantiated from a rotation matrix (DCM), another quaternion, or any combination of Euler angles, giving you a lot of flexibility in how you think about representing your attitude while still providing a robust representation of 3D rotations.
 
 :::{note}
-One difference from the SciPy version is that by default Archimedes uses a scalar-first component ordering, more common in engineering applications compared to, for instance, computer graphics.
+Another difference from the SciPy version is that by default Archimedes uses a scalar-first component ordering, more common in engineering applications compared to, for instance, computer graphics.
 :::
 
 Archimedes also diverges from SciPy by implementing the `Attitude` interface; namely, by providing a `kinematics` method that calculates quaternion kinematics, assuming the rotation represents the orientation of a moving body with respect to some reference frame.

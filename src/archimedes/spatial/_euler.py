@@ -70,8 +70,8 @@ def _rot_x(angle: float) -> np.ndarray:
     R = array(
         [
             [1.0, 0.0, 0.0],
-            [0.0, c, -s],
-            [0.0, s, c],
+            [0.0, c, s],
+            [0.0, -s, c],
         ]
     )
     return cast(np.ndarray, R)
@@ -84,9 +84,9 @@ def _rot_y(angle: float) -> np.ndarray:
 
     R = array(
         [
-            [c, 0.0, s],
+            [c, 0.0, -s],
             [0.0, 1.0, 0.0],
-            [-s, 0.0, c],
+            [s, 0.0, c],
         ]
     )
     return cast(np.ndarray, R)
@@ -99,8 +99,8 @@ def _rot_z(angle: float) -> np.ndarray:
 
     R = array(
         [
-            [c, -s, 0.0],
-            [s, c, 0.0],
+            [c, s, 0.0],
+            [-s, c, 0.0],
             [0.0, 0.0, 1.0],
         ]
     )
@@ -111,24 +111,17 @@ def euler_to_dcm(angles: np.ndarray, seq: str = "xyz") -> np.ndarray:
     """Direction cosine matrix from Euler angles
 
     If the Euler angles represent the attitude of a body B relative to a frame A,
-    then this function returns the matrix R_AB that transforms vectors from
-    frame B to frame A.  Specifically, for a vector v_B expressed in frame B,
-    the corresponding vector in frame A is given by ``v_A = R_AB @ v_B``.
+    then this function returns the matrix R_BA that transforms vectors from
+    frame A to frame B.  Specifically, for a vector v_A expressed in frame A,
+    the corresponding vector in frame B is given by ``v_B = R_BA @ v_A``.
 
     The inverse transformation can be obtained by transposing this matrix:
-    ``R_BA = R_AB.T``.
+    ``R_AB = R_BA.T``.
 
     By default, the Euler angle sequence is assumed to follow the standard aerospace
     convention of an extrinsic roll-pitch-yaw sequence ("xyz").  However, it supports
     arbitrary sequences of non-repeating axes up to length 3. Both intrinsic
     (uppercase letters) and extrinsic (lowercase letters) sequences are supported.
-
-    Specifically, the following will generate equivalent DCMs:
-
-    .. code-block:: python
-
-        R_AB = euler_to_dcm(rpy)
-        R_AB = Quaternion.from_euler(rpy, 'xyz').as_matrix()
 
     In general, the ``Quaternion`` class should be preferred over Euler representations,
     although Euler angles are used in some special cases (e.g. stability analysis).
@@ -138,7 +131,8 @@ def euler_to_dcm(angles: np.ndarray, seq: str = "xyz") -> np.ndarray:
     Parameters
     ----------
     angles : array_like
-        Euler angles in radians. Shape must match the length of ``seq``.
+        Euler angles in radians representing the orientation of frame B with respect to
+        frame A. Shape must match the length of ``seq``.
     seq : str, optional
         Sequence of axes for Euler angles (up to length 3).  Each character must be one
         of 'x', 'y', 'z' (extrinsic) or 'X', 'Y', 'Z' (intrinsic).  Default is 'xyz'.
@@ -146,7 +140,7 @@ def euler_to_dcm(angles: np.ndarray, seq: str = "xyz") -> np.ndarray:
     Returns
     -------
     np.ndarray, shape (3, 3)
-        Direction cosine matrix R_AB that transforms vectors from frame B to frame A.
+        Direction cosine matrix R_BA that transforms vectors from frame A to frame B.
     """
 
     # Validate angle sequence
@@ -168,12 +162,11 @@ def euler_to_dcm(angles: np.ndarray, seq: str = "xyz") -> np.ndarray:
     for char, angle in zip(seq, angles):
         match char:
             case "x":
-                R = _rot_x(angle) @ R
+                R = R @ _rot_x(angle)
             case "y":
-                R = _rot_y(angle) @ R
+                R = R @ _rot_y(angle)
             case "z":
-                R = _rot_z(angle) @ R
-
+                R = R @ _rot_z(angle)
     return R
 
 

@@ -49,7 +49,10 @@ class TestQuaternionLowLevel:
         quat = random_quat()
         R1 = quaternion_to_dcm(quat)
         R2 = ScipyRotation.from_quat(quat, scalar_first=True).as_matrix()
-        np.testing.assert_allclose(R1, R2)
+        # NOTE: SciPy's rotation uses an "active" convention (rotating vectors
+        # in a single frame), whereas our DCMs are "passive" (rotating between
+        # frames).  Thus the matrices are transposes of each other.
+        np.testing.assert_allclose(R1, R2.T)
 
     def test_to_euler(self):
         q = random_quat()
@@ -64,7 +67,7 @@ class TestQuaternionWrapper:
         q = Quaternion.identity()
         assert len(q) == 4
 
-        # __getitem__
+        # __getitem__x
         assert q[0] == 1.0
 
         # __iter__
@@ -85,13 +88,13 @@ class TestQuaternionWrapper:
         w = q.rotate(v)
 
         R_scipy = ScipyRotation.from_quat(q.array, scalar_first=True)
-        w_scipy = R_scipy.apply(v)
+        w_scipy = R_scipy.apply(v, inverse=True)
 
         assert np.allclose(w, w_scipy)
 
         # Inverse apply
         w = q.rotate(v, inverse=True)
-        w_scipy = R_scipy.apply(v, inverse=True)
+        w_scipy = R_scipy.apply(v, inverse=False)
         assert np.allclose(w, w_scipy)
 
     def test_multiplication(self):
@@ -186,8 +189,8 @@ class TestQuaternionWrapper:
         R_scipy = ScipyRotation.from_euler(seq, angles)
         q = Quaternion.from_euler(angles, seq)
 
-        test_vector = np.array([1, 2, 3])
-        assert np.allclose(q.rotate(test_vector), R_scipy.apply(test_vector))
+        v = np.array([1, 2, 3])
+        assert np.allclose(q.rotate(v), R_scipy.apply(v, inverse=True))
 
     def test_compile(self):
         @arc.compile

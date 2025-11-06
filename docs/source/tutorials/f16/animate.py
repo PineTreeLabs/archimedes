@@ -31,8 +31,11 @@ def traj_data(xs_flat, unravel, stride=5):
     orientations = []
     for i in range(len(ts)):
         x = unravel(xs_flat[:, i])
-        R_BN = x.att.as_matrix()
-        orientations.append(R_BN)
+        # The rotation matrix is for a "passive" rotation (changing coordinate
+        # systems).  For visualization we want the "active" rotation, which
+        # will rotate the points in a single coordinate system. Hence we take the
+        # transpose.
+        orientations.append(x.att.as_matrix().T)
 
     def att_as_rpy(x_flat):
         x = unravel(x_flat)

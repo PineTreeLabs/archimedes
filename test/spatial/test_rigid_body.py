@@ -55,7 +55,7 @@ class TestVehicleDynamics:
         att = Quaternion.from_euler(rpy)
 
         # Could do att.rotate(v_B) but this tests euler_to_dcm
-        R_NB = euler_to_dcm(rpy)
+        R_NB = euler_to_dcm(rpy).T
         v_N = R_NB @ v_B
 
         t = 0

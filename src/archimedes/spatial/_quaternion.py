@@ -101,6 +101,10 @@ def _elementary_quat_compose(
 def dcm_to_quaternion(matrix: np.ndarray) -> np.ndarray:
     """Create a Quaternion from a rotation matrix.
 
+    If the rotation matrix is R_BA that represents the attitude of a body B
+    relative to a frame A, then the resulting quaternion represents the attitude
+    of the body B relative to frame A.
+
     Note that for the sake of symbolic computation, this method assumes that
     the input is a valid rotation matrix (orthogonal and determinant +1).
 
@@ -114,8 +118,8 @@ def dcm_to_quaternion(matrix: np.ndarray) -> np.ndarray:
     Returns
     -------
     np.ndarray, shape (4,)
-        Unit quaternion [q0, q1, q2, q3] corresponding to the rotation matrix,
-        where q0 is the scalar part.
+        Unit quaternion [w, x, y, z] corresponding to the rotation matrix,
+        where w is the scalar part.
 
     References
     ----------
@@ -126,6 +130,10 @@ def dcm_to_quaternion(matrix: np.ndarray) -> np.ndarray:
     matrix = cast(np.ndarray, array(matrix))
     if matrix.shape != (3, 3):
         raise ValueError("Rotation matrix must be 3x3")
+    
+    # Transpose of SciPy convention  (we assume passive rotations for coordinate
+    # system transformations rather than active rotations of vectors)
+    matrix = matrix.T
 
     t = np.linalg.trace(matrix)
 
@@ -234,12 +242,12 @@ def quaternion_to_dcm(quat: np.ndarray) -> np.ndarray:
     """Direction cosine matrix from unit quaternion
 
     If the quaternion represents the attitude of a body B relative to a frame A,
-    then this function returns the matrix R_AB that transforms vectors from
-    frame B to frame A.  Specifically, for a vector v_B expressed in frame B,
-    the corresponding vector in frame A is given by ``v_A = R_AB @ v_B``.
+    then this function returns the matrix R_BA that transforms vectors from
+    frame A to frame B.  Specifically, for a vector v_A expressed in frame A,
+    the corresponding vector in frame B is given by ``v_B = R_BA @ v_A``.
 
     The inverse transformation can be obtained by transposing this matrix:
-    ``R_BA = R_AB.T``.
+    ``R_AB = R_BA.T``.
 
     Note that this function assumes the scalar-first convention, and assumes the
     quaternion is normalized.
@@ -248,12 +256,12 @@ def quaternion_to_dcm(quat: np.ndarray) -> np.ndarray:
     ----------
     quat : array_like, shape (4,)
         Unit quaternion representing rotation from frame A to frame B,
-        in the format [q0, q1, q2, q3] where q0 is the scalar part.
+        in the format [w, x, y, z] where w is the scalar part.
 
     Returns
     -------
     np.ndarray, shape (3, 3)
-        Direction cosine matrix R_AB that transforms vectors from frame B to frame A.
+        Direction cosine matrix R_BA that transforms vectors from frame A to frame B.
     """
     w, x, y, z = quat
     x2 = x * x
@@ -274,7 +282,7 @@ def quaternion_to_dcm(quat: np.ndarray) -> np.ndarray:
             [2 * (xz - yw), 2 * (yz + xw), w2 - x2 - y2 + z2],
         ],
         like=quat,
-    )
+    ).T
 
 
 # See: https://github.com/scipy/scipy/blob/3ead2b543df7c7c78619e20f0cb6139e344a8866/scipy/spatial/transform/_rotation_cy.pyx#L774-L851  # ruff: noqa: E501

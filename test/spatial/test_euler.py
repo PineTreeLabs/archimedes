@@ -32,8 +32,8 @@ def _test_kinematics(wrapper):
     # Given roll-pitch-yaw rates, compute the body-frame angular velocity
     # using the rotation matrices directly.
     pqr = np.array([0.4, 0.5, 0.6])  # Roll, pitch, yaw rates
-    C_roll = EulerAngles(rpy[0], "x").as_matrix().T  # C_φ
-    C_pitch = EulerAngles(rpy[1], "y").as_matrix().T  # C_θ
+    C_roll = EulerAngles(rpy[0], "x").as_matrix()  # C_φ
+    C_pitch = EulerAngles(rpy[1], "y").as_matrix()  # C_θ
     # Successively transform each rate into the body frame
     w_B_ex = np.array([pqr[0], 0.0, 0.0]) + C_roll @ (
         np.array([0.0, pqr[1], 0.0]) + C_pitch @ np.array([0.0, 0.0, pqr[2]])
@@ -72,7 +72,10 @@ class TestEulerLowLevel:
             R1 = euler_to_dcm(angles, seq=seq)
             R2 = ScipyRotation.from_euler(seq, angles).as_matrix()
 
-            np.testing.assert_allclose(R1, R2)
+            # NOTE: SciPy's rotation uses an "active" convention (rotating vectors
+            # in a single frame), whereas our DCMs are "passive" (rotating between
+            # frames).  Thus the matrices are transposes of each other.
+            np.testing.assert_allclose(R1, R2.T)
 
     def test_kinematics(self):
         _test_kinematics(wrapper=False)
@@ -121,13 +124,13 @@ class TestEulerWrapper:
         w = angles.rotate(v)
 
         R_scipy = ScipyRotation.from_euler(seq, angles.array)
-        w_scipy = R_scipy.apply(v)
+        w_scipy = R_scipy.apply(v, inverse=True)
 
         assert np.allclose(w, w_scipy)
 
         # Inverse apply
         w = angles.rotate(v, inverse=True)
-        w_scipy = R_scipy.apply(v, inverse=True)
+        w_scipy = R_scipy.apply(v, inverse=False)
         assert np.allclose(w, w_scipy)
 
     def test_from_euler(self):
@@ -163,7 +166,10 @@ class TestEulerWrapper:
             angles = random_euler(wrapper=True, seq=seq)
             R1 = angles.as_matrix()
             R2 = ScipyRotation.from_euler(seq, angles.array).as_matrix()
-            np.testing.assert_allclose(R1, R2)
+            # NOTE: SciPy's rotation uses an "active" convention (rotating vectors
+            # in a single frame), whereas our DCMs are "passive" (rotating between
+            # frames).  Thus the matrices are transposes of each other.
+            np.testing.assert_allclose(R1, R2.T)
 
     def test_inv(self):
         seq = "xyz"
