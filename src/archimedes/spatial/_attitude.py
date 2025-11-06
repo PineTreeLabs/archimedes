@@ -53,7 +53,7 @@ class Attitude(Protocol):
         """
 
     def rotate(self, vectors: np.ndarray, inverse: bool = False) -> np.ndarray:
-        """Rotate vectors by the attitude.
+        """Rotate vectors with the transformation represented by the attitude.
 
         If the attitude represents the orientation of a body B relative to a frame A,
         this method rotates vectors between the two frames. Specifically, for a vector
@@ -74,7 +74,7 @@ class Attitude(Protocol):
         """
 
     def inv(self) -> Attitude:
-        """Compute the inverse (conjugate) of the attitude.
+        """Compute the inverse of the rotation corresponding to the attitude.
 
         Returns
         -------
@@ -167,7 +167,7 @@ class EulerAngles:
             # by inadvertently passing a 2D array.  It might be better to
             # check the angles when methods are called instead.
             if not getattr(angles, "ndim", None) == 2:
-                _check_angles(angles, seq)
+                angles = _check_angles(angles, seq)
 
         self.array = angles
         self.seq = seq

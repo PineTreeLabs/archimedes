@@ -22,9 +22,9 @@ class LongitudinalState:
         cls, x: SubsonicF16.State, vt: float = None, alpha: float = None
     ) -> LongitudinalState:
         if vt is None:
-            vt = np.sqrt(np.dot(x.vel, x.vel))
+            vt = np.sqrt(np.dot(x.v_B, x.v_B))
         if alpha is None:
-            alpha = np.arctan2(x.vel[2], x.vel[0])
+            alpha = np.arctan2(x.v_B[2], x.v_B[0])
 
         return cls(
             vt=vt,
@@ -51,7 +51,7 @@ class LongitudinalState:
         return SubsonicF16.State(
             pos=np.zeros(3),
             att=rpy,
-            vel=v_B,
+            v_B=v_B,
             w_B=w_B,
             eng=self.eng,
         )
@@ -92,8 +92,8 @@ class LateralState:
         beta: float = None,
     ):
         if beta is None:
-            vt = np.sqrt(np.dot(x.vel, x.vel))
-            beta = np.arcsin(x.vel[1] / vt)
+            vt = np.sqrt(np.dot(x.v_B, x.v_B))
+            beta = np.arcsin(x.v_B[1] / vt)
         return cls(
             beta=beta,
             phi=x.att[0],
@@ -144,12 +144,12 @@ class StabilityState:
         cls, x: SubsonicF16.State, x_dot: SubsonicF16.State
     ) -> StabilityState:
         # Compute time derivatives of airspeed, alpha, and beta
-        vt = np.sqrt(np.dot(x.vel, x.vel))
-        vt_dot = np.dot(x.vel, x_dot.vel) / vt
-        dum = x.vel[0] ** 2 + x.vel[2] ** 2
-        beta = np.arcsin(x.vel[1] / vt)
-        alpha_dot = (x.vel[0] * x_dot.vel[2] - x.vel[2] * x_dot.vel[0]) / dum
-        beta_dot = (vt * x_dot.vel[1] - x.vel[1] * vt_dot) / (vt**2 * np.cos(beta))
+        vt = np.sqrt(np.dot(x.v_B, x.v_B))
+        vt_dot = np.dot(x.v_B, x_dot.v_B) / vt
+        dum = x.v_B[0] ** 2 + x.v_B[2] ** 2
+        beta = np.arcsin(x.v_B[1] / vt)
+        alpha_dot = (x.v_B[0] * x_dot.v_B[2] - x.v_B[2] * x_dot.v_B[0]) / dum
+        beta_dot = (vt * x_dot.v_B[1] - x.v_B[1] * vt_dot) / (vt**2 * np.cos(beta))
         return cls(
             lon=LongitudinalState.from_full_state(x_dot, vt=vt_dot, alpha=alpha_dot),
             lat=LateralState.from_full_state(x_dot, beta=beta_dot),
@@ -168,7 +168,7 @@ class StabilityState:
         return SubsonicF16.State(
             pos=p_N,
             att=EulerAngles(rpy),
-            vel=v_B,
+            v_B=v_B,
             w_B=w_B,
             eng=self.lon.eng,
         )

@@ -21,7 +21,7 @@ kernelspec:
 
 **_Inside the new `spatial` module_**
 
-Jared Callaham • 16 Oct 2025
+Jared Callaham • 16 Oct 2025 (Updated 5 Nov 2025)
 
 <!-- Graphic: 6dof gimbal with graduation cap -->
 
@@ -39,7 +39,9 @@ We'll cover:
 - Building your own vehicle models
 - What's next for `spatial`
 
-This post serves as an announcement of these new features, but will also be updated to provide a basic reference for the relevant conventions and equations.
+:::{note}
+This post serves as an announcement of these new features, but will also be updated to provide a basic reference for the relevant conventions and equations. **Most recent update: 5 Nov 2025 (v0.4.0)**
+:::
 
 ## What `spatial` Does
 
@@ -57,13 +59,11 @@ Much sooner on the roadmap, `spatial` will eventually add functionality for _spa
 
 In short, the current functionality is useful for 3D orientations and when simulating isolated rigid bodies in 3D (especially vehicle dynamics), but not for full-fledged multibody systems including joints and collisions.
 
-## 3D Rotations
+## TL; DR
 
-Direction cosine matrices, Euler angles, and quaternions are all representations of 3D rotations - how one frame or body is oriented relative to another in space.
-Archimedes represents these rotations using the [`Attitude`](#archimedes.spatial.Attitude) protocol and classes that implement this abstract interface, most importantly [`EulerAngles`](#archimedes.spatial.EulerAngles) and [`Quaternion`](#archimedes.spatial.Quaternion).
+Here's a "quickstart" version of the capabilities in `spatial`.
 
-This class is modeled directly on [SciPy's `Rotation` class](https://docs.scipy.org/doc/scipy/reference/generated/scipy.spatial.transform.Rotation.html) and is unit tested directly against the SciPy behavior.
-However, by re-implementing it in Archimedes we can ensure that it is compatible with all of the symbolic-numeric capabilities like autodiff and codegen.
+First, working with attitudes and rotations:
 
 ```{code-cell} python
 :tags: [remove-cell]
@@ -71,50 +71,176 @@ However, by re-implementing it in Archimedes we can ensure that it is compatible
 ```
 
 ```{code-cell} python
-:tags: [hide-cell]
 import numpy as np
 
 import archimedes as arc
-from archimedes.spatial import RigidBody, Rotation, Quaternion
+from archimedes.spatial import Attitude, EulerAngles, Quaternion, RigidBody
+
+# Define a roll-pitch-yaw sequence representing the attitude of body B with respect
+# to inertial earth frame E
+rpy = EulerAngles([0.1, 0.2, 0.3], seq="xyz")
+
+# Convert to a rotation matrix that transforms vectors from frame B to frame E
+R_EB = rpy.as_matrix()
+v_B = np.array([1.0, 0.0, 0.0])
+v_E = R_EB @ v_B
+
+# Or use the equivalent `.rotate` method
+v_E = rpy.rotate(v_B)
+
+# Inverse transformations (equivalent)
+v_B = R_EB.T @ v_E
+v_B = rpy.rotate(v_E, inverse=True)
+
+# Convert between representations
+q = rpy.as_quat()
+
+# Same operations in either representation
+R_EB = q.as_matrix()
+v_E = R_EB @ v_B  # Or q.rotate(v_B)
 ```
 
 ```{code-cell} python
-# Rotate a vector from the body frame B to an inertial reference frame N if the body
+:tags: [remove-cell]
+
+v_E = rpy.as_matrix() @ v_B
+assert np.allclose(v_E, rpy.rotate(v_B))
+assert np.allclose(v_E, q.rotate(v_B))
+assert np.allclose(v_E, q.as_matrix() @ v_B)
+```
+
+6-dof rigid body dynamics:
+
+```{code-cell} python
+:tags: [hide-output]
+# Rigid body dynamics
+t = 0
+x = RigidBody.State(
+    pos=np.zeros(3),  # Inertial position
+    att=rpy,
+    v_B=np.array([10.0, 0.0, 0.0]),  # Body-frame velocity
+    w_B=np.zeros(3),  # Body-frame angular velocity
+)
+u = RigidBody.Input(
+    F_B=np.array([0.0, 0.0, 10.0]),  # Body-frame forces
+    M_B=np.array([0.0, 1.0, 0.0]),  # Body-frame moments
+    m=10.0,  # Mass
+    J_B=np.eye(3),  # Inertia matrix
+)
+x_t = RigidBody.dynamics(t, x, u)  # Calculate time derivatives
+
+# Can use either attitude representation
+x = x.replace(att=q)
+x_t = RigidBody.dynamics(t, x, u)  # Automatically uses quaternion kinematics
+```
+
+This works because the `Attitude` protocol lets you write type-safe "polymorphic" functions that work with any attitude representation (basically, fancy old school duck-typing):
+
+```{code-cell} python
+def body_frame_kinematics(
+    att: Attitude, v_B: np.ndarray, w_B: np.ndarray
+) -> tuple[np.ndarray, Attitude]:
+    pos_deriv = att.rotate(v_B)  # Time derivative of inertial-frame position
+    att_deriv = att.kinematics(w_B)  # Attitude kinematics
+    return pos_deriv, att_deriv
+
+v_B = np.array([10.0, 0.0, 0.0])
+w_B = np.array([0.0, 1.0, 0.0])
+dp_E, drpy = body_frame_kinematics(rpy, v_B, w_B)  # Euler kinematics
+dp_E, dq = body_frame_kinematics(q, v_B, w_B)  # Quaternion kinematics
+```
+
+That's basically all you need to know to start working with `spatial`, but read on for a deeper dive.
+
+## 3D Rotations
+
+Direction cosine matrices, Euler angles, and quaternions are all representations of 3D rotations - how one frame or body is oriented relative to another in space.
+Archimedes represents these rotations using the [`Attitude`](#archimedes.spatial.Attitude) protocol and classes that implement this abstract interface, most importantly [`EulerAngles`](#archimedes.spatial.EulerAngles) and [`Quaternion`](#archimedes.spatial.Quaternion).
+
+The `Attitude` interface is largely patterned on [SciPy's `Rotation` class](https://docs.scipy.org/doc/scipy/reference/generated/scipy.spatial.transform.Rotation.html), but deviates from SciPy in several ways that make it more convenient for flexible dynamics modeling.
+
+### The `Attitude` protocol
+
+The interface expected by rotation representations is defined by an [`Attitude`](#archimedes.spatial.Attitude) protocol that looks like the following:
+
+```python
+class Attitude(Protocol):
+    def as_matrix(self) -> np.ndarray:
+        """Convert the attitude to a direction cosine matrix (DCM)"""
+    
+    def rotate(self, vectors: np.ndarray, inverse: bool = False) -> np.ndarray:
+        """Rotate vectors with the transformation represented by the attitude"""
+
+    def inv(self) -> Attitude:
+        """Compute the inverse of the rotation corresponding to the attitude."""
+
+    def kinematics(self, w_B: np.ndarray) -> Attitude:
+        """Compute the time derivative of the attitude given angular velocity."""
+```
+
+The two current implementations of this protocol are [`EulerAngles`](#archimedes.spatial.EulerAngles) and [`Quaternion`](#archimedes.spatial.Quaternion), both of which additionally support indexing, iteration, and conversions back and forth.
+
+This design departs from SciPy's `Rotation` class, which always uses an quaternion representation internally but has flexible constructor methods (`from_euler`) and conversion to arrays (`as_euler`).
+The difficulty with this for dynamics modeling is that quaternions are not _always_ the best choice.
+Quaternions are a good default, since they provide a minimal, singularity-free representation of 3D rotations, but Euler angles are more intuitive for applications like stability analysis of flight dynamics and when working with vehicles like cars that are unlikely to reach gimbal lock.
+Additionally, some specialized applications like trajectory optimization might use representations like modified Rodrigues parameters that do not require the unit-norm constraint of quaternions.
+
+What the `Attitude` protocol buys us is _polymorphism_.
+You can write code that accepts an `Attitude` and expect to use any of the methods above safely, regardless of what the representation is.
+For example, the position and attitude kinematics calculation in `RigidBody` looks roughly like:
+
+```python
+def kinematics(
+    att: Attitude, v_B: np.ndarray, w_B: np.ndarray
+) -> tuple[np.ndarray, Attitude]:
+    pos_deriv = att.rotate(v_B)  # Derivative of inertial position
+    att_deriv = att.kinematics(w_B)  # Attitude kinematics
+    return pos_deriv, att_deriv
+```
+
+This function will work for _any_ class that properly implements the `Attitude` spec, meaning that you can freely swap between Euler angles, quaternions, custom attitude parameterizations, etc. without any reconfiguration or special handling.
+
+### Quaternions
+
+The [`Quaternion`](#archimedes.spatial.Quaternion) implementation closely follows [SciPy's `Rotation`](https://docs.scipy.org/doc/scipy/reference/generated/scipy.spatial.transform.Rotation.html) and is unit tested directly against the SciPy behavior.
+However, by re-implementing it in Archimedes we can ensure that it is compatible with the `Attitude` spec as well as all of the symbolic-numeric capabilities like autodiff and codegen.
+
+```{code-cell} python
+# Rotate a vector from the body frame B to an inertial reference frame I if the body
 # attitude is given by (roll, pitch, yaw) Euler angles rpy
 def to_inertial(rpy, v_B):
-    att = Rotation.from_euler("xyz", rpy)
-    return att.apply(v_B)
+    att = Quaternion.from_euler(rpy, seq="xyz")
+    return att.rotate(v_B)
 
 
 rpy = np.array([0.1, 0.2, 0.3])
-v_N = np.array([10.0, 0.0, 0.0])
-print(arc.jac(to_inertial)(rpy, v_N))  # dv_B/drpy
+v_B = np.array([10.0, 0.0, 0.0])
+print(arc.jac(to_inertial)(rpy, v_B))  # dv_B/drpy
 ```
 
 ```{code-cell} python
 :tags: [remove-cell]
 from scipy.spatial.transform import Rotation as ScipyRotation
 
-v_B_arc = to_inertial(rpy, v_N)
-v_B_sp = ScipyRotation.from_euler("xyz", rpy).apply(v_N)
-assert np.allclose(v_B_sp, v_B_arc)
+v_I_arc = to_inertial(rpy, v_B)
+v_I_sp = ScipyRotation.from_euler("xyz", rpy).apply(v_B)
+assert np.allclose(v_I_sp, v_I_arc)
 ```
 
-Internally, `Rotation` uses a quaternion representation, as in the SciPy implementation.
-However, it can be instantiated from a quaternion, a rotation matrix (DCM), or any combination of Euler angles, giving you a lot of flexibility in how you think about representing your attitude while still providing a robust, minimal, singularity-free representation of 3D rotations.
+As with the SciPy implementation, a `Quaternion` can be instantiated from a rotation matrix (DCM), another quaternion, or any combination of Euler angles, giving you a lot of flexibility in how you think about representing your attitude while still providing a robust representation of 3D rotations.
 
 :::{note}
 One difference from the SciPy version is that by default Archimedes uses a scalar-first component ordering, more common in engineering applications compared to, for instance, computer graphics.
 :::
 
-Archimedes also diverges from the SciPy implementation by providing a `derivative` method that calculates attitude kinematics, assuming the rotation represents the orientation of a moving body with respect to some reference frame.
+Archimedes also diverges from SciPy by implementing the `Attitude` interface; namely, by providing a `kinematics` method that calculates quaternion kinematics, assuming the rotation represents the orientation of a moving body with respect to some reference frame.
 Given the angular velocity of the body in its own frame, $\omega_B$, this function calculates the time derivative of the rotation using quaternion kinematics:
 
 ```{math}
 \dot{\mathbf{q}} = \frac{1}{2} \mathbf{q} \otimes \mathbf{\omega}_B
 ```
 
-The actual implementation of quaternion kinematics deviates slightly from the ideal form by adding a "Baumgarte stabilization" to preserve the unit-norm requirement.
+The actual implementation of quaternion kinematics differs slightly from the ideal form by adding a "Baumgarte stabilization" to numerically preserve the unit-norm requirement.
 With a stabilization factor of $\lambda$, the full kinematics model is:
 
 ```{math}
@@ -124,19 +250,32 @@ With a stabilization factor of $\lambda$, the full kinematics model is:
 A factor of $\lambda = 1$ is a good default (and is the default in `RigidBody` as well).
 
 ```{code-cell} python
-att = Rotation.from_euler("xyz", rpy)
+att = Quaternion.from_euler(rpy, "xyz")
 w_B = np.array([0.0, 0.1, 0.0])  # 0.1 rad/sec pitch-up
-att.derivative(w_B, baumgarte=1.0)
+att.kinematics(w_B)
 ```
 
 :::{caution}
-The `kinematics` method returns the time derivative of the `Rotation` as a new `Rotation` instance.
+The `kinematics` method returns the time derivative of the `Quaternion` as a new `Quaternion` instance.
 This is convenient for working with ODE solvers and other algorithms that expect the output to have the same structure as the input state.
 However, keep in mind that the time derivative $\dot{\mathbf{q}}$ is _not_ itself a valid rotation.
-Hence, you CANNOT use `att.kinematics(w_B).as_euler("xyz")` to get the Euler angle rates (instead use [`euler_kinematics`](#archimedes.spatial.euler_kinematics) if you need this).
+Hence, you CANNOT use `att.kinematics(w_B).as_euler("xyz")` to get the Euler angle rates.
+If you need Euler rates, use Euler kinematics directly: `att.as_euler("xyz").kinematics(w_B)`.
 :::
 
 This attitude kinematics calculation comes in particularly handy for the second major functionality released with `spatial`: 6dof rigid body dynamics modeling.
+
+### Euler angles
+
+TODO:
+- Sequences (and default)
+- Conversion
+- Kinematics (note RPY restriction)
+- Same caution about Euler kinematics not returning a valid rotation
+
+### Low-level API
+
+TODO:
 
 ## 6dof Dynamics
 
@@ -221,6 +360,7 @@ See the [source code](https://github.com/PineTreeLabs/archimedes/blob/main/src/a
 
 The inner classes `State` and `Input` help to organize the data and states, and the `dynamics` method does the work of actually calculating the equations of motion as given above.
 
+TODO: Fix this
 :::{note}
 **On time-varying mass/inertia**: it is relatively common to have vehicles that change mass and inertia properties over time (e.g. a rocket burning fuel).
 `RigidBody` takes these as inputs so that you can manage their characteristics however you want.
@@ -233,21 +373,6 @@ But it's up to you to ignore/include these effects in whatever way makes the mos
 While [`RigidBody`](#archimedes.spatial.RigidBody) uses quaternion kinematics by default for stability and robustness - critical for vehicles like satellites, quadrotors, and fighter jets - there is also the option to use roll-pitch-yaw Euler kinematics for bodies like cars and ships that (nominally) won't reach 90-degrees pitch-up and hit the gimbal lock singularity.
 In these cases you can set `rpy_attitude = True` and use a roll-pitch-yaw sequence instead of the `Rotation` for the attitude representation.
 
-<!--
-:::{note}
-Why are there _six_ degrees of freedom? For historical reasons (I assume related to Lagrangian mechanics) the number of _degrees of freedom_ of a mechanical system are the number of variables required to say where something _is_, but not how it is moving.
-If there are three components of position ($x$, $y$, $z$) and three components of attitude (roll, pitch, yaw), we have a total of six degrees of freedom.
-The quaternion attitude representation has four components but it must be unit norm, so technically this still only contributes three degrees of freedom.
-
-So, a point mass in 2D has two degrees of freedom ($x$ and $y$), while a 3D point mass and longitudinal vehicle dynamics both have three degrees of freedom (3D location or 2D location plus pitch).
-Full 3D rigid body dynamics have six degrees of freedom, and certain aftermarket Deloreans have seven (all the usual ones plus time).
-
-This is a bit with the prevalence of modern state-space modeling, since there are roughly twice as many dynamical states as there are "degrees of freedom".
-As implemented here, the "6dof" model has thirteen dynamical states (three position, three velocity, four quaternion, and three angular velocity).
-Flux capacitors not included.
-:::
--->
-
 Here's the `RigidBody` class in action:
 
 ```{code-cell} python
@@ -255,7 +380,7 @@ Here's the `RigidBody` class in action:
 x = RigidBody.State(
     pos=np.array([0.0, 0.0, 10.0]),
     att=Quaternion.identity(),
-    vel=np.zeros(3),
+    v_B=np.zeros(3),
     w_B=np.zeros(3),
 )
 
@@ -270,6 +395,14 @@ RigidBody.dynamics(0.0, x, u)
 ```
 
 In this simple case, since the body and world axes are aligned (`Rotation.identity()`) and we start out with zero angular velocity, most of the complexity from non-inertial frames in the equations of motion disappears. and we just get $m \dot{\mathbf{v}}_B = \mathbf{F}_B$ and $\mathbf{J}_B \dot{\mathbf{\omega}}_B = \mathbf{M}_B$.
+
+### Customizing with pseudo-forces and moments
+
+TODO
+
+### Non-inertial frames
+
+TODO
 
 ## Custom Vehicle Models
 
@@ -380,7 +513,7 @@ class Aircraft:
         return self.State(
             pos=x_rb_dot.pos,
             att=x_rb_dot.att,
-            vel=x_rb_dot.vel,
+            v_B=x_rb_dot.v_B,
             w_B=x_rb_dot.w_B,
             aero=x_aero_dot,
             engine=x_eng_dot,

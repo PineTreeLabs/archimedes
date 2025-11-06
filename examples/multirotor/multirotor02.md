@@ -468,7 +468,7 @@ Finally, although we have included `FlightVehicle` as part of our class hierarch
 The interface is the same as what we've shown here, and you can look at the source code in [multirotor.py](https://github.com/jcallaham/archimedes/tree/main/docs/source/notebooks/multirotor/multirotor.py) to see how exactly it builds on the generic `FlightVehicle`.
 
 One difference with what we've shown here is that instead of using a flat 12-element vector to represent the state of the vehicle, the built-in `FlightVehicle` defines its own `State` class.
-This is another [`struct`](#archimedes.tree.struct) with fields for each of the four groups of state variables: position (`State.pos`), attitude (`State.att`), velocity (`State.vel`), angular velocity (`State.w_B`), and any additional state variables (`State.aux`).
+This is another [`struct`](#archimedes.tree.struct) with fields for each of the four groups of state variables: position (`State.pos`), attitude (`State.att`), velocity (`State.v_B`), angular velocity (`State.w_B`), and any additional state variables (`State.aux`).
 The naming convention follows [monogram notation](https://drake.mit.edu/doxygen_cxx/group__multibody__notation__basics.html).
 
 This avoids the need to remember what index represents the $y$-component of angular velocity, for example.

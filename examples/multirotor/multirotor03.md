@@ -110,7 +110,7 @@ u0 = 500.0 * np.ones(4)  # Rotor angular velocity
 x0 = vehicle.state(
     pos=np.zeros(3),  # Initial position [m]
     rpy=np.zeros(3),  # Initial roll-pitch-yaw [rad]
-    vel=np.zeros(3),  # Initial body-frame velocity [m/s]
+    v_B=np.zeros(3),  # Initial body-frame velocity [m/s]
     w_B=np.zeros(3),  # Initial angular velocity [rad/s]
 )
 x0_flat, unravel = arc.tree.ravel(x0)
@@ -139,7 +139,7 @@ fig, ax = plt.subplots(2, 1, figsize=(7, 4), sharex=True)
 ax[0].plot(t_eval, xs.pos[2], label="z")
 ax[0].grid()
 ax[0].set_ylabel("z_N [m]")
-ax[1].plot(t_eval, xs.vel[2], label="vz_B")
+ax[1].plot(t_eval, xs.v_B[2], label="vz_B")
 ax[1].grid()
 ax[1].set_ylabel("vz_B [m/s]")
 plt.xlabel("Time [s]")
@@ -154,7 +154,7 @@ for theme in {"light", "dark"}:
     ax[0].plot(t_eval, xs.pos[2], label="z")
     ax[0].grid()
     ax[0].set_ylabel("z_N [m]")
-    ax[1].plot(t_eval, xs.vel[2], label="vz_B")
+    ax[1].plot(t_eval, xs.v_B[2], label="vz_B")
     ax[1].grid()
     ax[1].set_ylabel("vz_B [m/s]")
     plt.xlabel("Time [s]")
@@ -188,8 +188,8 @@ ax[0].plot(t_eval, xs_arc.pos[2], "--", label="Archimedes")
 ax[0].legend()
 ax[0].grid()
 ax[0].set_ylabel("z_N [m]")
-ax[1].plot(t_eval, xs.vel[2])
-ax[1].plot(t_eval, xs_arc.vel[2], "--")
+ax[1].plot(t_eval, xs.v_B[2])
+ax[1].plot(t_eval, xs_arc.v_B[2], "--")
 ax[1].grid()
 ax[1].set_ylabel("vz_B [m/s]")
 plt.xlabel("Time [s]")
@@ -206,8 +206,8 @@ for theme in {"light", "dark"}:
     ax[0].legend()
     ax[0].grid()
     ax[0].set_ylabel("z_N [m]")
-    ax[1].plot(t_eval, xs.vel[2])
-    ax[1].plot(t_eval, xs_arc.vel[2], "--")
+    ax[1].plot(t_eval, xs.v_B[2])
+    ax[1].plot(t_eval, xs_arc.v_B[2], "--")
     ax[1].grid()
     ax[1].set_ylabel("vz_B [m/s]")
     plt.xlabel("Time [s]")

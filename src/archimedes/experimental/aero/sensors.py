@@ -45,7 +45,7 @@ class Accelerometer:
         C_BN = x.att.as_dcm()
 
         # Measure inertial acceleration in body coordinates
-        a_N_B = a_B + np.cross(x.w_B, x.vel)
+        a_N_B = a_B + np.cross(x.w_B, x.v_B)
         a_meas_B = a_N_B - C_BN @ g_N  # "proper" inertial acceleration
 
         return a_meas_B + self.noise * w

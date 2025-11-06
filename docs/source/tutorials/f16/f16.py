@@ -123,7 +123,7 @@ class SubsonicF16:
         return F_grav_B
 
     def flight_condition(self, x: RigidBody.State) -> FlightCondition:
-        vt, alpha, beta = aero.wind_frame(x.vel)
+        vt, alpha, beta = aero.wind_frame(x.v_B)
 
         # Atmosphere model
         alt = -x.pos[2]
@@ -251,7 +251,7 @@ class SubsonicF16:
         return self.State(
             pos=rb_deriv.pos,
             att=rb_deriv.att,
-            vel=rb_deriv.vel,
+            v_B=rb_deriv.v_B,
             w_B=rb_deriv.w_B,
             eng=eng_deriv,
             aero=aero_deriv,

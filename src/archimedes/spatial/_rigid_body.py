@@ -28,13 +28,13 @@ class RigidBody:
     vehicle's center of mass.
 
     With these conventions, the state vector is defined as
-        ``x = [pos, att, vel, w_B]``
+        ``x = [pos, att, v_B, w_B]``
 
     where
 
     - ``pos`` = position of the center of mass in the inertial frame
     - ``att`` = attitude (orientation) of the vehicle
-    - ``vel`` = velocity of the center of mass in body frame B
+    - ``v_B`` = velocity of the center of mass in body frame B
     - ``w_B`` = angular velocity in body frame (ω_B)
 
     Note that the attitude can be any object implementing the :py:class:`Attitude`
@@ -89,7 +89,7 @@ class RigidBody:
     >>> x = RigidBody.State(
     ...     pos=np.zeros(3),
     ...     att=att,
-    ...     vel=v_B,
+    ...     v_B=v_B,
     ...     w_B=np.zeros(3),
     ... )
     >>> u = RigidBody.Input(
@@ -101,7 +101,7 @@ class RigidBody:
     >>> RigidBody.dynamics(t, x, u)
     State(pos=array([1., 0., 0.]),
       att=Quaternion([0., 0., 0., 0.]),
-      vel=array([ 0.   ,  0.   , -4.905]),
+      v_B=array([ 0.   ,  0.   , -4.905]),
       w_B=array([0., 0., 0.]))
 
     A common pattern is to have a vehicle model inherit from ``RigidBody.State``,
@@ -116,7 +116,7 @@ class RigidBody:
     >>> state = AircraftState(
     ...     pos=np.zeros(3),
     ...     att=Quaternion([1, 0, 0, 0]),
-    ...     vel=np.zeros(3),
+    ...     v_B=np.zeros(3),
     ...     w_B=np.zeros(3),
     ...     eng=np.array([0.0]),
     ... )
@@ -124,7 +124,7 @@ class RigidBody:
     >>> x_dot_rb
     State(pos=array([0., 0., 0.]),
       att=Quaternion([0., 0., 0., 0.]),
-      vel=array([ 0.   ,  0.   , -4.905]),
+      v_B=array([ 0.   ,  0.   , -4.905]),
       w_B=array([0., 0., 0.]))
 
     The ``dynamics`` method returns a ``RigidBody.State`` struct containing only the
@@ -135,14 +135,14 @@ class RigidBody:
     >>> x_dot = AircraftState(
     ...     pos=x_dot_rb.pos,
     ...     att=x_dot_rb.att,
-    ...     vel=x_dot_rb.vel,
+    ...     v_B=x_dot_rb.v_B,
     ...     w_B=x_dot_rb.w_B,
     ...     eng=np.array([0.1]),  # engine state derivative
     ... )
     >>> x_dot
     AircraftState(pos=array([0., 0., 0.]),
       att=Quaternion([0., 0., 0., 0.]),
-      vel=array([ 0.   ,  0.   , -4.905]),
+      v_B=array([ 0.   ,  0.   , -4.905]),
       w_B=array([0., 0., 0.]),
       eng=array([0.1]))
 
@@ -267,6 +267,7 @@ class RigidBody:
         acceleration might look like:
 
         .. code-block:: python
+
             h_int_B = J_rot_B @ w_rot_B  # Rotor angular momentum
 
             # Compute effective moment including gyroscopic effects
@@ -320,21 +321,33 @@ class RigidBody:
         .. code-block python
 
             @struct
-            class EarthReferencedBody(RigidBody):
+            class EarthReferencedBody:
                 rot_earth: float = 7.292e-5
 
-                @classmethod
-                def dynamics(cls, t: float, x: State, u: Input) -> State:
+                @struct
+                class State:
+                    pos: np.ndarray  # ECEF position
+                    att: Attitude  # Body attitude relative to ECEF
+                    v_E: np.ndarray  # ECEF velocity
+                    w_B: np.ndarray
+
+                @struct
+                class Input:
+                    F_E: np.ndarray  # Forces in Earth frame
+                    M_B: np.ndarray  # Moments in body frame
+                    m: float  # Mass
+                    J_B: np.ndarray  # Inertia matrix in body frame
+
+                def dynamics(self, t: float, x: State, u: Input) -> State:
                     Ω_E = np.hstack([0.0, 0.0, self.rot_earth])
-                    v_E, p_E = x.vel, x.pos  # ECEF position, velocity
+                    v_E, p_E = x.v_E, x.pos  # ECEF position, velocity
 
                     # Position and attitude kinematics
                     pos_deriv = v_E
                     att_deriv = x.att.kinematics(x.w_B - Ω_E)
 
                     # Force equation with Coriolis and centrifugal effects
-                    F_E = x.att.rotate(u.F_B)
-                    dv_E = (F_E / m) - np.cross(Ω_E, 2 * v_E - np.cross(Ω_E, p_E))
+                    dv_E = (u.F_E / u.m) - np.cross(Ω_E, 2 * v_E - np.cross(Ω_E, p_E))
                     
                     # Moment equation (same as body-referenced formulation)
                     dw_B = np.linalg.solve(
@@ -343,7 +356,7 @@ class RigidBody:
 
                     # Output time derivatives of substates
                     return RigidBody.State(
-                        pos=pos_deriv, att=att_deriv, vel=dv_E, w_B=dw_B
+                        pos=pos_deriv, att=att_deriv, v_E=dv_E, w_B=dw_B
                     )
 
         While this formulation does cover a substantial number of orbtial mechanics
@@ -388,7 +401,7 @@ class RigidBody:
                 r_CM_B = self.dCM_dm * (self.wet_mass - m)  # ref point -> CM
 
                 # Velocity at reference point
-                v_ref_B = x.vel - np.cross(x.w_B, r_CM_B)
+                v_ref_B = x.v_B - np.cross(x.w_B, r_CM_B)
 
                 # Aerodynamic forces and moments at body frame origin
                 F_aero_B, M_aero_B = self.aerodynamics(v_ref_B, ...)
@@ -410,7 +423,7 @@ class RigidBody:
                 return Vehicle.State(
                     pos=x_dot_rb.pos,
                     att=x_dot_rb.att,
-                    vel=x_dot_rb.vel,
+                    v_B=x_dot_rb.v_B,
                     w_B=x_dot_rb.w_B,
                     fuel_mass=-self.propulsion.burn_rate(u),
                     ...
@@ -424,9 +437,9 @@ class RigidBody:
     """
     @struct
     class State:
-        pos: np.ndarray  # Position of the center of mass in the world frame
+        pos: np.ndarray  # Position of the center of mass in the inertial frame
         att: Attitude  # Attitude (orientation) of the vehicle
-        vel: np.ndarray  # Velocity of the center of mass
+        v_B: np.ndarray  # Velocity of the center of mass in body frame B
         w_B: np.ndarray  # Angular velocity in body frame (ω_B)
 
     @struct
@@ -448,10 +461,10 @@ class RigidBody:
         Returns:
             x_t: time derivative of the state vector
         """
-        pos_deriv = x.att.rotate(x.vel)
+        pos_deriv = x.att.rotate(x.v_B)
         att_deriv = x.att.kinematics(x.w_B)
-        dv_B = (u.F_B / u.m) - np.cross(x.w_B, x.vel)
+        dv_B = (u.F_B / u.m) - np.cross(x.w_B, x.v_B)
         dw_B = np.linalg.solve(u.J_B, u.M_B - np.cross(x.w_B, u.J_B @ x.w_B))
         return RigidBody.State(
-            pos=pos_deriv, att=att_deriv, vel=dv_B, w_B=dw_B
+            pos=pos_deriv, att=att_deriv, v_B=dv_B, w_B=dw_B
         )
