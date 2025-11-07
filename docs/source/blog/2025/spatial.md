@@ -85,28 +85,21 @@ R_BE = rpy.as_matrix()
 v_E = np.array([1.0, 0.0, 0.0])
 v_B = R_BE @ v_E
 
-# Or use the equivalent `.rotate` method
-v_B = rpy.rotate(v_E)
-
-# Inverse transformations (equivalent)
+# Inverse transformation
 v_E = R_BE.T @ v_B
-v_E = rpy.rotate(v_B, inverse=True)
 
 # Convert between representations
 q = rpy.as_quat()
 
 # Same operations in either representation
 R_BE = q.as_matrix()
-v_B = R_BE @ v_E  # Or q.rotate(v_E)
+v_B = R_BE @ v_E
 ```
 
 ```{code-cell} python
 :tags: [remove-cell]
 
-v_B = rpy.as_matrix() @ v_E
-assert np.allclose(v_B, rpy.rotate(v_E))
-assert np.allclose(v_B, q.rotate(v_E))
-assert np.allclose(v_B, q.as_matrix() @ v_E)
+assert np.allclose(rpy.as_matrix() @ v_E, q.as_matrix() @ v_E)
 ```
 
 6-dof rigid body dynamics:
@@ -140,7 +133,8 @@ This works because the `Attitude` protocol lets you write type-safe "polymorphic
 def body_frame_kinematics(
     att: Attitude, v_B: np.ndarray, w_B: np.ndarray
 ) -> tuple[np.ndarray, Attitude]:
-    pos_deriv = att.rotate(v_B, inverse=True)  # Inertial-frame velocity
+    R_EB = att.as_matrix().T
+    pos_deriv = R_EB @ v_B  # Inertial-frame velocity
     att_deriv = att.kinematics(w_B)  # Attitude kinematics
     return pos_deriv, att_deriv
 
@@ -257,7 +251,8 @@ For example, the position and attitude kinematics calculation in `RigidBody` loo
 def kinematics(
     att: Attitude, v_B: np.ndarray, w_B: np.ndarray
 ) -> tuple[np.ndarray, Attitude]:
-    pos_deriv = att.rotate(v_B, inverse=True)  # Inertial-frame velocity
+    R_EB = att.as_matrix().T
+    pos_deriv = R_EB @ v_B  # Inertial-frame velocity
     att_deriv = att.kinematics(w_B)  # Attitude kinematics
     return pos_deriv, att_deriv
 ```
@@ -274,7 +269,8 @@ However, by re-implementing it in Archimedes we can ensure that it is compatible
 # attitude is given by (roll, pitch, yaw) Euler angles rpy
 def to_body(rpy, v_E):
     att = Quaternion.from_euler(rpy, seq="xyz")
-    return att.rotate(v_E)
+    R_EB = att.as_matrix()
+    return R_EB @ v_E
 
 
 rpy = np.array([0.1, 0.2, 0.3])
@@ -511,7 +507,8 @@ class Aircraft(RigidBody):
 
         # Use the state attitude to calculate gravity in body axes
         F_grav_N = self.m * np.hstack([0, 0, 9.81])
-        F_grav_B = x.att.rotate(F_grav_N, inverse=True)
+        R_BN = x.att.as_matrix()
+        F_grav_B = R_BN @ F_grav_N
 
         # Net forces/moments
         F_B = F_aero_B + F_eng_B + F_grav_B
@@ -564,7 +561,8 @@ class Aircraft:
 
         # Use the state attitude to calculate gravity in body axes
         F_grav_N = self.gravity(x.rigid_body.pos)
-        F_grav_B = x.rigid_body.att.rotate(F_grav_N, inverse=True)
+        R_BN = x.rigid_body.att.as_matrix()
+        F_grav_B = R_BN @ F_grav_N
 
         # Net forces/moments
         F_B = F_aero_B + F_prop_B + F_grav_B

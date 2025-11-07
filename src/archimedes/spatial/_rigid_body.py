@@ -39,13 +39,13 @@ class RigidBody:
 
     Note that the attitude can be any object implementing the :py:class:`Attitude`
     protocol, commonly :py:class:`Quaternion` or :py:class:`EulerAngles`.
-    The transformation implemented by ``rotate`` with this attitude represents
-    ``R_NB``, the rotation from the body frame B to the inertial frame N.
+    The transformation implemented by ``as_matrix`` with this attitude represents
+    ``R_BN``, the rotation from the inertial frame N to the body frame B.
 
     The equations of motion for a quaternion attitude are given by
 
     .. math::
-        \\dot{\\mathbf{p}}^N &= \\mathbf{R}_{NB}(\\mathbf{q}) \\mathbf{v}^B \\\\
+        \\dot{\\mathbf{p}}^N &= \\mathbf{R}_{BN}^T(\\mathbf{q}) \\mathbf{v}^B \\\\
         \\dot{\\mathbf{q}} &= \\frac{1}{2} \\mathbf{q} \\otimes \\boldsymbol{\\omega}^B
             \\\\
         \\dot{\\mathbf{v}}^B &= \\frac{1}{m}\\mathbf{F}^B
@@ -55,7 +55,7 @@ class RigidBody:
 
     where
 
-    - :math:`\\mathbf{R}_{NB}(\\mathbf{q})` = direction cosine matrix (DCM)
+    - :math:`\\mathbf{R}_{BN}(\\mathbf{q})` = direction cosine matrix (DCM)
     - :math:`m` = mass of the vehicle
     - :math:`\\mathbf{J}^B` = inertia matrix of the vehicle in body axes
     - :math:`\\mathbf{F}^B` = net forces acting on the vehicle in body frame B
@@ -461,7 +461,8 @@ class RigidBody:
         Returns:
             x_t: time derivative of the state vector
         """
-        pos_deriv = x.att.rotate(x.v_B, inverse=True)
+        R_BN = x.att.as_matrix()
+        pos_deriv = R_BN.T @ x.v_B
         att_deriv = x.att.kinematics(x.w_B)
         dv_B = (u.F_B / u.m) - np.cross(x.w_B, x.v_B)
         dw_B = np.linalg.solve(u.J_B, u.M_B - np.cross(x.w_B, u.J_B @ x.w_B))

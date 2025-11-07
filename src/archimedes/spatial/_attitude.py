@@ -7,7 +7,7 @@ from typing import Protocol, cast
 
 import numpy as np
 
-from archimedes import array, tree
+from archimedes import array, tree, struct, field
 
 from ._euler import _check_angles, _check_seq, euler_kinematics, euler_to_dcm
 from ._quaternion import (
@@ -40,24 +40,6 @@ _as_matrix_docstring = """
         -------
             A 3x3 numpy array representing the DCM."""
 
-_rotate_docstring = """
-        If the attitude represents the orientation of a body A relative to a frame B,
-        this method rotates vectors between the two frames. Specifically, for a vector
-        v_A expressed in frame A, the corresponding vector in frame B is given by
-        ``v_B = R_BA @ v_A``, where R_BA is the DCM obtained from `as_matrix()`.
-
-        Parameters
-        ----------
-        vectors : np.ndarray
-            A 1D array of shape (3,) or 2D array of shape (3, N) representing
-            N vectors to rotate.
-        inverse : bool
-            If True, rotate the vectors in the opposite direction.
-
-        Returns
-        -------
-            An array representing the rotated vectors."""
-
 _kinematics_docstring = """
         **CAUTION**: This method returns the time derivative of the attitude,
         which is represented with the same data structure for consistency with
@@ -80,10 +62,6 @@ class Attitude(Protocol):
         f"""Convert the attitude to a direction cosine matrix (DCM).
         {_as_matrix_docstring}
         """
-
-    def rotate(self, vectors: np.ndarray, inverse: bool = False) -> np.ndarray:
-        f"""Apply the coordinate system transformation represented by the attitude.
-        {_rotate_docstring}"""
 
     def inv(self) -> Attitude:
         """Compute the inverse of the rotation corresponding to the attitude.
@@ -110,25 +88,7 @@ class Attitude(Protocol):
         """
 
 
-def _rotate(att: Attitude, v: np.ndarray, inverse: bool = False) -> np.ndarray:
-    matrix = att.as_matrix()
-    if inverse:
-        matrix = matrix.T
-
-    v = cast(np.ndarray, array(v))
-    if v.ndim == 1:
-        if v.shape != (3,):
-            raise ValueError("For 1D input, `vectors` must have shape (3,)")
-        result = matrix @ v
-
-    else:
-        if v.shape[1] != 3:
-            raise ValueError("For 2D input, `vectors` must have shape (N, 3)")
-        result = v @ matrix.T
-
-    return cast(np.ndarray, result)
-
-
+@struct
 class EulerAngles:
     """Euler angle representation of a rotation in 3 dimensions
 
@@ -199,8 +159,12 @@ class EulerAngles:
     euler_to_dcm : Directly calculate rotation matrix from roll-pitch-yaw angles
     euler_kinematics : Transform roll-pitch-yaw rates to body-frame angular velocity
     """
+    array: np.ndarray
+    seq: str = field(static=True, default="xyz")
 
-    def __init__(self, angles: np.ndarray, seq: str = "xyz"):
+    def __post_init__(self):
+        angles = self.array
+        seq = self.seq
         # Internal implementation: for some analysis (e.g. vmap), the
         # struct might be initialized with an int instead of an array
         # for determining axis indices.  In that case we don't want to
@@ -214,19 +178,15 @@ class EulerAngles:
             if not getattr(angles, "ndim", None) == 2:
                 angles = _check_angles(angles, seq)
 
-        self.array = angles
-        self.seq = seq
+        # NOTE: object.__setattr__ is used instead of directly setting because
+        # this is a frozen dataclass
+        object.__setattr__(self, "array", angles)
 
     # === Methods for implementing Attitude protocol ===
 
     def as_matrix(self) -> np.ndarray:
         f"""{_as_matrix_docstring}"""
         return euler_to_dcm(self.array, self.seq)
-
-    def rotate(self, vectors: np.ndarray, inverse: bool = False) -> np.ndarray:
-        f"""Apply the coordinate system transformation represented by the Euler angles.
-        {_rotate_docstring}"""
-        return _rotate(self, vectors, inverse=inverse)
 
     def inv(self) -> EulerAngles:
         """Return the inverse (conjugate) of this Euler angle rotation.
@@ -238,7 +198,7 @@ class EulerAngles:
         """
         angles = -self.array[::-1]
         seq = self.seq[::-1]
-        return EulerAngles(angles=angles, seq=seq)
+        return EulerAngles(angles, seq=seq)
 
     def kinematics(self, w_B: np.ndarray) -> EulerAngles:
         f"""Compute the time derivative of the Euler angles given angular velocity.
@@ -294,7 +254,7 @@ class EulerAngles:
         if isinstance(quat, Quaternion):
             quat = quat.array
         angles = quaternion_to_euler(quat, seq=seq)
-        return cls(angles=angles, seq=seq)
+        return cls(angles, seq=seq)
 
     def as_quat(self) -> Quaternion:
         """Return the corresponding Quaternion representation.
@@ -314,7 +274,7 @@ class EulerAngles:
         Can be used to change the sequence of axes.
         """
         if seq == euler.seq:
-            return cls(angles=euler.array, seq=seq)
+            return cls(euler.array, seq=seq)
 
         return euler.as_euler(seq)
 
@@ -344,9 +304,10 @@ class EulerAngles:
         """
         num_angles = len(seq)
         angles = np.zeros(num_angles)
-        return cls(angles=angles, seq=seq)
+        return cls(angles, seq=seq)
 
 
+@struct
 class Quaternion:
     """Quaternion representation of a rotation in 3 dimensions.
 
@@ -438,8 +399,10 @@ class Quaternion:
     euler_kinematics : Transform roll-pitch-yaw rates to body-frame angular velocity
     quaternion_kinematics : Low-level quaternion kinematics function
     """
+    array: np.ndarray
 
-    def __init__(self, quat: np.ndarray):
+    def __post_init__(self):
+        quat = self.array
         # Internal implementation: for some analysis (e.g. vmap), the
         # struct might be initialized with an int instead of an array
         # for determining axis indices.  In that case we don't want to
@@ -453,7 +416,10 @@ class Quaternion:
             if quat.shape not in [(4,), (1, 4), (4, 1)]:
                 raise ValueError("Quaternion must have shape (4,), (1, 4), or (4, 1)")
             quat = quat.flatten()
-        self.array: np.ndarray = quat
+
+        # NOTE: object.__setattr__ is used instead of directly setting because
+        # this is a frozen dataclass
+        object.__setattr__(self, "array", quat)
 
     # === Methods for implementing Attitude protocol ===
 
@@ -462,11 +428,6 @@ class Quaternion:
         {_as_matrix_docstring}
         """
         return quaternion_to_dcm(self.array)
-
-    def rotate(self, vectors: np.ndarray, inverse: bool = False) -> np.ndarray:
-        f"""Apply the coordinate system transformation represented by the quaternion.
-        {_rotate_docstring}"""
-        return _rotate(self, vectors, inverse=inverse)
 
     def inv(self) -> Quaternion:
         """Return the inverse of the quaternion
@@ -535,7 +496,7 @@ class Quaternion:
         Quaternion
             A copy of the input Quaternion instance.
         """
-        return cls(quat=quat.array)
+        return cls(quat.array)
 
     def as_quat(self) -> Quaternion:
         """Return the same object - dummy method for API consistency.
@@ -569,7 +530,7 @@ class Quaternion:
         dcm_to_quaternion : Low-level direction cosine matrix to quaternion conversion
         """
         quat = dcm_to_quaternion(matrix)
-        return cls(quat=quat)
+        return cls(quat)
 
     @classmethod
     def from_euler(
@@ -604,7 +565,7 @@ class Quaternion:
         else:
             if seq is None:
                 seq = "xyz"
-            euler = EulerAngles(angles=euler, seq=seq)
+            euler = EulerAngles(euler, seq=seq)
 
         return euler.as_quat()
 
@@ -637,35 +598,3 @@ class Quaternion:
     def __mul__(self, other: Quaternion) -> Quaternion:
         """Compose (multiply) this quaternion with another and normalize the result"""
         return self.mul(other, normalize=True)
-
-
-# === Struct registration ===
-
-
-def euler_to_iter(euler: EulerAngles):
-    children = (euler.array,)
-    aux_data = (euler.seq,)
-    return children, aux_data
-
-
-def euler_from_iter(aux_data, children) -> EulerAngles:
-    (seq,) = aux_data
-    (angles,) = children
-    return EulerAngles(angles=angles, seq=seq)
-
-
-tree.register_struct(EulerAngles, euler_to_iter, euler_from_iter)
-
-
-def quaternion_to_iter(quat: Quaternion):
-    children = (quat.array,)
-    aux_data = None  # No static metadata
-    return children, aux_data
-
-
-def quaternion_from_iter(aux_data, children) -> Quaternion:
-    (quat,) = children
-    return Quaternion(quat=quat)
-
-
-tree.register_struct(Quaternion, quaternion_to_iter, quaternion_from_iter)

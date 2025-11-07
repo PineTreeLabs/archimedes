@@ -79,22 +79,16 @@ class TestQuaternionWrapper:
 
     def test_identity(self):
         q = Quaternion.identity()
-        v = np.array([1, 2, 3])
-        assert np.allclose(q.rotate(v), v)
+        assert np.allclose(q.as_matrix(), np.eye(3))
 
     def test_rotate(self):
         q = random_quat(wrapper=True)
         v = np.array([0.1, 0.2, 0.3])
-        w = q.rotate(v)
+        w = q.as_matrix() @ v
 
         R_scipy = ScipyRotation.from_quat(q.array, scalar_first=True)
         w_scipy = R_scipy.apply(v, inverse=True)
 
-        assert np.allclose(w, w_scipy)
-
-        # Inverse apply
-        w = q.rotate(v, inverse=True)
-        w_scipy = R_scipy.apply(v, inverse=False)
         assert np.allclose(w, w_scipy)
 
     def test_multiplication(self):
@@ -189,29 +183,29 @@ class TestQuaternionWrapper:
         R_scipy = ScipyRotation.from_euler(seq, angles)
         q = Quaternion.from_euler(angles, seq)
 
-        v = np.array([1, 2, 3])
-        assert np.allclose(q.rotate(v), R_scipy.apply(v, inverse=True))
+        assert np.allclose(q.array, R_scipy.as_quat(scalar_first=True))
 
     def test_compile(self):
         @arc.compile
         def rotate_vector(q, v):
-            return q.rotate(v)
+            R = q.as_matrix()
+            return R @ v
 
         q = Quaternion.from_euler([0.1, 0.2, 0.3], "xyz")
         v = np.array([1, 2, 3])
 
         result = rotate_vector(q, v)
         assert result.shape == (3,)
-        assert np.allclose(result, q.rotate(v))
+        assert np.allclose(result, q.as_matrix() @ v)
 
     def test_tree_ops(self):
         q = Quaternion.from_euler([0.1, 0.2, 0.3], "xyz")
         flat, unflatten = arc.tree.ravel(q)
         q_restored = unflatten(flat)
 
-        # Should preserve rotation behavior (here to a sequence of vectors)
-        v = np.array([[1, 2, 3], [4, 5, 6]])
-        assert np.allclose(q.rotate(v), q_restored.rotate(v))
+        R1 = q.as_matrix()
+        R2 = q_restored.as_matrix()
+        assert np.allclose(R1, R2)
 
     def test_errors(self):
         # Invalid output sequence
@@ -231,9 +225,3 @@ class TestQuaternionWrapper:
         with pytest.raises(ValueError, match="Rotation matrix must be 3x3"):
             Quaternion.from_matrix(np.eye(4))
 
-        # Invalid rotate input shape
-        with pytest.raises(ValueError, match="For 1D input, `vectors` must have"):
-            Quaternion.identity().rotate(np.array([1.0, 2.0]))
-
-        with pytest.raises(ValueError, match="For 2D input, `vectors` must have"):
-            Quaternion.identity().rotate(np.zeros((1, 2)))

@@ -97,8 +97,8 @@ def trim_state(
 
     # Body-frame velocity (rotate from wind frame)
     v_W = np.array([condition.vt, 0.0, 0.0])  # Wind-frame velocity [ft/s]
-    R_WB = EulerAngles([-beta, alpha], "zy")
-    v_B = R_WB.rotate(v_W)
+    R_WB = EulerAngles([-beta, alpha], "zy").as_matrix()
+    v_B = R_WB @ v_W
 
     att = EulerAngles(rpy)
 

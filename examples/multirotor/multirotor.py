@@ -331,7 +331,8 @@ class MultiRotorVehicle:
 
     def state(self, pos, att, vel, w_B, inertial_velocity=False) -> State:
         if inertial_velocity:
-            vel = att.rotate(vel)
+            R_BN = att.as_matrix()
+            vel = R_BN @ vel
         return self.State(
             pos=pos,
             att=att,
@@ -378,7 +379,8 @@ class MultiRotorVehicle:
         # Calculate drag forces and moments in body frame B
         Fdrag_B, Mdrag_B = self.drag_model(t, x)
 
-        Fgravity_B = x.att.rotate(Fgravity_N)
+        R_BN = x.att.as_matrix()
+        Fgravity_B = R_BN @ Fgravity_N
 
         F_B = Frotor_B + Fdrag_B + Fgravity_B
 

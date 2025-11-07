@@ -121,16 +121,12 @@ class TestEulerWrapper:
         angles = random_euler(wrapper=True, seq=seq)
 
         v = np.array([0.1, 0.2, 0.3])
-        w = angles.rotate(v)
+        R = angles.as_matrix()
+        w = R @ v
 
         R_scipy = ScipyRotation.from_euler(seq, angles.array)
         w_scipy = R_scipy.apply(v, inverse=True)
 
-        assert np.allclose(w, w_scipy)
-
-        # Inverse apply
-        w = angles.rotate(v, inverse=True)
-        w_scipy = R_scipy.apply(v, inverse=False)
         assert np.allclose(w, w_scipy)
 
     def test_from_euler(self):
@@ -189,6 +185,6 @@ class TestEulerWrapper:
         flat, unflatten = arc.tree.ravel(euler)
         euler_restored = unflatten(flat)
 
-        # Should preserve rotation behavior (here to a sequence of vectors)
-        v = np.array([[1, 2, 3], [4, 5, 6]])
-        assert np.allclose(euler.rotate(v), euler_restored.rotate(v))
+        R1 = euler.as_matrix()
+        R2 = euler_restored.as_matrix()
+        assert np.allclose(R1, R2)
