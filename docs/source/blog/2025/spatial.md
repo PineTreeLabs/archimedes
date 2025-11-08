@@ -425,12 +425,10 @@ Then the equations of motion are:
 
 ```{math}
 \begin{align*}
-\dot{\mathbf{p}}_N &= \mathbf{R}_{BN}^T(\mathbf{q}) \mathbf{v}_B \
-\dot{\mathbf{q}} &= \frac{1}{2} \mathbf{q} \otimes \mathbf{\omega}_B
-    - \lambda * (||\mathbf{q}||^2 - 1) \mathbf{q} \
-\dot{\mathbf{v}}_B &= \frac{1}{m}\mathbf{F}_B - \mathbf{\omega}_B \times \mathbf{v}_B \
-\dot{\mathbf{\omega}}_B &= \mathbf{J}_B^{-1}(\mathbf{M}_B
-    - \mathbf{\omega}_B \times (\mathbf{J}_B \mathbf{\omega}_B))
+\dot{\mathbf{p}}_N &= \mathbf{R}_{BN}^T(\mathbf{q}) \mathbf{v}_B \\
+\dot{\mathbf{q}} &= \frac{1}{2} \mathbf{q} \otimes \mathbf{\omega}_B - \lambda * (||\mathbf{q}||^2 - 1) \mathbf{q} \\
+\dot{\mathbf{v}}_B &= \frac{1}{m}\mathbf{F}_B - \mathbf{\omega}_B \times \mathbf{v}_B \\
+\dot{\mathbf{\omega}}_B &= \mathbf{J}_B^{-1}(\mathbf{M}_B - \mathbf{\omega}_B \times (\mathbf{J}_B \mathbf{\omega}_B))
 \end{align*}
 ```
 
@@ -598,8 +596,8 @@ In both cases, the current value and time derivatve should be tracked and comput
     
     However, if there are significant additional contributions to angular momentum,
     these affect the dynamics via gyroscopic pseudo-moments.  If a system has
-    internal angular momentum :math:`\mathbf{h}_{int}^B =
-    \sum_{i} \mathbf{J}_{int,i}^B \boldsymbol{\omega}_{int,i}^B`, these
+    internal angular momentum $\mathbf{h}_{int}^B =
+    \sum_{i} \mathbf{J}_{int,i}^B \boldsymbol{\omega}_{int,i}^B$, these
     contributions must be included:
 
     ```{math}
@@ -635,19 +633,14 @@ In both cases, the current value and time derivatve should be tracked and comput
     M_eff_B = M_B - np.cross(w_B, h_int_B)
     ```
 
+    Time-varying subsystem inertias $\mathbf{J}_{int,i}^B$ can also be handled in this way and show up as a pseudo-torque in the effective net moment.
+
 ### Non-inertial frames
 
 These equations of motion are valid only
-when referenced to a Newtonian inertial frame N.  This is of course an
-idealization in all cases, but it is always possible to find _some_ frame
-that is nearly enough inertial for modeling purposes.
+when referenced to a Newtonian inertial frame N.  This is of course an idealization in all cases, but it is always possible to find _some_ frame that is nearly enough inertial for modeling purposes.
 
-However, a common situation in aerospace applications is to model a body
-moving relative to a rotating planetary frame E (e.g. the Earth-centered,
-Earth-fixed frame ECEF) that is assumed to be in non-accelerating but
-rotating with some angular velocity $\boldsymbol{\Omega}_{E}$ with
-respect to the inertial frame N.  In this case an alternative formulation
-uses a state vector composed of:
+A common situation in aerospace applications is to model a body moving relative to a rotating planetary frame E (e.g. the Earth-centered, Earth-fixed frame ECEF) that is assumed to be in non-accelerating but rotating with some angular velocity $\boldsymbol{\Omega}_{E}$ with respect to the inertial frame N.  In this case an alternative formulation uses a state vector composed of:
 
 - $\mathbf{p}^E$ = position of the center of mass in the frame E
 - $\mathbf{q}$ = attitude (orientation) of the vehicle with respect to E
@@ -659,34 +652,20 @@ The equations of motion in this formulation are:
 
 ```{math}
 \begin{align*}
-    \dot{\mathbf{p}}^E &= \mathbf{v}^E \\
-    \dot{\mathbf{q}} &= \frac{1}{2} \mathbf{q} \otimes \left(
-        \boldsymbol{\omega}^B - \boldsymbol{\Omega}_{E}^B \right) \\
-    \dot{\mathbf{v}}^E &= \mathbf{R}_{BE}(\mathbf{q}) 
-        \frac{1}{m}\mathbf{F}^B
-        - 2 \boldsymbol{\Omega}_{E}^E \times \mathbf{v}^E
-        - \boldsymbol{\Omega}_{E}^E \times
-        (\boldsymbol{\Omega}_{E}^E \times \mathbf{p}^E)
-    \dot{\boldsymbol{\omega}}^B &= \mathbf{J}_B^{-1}(\mathbf{M}^B
-        - \boldsymbol{\omega}^B \times (\mathbf{J}^B
-        \boldsymbol{\omega}^B))
+\dot{\mathbf{p}}^E &= \mathbf{v}^E \\
+\dot{\mathbf{q}} &= \frac{1}{2} \mathbf{q} \otimes \left(\boldsymbol{\omega}^B - \boldsymbol{\Omega}_{E}^B \right) \\
+\dot{\mathbf{v}}^E &= \frac{1}{m}\mathbf{F}^E - 2 \boldsymbol{\Omega}_{E}^E \times \mathbf{v}^E - \boldsymbol{\Omega}_{E}^E \times (\boldsymbol{\Omega}_{E}^E \times \mathbf{p}^E) \\
+\dot{\boldsymbol{\omega}}^B &= \mathbf{J}_B^{-1}(\mathbf{M}^B - \boldsymbol{\omega}^B \times (\mathbf{J}^B \boldsymbol{\omega}^B))
 \end{align*}
 ```
 
-Unfortunately, this cannot be straightforwardly reconciled with the
-implementation here, even with the addition of the Coriolis and centrifugal
-pseudo-forces.  This is because of the definition of the attitude and angular
-velocity with respect to different reference frames (E and N, respectively).
-Using the angular velocity relative to frame N allows the use of the Euler
-dynamics equation without complex pseudo-moments, but means that the angular
-velocity must be modified by $-\boldsymbol{\Omega}_{E}^B$ in the
-attitude kinematics.
+Unfortunately, this cannot be straightforwardly reconciled with the implementation here, even with the addition of the Coriolis and centrifugal pseudo-forces.
+This is because of the definition of the attitude and angular velocity with respect to different reference frames (E and N, respectively).
+Using the angular velocity relative to frame N allows the use of the Euler dynamics equation without complex pseudo-moments, but means that the angular velocity must be modified by $-\boldsymbol{\Omega}_{E}^B$ in the attitude kinematics.
 
-The equations above could be implemented in an ECEF frame with a simple custom
-rigid body class:
+The equations above could be implemented in an ECEF frame with a simple custom rigid body class:
 
-```{python}
-
+```python
 @struct
 class EarthReferencedBody:
     rot_earth: float = 7.292e-5
@@ -707,11 +686,12 @@ class EarthReferencedBody:
 
     def dynamics(self, t: float, x: State, u: Input) -> State:
         Ω_E = np.hstack([0.0, 0.0, self.rot_earth])
+        R_BE = x.att.as_matrix()
         v_E, p_E = x.v_E, x.pos  # ECEF position, velocity
 
         # Position and attitude kinematics
         pos_deriv = v_E
-        att_deriv = x.att.kinematics(x.w_B - Ω_E)
+        att_deriv = x.att.kinematics(x.w_B - x.w_B - R_BE @ Ω_E)
 
         # Force equation with Coriolis and centrifugal effects
         dv_E = (u.F_E / u.m) - np.cross(Ω_E, 2 * v_E - np.cross(Ω_E, p_E))
@@ -727,18 +707,16 @@ class EarthReferencedBody:
         )
 ```
 
-While this formulation does cover a substantial number of orbtial mechanics
-applications, it is not one-size-fits all.  Are centrifugal effects accounted
-for in the gravity model?  Are precession and nutation important?  Is the
-angular velocity time-varying?  The present design prioritizes _customization_
-over _comprehensiveness_.
+While this formulation does cover a substantial number of orbtial mechanics applications, it is not one-size-fits all.
+Are centrifugal effects accounted for in the gravity model?
+Are precession and nutation important?
+Is the
+angular velocity time-varying?
+The present design prioritizes _customization_ over _comprehensiveness_.
 
-In short, handling of non-inertial frames in Archimedes still needs some
-design work and is not robustly supported.  The recommendation is to
-implement custom rigid body dynamics based on the above equations.  If you
-would like to see support for non-inertial frames be a higher priority,
-please feel free to raise the issue in the `Discussions
-<https://github.com/PineTreeLabs/archimedes/discussions>`__ page on GitHub.
+In short, handling of non-inertial frames in Archimedes still needs some design work and is not robustly supported.
+The recommendation is to implement custom rigid body dynamics based on the above equations.
+If you would like to see support for non-inertial frames be a higher priority, please feel free to raise the issue in the [Discussions](https://github.com/PineTreeLabs/archimedes/discussions) page on GitHub.
 
 ## Custom Vehicle Models
 

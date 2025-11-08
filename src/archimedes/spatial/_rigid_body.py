@@ -255,15 +255,15 @@ class RigidBody:
         calculation), and then pass the net effective moment
 
         .. math::
-            \\mathbf{M}_\mathrm{eff}^B = \\mathbf{M}^B
+            \\mathbf{M}_\\mathrm{eff}^B = \\mathbf{M}^B
             - \\frac{d}{dt}(\\mathbf{h}_{int}^B)
             - \\boldsymbol{\\omega}^B \\times \\mathbf{h}_{int}^B
 
         as the input to the rigid body dynamics.
 
         For example, a calculation of the gyroscopic effects of a spinning rotor
-        with inertia :math:`\\mathbf{J}_\mathrm{rot}^B`, angular velocity
-        :math:`\\boldsymbol{\\omega}_\mathrm{rot}^B`, and negligible angular
+        with inertia :math:`\\mathbf{J}_\\mathrm{rot}^B`, angular velocity
+        :math:`\\boldsymbol{\\omega}_\\mathrm{rot}^B`, and negligible angular
         acceleration might look like:
 
         .. code-block:: python
@@ -297,8 +297,7 @@ class RigidBody:
             \\dot{\\mathbf{p}}^E &= \\mathbf{v}^E \\\\
             \\dot{\\mathbf{q}} &= \\frac{1}{2} \\mathbf{q} \\otimes \\left(
                 \\boldsymbol{\\omega}^B - \\boldsymbol{\\Omega}_{E}^B \\right) \\\\
-            \\dot{\\mathbf{v}}^E &= \\mathbf{R}_{BE}(\\mathbf{q}) 
-                \\frac{1}{m}\\mathbf{F}^B
+            \\dot{\\mathbf{v}}^E &= \\frac{1}{m}\\mathbf{F}^E
                 - 2 \\boldsymbol{\\Omega}_{E}^E \\times \\mathbf{v}^E
                 - \\boldsymbol{\\Omega}_{E}^E \\times
                 (\\boldsymbol{\\Omega}_{E}^E \\times \\mathbf{p}^E)
@@ -340,11 +339,12 @@ class RigidBody:
 
                 def dynamics(self, t: float, x: State, u: Input) -> State:
                     Ω_E = np.hstack([0.0, 0.0, self.rot_earth])
+                    R_BE = x.att.as_matrix()
                     v_E, p_E = x.v_E, x.pos  # ECEF position, velocity
 
                     # Position and attitude kinematics
                     pos_deriv = v_E
-                    att_deriv = x.att.kinematics(x.w_B - Ω_E)
+                    att_deriv = x.att.kinematics(x.w_B - R_BE @ Ω_E)
 
                     # Force equation with Coriolis and centrifugal effects
                     dv_E = (u.F_E / u.m) - np.cross(Ω_E, 2 * v_E - np.cross(Ω_E, p_E))
