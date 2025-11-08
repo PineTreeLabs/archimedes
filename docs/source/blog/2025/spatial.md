@@ -297,14 +297,14 @@ Archimedes also diverges from SciPy by implementing the `Attitude` interface; na
 Given the angular velocity of the body in its own frame, $\omega_B$, this function calculates the time derivative of the rotation using quaternion kinematics:
 
 ```{math}
-\dot{\mathbf{q}} = \frac{1}{2} \mathbf{q} \otimes \mathbf{\omega}_B
+\dot{\mathbf{q}} = \frac{1}{2} \mathbf{q} \otimes \boldsymbol{\omega}^B
 ```
 
 The actual implementation of quaternion kinematics differs slightly from the ideal form by adding a "Baumgarte stabilization" to numerically preserve the unit-norm requirement.
 With a stabilization factor of $\lambda$, the full kinematics model is:
 
 ```{math}
-\dot{\mathbf{q}} = \frac{1}{2} \mathbf{q} \otimes \mathbf{\omega}_B - \lambda * (||\mathbf{q}||² - 1) \mathbf{q}.
+\dot{\mathbf{q}} = \frac{1}{2} \mathbf{q} \otimes \boldsymbol{\omega}^B - \lambda * (||\mathbf{q}||² - 1) \mathbf{q}.
 ```
 
 A factor of $\lambda = 1$ is a good default (and is the default in `RigidBody` as well).
@@ -371,7 +371,7 @@ For the Euler-to-Euler conversion, note that the `as_euler(seq)` requires a sequ
 That is, `rpy.as_euler("x")` will raise an error since this is mathematically undefined.
 
 Finally, `EulerAngles` implements Euler kinematics _for the roll-pitch-yaw sequence `"xyz"` only_.
-This converts body-frame angular velocity $\boldsymbol{\omega}_B$ to Euler angle rates:
+This converts body-frame angular velocity $\boldsymbol{\omega}^B$ to Euler angle rates:
 
 ```{code-cell} python
 rpy = EulerAngles([0.1, 0.2, 0.3], seq="xyz")
@@ -426,27 +426,35 @@ Our rigid body model assumes two reference frames: a body-fixed frame "B" with t
 :class: only-dark
 ```
 
-Vectors are suffixed with `*_B` or `*_N` to indicate their coordinate systems.
+Vectors are suffixed following [monogram notation](https://drake.mit.edu/doxygen_cxx/group__multibody__notation__basics.html) to indicate coordinate systems unless it is clear.
 In this convention, the dynamical states for a rigid body are four vectors:
 
-- `p_N`: the position of the body in the inertial frame ($\mathbf{p}_N$)
-- `att`: the attitude of the body with respect to the inertial frame (by default a `Rotation` $\mathbf{q}$, but can optionally be roll-pitch-yaw sequence)
-- `v_B`: the translational velocity of the body in its own coordinate system B ($\mathbf{v}_B$)
-- `w_B`: the body-relative angular velocity vector ($\mathbf{\omega}_B$)
+- `pos`: the position of the body in the inertial frame ($\mathbf{p}^N$)
+- `att`: the attitude of the body with respect to the inertial frame
+- `v_B`: the translational velocity of the body in its own coordinate system B ($\mathbf{v}^B$)
+- `w_B`: the body-relative angular velocity vector ($\boldsymbol{\omega}^B$)
 
-The governing equations for these four state components depend on the applied forces and moments in the body frame ($\mathbf{F}_B$ and $\mathbf{M}_B$, respectively), as well as on the mass $m$ and inertia matrix $J_B$ of the vehicle.
+The governing equations for these four state components depend on the applied forces and moments in the body frame ($\mathbf{F}^B$ and $\mathbf{M}^B$, respectively), as well as on the mass $m$ and inertia matrix $J_B$ of the vehicle.
 If the mass and/or inertia matrix are changing significantly in time, their time derivatives can also be provided (we'll ignore this here, since this is uncommon).
 
 Then the equations of motion are:
 
 ```{math}
 \begin{align*}
-\dot{\mathbf{p}}_N &= \mathbf{R}_{BN}^T(\mathbf{q}) \mathbf{v}_B \\
-\dot{\mathbf{q}} &= \frac{1}{2} \mathbf{q} \otimes \mathbf{\omega}_B - \lambda * (||\mathbf{q}||^2 - 1) \mathbf{q} \\
-\dot{\mathbf{v}}_B &= \frac{1}{m}\mathbf{F}_B - \mathbf{\omega}_B \times \mathbf{v}_B \\
-\dot{\mathbf{\omega}}_B &= \mathbf{J}_B^{-1}(\mathbf{M}_B - \mathbf{\omega}_B \times (\mathbf{J}_B \mathbf{\omega}_B))
+\dot{\mathbf{p}}^N &= \mathbf{R}_{BN}^T(\mathbf{q}) \mathbf{v}^B \\
+\dot{\mathbf{q}} &= \frac{1}{2} \mathbf{q} \otimes \boldsymbol{\omega}^B - \lambda * (||\mathbf{q}||^2 - 1) \mathbf{q} \\
+\dot{\mathbf{v}}^B &= \frac{1}{m}\mathbf{F}^B - \boldsymbol{\omega}^B \times \mathbf{v}^B \\
+\dot{\boldsymbol{\omega}}^B &= \mathbf{J}_B^{-1}(\mathbf{M}^B - \boldsymbol{\omega}^B \times (\mathbf{J}_B \boldsymbol{\omega}^B))
 \end{align*}
 ```
+
+:::{note}
+The choice to use body-frame rather than inertial velocity may be surprising, given that the evolution equation then requires the non-inertial term $\boldsymbol{\omega}^B \times \mathbf{v}^B$.
+This is done for two reasons.
+First, in many applications forces are more naturally expressed in body-frame coordinates, so working with body-frame velocities avoids an extra rotation (though integrating velocity to position requires the rotation anyway, so this is basically a wash).
+More importantly, choosing to represent both the translational and angular velocity in the body frame is consistent with ["Plücker coordinates"](https://en.wikipedia.org/wiki/Pl%C3%BCcker_coordinates), which will become the common representation of motion and forces as the `spatial` module grows to encompass multibody dynamics (think recursive Newton-Euler, composite rigid body, etc.).
+For more, see ["Looking Ahead"](#looking-ahead) below - and don't worry, if you've never heard of Plücker coordinates you won't need to learn them to use this module.
+:::
 
 The `RigidBody` class exists to calculate these equations for a generic body - you just have to provide forces, moments, mass, and inertia characteristics. 
 The idea is that you can use this as a building block and construct your own vehicle models (or models of whatever it is you're building) by implementing the domain-specific physics models and letting Archimedes handle the generic parts.
@@ -463,7 +471,7 @@ class RigidBody:
 
     @struct
     class State:
-        p_N: np.ndarray  # Position of the center of mass in the Newtonian frame N
+        pos: np.ndarray  # Position of the center of mass in the Newtonian frame N
         att: Rotation | np.ndarray  # Attitude (orientation) of the vehicle
         v_B: np.ndarray  # Velocity of the center of mass in body frame B
         w_B: np.ndarray  # Angular velocity in body frame (ω_B)
@@ -520,7 +528,7 @@ u = RigidBody.Input(
 RigidBody.dynamics(0.0, x, u)
 ```
 
-In this simple case, since the body and world axes are aligned (`Rotation.identity()`) and we start out with zero angular velocity, most of the complexity from non-inertial frames in the equations of motion disappears. and we just get $m \dot{\mathbf{v}}_B = \mathbf{F}_B$ and $\mathbf{J}_B \dot{\mathbf{\omega}}_B = \mathbf{M}_B$.
+In this simple case, since the body and world axes are aligned (`Rotation.identity()`) and we start out with zero angular velocity, most of the complexity from non-inertial frames in the equations of motion disappears. and we just get $m \dot{\mathbf{v}}^B = \mathbf{F}^B$ and $\mathbf{J}_B \dot{\boldsymbol{\omega}}^B = \mathbf{M}^B$.
 
 (pseudo-forces)=
 ### Customizing with pseudo-forces and moments
@@ -862,7 +870,81 @@ For a deeper dive on hierarchical modeling in Archimedes, check out the [tutoria
 
 We'll be releasing more in-depth examples of different vehicle dynamics models soon, so be sure to [sign up for the mailing list](https://jaredcallaham.substack.com/embed) to stay in the loop.
 
-## What's Next
+(looking-ahead)=
+## Looking Ahead
+
+We've covered a lot of ground already, so this isn't the place for a lengthy design doc or roadmap, but it's worth mentioning where this is headed.
+
+Again, the 6dof rigid body state has four components:
+
+- `pos`: the position of the body in the inertial frame ($\mathbf{p}^N$)
+- `att`: the attitude of the body with respect to the inertial frame ($\mathbf{q}$)
+- `v_B`: the translational velocity of the body in its own coordinate system B ($\mathbf{v}^B$)
+- `w_B`: the body-relative angular velocity vector ($\boldsymbol{\omega}^B$)
+
+In state-space dynamics modeling, it's natural to think of this as a 13-element state vector.
+However, from a spatial mechanics point of view, this is really a representation of two things:
+
+1. A coordinate system B defined relative to N by a translation $\mathbf{p}^N$ and orientation $\mathbf{q}$.
+2. The translational and rotational motion of the body in coordinate system B
+
+Let's take a brief technical digression, which you can feel free to skim if uninterested.
+
+In spatial geometry lingo, the numerical representation of the motion are the "Plücker coordinates", meaning that $\mathbf{v}^B$ and $\boldsymbol{\omega}^B$ together form an element of the 6D space of spatial motions $M^6$.
+Likewise, the input combination of body-frame forces and moments are also expressed in Plücker coordinates, so $\mathbf{F}^B$ and $\mathbf{M}^B$ together form an element of the 6D space of spatial forces $F^6$, dual to $M^6$.
+
+Getting back to practical terms, what this means is that we can layer on top of the `Attitude` and `RigidBody` concepts two new abstractions: a `Transformation` (translation + attitude) and a 6D `SpatialVector` (element of $M^6$ or $F^6$).
+
+### Transformations
+
+A `Transformation` is basically a combination of a position and an orientation, sometimes called a _homogeneous transformation_.
+This could be applied to points (both translation and rotation) or pure vectors (rotation only).
+
+A sketch of the implementation would look something like the following:
+
+```python
+@struct
+class Transformation
+    t: np.ndarray  # Translation (3,)
+    r: Attitude
+
+    def apply(self, pos: np.ndarray) -> np.ndarray:
+        return self.t + self.apply_vec(pos)
+
+    def apply_vec(self, vec: np.ndarray) -> np.ndarray:
+        R = self.r.as_matrix()
+        return R @ vec
+
+    def inv(self) -> Transformation:
+        ...
+```
+
+The `Transformation` concept will also let us create _kinematic trees_ - a way to express relationships between various reference frames and coordinate systems.
+The API design for both the `Transformation` and `KinematicTree` are still fairly hazy, but the goal is to eliminate much of the bookkeeping associated with the exploding numbers of coordinate systems common in orbital mechanics and robotics applications, for instance.
+Ideally, you would simply define the relationships between the frames (including how they evolve with time) and be able to simply call:
+
+```python
+X_BE = ktree.get_transform("earth", "body")
+r_B = X_BE.apply(r_E)  # ECEF -> NED tangent plane -> body frame
+```
+
+### Multibody dynamics
+
+While `Transformation` and kinematic trees would be convenient for keeping track of complicated arrangements of coordinate systems, the 6D spatial vectors open up more exciting possibilities.
+This is because this abstraction maps directly to [Roy Featherstone-style spatial vector algebra](https://bleyer.org/files/A%20Beginner%27s%20Guide%20to%206-D%20Vectors%20-%20Feathersone%20(IEEE,%202010).pdf), including generalized spatial velocity, force, inertia, and associated constraints between multibody motion.
+
+If we can set up a way to intuitively work with these vectors, we can get clean, performant implementations of powerful algorithms like Recursive Newton-Euler, Compositite Rigid Body, and the Articulated Body Algorithm.
+These are the cornerstones of constrained multibody dynamics - that is, robotics.
+
+Once we have transformations, kinematic trees, spatial vectors, and rigid body algorithms, we can then layer on 3D contact and collision models to get a true robotics simulator along the lines of MuJoCo or Drake.
+
+Now, there are existing options for all kinds of robotics work out there already (MuJoCo and Drake being my personal favorites), so you may well ask: why build another robotics simulator?
+The basic premise is that robotics will continue to converge with other engineering disciplines, so even outside of "traditional" robotics we'll see more articulation, more underactuation, and more autonomy.
+Putting capabilities for robotics-type work under the same roof as flight dynamics, orbital mechanics, battery modeling, lumped-parameter multiphysics models, etc. with deployment capabilities could make it easier to build almost anything you can think of.
+
+Multibody dynamics and contact won't be coming for a while, and the plans could certainly change between now and then, but it's worth mentioning now because (as you can see from the choice to use body-frame velocity) these plans will inform the design and priorities of the spatial mechanics functionality well before we can simulate anything that looks like a robot.
+
+## Parting Thoughts
 
 The new `spatial` module is the first core physics modeling functionality in Archimedes, but this is just the beginning.
 For `spatial` itself, the next priorities are _spatial transformations_ (transformation + rotation), _kinematic trees_ for handling multiple reference frames, and _interpolations_ (slerp) for trajectory generation and optimization.
