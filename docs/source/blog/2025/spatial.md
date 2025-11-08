@@ -386,9 +386,25 @@ However, keep in mind that the time derivative of the Euler angles are not thems
 In almost all cases, the only thing you should do with the Euler rates is integrate them to get the time series of angles.
 :::
 
-### Low-level API
+### Low-level rotation API
 
-TODO:
+If the `Attitude` system isn't your thing and you prefer an interface closer to MATLAB's Aerospace Toolbox - or if you want to implement your own system for attitude and rotation representation - there are also lower-level functions that operate directly on arrays.
+
+The low-level functions are:
+
+- [`euler_to_quaternion`](#archimedes.spatial.euler_to_quaternion)
+- [`euler_to_dcm`](#archimedes.spatial.euler_to_dcm)
+- [`quaternion_to_euler`](#archimedes.spatial.quaternion_to_euler)
+- [`euler_kinematics`](#archimedes.spatial.euler_kinematics)
+- [`quaternion_to_dcm`](#archimedes.spatial.quaternion_to_dcm)
+- [`dcm_to_quaternion`](#archimedes.spatial.dcm_to_quaternion)
+- [`quaternion_inverse`](#archimedes.spatial.quaternion_inverse)
+- [`quaternion_multiply`](#archimedes.spatial.quaternion_multiply)
+- [`quaternion_kinematics`](#archimedes.spatial.quaternion_kinematics)
+
+Each of these do exactly what they sound like - see the docstrings for details.
+
+These functions are called by wrapper classes like `Quaternion` and `EulerAngles` for conversions and kinematics, so you get the same behavior and performance either way - it's just a matter of which interface you prefer.
 
 ## 6dof Dynamics
 
