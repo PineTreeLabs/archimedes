@@ -11,6 +11,8 @@ stability:
 
 full:
   xcg: 0.3
+  atmosphere:
+    type: ussa1976
   engine:
     type: nasa
   elevator:
