@@ -132,6 +132,10 @@ class TestCodegen:
             arr: np.ndarray  # Empty array
             static_field: str = arc.field(static=True, default="static")
 
+            @arc.struct
+            class InnerStruct:
+                value: float
+
         class Point(NamedTuple):
             x: float
             y: float
@@ -141,6 +145,7 @@ class TestCodegen:
             center: Point
             points: list[Point]  # Array of structs
             weights: np.ndarray  # Simple array
+            inner: EmptyStruct.InnerStruct
 
         def nested_func(
             scalar: float,
@@ -174,6 +179,7 @@ class TestCodegen:
                         Point(3.0, 4.0),
                     ],
                     weights=np.array([0.1, 0.2, 0.3]),
+                    inner=EmptyStruct.InnerStruct(value=3.14),
                 ),
                 Cluster(
                     center=Point(4.0, 5.0),
@@ -182,6 +188,7 @@ class TestCodegen:
                         Point(5.0, 6.0),
                     ],
                     weights=np.array([0.4, 0.5, 0.6]),
+                    inner=EmptyStruct.InnerStruct(value=2.71),
                 ),
             ],
             EmptyStruct(arr=np.array([])),  # empty struct

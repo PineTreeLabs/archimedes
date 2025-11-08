@@ -55,7 +55,9 @@ class CodegenError(ValueError):
 
 
 def _to_snake_case(name: str) -> str:
-    return re.sub(r"(?<!^)(?=[A-Z])", "_", name).lower()
+    parts = name.split(".")
+    snake_parts = [re.sub(r"(?<!^)(?=[A-Z])", "_", part).lower() for part in parts]
+    return "_".join(snake_parts)
 
 
 def codegen(
@@ -561,8 +563,16 @@ class ContextHelper:
         if len(children) == 0 or all(isinstance(c, NoneContext) for c in children):
             return self._process_none(name)
 
+        classname = arg.__class__.__qualname__
+        # Get rid of <locals> and anything above it
+        paths = classname.split(".")
+        if "<locals>" in paths:
+            idx = paths.index("<locals>")
+            paths = paths[idx + 1 :]
+        classname = ".".join(paths)
+
         return StructContext(
-            type_=f"{_to_snake_case(arg.__class__.__name__)}_t",
+            type_=f"{_to_snake_case(classname)}_t",
             name=name,
             children=children,
             description=self.descriptions.get(name, None),
