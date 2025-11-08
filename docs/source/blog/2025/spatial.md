@@ -327,11 +327,64 @@ This attitude kinematics calculation comes in particularly handy for the second 
 
 ### Euler angles
 
-TODO:
-- Sequences (and default)
-- Conversion
-- Kinematics (note RPY restriction)
-- Same caution about Euler kinematics not returning a valid rotation
+The [`EulerAngles`](#archimedes.spatial.EulerAngles) class has a similar interface to [`Quaternion`](#archimedes.spatial.Quaternion), differing mainly in construction and interpretation.
+
+The class allows you to specify a sequence `seq` of rotation axes as a string of 1-3 letters `'x'`, `'y'`, and `'z'`.
+These are interpreted as sequential rotations about each axis to go from a "parent" or "world" frame to the body frame specified by the attitude.
+For example, the typical roll-pitch-yaw sequence for vehicle dynamics is specified by `seq="xyz"` and is interpreted as a right-handed rotation about the world-frame $x$-axis, followed by a rotation about the _new_ $y$-axis and finally a rotation about the subsequent $z$-axis.
+
+:::{note}
+`EulerAngles` supports "intrinsic" rotations (use upper-case letters, as in the SciPy convention), but here we'll mostly discuss the "extrinsic" convention with lower-case axis sequences.
+:::
+
+Mathematically, `EulerAngles(rpy, seq="xyz").as_matrix()` produces the following matrix, representing a coordinate transform from "earth frame" E to "body frame" B with `rpy` a 3-element array of roll $\phi$, pitch $\theta$, and yaw $\psi$:
+
+```{math}
+R_BE(\phi, \theta, \psi) = R_z(\psi) R_y(\theta) R_x(\psi)
+```
+
+This sequence can be used to flexibly represent a variety of coordinate transformations, for instance:
+
+```python
+# Simple rotation about a single axis from A -> B
+R_BA = EulerAngles(theta, "z")
+
+# Standard roll-pitch-yaw sequence
+R_BE = EulerAngles(rpy, seq="xyz")
+
+# Rotation from wind frame W with (α, β) to body frame B
+R_BW = EulerAngles([-beta, alpha], seq="zy")
+
+# Rotation from ECI frame to perifocal in orbital mechanics
+R_PE = EulerAngles([ω, i, Ω], "zxz")
+```
+
+The `EulerAngles` representation can easily be converted to/from other representations like `Quaternion`, or betweeen sequences:
+
+```{code-cell} python
+rpy = EulerAngles([0.1, 0.2, 0.3], seq="xyz")
+q = rpy.as_quat()  # Quaternion([0.98334744 0.0342708  0.10602051 0.14357218])
+ypr = rpy.as_euler("zyx")  # EulerAngles([0.2857717  0.22012403 0.03787988], seq='zyx')
+```
+
+For the Euler-to-Euler conversion, note that the `as_euler(seq)` requires a sequence of exactly three non-repeating axes in order to guarantee a complete representation in the output.
+That is, `rpy.as_euler("x")` will raise an error since this is mathematically undefined.
+
+Finally, `EulerAngles` implements Euler kinematics _for the roll-pitch-yaw sequence `"xyz"` only_.
+This converts body-frame angular velocity $\boldsymbol{\omega}_B$ to Euler angle rates:
+
+```{code-cell} python
+rpy = EulerAngles([0.1, 0.2, 0.3], seq="xyz")
+w_B = np.array([0.0, 0.1, 0.0])  # Angular velocity
+drpy_dt = rpy.kinematics(w_B)
+```
+
+:::{caution}
+As with `Quaternion.kinematics`, the `EulerAngles.kinematics`method returns the time derivative of the `EulerAngles` as a new `EulerAngles` instance.
+This is convenient for working with ODE solvers and other algorithms that expect the output to have the same structure as the input state.
+However, keep in mind that the time derivative of the Euler angles are not themselves a valid rotation representation.
+In almost all cases, the only thing you should do with the Euler rates is integrate them to get the time series of angles.
+:::
 
 ### Low-level API
 
@@ -372,10 +425,10 @@ Then the equations of motion are:
 
 ```{math}
 \begin{align*}
-\dot{\mathbf{p}}_N &= \mathbf{R}_{BN}^T(\mathbf{q}) \mathbf{v}_B \\
+\dot{\mathbf{p}}_N &= \mathbf{R}_{BN}^T(\mathbf{q}) \mathbf{v}_B \
 \dot{\mathbf{q}} &= \frac{1}{2} \mathbf{q} \otimes \mathbf{\omega}_B
-    - \lambda * (||\mathbf{q}||^2 - 1) \mathbf{q} \\
-\dot{\mathbf{v}}_B &= \frac{1}{m}\mathbf{F}_B - \mathbf{\omega}_B \times \mathbf{v}_B \\
+    - \lambda * (||\mathbf{q}||^2 - 1) \mathbf{q} \
+\dot{\mathbf{v}}_B &= \frac{1}{m}\mathbf{F}_B - \mathbf{\omega}_B \times \mathbf{v}_B \
 \dot{\mathbf{\omega}}_B &= \mathbf{J}_B^{-1}(\mathbf{M}_B
     - \mathbf{\omega}_B \times (\mathbf{J}_B \mathbf{\omega}_B))
 \end{align*}
@@ -420,14 +473,13 @@ See the [source code](https://github.com/PineTreeLabs/archimedes/blob/main/src/a
 
 The inner classes `State` and `Input` help to organize the data and states, and the `dynamics` method does the work of actually calculating the equations of motion as given above.
 
-TODO: Fix this
 :::{note}
 **On time-varying mass/inertia**: it is relatively common to have vehicles that change mass and inertia properties over time (e.g. a rocket burning fuel).
 `RigidBody` takes these as inputs so that you can manage their characteristics however you want.
-Technically, when the mass and inertia are time-varying this adds terms like $\dot{m} v_B$ to the dynamics equations, though under most circumstances these contributions are negligible even if $\dot{m} \neq 0$.
+Technically, when the mass and inertia are time-varying this adds terms like $\dot{m} v_B$ to the dynamics equations.
+Under most circumstances these contributions are negligible even if $\dot{m} \neq 0$.
 The compromise model in this case is the "quasi-steady" approximation: provide time-varying mass $m(t)$ as inputs to the `dynamics` method, but leave $\dot{m} = 0$.
-This is why the `Input` struct by default has `dm_dt = dJ_dt = 0`.
-But it's up to you to ignore/include these effects in whatever way makes the most sense for your application.
+If the mass/inertia rate-of-change terms are significant, they can be included as "pseudo-forces" - see [below](#pseudo-forces) for details.
 :::
 
 While [`RigidBody`](#archimedes.spatial.RigidBody) uses quaternion kinematics by default for stability and robustness - critical for vehicles like satellites, quadrotors, and fighter jets - there is also the option to use roll-pitch-yaw Euler kinematics for bodies like cars and ships that (nominally) won't reach 90-degrees pitch-up and hit the gimbal lock singularity.
@@ -456,13 +508,237 @@ RigidBody.dynamics(0.0, x, u)
 
 In this simple case, since the body and world axes are aligned (`Rotation.identity()`) and we start out with zero angular velocity, most of the complexity from non-inertial frames in the equations of motion disappears. and we just get $m \dot{\mathbf{v}}_B = \mathbf{F}_B$ and $\mathbf{J}_B \dot{\mathbf{\omega}}_B = \mathbf{M}_B$.
 
+(pseudo-forces)=
 ### Customizing with pseudo-forces and moments
 
-TODO
+The equations of motion implemented here are technically correct only for the case of a rigid body with constant mass, inertia, and center of gravity moving in an inertial reference frame and without "internal" angular velocity (gyroscopic effects).
+However, the model can be extended to account for these effects if needed by passing pseudo-forces and moments.
+
+In all the following cases, the effects can be treated as constant, quasi-steady (time-varying but with negligible rates), or fully dynamic (time-varying with non-negligible rates).
+In both cases, the current value and time derivatve should be tracked and computed outside of the rigid body model, and the appropriate values passed in the input struct.
+
+- **Variable mass**: Quasi-steady mass may be handled by passing the current mass in the input struct.
+    The mass rate of change $\dot{m}$ enters the equations of motion via the time derivative of linear momentum:
+
+    ```{math}
+    \frac{d}{dt}(m \mathbf{v}^B) = \mathbf{F}^B
+    \implies m \dot{\mathbf{v}}^B + \dot{m} \mathbf{v}^B = \mathbf{F}^B
+    ```
+
+    Hence, mass flow rates can be accounted for by including the pseudo-force
+    $-\dot{m} \mathbf{v}^B$ in the net forces passed as input.
+
+- **Variable inertia**: In the same way, quasi-steady inertia may be handled
+    by passing the current inertia matrix in the input struct.  The inertia rate
+    of change $\dot{\mathbf{J}}^B$ enters the equations of motion via the
+    time derivative of angular momentum:
+
+    ```{math}
+    \frac{d}{dt}(\mathbf{J}^B \boldsymbol{\omega}^B) = \mathbf{M}^B
+    \implies \mathbf{J}^B \dot{\boldsymbol{\omega}}^B
+    + \dot{\mathbf{J}}^B \boldsymbol{\omega}^B = \mathbf{M}^B
+    ```
+
+    Non-negligible inertia rates can be accounted for by including the
+    pseudo-moment $-\dot{\mathbf{J}}^B \boldsymbol{\omega}^B$ in the
+    net moment passed as input.
+
+- **Variable center of mass**: The equations of motion are derived about the
+    center of mass (CM).  However, typically the body-fixed reference frame B is
+    defined at some convenient reference point that may not coincide with the
+    instantaneous center of mass.  Properties like aerodynamics and propulsion
+    behaviors are also often defined with respect to the reference CM.
+
+    If the reference CM is at the origin of the body frame B and the actual CM
+    is at a point $\mathbf{r}_{CM}^B$ in body frame B moving with velocity
+    $\dot{\mathbf{r}}_{CM}^B$ with respect to the reference point, then
+    the relationship between the state velocity $\mathbf{v}^B$ (that is, the
+    inertial velocity of the CM expressed in body frame B) and the velocity of
+    the reference point $\mathbf{v}_{ref}^B$ is
+
+    ```{math}
+    \mathbf{v}^B = \mathbf{v}_{ref}^B +
+    \dot{\mathbf{r}}_{CM}^B + \boldsymbol{\omega}^B \times
+    \mathbf{r}_{CM}^B
+    ```
+
+    Often this correction is negligible, but if needed then the state velocity
+    should be converted to the reference point velocity before computing
+    aerodynamics or other quantities referenced to the body frame origin.
+    In the common case that the CM is moving due to fuel consumption or payload
+    release, the relative velocity $\dot{\mathbf{r}}_{CM}^B$ is usually
+    negligible.
+
+    A more important effect is the moment transfer from the offset of the forces
+    acting at the reference point to the actual CM.  If the net force acting on
+    the vehicle at the reference point is $\mathbf{F}_{ref}^B$, then the
+    moment about the CM is given by
+
+    ```{math}
+        \mathbf{M}^B = \mathbf{M}_{ref}^B -
+        \mathbf{r}_{CM}^B \times \mathbf{F}_{ref}^B
+    ```
+
+    The same transformation applies to forces computed about an arbitrary reference
+    point, but the moment arm will then be the vector from that reference point to
+    the instantaneous CM.
+
+- **Gyroscopic effects**: The full Euler equation for rotational dynamics in a
+    non-inertial body-fixed frame is
+
+    ```{math}
+        \mathbf{M}^B = \frac{d\mathbf{h}^B}{dt} + \boldsymbol{\omega}^B
+        \times \mathbf{h}^B,
+    ```
+
+    where $\mathbf{h}^B$ is the net angular momentum of the vehicle in the
+    body frame B.  If the vehicle does not have any "internal" angular momentum,
+    then $\mathbf{h}^B = \mathbf{J}^B \boldsymbol{\omega}^B$ and the
+    equations reduce to those implemented here.
+    
+    However, if there are significant additional contributions to angular momentum,
+    these affect the dynamics via gyroscopic pseudo-moments.  If a system has
+    internal angular momentum :math:`\mathbf{h}_{int}^B =
+    \sum_{i} \mathbf{J}_{int,i}^B \boldsymbol{\omega}_{int,i}^B`, these
+    contributions must be included:
+
+    ```{math}
+        \mathbf{M}^B = \frac{d}{dt}(\mathbf{J}^B \boldsymbol{\omega}^B)
+        + \frac{d\mathbf{h}_{int}^B}{dt}
+        + \boldsymbol{\omega}^B \times \mathbf{J}^B \boldsymbol{\omega}^B
+        + \boldsymbol{\omega}^B \times \mathbf{h}_{int}^B
+    ```
+
+    The additional terms involving $\mathbf{h}_{int}^B$ can be treated as
+    pseudo-moments and included in the net moment passed as input.  The usual
+    logical flow would be to compute both the internal angular momentum and its
+    time derivative outside of the rigid body model (e.g. as a subsystem
+    calculation), and then pass the net effective moment
+
+    ```{math}
+        \mathbf{M}_\mathrm{eff}^B = \mathbf{M}^B
+        - \frac{d}{dt}(\mathbf{h}_{int}^B)
+        - \boldsymbol{\omega}^B \times \mathbf{h}_{int}^B
+    ```
+
+    as the input to the rigid body dynamics.
+
+    For example, a calculation of the gyroscopic effects of a spinning rotor
+    with inertia $\mathbf{J}_\mathrm{rot}^B$, angular velocity
+    $\boldsymbol{\omega}_\mathrm{rot}^B$, and negligible angular
+    acceleration might look like:
+
+    ```python
+    h_int_B = J_rot_B @ w_rot_B  # Rotor angular momentum
+
+    # Compute effective moment including gyroscopic effects
+    M_eff_B = M_B - np.cross(w_B, h_int_B)
+    ```
 
 ### Non-inertial frames
 
-TODO
+These equations of motion are valid only
+when referenced to a Newtonian inertial frame N.  This is of course an
+idealization in all cases, but it is always possible to find _some_ frame
+that is nearly enough inertial for modeling purposes.
+
+However, a common situation in aerospace applications is to model a body
+moving relative to a rotating planetary frame E (e.g. the Earth-centered,
+Earth-fixed frame ECEF) that is assumed to be in non-accelerating but
+rotating with some angular velocity $\boldsymbol{\Omega}_{E}$ with
+respect to the inertial frame N.  In this case an alternative formulation
+uses a state vector composed of:
+
+- $\mathbf{p}^E$ = position of the center of mass in the frame E
+- $\mathbf{q}$ = attitude (orientation) of the vehicle with respect to E
+- $\mathbf{v}^E$ = velocity of the center of mass in rotating frame E
+- $\boldsymbol{\omega}^B$ = angular velocity in body frame (ω_B) with
+    respect to the inertial frame N
+
+The equations of motion in this formulation are:
+
+```{math}
+\begin{align*}
+    \dot{\mathbf{p}}^E &= \mathbf{v}^E \\
+    \dot{\mathbf{q}} &= \frac{1}{2} \mathbf{q} \otimes \left(
+        \boldsymbol{\omega}^B - \boldsymbol{\Omega}_{E}^B \right) \\
+    \dot{\mathbf{v}}^E &= \mathbf{R}_{BE}(\mathbf{q}) 
+        \frac{1}{m}\mathbf{F}^B
+        - 2 \boldsymbol{\Omega}_{E}^E \times \mathbf{v}^E
+        - \boldsymbol{\Omega}_{E}^E \times
+        (\boldsymbol{\Omega}_{E}^E \times \mathbf{p}^E)
+    \dot{\boldsymbol{\omega}}^B &= \mathbf{J}_B^{-1}(\mathbf{M}^B
+        - \boldsymbol{\omega}^B \times (\mathbf{J}^B
+        \boldsymbol{\omega}^B))
+\end{align*}
+```
+
+Unfortunately, this cannot be straightforwardly reconciled with the
+implementation here, even with the addition of the Coriolis and centrifugal
+pseudo-forces.  This is because of the definition of the attitude and angular
+velocity with respect to different reference frames (E and N, respectively).
+Using the angular velocity relative to frame N allows the use of the Euler
+dynamics equation without complex pseudo-moments, but means that the angular
+velocity must be modified by $-\boldsymbol{\Omega}_{E}^B$ in the
+attitude kinematics.
+
+The equations above could be implemented in an ECEF frame with a simple custom
+rigid body class:
+
+```{python}
+
+@struct
+class EarthReferencedBody:
+    rot_earth: float = 7.292e-5
+
+    @struct
+    class State:
+        pos: np.ndarray  # ECEF position
+        att: Attitude  # Body attitude relative to ECEF
+        v_E: np.ndarray  # ECEF velocity
+        w_B: np.ndarray
+
+    @struct
+    class Input:
+        F_E: np.ndarray  # Forces in Earth frame
+        M_B: np.ndarray  # Moments in body frame
+        m: float  # Mass
+        J_B: np.ndarray  # Inertia matrix in body frame
+
+    def dynamics(self, t: float, x: State, u: Input) -> State:
+        Ω_E = np.hstack([0.0, 0.0, self.rot_earth])
+        v_E, p_E = x.v_E, x.pos  # ECEF position, velocity
+
+        # Position and attitude kinematics
+        pos_deriv = v_E
+        att_deriv = x.att.kinematics(x.w_B - Ω_E)
+
+        # Force equation with Coriolis and centrifugal effects
+        dv_E = (u.F_E / u.m) - np.cross(Ω_E, 2 * v_E - np.cross(Ω_E, p_E))
+        
+        # Moment equation (same as body-referenced formulation)
+        dw_B = np.linalg.solve(
+            u.J_B, u.M_B - np.cross(x.w_B, u.J_B @ x.w_B)
+        )
+
+        # Output time derivatives of substates
+        return RigidBody.State(
+            pos=pos_deriv, att=att_deriv, v_E=dv_E, w_B=dw_B
+        )
+```
+
+While this formulation does cover a substantial number of orbtial mechanics
+applications, it is not one-size-fits all.  Are centrifugal effects accounted
+for in the gravity model?  Are precession and nutation important?  Is the
+angular velocity time-varying?  The present design prioritizes _customization_
+over _comprehensiveness_.
+
+In short, handling of non-inertial frames in Archimedes still needs some
+design work and is not robustly supported.  The recommendation is to
+implement custom rigid body dynamics based on the above equations.  If you
+would like to see support for non-inertial frames be a higher priority,
+please feel free to raise the issue in the `Discussions
+<https://github.com/PineTreeLabs/archimedes/discussions>`__ page on GitHub.
 
 ## Custom Vehicle Models
 

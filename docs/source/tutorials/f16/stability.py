@@ -159,8 +159,8 @@ class StabilityState:
         p_N = np.zeros(3)
 
         v_W = np.hstack([self.lon.vt, 0.0, 0.0])
-        R_WB = Quaternion.from_euler([-self.lat.beta, self.lon.alpha], "zy").as_matrix()
-        v_B = R_WB @ v_W
+        R_BW = Quaternion.from_euler([-self.lat.beta, self.lon.alpha], "zy").as_matrix()
+        v_B = R_BW @ v_W
         w_B = np.hstack([self.lat.p, self.lon.q, self.lat.r])
 
         rpy = np.hstack([self.lat.phi, self.lon.theta, 0.0])
