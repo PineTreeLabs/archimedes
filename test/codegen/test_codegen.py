@@ -136,7 +136,6 @@ class TestCodegen:
             class InnerStruct:
                 value: float
 
-
         class Point(NamedTuple):
             x: float
             y: float
