@@ -29,6 +29,7 @@ int nested_func_init(nested_func_arg_t* arg, nested_func_res_t* res, nested_func
     arg->clusters[0].weights[0] = 0.100000f;
     arg->clusters[0].weights[1] = 0.200000f;
     arg->clusters[0].weights[2] = 0.300000f;
+    arg->clusters[0].inner.value = 3.140000f;
     arg->clusters[1].center.x = 4.000000f;
     arg->clusters[1].center.y = 5.000000f;
     arg->clusters[1].points[0].x = 4.000000f;
@@ -40,8 +41,9 @@ int nested_func_init(nested_func_arg_t* arg, nested_func_res_t* res, nested_func
     arg->clusters[1].weights[0] = 0.400000f;
     arg->clusters[1].weights[1] = 0.500000f;
     arg->clusters[1].weights[2] = 0.600000f;
+    arg->clusters[1].inner.value = 2.710000f;
 
-    _Static_assert(sizeof(nested_func_arg_t) == 26 * sizeof(float),
+    _Static_assert(sizeof(nested_func_arg_t) == 28 * sizeof(float),
         "Non-contiguous arg struct; please enable -fpack-struct or equivalent.");
 
     _Static_assert(sizeof(nested_func_res_t) == 1 * sizeof(float),
