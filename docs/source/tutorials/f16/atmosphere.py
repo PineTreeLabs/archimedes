@@ -1,4 +1,4 @@
-# ruff: noqa: N803, N806, N815, N816
+# ruff: noqa: N802, N803, N806, N815, N816
 from __future__ import annotations
 
 from typing import Protocol
@@ -7,7 +7,6 @@ import numpy as np
 
 from archimedes import StructConfig, UnionConfig, struct
 from archimedes._core.utils import find_equal
-
 
 __all__ = [
     "AtmosphereModel",
@@ -67,24 +66,21 @@ class LinearAtmosphereConfig(StructConfig, type="linear"):
         return LinearAtmosphere()
 
 
-
 # Altitude [ft]
 M_TO_FT = 3.28084
 K_TO_R = 9 / 5
 PA_TO_PSF = 0.02088
 h_USSA1976 = M_TO_FT * np.array([0, 11000, 20000, 32000, 47000, 51000, 71000, 84852])
 # Temperature [R]
-T_USSA1976 = K_TO_R * np.array([
-    288.15, 216.65, 216.65, 228.65, 270.65, 270.65, 214.65, 186.95
-])
+T_USSA1976 = K_TO_R * np.array(
+    [288.15, 216.65, 216.65, 228.65, 270.65, 270.65, 214.65, 186.95]
+)
 # Pressure [psf]
-p_USSA1976 = PA_TO_PSF * np.array([
-    101325, 22632.06, 5474.89, 868.02, 110.91, 66.94, 3.96, 0.3734
-])
+p_USSA1976 = PA_TO_PSF * np.array(
+    [101325, 22632.06, 5474.89, 868.02, 110.91, 66.94, 3.96, 0.3734]
+)
 # Temperature lapse rate [R/ft]
-L_USSA1976 = (K_TO_R / M_TO_FT) * np.array([
-    -0.0065, 0, 0.001, 0.0028, 0, 0.0028, 0, 0
-])
+L_USSA1976 = (K_TO_R / M_TO_FT) * np.array([-0.0065, 0, 0.001, 0.0028, 0, 0.0028, 0, 0])
 
 
 @struct

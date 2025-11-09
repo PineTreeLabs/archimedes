@@ -26,7 +26,7 @@ from engine import (
     NASAEngineConfig,
 )
 
-from archimedes import StructConfig, field, struct, spatial
+from archimedes import StructConfig, field, struct
 from archimedes.experimental import aero
 from archimedes.experimental.aero import (
     ConstantGravity,

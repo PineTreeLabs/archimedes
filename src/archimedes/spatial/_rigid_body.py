@@ -435,6 +435,7 @@ class RigidBody:
     .. [1] Lewis, F. L., Johnson, E. N., & Stevens, B. L. (2015).
             Aircraft Control and Simulation. Wiley.
     """
+
     @struct
     class State:
         pos: np.ndarray  # Position of the center of mass in the inertial frame
@@ -466,6 +467,4 @@ class RigidBody:
         att_deriv = x.att.kinematics(x.w_B)
         dv_B = (u.F_B / u.m) - np.cross(x.w_B, x.v_B)
         dw_B = np.linalg.solve(u.J_B, u.M_B - np.cross(x.w_B, u.J_B @ x.w_B))
-        return RigidBody.State(
-            pos=pos_deriv, att=att_deriv, v_B=dv_B, w_B=dw_B
-        )
+        return RigidBody.State(pos=pos_deriv, att=att_deriv, v_B=dv_B, w_B=dw_B)

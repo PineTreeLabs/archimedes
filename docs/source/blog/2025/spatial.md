@@ -67,7 +67,7 @@ First, working with attitudes and rotations:
 
 ```{code-cell} python
 :tags: [remove-cell]
-# ruff: noqa: N803, N816
+# ruff: noqa: N803, N806, N816
 ```
 
 ```{code-cell} python

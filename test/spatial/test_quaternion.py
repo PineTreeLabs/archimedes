@@ -224,4 +224,3 @@ class TestQuaternionWrapper:
         # Invalid matrix shape
         with pytest.raises(ValueError, match="Rotation matrix must be 3x3"):
             Quaternion.from_matrix(np.eye(4))
-

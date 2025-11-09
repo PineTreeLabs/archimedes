@@ -130,7 +130,7 @@ def dcm_to_quaternion(matrix: np.ndarray) -> np.ndarray:
     matrix = cast(np.ndarray, array(matrix))
     if matrix.shape != (3, 3):
         raise ValueError("Rotation matrix must be 3x3")
-    
+
     # Transpose of SciPy convention  (we assume passive rotations for coordinate
     # system transformations rather than active rotations of vectors)
     matrix = matrix.T
