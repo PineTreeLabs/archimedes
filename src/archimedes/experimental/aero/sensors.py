@@ -41,7 +41,7 @@ class Accelerometer:
         a_B: ArrayLike,
         w: ArrayLike,
     ) -> ArrayLike:
-        g_N = self.gravity(x.p_N)  # Inertial gravity vector
+        g_N = self.gravity(x.pos)  # Inertial gravity vector
         C_BN = x.att.as_dcm()
 
         # Measure inertial acceleration in body coordinates
@@ -98,7 +98,7 @@ class LineOfSight:
     ) -> ArrayLike:
         C_BN = dcm_from_quaternion(vehicle.att)
 
-        r_N = target.p_N - vehicle.p_N  # Relative position in inertial coordinates
+        r_N = target.pos - vehicle.pos  # Relative position in inertial coordinates
         r_B = C_BN @ r_N  # Relative position in body-fixed coordinates
         az = np.atan2(r_B[1], r_B[0])  # Azimuth angle
         el = np.arctan2(r_B[2], np.sqrt(r_B[0] ** 2 + r_B[1] ** 2))  # Elevation angle

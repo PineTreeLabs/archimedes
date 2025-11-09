@@ -24,15 +24,18 @@ import archimedes as arc
 def traj_data(xs_flat, unravel, stride=5):
     xs = arc.vmap(unravel)(xs_flat.T)
 
-    positions = xs.p_N.copy()
+    positions = xs.pos.copy()
     positions[:, 2] *= -1  # Use altitude as Z for visualization
     positions *= 1 / 1000  # Scale to kft
 
     orientations = []
     for i in range(len(ts)):
         x = unravel(xs_flat[:, i])
-        R_BN = x.att.as_matrix()
-        orientations.append(R_BN)
+        # The rotation matrix is for a "passive" rotation (changing coordinate
+        # systems).  For visualization we want the "active" rotation, which
+        # will rotate the points in a single coordinate system. Hence we take the
+        # transpose.
+        orientations.append(x.att.as_matrix().T)
 
     def att_as_rpy(x_flat):
         x = unravel(x_flat)

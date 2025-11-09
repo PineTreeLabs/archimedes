@@ -8,9 +8,8 @@ from scipy.special import roots_legendre
 
 import archimedes as arc
 from archimedes.spatial import (
-    Rotation,
+    Quaternion,
     RigidBody,
-    dcm_from_euler,
 )
 
 __all__ = [
@@ -131,7 +130,7 @@ class RotorGeometry:
 
     @cached_property
     def R_BH(self):
-        """Rotation matrix from the hub frame H to the body frame B"""
+        """Quaternion matrix from the hub frame H to the body frame B"""
         x, y, z = self.offset
 
         # Torsional cant angle rotation (Rχ)
@@ -263,7 +262,7 @@ class RotorModel(metaclass=abc.ABCMeta):
         # effect and the wind angle is undefined (+/- 90 degrees will also work).
         psi_w = np.where(abs(v_H[0]) < 1e-6, np.sign(v_H[1]) * np.pi / 2, psi_w)
 
-        R_WH = Rotation.from_euler("z", psi_w).as_matrix().T
+        R_WH = Quaternion.from_euler(psi_w, "z").as_matrix()
 
         v_W = R_WH @ v_H  # Rotate velocity to wind frame
         w_W = R_WH @ w_H  # Rotate angular velocity to wind frame
@@ -316,7 +315,6 @@ class QuadraticRotorModel(RotorModel):
 
 @arc.struct
 class MultiRotorVehicle:
-    rigid_body: RigidBody = arc.field(default_factory=RigidBody)
     rotors: list[RotorGeometry] = arc.field(default_factory=list)
     rotor_model: RotorModel = arc.field(default_factory=QuadraticRotorModel)
     drag_model: VehicleDragModel = arc.field(default_factory=QuadraticDragModel)
@@ -328,40 +326,22 @@ class MultiRotorVehicle:
     )  # inertia matrix [kg·m²]
 
     @arc.struct
-    class State:
-        rigid_body: RigidBody.State
-        aux: np.ndarray = None  # auxiliary state variables for rotors
+    class State(RigidBody.State):
+        aux: np.ndarray = None  # rotor auxiliary states
 
-        @property
-        def p_N(self):
-            return self.rigid_body.p_N
-
-        @property
-        def att(self):
-            return self.rigid_body.att
-
-        @property
-        def v_B(self):
-            return self.rigid_body.v_B
-
-        @property
-        def w_B(self):
-            return self.rigid_body.w_B
-
-    def state(self, pos, rpy, vel, w_B, aux=None, inertial_velocity=False) -> State:
-        if self.rigid_body.rpy_attitude:
-            att = rpy
-            R_BN = dcm_from_euler(rpy)
-        else:
-            att = Rotation.from_euler("xyz", rpy)
-            R_BN = att.as_matrix().T
+    def state(self, pos, att, vel, w_B, inertial_velocity=False) -> State:
         if inertial_velocity:
+            R_BN = att.as_matrix()
             vel = R_BN @ vel
-        rb_state = self.rigid_body.State(pos, att, vel, w_B)
-        return self.State(rb_state, aux)
+        return self.State(
+            pos=pos,
+            att=att,
+            v_B=vel,
+            w_B=w_B,
+        )
 
     def net_forces(self, t, x: State, u):
-        p_N = x.p_N  # Position of the center of mass in inertial frame N
+        p_N = x.pos  # Position of the center of mass in inertial frame N
         v_B = x.v_B  # Velocity of the center of mass in body frame B
         w_B = x.w_B  # Roll-pitch-yaw rates in body frame (ω_B)
 
@@ -399,12 +379,8 @@ class MultiRotorVehicle:
         # Calculate drag forces and moments in body frame B
         Fdrag_B, Mdrag_B = self.drag_model(t, x)
 
-        if self.rigid_body.rpy_attitude:
-            R_BN = dcm_from_euler(x.att)
-            Fgravity_B = R_BN @ Fgravity_N
-
-        else:
-            Fgravity_B = x.att.apply(Fgravity_N, inverse=True)
+        R_BN = x.att.as_matrix()
+        Fgravity_B = R_BN @ Fgravity_N
 
         F_B = Frotor_B + Fdrag_B + Fgravity_B
 
@@ -433,11 +409,13 @@ class MultiRotorVehicle:
             m=self.m,
             J_B=self.J_B,
         )
-        rb_derivs = self.rigid_body.dynamics(t, x.rigid_body, rb_input)
+        rb_derivs = RigidBody.dynamics(t, x, rb_input)
 
         return self.State(
-            rigid_body=rb_derivs,
-            aux=aux_state_derivs,
+            pos=rb_derivs.pos,
+            att=rb_derivs.att,
+            v_B=rb_derivs.v_B,
+            w_B=rb_derivs.w_B,
         )
 
 

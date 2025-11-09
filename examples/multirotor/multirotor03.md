@@ -90,7 +90,6 @@ vehicle = multirotor.MultiRotorVehicle(
     drag_model=drag_model,
     rotor_model=rotor_model,
     gravity_model=gravity_model,
-    rigid_body=multirotor.RigidBody(),
 )
 ```
 
@@ -111,7 +110,7 @@ u0 = 500.0 * np.ones(4)  # Rotor angular velocity
 x0 = vehicle.state(
     pos=np.zeros(3),  # Initial position [m]
     rpy=np.zeros(3),  # Initial roll-pitch-yaw [rad]
-    vel=np.zeros(3),  # Initial body-frame velocity [m/s]
+    v_B=np.zeros(3),  # Initial body-frame velocity [m/s]
     w_B=np.zeros(3),  # Initial angular velocity [rad/s]
 )
 x0_flat, unravel = arc.tree.ravel(x0)
@@ -137,7 +136,7 @@ xs = vmap_unravel(sol.y)  # Return to vehicle.State format
 ```{code-cell} python
 :tags: [remove-output]
 fig, ax = plt.subplots(2, 1, figsize=(7, 4), sharex=True)
-ax[0].plot(t_eval, xs.p_N[2], label="z")
+ax[0].plot(t_eval, xs.pos[2], label="z")
 ax[0].grid()
 ax[0].set_ylabel("z_N [m]")
 ax[1].plot(t_eval, xs.v_B[2], label="vz_B")
@@ -152,7 +151,7 @@ plt.xlabel("Time [s]")
 for theme in {"light", "dark"}:
     arc.theme.set_theme(theme)
     fig, ax = plt.subplots(2, 1, figsize=(7, 4), sharex=True)
-    ax[0].plot(t_eval, xs.p_N[2], label="z")
+    ax[0].plot(t_eval, xs.pos[2], label="z")
     ax[0].grid()
     ax[0].set_ylabel("z_N [m]")
     ax[1].plot(t_eval, xs.v_B[2], label="vz_B")
@@ -184,8 +183,8 @@ xs_arc = vmap_unravel(xs_flat)
 ```{code-cell} python
 :tags: [remove-output]
 fig, ax = plt.subplots(2, 1, figsize=(7, 4), sharex=True)
-ax[0].plot(t_eval, xs.p_N[2], label="SciPy")
-ax[0].plot(t_eval, xs_arc.p_N[2], "--", label="Archimedes")
+ax[0].plot(t_eval, xs.pos[2], label="SciPy")
+ax[0].plot(t_eval, xs_arc.pos[2], "--", label="Archimedes")
 ax[0].legend()
 ax[0].grid()
 ax[0].set_ylabel("z_N [m]")
@@ -202,8 +201,8 @@ plt.xlabel("Time [s]")
 for theme in {"light", "dark"}:
     arc.theme.set_theme(theme)
     fig, ax = plt.subplots(2, 1, figsize=(7, 4), sharex=True)
-    ax[0].plot(t_eval, xs.p_N[2], label="SciPy")
-    ax[0].plot(t_eval, xs_arc.p_N[2], "--", label="Archimedes")
+    ax[0].plot(t_eval, xs.pos[2], label="SciPy")
+    ax[0].plot(t_eval, xs_arc.pos[2], "--", label="Archimedes")
     ax[0].legend()
     ax[0].grid()
     ax[0].set_ylabel("z_N [m]")

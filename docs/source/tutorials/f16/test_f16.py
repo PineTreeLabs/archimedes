@@ -16,7 +16,7 @@ from stability import (
 )
 
 import archimedes as arc
-from archimedes.spatial import RigidBody, Rotation, euler_kinematics
+from archimedes.spatial import Quaternion, euler_kinematics
 
 CURRENT_PATH = Path(__file__).parent
 
@@ -55,7 +55,7 @@ def test_352(f16: SubsonicF16):
     v_B = np.array([430.0447, -99.3347, 234.9345])  # Velocity in body frame
     w_B = np.array([0.7, -0.8, 0.9])  # Angular velocity in body frame
 
-    att = Rotation.from_euler("xyz", rpy)
+    att = Quaternion.from_euler(rpy)
     x_eng = f16.engine.State(90.0)  # Engine power
     x = f16.State(p_N, att, v_B, w_B, x_eng)
 
@@ -92,9 +92,9 @@ def test_352(f16: SubsonicF16):
     # => ω_B = 2 * q⁻¹ ⊗ q_t
     # This gives a check on the quaternion derivative calculation
     # without using the roll-pitch-yaw rates.
-    w_B_out = 2 * (att.inv().mul(x_t.att, normalize=False)).as_quat()[1:]
+    w_B_out = 2 * (att.inv().mul(x_t.att, normalize=False)).array[1:]
 
-    npt.assert_allclose(x_t.p_N, dp_N_ex, atol=1e-2)
+    npt.assert_allclose(x_t.pos, dp_N_ex, atol=1e-2)
     npt.assert_allclose(w_B_out, w_B, atol=1e-2)
     npt.assert_allclose(x_t.v_B, dv_B_ex, atol=1e-2, rtol=1e-3)
     npt.assert_allclose(x_t.w_B, dw_B_ex, atol=1e-2, rtol=1e-3)
@@ -117,7 +117,7 @@ def test_362(f16: SubsonicF16):
         [-1.499617e-2, 2.933811e-1, 6.084932e-2]
     )  # Angular velocity in body frame
 
-    att = Rotation.from_euler("xyz", rpy)
+    att = Quaternion.from_euler(rpy)
     x_eng = f16.engine.State(6.412363e1)  # Engine power
     x = f16.State(p_N, att, v_B, w_B, x_eng)
 
@@ -140,7 +140,7 @@ def test_362(f16: SubsonicF16):
 
     # Second, convert the quaternion derivative to angular momentum
     # See notes above on this conversion
-    w_B_out = 2 * (att.inv().mul(x_t.att, normalize=False)).as_quat()[1:]
+    w_B_out = 2 * (att.inv().mul(x_t.att, normalize=False)).array[1:]
     assert np.allclose(w_B_out, w_B_expected, atol=1e-4)
 
     # Turn coordination when flight path angle is zero
@@ -192,8 +192,7 @@ def test_linearization(trim_cases):
     case = next(case for case in trim_cases if case["name"] == "pull_up")
     print(case)
 
-    rigid_body = RigidBody(rpy_attitude=True)
-    f16 = SubsonicF16(rigid_body=rigid_body, xcg=case["xcg"])
+    f16 = SubsonicF16(xcg=case["xcg"])
     result = f16.trim(**case["condition"])
 
     x0 = StabilityState.from_full_state(result.state)
@@ -205,7 +204,7 @@ def test_linearization(trim_cases):
     def unravel_stab(x_flat, u_flat):
         x_stab = unravel_x(x_flat)
         u_stab = unravel_u(u_flat)
-        x_full = x_stab.as_full_state(rpy_attitude=True)
+        x_full = x_stab.as_full_state()
         u_full = u_stab.as_full_input()
         return x_full, u_full
 
@@ -341,8 +340,7 @@ def test_linearization(trim_cases):
 def test_lon_stability():
     """Test case for longitudinal stability"""
     # Steady pitch-up
-    rigid_body = RigidBody(rpy_attitude=True)
-    model = SubsonicF16(rigid_body=rigid_body, xcg=0.3)
+    model = SubsonicF16(xcg=0.3)
     result = model.trim(vt=502, pitch_rate=0.0)
 
     x0 = LongitudinalState.from_full_state(result.state)
@@ -355,7 +353,7 @@ def test_lon_stability():
     def unravel_stab(x_flat, u_flat):
         x_stab = StabilityState(lon=unravel_x(x_flat), lat=x0_lat)
         u_stab = unravel_u(u_flat)
-        x_full = x_stab.as_full_state(rpy_attitude=True)
+        x_full = x_stab.as_full_state()
         u_full = u_stab.as_full_input()
         return x_full, u_full
 
@@ -394,7 +392,7 @@ def test_lon_stability():
         v_phugoid = v_phugoid.conj()  # Make imaginary part positive for comparison
     npt.assert_allclose(
         v_phugoid,
-        np.array([1.0, -9.6e-5 + 5e-7j, -3.8e-4 + 2.3e-3j, 1.7e-4 + 8.4e-6j, 0]),
+        np.array([-1.0, 9.6e-5 + 5e-7j, 3.8e-4 + 2.3e-3j, -1.7e-4 + 8.4e-6j, 0]),
         rtol=1e-2,
         atol=1e-5,
     )
@@ -413,8 +411,7 @@ def test_lon_stability():
 def test_lat_stability():
     """Test case for lateral-directional stability"""
     # Steady pitch-up
-    rigid_body = RigidBody(rpy_attitude=True)
-    model = SubsonicF16(rigid_body=rigid_body, xcg=0.3)
+    model = SubsonicF16(xcg=0.3)
     result = model.trim(vt=502, pitch_rate=0.0)
 
     x0 = LateralState.from_full_state(result.state)
@@ -427,7 +424,7 @@ def test_lat_stability():
     def unravel_stab(x_flat, u_flat):
         x_stab = StabilityState(lon=x0_lon, lat=unravel_x(x_flat))
         u_stab = unravel_u(u_flat)
-        x_full = x_stab.as_full_state(rpy_attitude=True)
+        x_full = x_stab.as_full_state()
         u_full = u_stab.as_full_input()
         return x_full, u_full
 

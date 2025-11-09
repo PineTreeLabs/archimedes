@@ -31,11 +31,38 @@ class TestRotation:
         q2 = (R1_scipy * R2_scipy).as_quat(scalar_first=True)
         assert np.allclose(q1, q2)
 
+    def test_apply(self):
+        R = random_rotation()
+        v = np.array([0.1, 0.2, 0.3])
+        w = R.apply(v)
+
+        R_scipy = ScipyRotation.from_quat(R.as_quat(), scalar_first=True)
+        w_scipy = R_scipy.apply(v)
+
+        assert np.allclose(w, w_scipy)
+
+        # Inverse apply
+        w = R.apply(v, inverse=True)
+        w_scipy = R_scipy.apply(v, inverse=True)
+        assert np.allclose(w, w_scipy)
+
     def test_composition_associativity(self):
         R1, R2, R3 = [random_rotation() for _ in range(3)]
         q1 = ((R1 * R2) * R3).as_quat()
         q2 = (R1 * (R2 * R3)).as_quat()
         assert np.allclose(q1, q2)
+
+    def test_derivative(self):
+        from archimedes.spatial import quaternion_multiply
+
+        R = random_rotation()
+        w_B = np.array([0.01, -0.02, 0.03])
+        R_t = R.derivative(w_B, baumgarte=1.0)
+
+        q = R.as_quat()
+        q_t = 0.5 * quaternion_multiply(q, np.array([0, *w_B]))
+
+        assert np.allclose(R_t.quat, q_t, atol=1e-6)
 
     def test_inverse(self):
         R = random_rotation()

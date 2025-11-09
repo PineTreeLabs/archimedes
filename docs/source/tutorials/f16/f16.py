@@ -34,7 +34,7 @@ from archimedes.experimental.aero import (
     GravityConfig,
     GravityModel,
 )
-from archimedes.spatial import RigidBody, RigidBodyConfig, dcm_from_euler
+from archimedes.spatial import RigidBody
 
 if TYPE_CHECKING:
     from trim import TrimPoint
@@ -81,7 +81,6 @@ class F16Geometry:
 
 @struct
 class SubsonicF16:
-    rigid_body: RigidBody = field(default_factory=RigidBody)
     gravity: GravityModel = field(default_factory=lambda: ConstantGravity(GRAV_FTS2))
     atmos: AtmosphereModel = field(default_factory=LinearAtmosphere)
     engine: F16Engine = field(default_factory=NASAEngine)
@@ -119,18 +118,16 @@ class SubsonicF16:
         rudder: float  # Rudder deflection [deg]
 
     def calc_gravity(self, x: State):
-        F_grav_N = self.m * self.gravity(x.p_N)
-        if self.rigid_body.rpy_attitude:
-            F_grav_B = dcm_from_euler(x.att) @ F_grav_N
-        else:
-            F_grav_B = x.att.apply(F_grav_N, inverse=True)
+        F_grav_N = self.m * self.gravity(x.pos)
+        R_BN = x.att.as_matrix()
+        F_grav_B = R_BN @ F_grav_N
         return F_grav_B
 
     def flight_condition(self, x: RigidBody.State) -> FlightCondition:
         vt, alpha, beta = aero.wind_frame(x.v_B)
 
         # Atmosphere model
-        alt = -x.p_N[2]
+        alt = -x.pos[2]
         mach, qbar = self.atmos(vt, alt)
 
         return FlightCondition(
@@ -226,7 +223,7 @@ class SubsonicF16:
             m=self.m,
             J_B=self.J_B,
         )
-        rb_deriv = self.rigid_body.dynamics(t, x, rb_input)
+        rb_deriv = RigidBody.dynamics(t, x, rb_input)
 
         # Engine dynamics
         eng_input = self.engine.Input(
@@ -253,7 +250,7 @@ class SubsonicF16:
         rud_deriv = self.rudder.dynamics(t, x.rudder, u.rudder)
 
         return self.State(
-            p_N=rb_deriv.p_N,
+            pos=rb_deriv.pos,
             att=rb_deriv.att,
             v_B=rb_deriv.v_B,
             w_B=rb_deriv.w_B,
@@ -312,7 +309,6 @@ class SubsonicF16:
 
 
 class SubsonicF16Config(StructConfig):
-    rigid_body: RigidBodyConfig = field(default_factory=RigidBodyConfig)
     gravity: GravityConfig = field(
         default_factory=lambda: ConstantGravityConfig(g0=GRAV_FTS2)
     )
@@ -337,7 +333,6 @@ class SubsonicF16Config(StructConfig):
 
     def build(self) -> SubsonicF16:
         return SubsonicF16(
-            rigid_body=self.rigid_body.build(),
             gravity=self.gravity.build(),
             atmos=self.atmos.build(),
             engine=self.engine.build(),

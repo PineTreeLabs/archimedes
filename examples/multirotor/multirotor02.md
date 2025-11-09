@@ -156,14 +156,14 @@ With that in mind, we can define a generic callable interface for gravity, with 
 from typing import Protocol
 
 class GravityModel(Protocol):
-    def __call__(self, p_N):
-        """Gravitational acceleration at the body CM in the inertial frame N
+    def __call__(self, p_E):
+        """Gravitational acceleration at the body CM in the earth frame E
 
         Args:
-            p_N: position vector in inertial frame N
+            p_E: position vector in earth frame E
 
         Returns:
-            g_N: gravitational acceleration in inertial frame N
+            g_E: gravitational acceleration in earth frame E
         """
 
 
@@ -171,8 +171,8 @@ class GravityModel(Protocol):
 class ConstantGravity:
     g0: float = 9.81
 
-    def __call__(self, p_N):
-        return np.array([0, 0, self.g0], like=p_N)
+    def __call__(self, p_E):
+        return np.array([0, 0, self.g0], like=p_E)
 
 
 @struct
@@ -180,7 +180,7 @@ class PointGravity:
     r_EN: np.ndarray  # Position vector from Earth's CM to the origin of the N frame [m]
     G: float = 6.6743e-11  # Gravitational constant [N-m²/kg²]
 
-    def __call__(self, p_N):
+    def __call__(self, p_E):
         # ...
 ```
 
@@ -249,7 +249,7 @@ class RotorGeometry:
 
     @cached_property
     def R_BH(self):
-        """Rotation matrix from the hub frame H to the body frame B"""
+        """Quaternion matrix from the hub frame H to the body frame B"""
         # ...
     
     @property
@@ -468,7 +468,7 @@ Finally, although we have included `FlightVehicle` as part of our class hierarch
 The interface is the same as what we've shown here, and you can look at the source code in [multirotor.py](https://github.com/jcallaham/archimedes/tree/main/docs/source/notebooks/multirotor/multirotor.py) to see how exactly it builds on the generic `FlightVehicle`.
 
 One difference with what we've shown here is that instead of using a flat 12-element vector to represent the state of the vehicle, the built-in `FlightVehicle` defines its own `State` class.
-This is another [`struct`](#archimedes.tree.struct) with fields for each of the four groups of state variables: position (`State.p_N`), attitude (`State.att`), velocity (`State.v_B`), angular velocity (`State.w_B`), and any additional state variables (`State.aux`).
+This is another [`struct`](#archimedes.tree.struct) with fields for each of the four groups of state variables: position (`State.pos`), attitude (`State.att`), velocity (`State.v_B`), angular velocity (`State.w_B`), and any additional state variables (`State.aux`).
 The naming convention follows [monogram notation](https://drake.mit.edu/doxygen_cxx/group__multibody__notation__basics.html).
 
 This avoids the need to remember what index represents the $y$-component of angular velocity, for example.

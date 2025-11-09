@@ -20,8 +20,18 @@ uv run pytest --cov=archimedes --cov-report=term-missing
 Alternatively, generate a detailed report with
 
 ```bash
-uv run pytest --cov=archimedes --cov-report=html
+uv run pytest test --cov=archimedes --cov-report=html
 ```
+
+In theory submodules are fully covered by a subdirectory in test/, so you should also see 100% coverage with
+
+```bash
+uv run pytest test/<submodule> --cov=archimedes.<submodule> --cov-report=term-missing
+```
+
+Essentially this requires that code be specifically covered by unit-type tests, instead of happening to be called by integration tests or examples.
+This is not strictly enforced by CI, but is a faster way to check and build out coverage during development.
+At some point it may be a prerequisite for merging PRs.
 
 Linting and formatting is done with [ruff](https://docs.astral.sh/ruff/):
 

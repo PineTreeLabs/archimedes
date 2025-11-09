@@ -17,13 +17,13 @@ __all__ = [
 
 class GravityModel(Protocol):
     def __call__(self, p_E: np.ndarray) -> np.ndarray:
-        """Gravitational acceleration at the body CM in the inertial frame E
+        """Gravitational acceleration at the body CM in the earth frame E
 
         Args:
-            p_N position vector relative to the inertial frame N [m]
+            p_E: position vector relative to the earth frame E [m]
 
         Returns:
-            g_N: gravitational acceleration in inertial frame N [m/s^2]
+            g_E: gravitational acceleration in earth frame E [m/s^2]
         """
 
 
@@ -37,7 +37,7 @@ class ConstantGravity:
 
     g0: float = 9.81  # m/s^2
 
-    def __call__(self, p_N: np.ndarray) -> np.ndarray:
+    def __call__(self, p_E: np.ndarray) -> np.ndarray:
         return np.hstack([0, 0, self.g0])
 
 
@@ -61,7 +61,7 @@ def lla2eci(
 
     Returns:
         p_EN: Cartesian coordinates [m]
-        R_EN: Rotation matrix from NED to E
+        R_EN: Quaternion matrix from NED to E
     """
     r = RE + alt  # Radius from Earth center [m]
     lat = np.deg2rad(lat)
@@ -95,11 +95,11 @@ class PointGravity:
     """
 
     p_EN: np.ndarray  # Relative position of N with respect to E (measured in E) [m]
-    R_EN: np.ndarray  # Rotation from N to E
+    R_EN: np.ndarray  # Quaternion from N to E
     mu: float = 3.986e14  # m^3/s^2
 
-    def __call__(self, p_N):
-        r_E = self.p_EN + self.R_EN @ p_N
+    def __call__(self, p_E: np.ndarray):
+        r_E = self.p_EN + self.R_EN @ p_E
         r = np.linalg.norm(r_E)
         g_E = -self.mu * r_E / r**3
         return self.R_EN.T @ g_E
@@ -113,7 +113,7 @@ class PointGravityConfig(StructConfig):
 
 class PointGravityCartesianConfig(PointGravityConfig, type="point_cartesian"):
     p_EN: np.ndarray  # Relative position of N with respect to E (measured in E) [m]
-    R_EN: np.ndarray  # Rotation from N to E
+    R_EN: np.ndarray  # Quaternion from N to E
 
     def build(self) -> PointGravity:
         return PointGravity(self.p_EN, self.R_EN, mu=self.mu)

@@ -308,7 +308,7 @@ import numpy as np
 
 import archimedes as arc
 from archimedes.spatial import (
-    Rotation, euler_kinematics, dcm_from_euler
+    Quaternion, euler_kinematics, euler_to_dcm
 )
 ```
 
@@ -399,7 +399,6 @@ vehicle = multirotor.MultiRotorVehicle(
     drag_model=drag_model,
     rotor_model=rotor_model,
     gravity_model=gravity_model,
-    rigid_body=multirotor.RigidBody(rpy_attitude=True),
 )
 ```
 
@@ -421,7 +420,7 @@ t1 = 20.0
 x0 = vehicle.state(
     pos=np.zeros(3),  # Initial position [m]
     rpy=np.zeros(3),  # Initial roll-pitch-yaw [rad]
-    vel=np.zeros(3),  # Initial body-frame velocity [m/s]
+    v_B=np.zeros(3),  # Initial body-frame velocity [m/s]
     w_B=np.zeros(3),  # Initial angular velocity [rad/s]
 )
 x0_flat, unravel = arc.tree.ravel(x0)
@@ -445,7 +444,7 @@ xs_flat = arc.odeint(f, t_span, x0_flat, t_eval=t_eval)
 xs = vmap_unravel(xs_flat)  # Return to vehicle.State format
 
 fig, ax = plt.subplots(2, 1, figsize=(7, 4), sharex=True)
-ax[0].plot(t_eval, xs.p_N[2])
+ax[0].plot(t_eval, xs.pos[2])
 ax[0].grid()
 ax[0].set_ylabel("z_N [m]")
 ax[1].plot(t_eval, xs.v_B[2])
@@ -461,7 +460,7 @@ plt.xlabel("Time [s]")
 for theme in {"light", "dark"}:
     arc.theme.set_theme(theme)
     fig, ax = plt.subplots(2, 1, figsize=(7, 4), sharex=True)
-    ax[0].plot(t_eval, xs.p_N[2])
+    ax[0].plot(t_eval, xs.pos[2])
     ax[0].grid()
     ax[0].set_ylabel("z_N [m]")
     ax[1].plot(t_eval, xs.v_B[2])
@@ -512,7 +511,7 @@ phi_trim = p_trim[0]
 theta_trim = p_trim[1]
 u_trim = p_trim[2:]
 
-R_BN = dcm_from_euler(np.array([phi_trim, theta_trim, 0.0]))
+R_BN = euler_to_dcm(np.array([phi_trim, theta_trim, 0.0]))
 v_B_trim = R_BN @ v_N
 
 print(f"roll: {np.rad2deg(phi_trim):.2f} deg")

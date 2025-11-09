@@ -59,10 +59,14 @@ New version tag for release to PyPI (previous "Archimedes" project tagged with v
 - Add blog to website
 - Convert all notebooks to MyST
 
-## [0.3.1]
+## [0.3.1] - 2025-10-15
 - Bugfix for `Rotation.as_euler` for rotations with odd permutations
 - Move `RigidBody` and related functionality to `spatial` module
 - Move `spatial` module out of `experimental` (+codecov, documentation)
 
-## [0.3.2]
+## [0.3.2] - 2025-11-01
 - Bump pip to 25.3 to resolve vulnerability ([Issue #103](https://github.com/PineTreeLabs/archimedes/issues/103))
+
+## [0.4.0] - 2025-11-09
+- Overhaul `spatial` module: `Attitude` protocol, low-level functions, wrapper classes, `RigidBody` singleton ([Issue #114](https://github.com/PineTreeLabs/archimedes/issues/114))
+- Bugfix for struct type name resolution with inner classes ([Issue #115](https://github.com/PineTreeLabs/archimedes/issues/115))

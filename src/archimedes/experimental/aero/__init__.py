@@ -31,7 +31,7 @@ _deprecated = {
     "RigidBody",
     "RigidBodyConfig",
     "euler_kinematics",
-    "dcm_from_euler",
+    "euler_to_dcm",
 }
 
 

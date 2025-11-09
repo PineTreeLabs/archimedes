@@ -6,7 +6,7 @@ from engine import F16Engine
 from f16 import SubsonicF16
 
 from archimedes import struct
-from archimedes.spatial import Rotation
+from archimedes.spatial import EulerAngles, Quaternion
 
 
 @struct
@@ -34,7 +34,7 @@ class LongitudinalState:
             eng=x.eng,
         )
 
-    def as_full_state(self, rpy_attitude=True) -> SubsonicF16.State:
+    def as_full_state(self) -> SubsonicF16.State:
         # Assume zero sideslip, zero lateral states
 
         v_B = np.hstack(
@@ -45,17 +45,12 @@ class LongitudinalState:
             ]
         )
 
-        rpy = np.hstack([0.0, self.theta, 0.0])
-        if rpy_attitude:
-            att = rpy
-        else:
-            att = Rotation.from_euler("xyz", [0.0, self.theta, 0.0])
-
+        rpy = Quaternion.from_euler([0.0, self.theta, 0.0])
         w_B = np.hstack([0.0, self.q, 0.0])
 
         return SubsonicF16.State(
-            p_N=np.zeros(3),
-            att=att,
+            pos=np.zeros(3),
+            att=rpy,
             v_B=v_B,
             w_B=w_B,
             eng=self.eng,
@@ -160,23 +155,19 @@ class StabilityState:
             lat=LateralState.from_full_state(x_dot, beta=beta_dot),
         )
 
-    def as_full_state(self, rpy_attitude=True) -> SubsonicF16.State:
+    def as_full_state(self) -> SubsonicF16.State:
         p_N = np.zeros(3)
 
         v_W = np.hstack([self.lon.vt, 0.0, 0.0])
-        R_WB = Rotation.from_euler("zy", [-self.lat.beta, self.lon.alpha])
-        v_B = R_WB.apply(v_W, inverse=True)
+        R_BW = Quaternion.from_euler([-self.lat.beta, self.lon.alpha], "zy").as_matrix()
+        v_B = R_BW @ v_W
         w_B = np.hstack([self.lat.p, self.lon.q, self.lat.r])
 
         rpy = np.hstack([self.lat.phi, self.lon.theta, 0.0])
-        if rpy_attitude:
-            att = rpy
-        else:
-            att = Rotation.from_euler("xyz", rpy)
 
         return SubsonicF16.State(
-            p_N=p_N,
-            att=att,
+            pos=p_N,
+            att=EulerAngles(rpy),
             v_B=v_B,
             w_B=w_B,
             eng=self.lon.eng,

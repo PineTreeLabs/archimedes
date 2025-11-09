@@ -1,7 +1,5 @@
 stability:
   xcg: 0.3
-  rigid_body:
-    rpy_attitude: true
   engine:
     type: tabulated
   elevator:
@@ -13,6 +11,8 @@ stability:
 
 full:
   xcg: 0.3
+  atmosphere:
+    type: ussa1976
   engine:
     type: nasa
   elevator:

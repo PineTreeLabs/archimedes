@@ -12,7 +12,7 @@ from multirotor import (
 )
 
 import archimedes as arc
-from archimedes.spatial import RigidBody, euler_kinematics, dcm_from_euler
+from archimedes.spatial import EulerAngles, euler_to_dcm
 
 m = 1.7  # Arbitrary mass
 g0 = 9.81
@@ -396,9 +396,7 @@ class TestTrimStability:
             theta += np.pi / 2
             ccw = not ccw
 
-        rigid_body = RigidBody(rpy_attitude=True)
         vehicle = MultiRotorVehicle(
-            rigid_body=rigid_body,
             rotors=rotors,
             drag_model=drag_model,
             gravity_model=gravity_model,
@@ -420,8 +418,8 @@ class TestTrimStability:
         def residual(p):
             phi, theta = p[:2]  # (pitch, roll) angles
             u = p[2:]  # Rotor angular velocities
-            rpy = np.hstack([phi, theta, 0.0])
-            x = vehicle.state(p_N, rpy, v_N, w_B, inertial_velocity=True)
+            att = EulerAngles(np.hstack([phi, theta, 0.0]))
+            x = vehicle.state(p_N, att, v_N, w_B, inertial_velocity=True)
             x_t = vehicle.dynamics(0.0, x, u)
             # Residuals of dynamics equations only
             return np.hstack([x_t.v_B, x_t.w_B])
@@ -441,7 +439,7 @@ class TestTrimStability:
         npt.assert_allclose(theta_trim, 0.0, atol=1e-6)
         npt.assert_allclose(u_trim, u_trim_ex, atol=1e-6)
 
-        R_BN = dcm_from_euler(np.array([phi_trim, theta_trim, 0.0]))
+        R_BN = euler_to_dcm(np.array([phi_trim, theta_trim, 0.0]))
         v_B_trim = R_BN @ v_N
 
         #
@@ -458,13 +456,12 @@ class TestTrimStability:
         @arc.compile
         def f_lon(x_lon, u):
             theta, vx, vz, q = x_lon  # Perturbations
-            rpy = np.hstack([phi_trim, theta, 0.0])
+            rpy = EulerAngles(np.hstack([phi_trim, theta, 0.0]))
             w_B = np.hstack([0.0, q, 0.0])
-            rpy_t = euler_kinematics(rpy) @ w_B
             v_B = np.hstack([vx, v_B_trim[1], vz])
             x = vehicle.state(np.zeros(3), rpy, v_B, w_B)
             x_t = vehicle.dynamics(0.0, x, u)
-            return np.hstack([rpy_t[1], x_t.v_B[0], x_t.v_B[2], x_t.w_B[1]])
+            return np.hstack([x_t.att[1], x_t.v_B[0], x_t.v_B[2], x_t.w_B[1]])
 
         # Linearized state-space matrices
         A_lon = arc.jac(f_lon, 0)(x_lon_trim, u_trim)
@@ -506,13 +503,12 @@ class TestTrimStability:
         @arc.compile
         def f_lat(x_lat, u):
             phi, vy, p, r = x_lat  # Perturbations
-            rpy = np.hstack([phi, theta_trim, 0.0])
+            rpy = EulerAngles(np.hstack([phi, theta_trim, 0.0]))
             w_B = np.hstack([p, 0.0, r])
-            rpy_t = euler_kinematics(rpy) @ w_B
             v_B = np.hstack([v_B_trim[0], vy, v_B_trim[2]])
             x = vehicle.state(np.zeros(3), rpy, v_B, w_B)
             x_t = vehicle.dynamics(0.0, x, u)
-            return np.hstack([rpy_t[0], x_t.v_B[1], x_t.w_B[0], x_t.w_B[2]])
+            return np.hstack([x_t.att[0], x_t.v_B[1], x_t.w_B[0], x_t.w_B[2]])
 
         # Linearized state-space matrices
         A_lat = arc.jac(f_lat, 0)(x_lat_trim, u_trim)
