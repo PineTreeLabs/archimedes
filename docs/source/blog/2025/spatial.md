@@ -138,6 +138,7 @@ def body_frame_kinematics(
     att_deriv = att.kinematics(w_B)  # Attitude kinematics
     return pos_deriv, att_deriv
 
+
 v_B = np.array([10.0, 0.0, 0.0])
 w_B = np.array([0.0, 1.0, 0.0])
 dp_E, drpy = body_frame_kinematics(rpy, v_B, w_B)  # Euler kinematics
