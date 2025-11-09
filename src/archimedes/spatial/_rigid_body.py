@@ -317,7 +317,7 @@ class RigidBody:
         The equations above could be implemented in an ECEF frame with a simple custom
         rigid body class:
 
-        .. code-block python
+        .. code-block python::
 
             @struct
             class EarthReferencedBody:
@@ -359,7 +359,7 @@ class RigidBody:
                         pos=pos_deriv, att=att_deriv, v_E=dv_E, w_B=dw_B
                     )
 
-        While this formulation does cover a substantial number of orbtial mechanics
+        While this formulation does cover a substantial number of orbital mechanics
         applications, it is not one-size-fits all.  Are centrifugal effects accounted
         for in the gravity model?  Are precession and nutation important?  Is the
         angular velocity time-varying?  The present design prioritizes _customization_
