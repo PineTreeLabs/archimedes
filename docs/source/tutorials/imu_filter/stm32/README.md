@@ -27,5 +27,13 @@ set(CMAKE_CXX_FLAGS_RELEASE "-O3 -g0")
 cmake --preset=Release
 cmake --build --preset=Release
 openocd -f interface/stlink.cfg -f target/stm32h7x.cfg \
-	-c "program build/Release/f16_hil.elf verify reset exit"
+	-c "program build/Release/imu_filter.elf verify reset exit"
 ```
+
+### See output in terminal
+
+```bash
+screen /dev/tty.usbmodem142103 115200
+```
+
+Exit `screen` with `Ctrl + A , Ctrl + \`

@@ -26,6 +26,9 @@
 #include <stdio.h>
 #include <string.h>
 #include <math.h>
+#include "lsm6dsox.h"
+#include "stm32h7_i2c_dev.h"
+#include "cfilter.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -35,7 +38,8 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-
+#define SAMPLE_COUNT 600
+#define DT_IMU  1.0f/104.0f  // IMU sample period in seconds
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -47,10 +51,19 @@
 
 I2C_HandleTypeDef hi2c1;
 
+TIM_HandleTypeDef htim6;
+
 UART_HandleTypeDef huart3;
 
 /* USER CODE BEGIN PV */
+volatile bool imu_lsm6dsox_data_ready = false;
 
+uint32_t loop_cycles = 0; // Count CPU cycles in main loop
+
+lsm6dsox_dev_t dev;
+lsm6dsox_data_t lsm6dsox_data;
+float quat[4];
+float rpy[3];
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -59,6 +72,7 @@ static void MPU_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_USART3_UART_Init(void);
 static void MX_I2C1_Init(void);
+static void MX_TIM6_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -102,18 +116,79 @@ int main(void)
   MX_GPIO_Init();
   MX_USART3_UART_Init();
   MX_I2C1_Init();
+  MX_TIM6_Init();
   /* USER CODE BEGIN 2 */
+
+    
+  printf("\r\n");
+  printf("========================================\r\n");
+  printf("LSM6DSOX I2C Test - STM32H7\r\n");
+  printf("========================================\r\n\r\n");
+  
+  // Configure IMU
+  dev.handle = &hi2c1;  // Pass I2C handle
+  dev.addr = LSM6DSOX_I2CADDR_DEFAULT;
+  dev.read = stm32_i2c_read;
+  dev.write = stm32_i2c_write;
+  dev.accel_odr = LSM6DSOX_RATE_104_HZ;
+  dev.accel_range = LSM6DSOX_ACCEL_RANGE_2_G;
+  dev.gyro_odr = LSM6DSOX_RATE_104_HZ;
+  dev.gyro_range = LSM6DSOX_GYRO_RANGE_250_DPS;
+  
+
+  lsm6dsox_init(&dev);
+  
+  // Enable DWT cycle counter for profiling
+  CoreDebug->DEMCR |= CoreDebug_DEMCR_TRCENA_Msk;
+  DWT->CYCCNT = 0;
+  DWT->CTRL |= DWT_CTRL_CYCCNTENA_Msk;
+  
+  // Start IMU I2C timer
+  if (HAL_TIM_Base_Start_IT(&htim6) != HAL_OK)
+      Error_Handler();
 
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
+  uint32_t sample_idx = 0;
+  printf("Starting IMU filter test...\r\n");
+  HAL_GPIO_WritePin(ONBOARD_LED_GREEN_GPIO_Port, ONBOARD_LED_GREEN_Pin, GPIO_PIN_SET);
   while (1)
   {
+    if (sample_idx >= SAMPLE_COUNT)
+        break;
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
+
+    if (imu_lsm6dsox_data_ready) {
+      uint32_t start_cycles = DWT->CYCCNT; // Start cycle counter
+      
+      imu_callback();
+
+      uint32_t end_cycles = DWT->CYCCNT;          // End cycle counter
+      loop_cycles += (end_cycles - start_cycles); // Count cycles
+      float execution_us = (end_cycles - start_cycles) / (SystemCoreClock / 1000000.0f);
+      sample_idx++;
+
+      // Optional: Print every 10 samples to avoid overwhelming UART
+      static int count = 0;
+      if (++count >= 10) {
+          count = 0;
+          // printf("Roll: %f  Pitch: %f  Yaw: %f (%f µs)\r\n",
+          //         rpy[0]*57.3f, rpy[1]*57.3f, rpy[2]*57.3f, execution_us);
+          // printf("Roll: %d\r\n", (int)(rpy[0]*57.3f));
+          printf("Z-accel: %d mg (%f µs)\r\n",
+                  (int)(1000 * lsm6dsox_data.accel[2]), execution_us);
+      }
+    }
   }
+
+  printf("Average loop time: %.0f us\r\n",
+          (loop_cycles / (float)sample_idx) / (SystemCoreClock / 1000000.0f));
+          
+  HAL_GPIO_WritePin(ONBOARD_LED_GREEN_GPIO_Port, ONBOARD_LED_GREEN_Pin, GPIO_PIN_RESET);
   /* USER CODE END 3 */
 }
 
@@ -224,6 +299,44 @@ static void MX_I2C1_Init(void)
 }
 
 /**
+  * @brief TIM6 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM6_Init(void)
+{
+
+  /* USER CODE BEGIN TIM6_Init 0 */
+
+  /* USER CODE END TIM6_Init 0 */
+
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
+
+  /* USER CODE BEGIN TIM6_Init 1 */
+
+  /* USER CODE END TIM6_Init 1 */
+  htim6.Instance = TIM6;
+  htim6.Init.Prescaler = 4807;
+  htim6.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim6.Init.Period = 479;
+  htim6.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  if (HAL_TIM_Base_Init(&htim6) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim6, &sMasterConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM6_Init 2 */
+
+  /* USER CODE END TIM6_Init 2 */
+
+}
+
+/**
   * @brief USART3 Initialization Function
   * @param None
   * @retval None
@@ -322,6 +435,83 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
+    if (htim == &htim6) {
+        imu_lsm6dsox_data_ready = true;  // Signal main loop
+    }
+}
+
+void imu_callback(void) {
+  // Read sensor
+  lsm6dsox_read(&dev, &lsm6dsox_data);
+
+  // Convert gyro dps → rad/s
+  for (int i = 0; i < 3; i++) {
+      lsm6dsox_data.gyro[i] *= 0.0174533f;
+  }
+
+  // Update filter (alpha = 0.98)
+  cfilter(quat, lsm6dsox_data.gyro, lsm6dsox_data.accel, 0.98f, DT_IMU);
+  quaternion_to_euler(quat, rpy);
+
+  imu_lsm6dsox_data_ready = false;
+}
+
+void calibrate_imu(void)
+{
+    const int calibration_samples = 100;
+    float gyro_avg[3] = {0, 0, 0};
+    float accel_avg[3] = {0, 0, 0};
+    
+    printf("Starting calibration (%d samples)...\r\n", calibration_samples);
+    printf("Keep IMU steady!\r\n");
+    
+    for (int i = 0; i < calibration_samples; i++) {
+        lsm6dsox_read(&dev, &lsm6dsox_data);
+        
+        for (int j = 0; j < 3; j++) {
+            gyro_avg[j] += lsm6dsox_data.gyro[j];
+            accel_avg[j] += lsm6dsox_data.accel[j];
+        }
+        
+        HAL_Delay(10);
+        
+        // Show progress every 25 samples
+        if ((i + 1) % 25 == 0) {
+            printf("  %d%%...\r\n", ((i + 1) * 100) / calibration_samples);
+        }
+    }
+    
+    // Calculate averages
+    for (int j = 0; j < 3; j++) {
+        gyro_avg[j] /= calibration_samples;
+        accel_avg[j] /= calibration_samples;
+    }
+    
+    // Store biases
+    for (int j = 0; j < 3; j++) {
+        dev.gyro_bias[j] = gyro_avg[j];
+        dev.accel_bias[j] = accel_avg[j];
+    }
+
+    // Remove 1g from Z-axis (assuming IMU is level, Z points down)
+    dev.accel_bias[2] -= 1.0f;
+
+    printf("Calibration complete!\r\n");
+    printf("  Gyro bias: [%.3f, %.3f, %.3f] dps\r\n",
+           dev.gyro_bias[0], dev.gyro_bias[1], dev.gyro_bias[2]);
+    printf("  Accel bias: [%.3f, %.3f, %.3f] g\r\n\r\n",
+           dev.accel_bias[0], dev.accel_bias[1], dev.accel_bias[2]);
+}
+
+/**
+  * @brief  Redirect printf to UART
+  */
+int _write(int file, char *ptr, int len)
+{
+    HAL_UART_Transmit(&huart3, (uint8_t *)ptr, len, HAL_MAX_DELAY);
+    return len;
+}
 
 /* USER CODE END 4 */
 
