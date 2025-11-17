@@ -43,4 +43,13 @@ Exit `screen` with `Ctrl + A , Ctrl + \`
 
 Note I2C read takes ~150 µs
 
-By-hand implementation: 10 µs
+By-hand implementation: 9 µs
+
+
+## Visualization
+
+Requires:
+
+```bash
+uv pip install pyqt5 vispy
+```

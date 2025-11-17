@@ -156,8 +156,8 @@ int main(void)
   HAL_GPIO_WritePin(ONBOARD_LED_GREEN_GPIO_Port, ONBOARD_LED_GREEN_Pin, GPIO_PIN_SET);
   while (1)
   {
-    if (sample_idx >= SAMPLE_COUNT)
-        break;
+    // if (sample_idx >= SAMPLE_COUNT)
+    //     break;
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -175,14 +175,11 @@ int main(void)
       sample_idx++;
 
       // Optional: Print every 10 samples to avoid overwhelming UART
-      static int count = 0;
-      if (++count >= 10) {
-          count = 0;
-          printf("Roll: %d  Pitch: %d  Yaw: %d\r\n",
-                  (int)(1000 * rpy[0]*57.3f),
-                  (int)(1000 * rpy[1]*57.3f),
-                  (int)(1000 * rpy[2]*57.3f));
-      }
+      
+      printf("Roll: %d  Pitch: %d  Yaw: %d\r\n",
+              (int)(1000 * rpy[0]*57.3f),
+              (int)(1000 * rpy[1]*57.3f),
+              (int)(1000 * rpy[2]*57.3f));
     }
   }
 
