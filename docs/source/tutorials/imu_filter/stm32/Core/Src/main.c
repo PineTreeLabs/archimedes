@@ -26,7 +26,6 @@
 #include <stdio.h>
 #include <string.h>
 #include <math.h>
-#include "lsm6dsox.h"
 #include "stm32h7_i2c_dev.h"
 #include "cfilter.h"
 /* USER CODE END Includes */
@@ -38,7 +37,7 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-#define SAMPLE_COUNT 600
+#define SAMPLE_COUNT 6000
 #define DT_IMU  1.0f/104.0f  // IMU sample period in seconds
 /* USER CODE END PD */
 
@@ -62,7 +61,7 @@ uint32_t loop_cycles = 0; // Count CPU cycles in main loop
 
 lsm6dsox_dev_t dev;
 lsm6dsox_data_t lsm6dsox_data;
-float quat[4];
+float quat[4] = {1.0f, 0.0f, 0.0f, 0.0f}; // Initial quaternion
 float rpy[3];
 /* USER CODE END PV */
 
@@ -152,6 +151,7 @@ int main(void)
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   uint32_t sample_idx = 0;
+  calibrate_imu(&dev, &lsm6dsox_data, 200); // Calibrate with 200 samples
   printf("Starting IMU filter test...\r\n");
   HAL_GPIO_WritePin(ONBOARD_LED_GREEN_GPIO_Port, ONBOARD_LED_GREEN_Pin, GPIO_PIN_SET);
   while (1)
@@ -169,24 +169,25 @@ int main(void)
 
       uint32_t end_cycles = DWT->CYCCNT;          // End cycle counter
       loop_cycles += (end_cycles - start_cycles); // Count cycles
-      float execution_us = (end_cycles - start_cycles) / (SystemCoreClock / 1000000.0f);
       sample_idx++;
 
       // Optional: Print every 10 samples to avoid overwhelming UART
       static int count = 0;
       if (++count >= 10) {
           count = 0;
-          // printf("Roll: %f  Pitch: %f  Yaw: %f (%f µs)\r\n",
-          //         rpy[0]*57.3f, rpy[1]*57.3f, rpy[2]*57.3f, execution_us);
+          printf("Roll: %d  Pitch: %d  Yaw: %d\r\n",
+                  (int)(1000 * rpy[0]*57.3f),
+                  (int)(1000 * rpy[1]*57.3f),
+                  (int)(1000 * rpy[2]*57.3f));
           // printf("Roll: %d\r\n", (int)(rpy[0]*57.3f));
-          printf("Z-accel: %d mg (%f µs)\r\n",
-                  (int)(1000 * lsm6dsox_data.accel[2]), execution_us);
+          // printf("Z-accel: %d mg (%f µs)\r\n",
+          //         (int)(1000 * lsm6dsox_data.accel[2]), execution_us);
       }
     }
   }
 
-  printf("Average loop time: %.0f us\r\n",
-          (loop_cycles / (float)sample_idx) / (SystemCoreClock / 1000000.0f));
+  printf("Average loop time: %d µs\r\n",
+          (int)((loop_cycles / (float)sample_idx) / (SystemCoreClock / 1000000.0f)));
           
   HAL_GPIO_WritePin(ONBOARD_LED_GREEN_GPIO_Port, ONBOARD_LED_GREEN_Pin, GPIO_PIN_RESET);
   /* USER CODE END 3 */
@@ -442,13 +443,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
 }
 
 void imu_callback(void) {
-  // Read sensor
   lsm6dsox_read(&dev, &lsm6dsox_data);
-
-  // Convert gyro dps → rad/s
-  for (int i = 0; i < 3; i++) {
-      lsm6dsox_data.gyro[i] *= 0.0174533f;
-  }
 
   // Update filter (alpha = 0.98)
   cfilter(quat, lsm6dsox_data.gyro, lsm6dsox_data.accel, 0.98f, DT_IMU);
@@ -457,51 +452,45 @@ void imu_callback(void) {
   imu_lsm6dsox_data_ready = false;
 }
 
-void calibrate_imu(void)
+void calibrate_imu(lsm6dsox_dev_t *dev, lsm6dsox_data_t *data, int samples)
 {
-    const int calibration_samples = 100;
     float gyro_avg[3] = {0, 0, 0};
     float accel_avg[3] = {0, 0, 0};
     
-    printf("Starting calibration (%d samples)...\r\n", calibration_samples);
-    printf("Keep IMU steady!\r\n");
+    printf("Starting calibration (%d samples)...\r\n", samples);
     
-    for (int i = 0; i < calibration_samples; i++) {
-        lsm6dsox_read(&dev, &lsm6dsox_data);
-        
+    for (int i = 0; i < samples; i++) {
+        lsm6dsox_read(dev, data);
         for (int j = 0; j < 3; j++) {
-            gyro_avg[j] += lsm6dsox_data.gyro[j];
-            accel_avg[j] += lsm6dsox_data.accel[j];
+            gyro_avg[j] += data->gyro[j];
+            accel_avg[j] += data->accel[j];
         }
         
         HAL_Delay(10);
         
         // Show progress every 25 samples
         if ((i + 1) % 25 == 0) {
-            printf("  %d%%...\r\n", ((i + 1) * 100) / calibration_samples);
+            printf("  %d%%...\r\n", ((i + 1) * 100) / samples);
+            printf("Accel z: %d\r\n", (int)(1000 * data->accel[2]));
         }
     }
     
     // Calculate averages
     for (int j = 0; j < 3; j++) {
-        gyro_avg[j] /= calibration_samples;
-        accel_avg[j] /= calibration_samples;
+        gyro_avg[j] /= samples;
+        accel_avg[j] /= samples;
     }
     
     // Store biases
     for (int j = 0; j < 3; j++) {
-        dev.gyro_bias[j] = gyro_avg[j];
-        dev.accel_bias[j] = accel_avg[j];
+        dev->gyro_bias[j] = gyro_avg[j];
+        dev->accel_bias[j] = accel_avg[j];
     }
 
     // Remove 1g from Z-axis (assuming IMU is level, Z points down)
-    dev.accel_bias[2] -= 1.0f;
+    dev->accel_bias[2] -= 1.0f;
 
     printf("Calibration complete!\r\n");
-    printf("  Gyro bias: [%.3f, %.3f, %.3f] dps\r\n",
-           dev.gyro_bias[0], dev.gyro_bias[1], dev.gyro_bias[2]);
-    printf("  Accel bias: [%.3f, %.3f, %.3f] g\r\n\r\n",
-           dev.accel_bias[0], dev.accel_bias[1], dev.accel_bias[2]);
 }
 
 /**

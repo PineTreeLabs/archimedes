@@ -360,6 +360,11 @@ static inline int lsm6dsox_read(
     data->gyro[i] -= dev->gyro_bias[i];
   }
 
+  // Convert gyro dps → rad/s
+  for (int i = 0; i < 3; i++) {
+      data->gyro[i] *= 0.0174533f;
+  }
+
   return 0;
 }
 

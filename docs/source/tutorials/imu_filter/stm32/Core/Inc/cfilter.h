@@ -50,7 +50,7 @@ static inline int quaternion_normalize(float *q) {
     return 0;
 }
 
-static inline int quaternion_from_accel(const float *accel, float *q_accel) {
+static inline int quaternion_from_accel(const float *accel, float *q_accel, float yaw) {
     float ax = accel[0];
     float ay = accel[1];
     float az = accel[2];
@@ -64,9 +64,9 @@ static inline int quaternion_from_accel(const float *accel, float *q_accel) {
     float roll = atan2f(ay, az);
     float pitch = atan2f(-ax, sqrtf(ay * ay + az * az));
 
-    // Convert to quaternion (yaw = 0)
-    float cy = 1.0f; // cosf(0.0f * 0.5f);
-    float sy = 0.0f; // sinf(0.0f * 0.5f);
+    // Convert to quaternion
+    float cy = cosf(yaw * 0.5f);
+    float sy = sinf(yaw * 0.5f);
     float cr = cosf(roll * 0.5f);
     float sr = sinf(roll * 0.5f);
     float cp = cosf(pitch * 0.5f);
@@ -103,11 +103,16 @@ static inline int quaternion_to_euler(const float *q, float *euler) {
 }
 
 static inline int cfilter(float *q, const float *gyro, const float *accel, float alpha, float dt) {
+    // Calculate current yaw since the accel cannot correct
+    float siny_cosp = 2.0f * (q[0] * q[3] + q[1] * q[2]);
+    float cosy_cosp = 1.0f - 2.0f * (q[2] * q[2] + q[3] * q[3]);
+    float yaw = atan2f(siny_cosp, cosy_cosp);
+
     quaternion_update(q, gyro, dt);
     quaternion_normalize(q);
 
     float q_accel[4];
-    quaternion_from_accel(accel, q_accel);
+    quaternion_from_accel(accel, q_accel, yaw); // Use current yaw for accel estimate
     quaternion_normalize(q_accel);
 
     for (int i = 0; i < 4; i++) {

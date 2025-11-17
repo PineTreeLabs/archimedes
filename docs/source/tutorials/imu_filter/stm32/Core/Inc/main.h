@@ -31,7 +31,8 @@ extern "C" {
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include <stdbool.h>
+#include "lsm6dsox.h"
 /* USER CODE END Includes */
 
 /* Exported types ------------------------------------------------------------*/
@@ -68,6 +69,7 @@ void Error_Handler(void);
 
 /* USER CODE BEGIN Private defines */
 void imu_callback(void);
+void calibrate_imu(lsm6dsox_dev_t *dev, lsm6dsox_data_t *data, int samples);
 /* USER CODE END Private defines */
 
 #ifdef __cplusplus

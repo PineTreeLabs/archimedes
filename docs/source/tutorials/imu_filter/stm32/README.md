@@ -37,3 +37,10 @@ screen /dev/tty.usbmodem142103 115200
 ```
 
 Exit `screen` with `Ctrl + A , Ctrl + \`
+
+
+## Profiling
+
+Note I2C read takes ~150 µs
+
+By-hand implementation: 10 µs
