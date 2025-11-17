@@ -353,16 +353,23 @@ static inline int lsm6dsox_read(
   lsm6dsox_convert_gyro(&raw[1], data->gyro, dev->gyro_range);
   lsm6dsox_convert_accel(&raw[4], data->accel, dev->accel_range);
 
+  // Flip axes to forward-right-down convention
+  // See Figure 4 in datasheet
+  data->accel[1] = -data->accel[1];
+  data->gyro[1] = -data->gyro[1];
+  data->accel[2] = -data->accel[2];
+  data->gyro[2] = -data->gyro[2];
+
+  // Convert gyro dps → rad/s
+  for (int i = 0; i < 3; i++) {
+      data->gyro[i] *= 0.0174533f;
+  }
+
   // Apply calibration biases
   for (int i = 0; i < 3; i++)
   {
     data->accel[i] -= dev->accel_bias[i];
     data->gyro[i] -= dev->gyro_bias[i];
-  }
-
-  // Convert gyro dps → rad/s
-  for (int i = 0; i < 3; i++) {
-      data->gyro[i] *= 0.0174533f;
   }
 
   return 0;

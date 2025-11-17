@@ -151,7 +151,7 @@ int main(void)
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   uint32_t sample_idx = 0;
-  calibrate_imu(&dev, &lsm6dsox_data, 200); // Calibrate with 200 samples
+  calibrate_imu(&dev, &lsm6dsox_data, 200);
   printf("Starting IMU filter test...\r\n");
   HAL_GPIO_WritePin(ONBOARD_LED_GREEN_GPIO_Port, ONBOARD_LED_GREEN_Pin, GPIO_PIN_SET);
   while (1)
@@ -163,6 +163,9 @@ int main(void)
     /* USER CODE BEGIN 3 */
 
     if (imu_lsm6dsox_data_ready) {
+      // The read should go in the callback, but for timing demo this pulls
+      // it out of the timed code
+      lsm6dsox_read(&dev, &lsm6dsox_data);
       uint32_t start_cycles = DWT->CYCCNT; // Start cycle counter
       
       imu_callback();
@@ -179,9 +182,6 @@ int main(void)
                   (int)(1000 * rpy[0]*57.3f),
                   (int)(1000 * rpy[1]*57.3f),
                   (int)(1000 * rpy[2]*57.3f));
-          // printf("Roll: %d\r\n", (int)(rpy[0]*57.3f));
-          // printf("Z-accel: %d mg (%f µs)\r\n",
-          //         (int)(1000 * lsm6dsox_data.accel[2]), execution_us);
       }
     }
   }
@@ -443,9 +443,11 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
 }
 
 void imu_callback(void) {
+  // The read should go in the callback, but for timing demo it's in main
   lsm6dsox_read(&dev, &lsm6dsox_data);
 
   // Update filter (alpha = 0.98)
+  // alpha = 0 → accel only, alpha = 1 → gyro only
   cfilter(quat, lsm6dsox_data.gyro, lsm6dsox_data.accel, 0.98f, DT_IMU);
   quaternion_to_euler(quat, rpy);
 
@@ -471,7 +473,6 @@ void calibrate_imu(lsm6dsox_dev_t *dev, lsm6dsox_data_t *data, int samples)
         // Show progress every 25 samples
         if ((i + 1) % 25 == 0) {
             printf("  %d%%...\r\n", ((i + 1) * 100) / samples);
-            printf("Accel z: %d\r\n", (int)(1000 * data->accel[2]));
         }
     }
     
@@ -487,10 +488,18 @@ void calibrate_imu(lsm6dsox_dev_t *dev, lsm6dsox_data_t *data, int samples)
         dev->accel_bias[j] = accel_avg[j];
     }
 
-    // Remove 1g from Z-axis (assuming IMU is level, Z points down)
-    dev->accel_bias[2] -= 1.0f;
+    // Bias Z-axis to -1g (assuming IMU is level, Z points down)
+    dev->accel_bias[2] += 1.0f;
 
     printf("Calibration complete!\r\n");
+    printf("Gyro biases: X=%d Y=%d Z=%d mdps\r\n",
+           (int)(1000*gyro_avg[0]*57.3f),
+           (int)(1000*gyro_avg[1]*57.3f),
+           (int)(1000*gyro_avg[2]*57.3f));
+    printf("Accel biases: X=%d Y=%d Z=%d mg\r\n",
+           (int)(1000*accel_avg[0]),
+           (int)(1000*accel_avg[1]),
+           (int)(1000*accel_avg[2]));
 }
 
 /**

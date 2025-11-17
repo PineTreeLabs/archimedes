@@ -61,8 +61,8 @@ static inline int quaternion_from_accel(const float *accel, float *q_accel, floa
     ay /= norm;
     az /= norm;
 
-    float roll = atan2f(ay, az);
-    float pitch = atan2f(-ax, sqrtf(ay * ay + az * az));
+    float roll = atan2f(-ay, -az);
+    float pitch = atan2f(ax, sqrtf(ay * ay + az * az));
 
     // Convert to quaternion
     float cy = cosf(yaw * 0.5f);
