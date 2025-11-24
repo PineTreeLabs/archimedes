@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Callable
 import casadi as cs
 import numpy as np
 
-from ._array_impl import SymbolicArray, _as_casadi_array, array, type_inference
+from ._array_impl import SymbolicArray, _unwrap_sym_array, array, type_inference
 from ._function import FunctionCache
 
 if TYPE_CHECKING:
@@ -46,7 +46,7 @@ def _eval_interpolant(x, cs_interp, grid, data, name) -> ArrayLike:
     # The output dtype is the promotion of the data and input dtypes
     dtype = type_inference("default", data, x)
 
-    x_cs = _as_casadi_array(x)  # Either CasADi symbol or np.ndarray
+    x_cs = _unwrap_sym_array(x)  # Either CasADi symbol or np.ndarray
     return SymbolicArray(cs_interp(x_cs), shape=shape, dtype=dtype)
 
 

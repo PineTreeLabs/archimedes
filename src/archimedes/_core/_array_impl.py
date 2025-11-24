@@ -43,18 +43,11 @@ __all__ = [
 ]
 
 
-def _as_casadi_array(x: Any) -> CasadiMatrix | ArrayLike:
-    """Convert to a CasADi type (SX, MX, or ndarray)"""
+def _unwrap_sym_array(x: Any) -> CasadiMatrix | ArrayLike:
+    """Convert to a CasADi-friendly type (SX, MX, or ndarray)"""
     if isinstance(x, SymbolicArray):
         return x._sym
-    # Commented out for codecov... can add back in if these turn out to be necessary
-    # elif isinstance(x, (cs.SX, cs.MX)):
-    #     return x
-    # elif isinstance(x, (tuple, list)):  # Functions with sequence inputs
-    #     return [casadi_array(xi) for xi in x]
-    else:
-        return x
-        # return np.asarray(x)
+    return x
 
 
 class SymbolicArray:
@@ -158,7 +151,7 @@ class SymbolicArray:
         # CasADi's indexing and slicing machinery.  Probably there will be
         # edge cases where some preprocessing needs to be done on the index
         # before passing it to the underlying symbolic array.
-        value = _as_casadi_array(value)  # Make sure it's either SX or ndarray
+        value = _unwrap_sym_array(value)  # Make sure it's either SX or ndarray
 
         # If a 2D array is indexed with only one index, by default CasADi assumes
         # that the missing index should be 0, whereas NumPy assumes it should be
@@ -700,7 +693,7 @@ def _dispatch_array(x: Any, dtype: DTypeLike | None = None) -> ArrayLike:
                 raise ValueError(f"Creating array with inconsistent data: {x}")
             result_shape = (len(x),)
             result_dtype = dtype or _result_type(*x)
-            cs_x = list(map(_as_casadi_array, x))
+            cs_x = list(map(_unwrap_sym_array, x))
             arr = cs.vcat(cs_x)  # type: ignore
             # if isinstance(arr, cs.DM):
             #     return np.array(arr, dtype=result_dtype).reshape(result_shape)
@@ -723,7 +716,7 @@ def _dispatch_array(x: Any, dtype: DTypeLike | None = None) -> ArrayLike:
 
         result_shape = (len(x),) if len(x[0]) == 0 else (len(x), len(x[0]))  # type: ignore
         result_dtype = dtype or _result_type(*[_result_type(*xi) for xi in x])  # type: ignore
-        cs_x = [list(map(_as_casadi_array, xi)) for xi in x]
+        cs_x = [list(map(_unwrap_sym_array, xi)) for xi in x]
 
         arr = cs.vcat([cs.hcat(xi) for xi in cs_x])  # type: ignore
         if isinstance(arr, cs.DM):

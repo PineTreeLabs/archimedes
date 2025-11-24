@@ -5,14 +5,14 @@ from typing import Any, Callable
 import numpy as np
 from casadi import Callback, Sparsity
 
-from .._array_impl import _as_casadi_array, array
+from .._array_impl import _unwrap_sym_array, array
 from ._compile import FunctionCache
 
 _callback_refs: list[Callback] = []
 
 
 def _exec_callback(cb, arg_flat):
-    arg_flat = _as_casadi_array(arg_flat)  # Convert any lists, tuples, etc to arrays
+    arg_flat = _unwrap_sym_array(arg_flat)  # Convert any lists, tuples, etc to arrays
     ret_cs = cb(arg_flat)
     ret = array(ret_cs)
     return ret

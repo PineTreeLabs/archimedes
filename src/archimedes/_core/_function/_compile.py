@@ -9,7 +9,7 @@ import casadi as cs
 import numpy as np
 
 from archimedes import tree
-from archimedes._core._array_impl import DEFAULT_SYM_NAME, _as_casadi_array, array
+from archimedes._core._array_impl import DEFAULT_SYM_NAME, _unwrap_sym_array, array
 
 from .. import sym_like
 
@@ -149,7 +149,7 @@ class CompiledFunction(NamedTuple):
     results_unravel: tuple[HashablePartial, ...]
 
     def __call__(self, *args):
-        args = tuple(map(_as_casadi_array, args))
+        args = tuple(map(_unwrap_sym_array, args))
         result = self.func(*args)
 
         if not isinstance(result, tuple):
@@ -272,7 +272,7 @@ class FunctionCache(FunctionCacheBase):
             sym_ret_flat.append(x_flat)
             results_unravel.append(unravel)
 
-        cs_ret = [_as_casadi_array(x) for x in sym_ret_flat]
+        cs_ret = [_unwrap_sym_array(x) for x in sym_ret_flat]
 
         if self.return_names is None:
             self.return_names = [f"y{i}" for i in range(len(sym_ret_flat))]
@@ -402,7 +402,7 @@ class BufferedFunction(FunctionCacheBase):
         if not isinstance(sym_ret, (tuple, list)):
             sym_ret = (sym_ret,)
 
-        cs_ret = [_as_casadi_array(x) for x in sym_ret]
+        cs_ret = [_unwrap_sym_array(x) for x in sym_ret]
 
         if self.return_names is None:
             self.return_names = [f"y{i}" for i in range(len(sym_ret))]
@@ -522,6 +522,8 @@ def compile(
     name : str, optional
         The name of the function. If ``None``, taken from the function name.
         Required if the function is a lambda function.
+    buffered : bool, optional
+       Optimize for evaluation in a Python runtime (see notes). Default is False.
 
     Returns
     -------
@@ -575,6 +577,33 @@ def compile(
     - Configuration flags that affect control flow
     - Constants that shouldn't be differentiated through
     - Values that would be inefficient to recalculate online
+
+    Buffered compilation:
+
+    By default, ``compile`` supports flexible function structure, including
+    tree-structured arguments and returns, typical Python signatures, and static
+    arguments.  The same function can also be called with different argument shapes
+    and data types, which will cache different computational graphs for repeated
+    execution. However, this flexibility comes with some Python overhead at runtime,
+    and can mean that "compiled" functions perform worse than their pure-NumPy
+    counterparts.
+    
+    The ``buffered`` flag optimizes for Python runtime execution by disallowing
+    keyword args, static args, and repeated execution with different shapes/dtypes.
+    In ``buffered`` mode, all arguments and returns must be numeric arrays.  This
+    removes most of the Python overhead and is suitable for "production" use where
+    a single function will be evaluated many times with the same argument types.
+    Additionally, this mode pre-allocates memory for faster execution, although for
+    safety the arguments and returns are still copies rather than views into the
+    buffer.
+
+    The ``buffered`` mode should only be used for top-level function calls, not
+    embedded within larger compiled computations.  For functions that are embedded
+    within larger compiled functions, the "runtime overhead" is not applicable and
+    there is no advantage to ``buffered`` mode.
+
+    Note that even though you can only pass flat arrays as arguments to buffered
+    functions, these can still be "unraveled" into structured data types as usual.
 
     Examples
     --------

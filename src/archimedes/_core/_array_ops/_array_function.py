@@ -51,7 +51,7 @@ import numpy.exceptions as npex
 
 from .._array_impl import (
     SymbolicArray,
-    _as_casadi_array,
+    _unwrap_sym_array,
     _dispatch_array,
     _empty_like,
     _result_type,
@@ -124,7 +124,7 @@ def _tile(x, reps):
 
     ret_shape = tuple(int(x.shape[i] * reps[i]) for i in range(len(reps)))
 
-    x_cs = _as_casadi_array(x)
+    x_cs = _unwrap_sym_array(x)
     # CasADi arrays are always 2D, so we need might need to adjust the
     # reps before calling cs.repmat
     cs_reps = reps
@@ -316,7 +316,7 @@ def _concatenate(arrs, axis=0, dtype=None):
                         f"{j} has size {arr.shape[i]}."
                     )
 
-    args = [_as_casadi_array(arr) for arr in arrs]
+    args = [_unwrap_sym_array(arr) for arr in arrs]
     shape: ShapeLike = ()
 
     # If all arrays are 1D, then use cs.vcat
@@ -410,7 +410,7 @@ def _array_split(arr, indices_or_sections, axis=0):
             raise IndexError("indices to split must be non-decreasing")
         ax_sizes.append(ix2 - ix1)
 
-    arr = _as_casadi_array(arr)
+    arr = _unwrap_sym_array(arr)
     shapes: list[ShapeLike] = []
 
     if ndim == 1:
@@ -484,7 +484,7 @@ def _where(condition, x=None, y=None):
     y = y if np.prod(y.shape) <= 1 else np.reshape(y, shape)
 
     # Convert to NumPy or CasADi arrays only
-    condition, x, y = map(_as_casadi_array, (condition, x, y))
+    condition, x, y = map(_unwrap_sym_array, (condition, x, y))
     result = cs.if_else(condition, x, y)
     return SymbolicArray(result, dtype=dtype, shape=shape)
 
@@ -572,7 +572,7 @@ def _interp1d(x, xp, fp, left=None, right=None, period=None, method="linear"):
     shape = x.shape
     dtype = type_inference("default", x, xp, fp)
 
-    x_cs = _as_casadi_array(x)  # Map input to either NumPy or CasADi
+    x_cs = _unwrap_sym_array(x)  # Map input to either NumPy or CasADi
 
     # Create the CasADi interpolant object
     lut = cs.interpolant("interpolate", method, [xp], fp)

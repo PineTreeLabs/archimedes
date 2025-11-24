@@ -49,7 +49,7 @@ import casadi as cs
 import numpy as np
 from numpy import exceptions as npex
 
-from .._array_impl import SymbolicArray, _as_casadi_array, array
+from .._array_impl import SymbolicArray, _unwrap_sym_array, array
 from .._type_inference import shape_inference, type_inference
 
 
@@ -103,7 +103,7 @@ class SymbolicOp:
         self._func = self._wrap(func=function, result_type=result_type)
 
     def _compute_result(self, op, inputs, result_shape):
-        cs_inputs = map(_as_casadi_array, inputs)
+        cs_inputs = map(_unwrap_sym_array, inputs)
         return op(*cs_inputs)
 
     def _wrap(self, func, result_type=None):
@@ -134,7 +134,7 @@ class BroadcastOp(SymbolicOp):
     shape_inference_rule = "broadcast"
 
     def _compute_result(self, op, inputs, result_shape):
-        arr1, arr2 = map(_as_casadi_array, inputs)
+        arr1, arr2 = map(_unwrap_sym_array, inputs)
         shape1, shape2 = map(np.shape, inputs)  # Original shapes
         return _broadcast_binary_operation(op, arr1, arr2, shape1, shape2, result_shape)
 

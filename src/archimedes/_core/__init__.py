@@ -1,5 +1,5 @@
 from ._array_impl import (
-    _as_casadi_array,
+    _unwrap_sym_array,
     array,
     eye,  # noqa: F401
     ones,
@@ -35,7 +35,7 @@ __all__ = [
     "zeros_like",
     "ones_like,eye",
     "SymbolicArray",
-    "_as_casadi_array",
+    "_unwrap_sym_array",
     "compile",
     "FunctionCache",
     "callback",
