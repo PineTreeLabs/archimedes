@@ -361,6 +361,20 @@ class FunctionCache(FunctionCacheBase):
 
 
 class BufferedFunction(FunctionCacheBase):
+    def _validate_signature(self):
+        # Check there are no keyword args
+        for param in self.signature.parameters.values():
+            if param.kind in {
+                inspect.Parameter.VAR_POSITIONAL,
+                inspect.Parameter.VAR_KEYWORD,
+                inspect.Parameter.KEYWORD_ONLY,
+            }:
+                raise ValueError(
+                    "Buffered functions do not support *args, **kwargs, or "
+                    f"keyword-only arguments. Found parameter {param.name} of "
+                    f"kind {param.kind}"
+                )
+
     def _process_static_arg_spec(self, static_argnums, static_argnames):
         if static_argnums is not None or static_argnames is not None:
             raise ValueError(
@@ -368,8 +382,9 @@ class BufferedFunction(FunctionCacheBase):
             )
         
     def _initialize_cache(self):
-        self._cache: cs.Function | None = None
-        self._return_shapes = None
+        self._cache = None
+        self._arg_buffer = None
+        self._return_buffer = None
 
     def _compile(self, *args) -> cs.Function:
         # Create a casadi.Function for the particular argument types
@@ -387,7 +402,6 @@ class BufferedFunction(FunctionCacheBase):
         if not isinstance(sym_ret, (tuple, list)):
             sym_ret = (sym_ret,)
 
-        self._return_shapes = [x.shape for x in sym_ret]
         cs_ret = [_as_casadi_array(x) for x in sym_ret]
 
         if self.return_names is None:
@@ -402,9 +416,24 @@ class BufferedFunction(FunctionCacheBase):
         options = {
             "jit": self._jit,
         }
-        return cs.Function(
+        cs_func = cs.Function(
             self.name, cs_args, cs_ret, arg_names, self.return_names, options
         )
+
+        self._cache = cs_func.buffer()  # (buffer, eval)
+
+        func_buffer = self._cache[0]
+        self._arg_buffer = []
+        for (i, x) in enumerate(sym_args):
+            np_arg = np.zeros(x.shape)
+            func_buffer.set_arg(i, memoryview(np_arg))
+            self._arg_buffer.append(np_arg)
+
+        self._return_buffer = []
+        for (i, x) in enumerate(sym_ret):
+            np_ret = np.zeros(x.shape)
+            func_buffer.set_res(i, memoryview(np_ret))
+            self._return_buffer.append(np_ret)
 
     def __call__(self, *args, **kwargs):
         if kwargs or len(args) != len(self.arg_names):
@@ -413,17 +442,20 @@ class BufferedFunction(FunctionCacheBase):
             )
 
         if self._cache is None:
-            self._cache = self._compile(*args)
+            self._compile(*args)
 
         # Note that this implementation implicitly assumes that all arguments
         # are numeric.  For performance, this is not checked at runtime.
-        result = self._cache(*args)
+        func_buffer, func_eval = self._cache
+        for (i, arg) in enumerate(args):
+            arg = np.asarray(arg)
+            if len(self._arg_buffer[i].shape) > 0:
+                self._arg_buffer[i][:] = arg
+            else:
+                self._arg_buffer[i] = arg
 
-        if not isinstance(result, tuple):
-            result = (result,)
-
-        # The result will be a CasADi DM type - convert it to NumPy array
-        result = [np.asarray(x).reshape(shape) for (x, shape) in zip(result, self._return_shapes)]
+        func_eval()
+        result = [np.copy(x).T for x in self._return_buffer]
 
         if len(result) == 1:
             result = result[0]

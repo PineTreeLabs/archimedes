@@ -1031,12 +1031,12 @@ def zeros_like(
     ones_like : Create a symbolic array of ones with same shape as input
     array : Create an array from data
     """
+    x = array(x)  # Should be SymbolicArray or ndarray
     if kind is None:
         if isinstance(x, SymbolicArray):
             kind = x.kind
         else:
             kind = DEFAULT_SYM_NAME
-    x = array(x)  # Should be SymbolicArray or ndarray
     return zeros(x.shape, dtype=dtype or x.dtype, sparse=sparse, kind=kind)
 
 
