@@ -1,4 +1,5 @@
 from __future__ import annotations
+import abc
 
 import inspect
 from functools import partial
@@ -23,6 +24,113 @@ if TYPE_CHECKING:
 
 
 _lambda_idx = 0  # Global index for naming anonymous functions
+
+
+def _resolve_signature(func, arg_names):
+    # Determine the full signature of the Python function, including all static
+    # arguments.
+
+    # By default just get the argument names from the function signature
+    # Note that this will not work with functions defined with *args, e.g.
+    # for function created dynamically by wrapping with `integrator`,
+    # `implicit`, etc.
+    if arg_names is None:
+        signature = inspect.signature(func)
+
+        # So far only POSITIONAL_OR_KEYWORD arguments are allowed until
+        # it's more clear how to process other kinds of arguments like
+        # varargs and keyword-only arguments.
+        valid_kinds = {
+            inspect.Parameter.POSITIONAL_OR_KEYWORD,
+        }
+        for param in signature.parameters.values():
+            if param.kind not in valid_kinds:
+                raise ValueError(
+                    "Currently compiled functions only support explicit arguments "
+                    "(i.e. no *args, **kwargs, or keyword-only arguments). Found "
+                    f"{func} with parameter {param.name} of kind {param.kind}"
+                )
+
+    else:
+        # Assume that all the arguments are positional and allowed to
+        # be specified by keyword as well
+        parameters = [
+            inspect.Parameter(name, inspect.Parameter.POSITIONAL_OR_KEYWORD)
+            for name in arg_names
+        ]
+        signature = inspect.Signature(parameters)
+
+    return signature
+
+
+class FunctionCacheBase(metaclass=abc.ABCMeta):
+    def __init__(
+        self,
+        func,
+        arg_names=None,
+        return_names=None,
+        static_argnums=None,
+        static_argnames=None,
+        jit=False,
+        kind=DEFAULT_SYM_NAME,
+        name=None,
+    ):
+        self._func = func  # The original Python function
+
+        if name is None:
+            if hasattr(func, "__name__"):
+                name = func.__name__
+                if name == "<lambda>":
+                    global _lambda_idx
+                    name = f"lambda_{_lambda_idx}"
+                    _lambda_idx += 1
+            else:
+                name = f"function_{id(func)}"
+
+        self.name = name
+
+        # Kind of symbolic object to use
+        # TODO: Make this `scalar: bool` instead of `kind: str`
+        self._kind = kind
+
+        # Should we JIT compile the function?
+        self._jit = jit
+
+        self._initialize_cache()
+
+        # Determine the signature of the original function.  If not
+        # specified explicitly, it will be inferred using `inspect.signature`
+        self.signature = _resolve_signature(func, arg_names)
+        self._validate_signature()
+
+        self.default_return_names = return_names is None
+        self.return_names = return_names  # Can still be None at this point
+
+        self._process_static_arg_spec(static_argnums, static_argnames)
+
+    def _validate_signature(self):
+        # Hook for checking signature properties
+        return
+
+    @abc.abstractmethod
+    def _process_static_arg_spec(self, static_argnums, static_argnames):
+        pass
+    
+    @abc.abstractmethod
+    def _initialize_cache(self):
+        pass
+
+    @property
+    def arg_names(self):
+        return list(self.signature.parameters.keys())
+
+    def __repr__(self):
+        return f"{self.name}({', '.join(self.arg_names)})"
+
+    @abc.abstractmethod
+    def __call__(self, *args, **kwargs):
+        pass
+
 
 
 class CompiledFunction(NamedTuple):
@@ -74,85 +182,10 @@ class CompiledFunction(NamedTuple):
             raise e
 
 
-def _resolve_signature(func, arg_names):
-    # Determine the full signature of the Python function, including all static
-    # arguments.
-
-    # By default just get the argument names from the function signature
-    # Note that this will not work with functions defined with *args, e.g.
-    # for function created dynamically by wrapping with `integrator`,
-    # `implicit`, etc.
-    if arg_names is None:
-        signature = inspect.signature(func)
-
-        # So far only POSITIONAL_OR_KEYWORD arguments are allowed until
-        # it's more clear how to process other kinds of arguments like
-        # varargs and keyword-only arguments.
-        valid_kinds = {
-            inspect.Parameter.POSITIONAL_OR_KEYWORD,
-        }
-        for param in signature.parameters.values():
-            if param.kind not in valid_kinds:
-                raise ValueError(
-                    "Currently compiled functions only support explicit arguments "
-                    "(i.e. no *args, **kwargs, or keyword-only arguments). Found "
-                    f"{func} with parameter {param.name} of kind {param.kind}"
-                )
-
-    else:
-        # Assume that all the arguments are positional and allowed to
-        # be specified by keyword as well
-        parameters = [
-            inspect.Parameter(name, inspect.Parameter.POSITIONAL_OR_KEYWORD)
-            for name in arg_names
-        ]
-        signature = inspect.Signature(parameters)
-
-    return signature
-
-
-class FunctionCache:
-    def __init__(
-        self,
-        func,
-        arg_names=None,
-        return_names=None,
-        static_argnums=None,
-        static_argnames=None,
-        jit=False,
-        kind=DEFAULT_SYM_NAME,
-        name=None,
-    ):
-        self._func = func  # The original Python function
-
-        if name is None:
-            if hasattr(func, "__name__"):
-                name = func.__name__
-                if name == "<lambda>":
-                    global _lambda_idx
-                    name = f"lambda_{_lambda_idx}"
-                    _lambda_idx += 1
-            else:
-                name = f"function_{id(func)}"
-
-        self.name = name
-
-        # Kind of symbolic object to use
-        # TODO: Make this `scalar: bool` instead of `kind: str`
-        self._kind = kind
-
-        # Should we JIT compile the function?
-        self._jit = jit
-
-        self._compiled: dict[CompiledKey, CompiledFunction] = {}
-
-        # Determine the signature of the original function.  If not
-        # specified explicitly, it will be inferred using `inspect.signature`
-        self.signature = _resolve_signature(func, arg_names)
-
-        self.default_return_names = return_names is None
-        self.return_names = return_names  # Can still be None at this point
-
+class FunctionCache(FunctionCacheBase):
+    def _process_static_arg_spec(self, static_argnums, static_argnames):
+        # Process the static argument specification to determine
+        # the indices of static arguments
         if static_argnums is not None and static_argnames is not None:
             raise ValueError(
                 "Only one of static_argnums and static_argnames can be provided"
@@ -172,12 +205,8 @@ class FunctionCache:
                     raise ValueError(f"Argument {name} not found in function signature")
                 self.static_argnums.append(self.arg_names.index(name))
 
-    @property
-    def arg_names(self):
-        return list(self.signature.parameters.keys())
-
-    def __repr__(self):
-        return f"{self.name}({', '.join(self.arg_names)})"
+    def _initialize_cache(self):
+        self._cache: dict[CompiledKey, CompiledFunction] = {}
 
     def _split_func(self, static_args, sym_args):
         # Wrap the function call by interleaving the static and symbolic arguments
@@ -319,16 +348,99 @@ class FunctionCache:
         key = tuple(args_unravel), tuple(static_arg_keys)
         # print(f"Calling {self.name} with key {key}")
 
-        if key not in self._compiled:
+        if key not in self._cache:
             # Specialize the function for the static arguments
             func = partial(self._split_func, static_args)
-            self._compiled[key] = self._compile(func, args_unravel, *dynamic_args)
+            self._cache[key] = self._compile(func, args_unravel, *dynamic_args)
 
-        return self._compiled[key], dynamic_args
+        return self._cache[key], dynamic_args
 
     def __call__(self, *args, **kwargs):
         func, args = self._specialize(*args, **kwargs)
         return func(*args)
+
+
+class BufferedFunction(FunctionCacheBase):
+    def _process_static_arg_spec(self, static_argnums, static_argnames):
+        if static_argnums is not None or static_argnames is not None:
+            raise ValueError(
+                "Static args not supported for buffered functions"
+            )
+        
+    def _initialize_cache(self):
+        self._cache: cs.Function | None = None
+        self._return_shapes = None
+
+    def _compile(self, *args) -> cs.Function:
+        # Create a casadi.Function for the particular argument types
+        arg_names = self.arg_names
+
+        # Create symbolic arguments matching the types of the caller arguments
+        sym_args = [
+            sym_like(x, name, kind=self._kind) for (x, name) in zip(args, arg_names)
+        ]
+        cs_args = [x._sym for x in sym_args]
+
+        # Evaluate the function symbolically
+        sym_ret = self._func(*sym_args)
+
+        if not isinstance(sym_ret, (tuple, list)):
+            sym_ret = (sym_ret,)
+
+        self._return_shapes = [x.shape for x in sym_ret]
+        cs_ret = [_as_casadi_array(x) for x in sym_ret]
+
+        if self.return_names is None:
+            self.return_names = [f"y{i}" for i in range(len(sym_ret))]
+        else:
+            if len(self.return_names) != len(sym_ret):
+                raise ValueError(
+                    f"Expected {len(sym_ret)} return values, got "
+                    f"{len(self.return_names)} in call to {self.name}"
+                )
+
+        options = {
+            "jit": self._jit,
+        }
+        return cs.Function(
+            self.name, cs_args, cs_ret, arg_names, self.return_names, options
+        )
+
+    def __call__(self, *args, **kwargs):
+        if kwargs or len(args) != len(self.arg_names):
+            raise ValueError(
+                "Buffered functions only support positional arguments"
+            )
+
+        if self._cache is None:
+            self._cache = self._compile(*args)
+
+        # Note that this implementation implicitly assumes that all arguments
+        # are numeric.  For performance, this is not checked at runtime.
+        result = self._cache(*args)
+
+        if not isinstance(result, tuple):
+            result = (result,)
+
+        # The result will be a CasADi DM type - convert it to NumPy array
+        result = [np.asarray(x).reshape(shape) for (x, shape) in zip(result, self._return_shapes)]
+
+        if len(result) == 1:
+            result = result[0]
+
+        return result
+
+
+def _inner_compile(func, **kwargs):
+    if isinstance(func, FunctionCacheBase):
+        return func
+    
+    buffered = kwargs.pop("buffered", False)
+
+    if buffered:
+        return BufferedFunction(func, **kwargs)
+    
+    return FunctionCache(func, **kwargs)
 
 
 # Decorator for transforming functions into FunctionCache
@@ -341,6 +453,7 @@ def compile(
     jit: bool = False,
     kind: str = DEFAULT_SYM_NAME,
     name: str | None = None,
+    buffered: bool = False,
 ) -> Callable:
     """Create a "compiled" function from a Python function.
 
@@ -483,18 +596,16 @@ def compile(
         "jit": jit,
         "kind": kind,
         "name": name,
+        "buffered": buffered,
     }
 
     # If used as @compile(...)
     if func is None:
 
         def decorator(f):
-            return FunctionCache(f, **kwargs)
+            return _inner_compile(f, **kwargs)
 
         return decorator
 
     # If used as @compile
-    if isinstance(func, FunctionCache):
-        return func
-
-    return FunctionCache(func, **kwargs)
+    return _inner_compile(func, **kwargs)

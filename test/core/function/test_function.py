@@ -15,7 +15,7 @@ class TestCompile:
         assert isinstance(f_sym, FunctionCache)
         assert f_sym.name == "f"
         assert f_sym.arg_names == ["x"]
-        assert f_sym._compiled == {}
+        assert f_sym._cache == {}
 
         # Test recompilation
         f_sym2 = compile(f_sym)
@@ -101,21 +101,21 @@ class TestCompile:
             compile(f2, static_argnames="a"),
         ):
             # Nothing compiled yet
-            assert len(f_sym._compiled) == 0
+            assert len(f_sym._cache) == 0
 
             a = 2.0
             x = np.array(3.0, dtype=np.float64)
             y = f_sym(a, x)
             assert y == a * x
             # Only one function compiled so far
-            assert len(f_sym._compiled) == 1
+            assert len(f_sym._cache) == 1
 
             # Call again with different static data
             a = 3.0
             y = f_sym(a, x)
             assert y == a * x
             # Should have compiled a new function
-            assert len(f_sym._compiled) == 2
+            assert len(f_sym._cache) == 2
 
     def test_kwargs(self):
         a0 = 2.0
