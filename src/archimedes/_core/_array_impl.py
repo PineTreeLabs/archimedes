@@ -53,7 +53,8 @@ def _as_casadi_array(x: Any) -> CasadiMatrix | ArrayLike:
     # elif isinstance(x, (tuple, list)):  # Functions with sequence inputs
     #     return [casadi_array(xi) for xi in x]
     else:
-        return np.asarray(x)
+        return x
+        # return np.asarray(x)
 
 
 class SymbolicArray:
@@ -636,18 +637,25 @@ def array(x: Any, dtype: DTypeLike | None = None) -> ArrayLike:
     ones : Create an array of ones
     sym : Create a symbolic variable
     """
+    # x is already a numeric array
+    if isinstance(x, (np.ndarray, cs.DM)):
+        x = np.asarray(x)
+        if dtype is not None:
+            x = x.astype(dtype)
+        return x
 
-    # Case 1. x is already an array
-    if isinstance(x, (SymbolicArray, np.ndarray)):
+    # x is a scalar
+    if (np.isscalar(x) and np.isreal(x)):
+        return np.asarray(x, dtype=dtype)
+
+    # x is already a SymbolicArray
+    if isinstance(x, SymbolicArray):
         if dtype is not None:
             x = x.astype(dtype)
         return x  # type: ignore
 
     if isinstance(x, (cs.SX, cs.MX)):
         return SymbolicArray(x, dtype=dtype)
-
-    if (np.isscalar(x) and np.isreal(x)) or isinstance(x, cs.DM):
-        return np.array(x, dtype=dtype)
 
     return _dispatch_array(x, dtype=dtype)
 
@@ -677,7 +685,7 @@ def _dispatch_array(x: Any, dtype: DTypeLike | None = None) -> ArrayLike:
 
     # Case 1: x is already an array
     # This is handled by `array`, so we don't need to do anything here.
-    # Confirmed by code coverage analysis
+    # Confirmed by code coverage analysis.
 
     if isinstance(x, (list, tuple)):
         if len(x) == 0:

@@ -283,9 +283,13 @@ class FunctionCache:
                 dynamic_args.append(x_flat)
                 args_unravel.append(unravel)
         return static_args, dynamic_args, args_unravel
+    
+    def _bind_args(self, *args, **kwargs):
+        if not kwargs and len(args) == len(self.arg_names):
+            # Fast path: all arguments are provided positionally
+            return args
 
-    def _specialize(self, *args, **kwargs) -> Tuple[CompiledFunction, Tuple[Any]]:
-        """Process the arguments and compile the function if necessary."""
+        # Bind the arguments to the function signature to ensure consistency
         bound_args = self.signature.bind(*args, **kwargs)
         bound_args.apply_defaults()
 
@@ -294,6 +298,11 @@ class FunctionCache:
         # they were defined in the function signature and apply them as strictly
         # positional.
         pos_args = [bound_args.arguments[name] for name in self.arg_names]
+        return pos_args
+
+    def _specialize(self, *args, **kwargs) -> Tuple[CompiledFunction, Tuple[Any]]:
+        """Process the arguments and compile the function if necessary."""
+        pos_args = self._bind_args(*args, **kwargs)
 
         # Map the arguments to their shape and data types
         # For static arguments, add to a separate list for the purpose
