@@ -23,6 +23,7 @@ kernelspec:
 
 Jared Callaham • 16 Oct 2025 (Updated 5 Nov 2025)
 
+---
 <!-- Graphic: 6dof gimbal with graduation cap -->
 
 Release v0.3.1 marks the graduation of the [`spatial`](#archimedes.spatial) module out of experimental status and into production.
