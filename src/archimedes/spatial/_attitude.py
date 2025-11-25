@@ -613,7 +613,7 @@ class Quaternion:
     def identity(cls) -> Quaternion:
         """Return a quaternion representing the identity rotation."""
         return cls(np.array([1.0, 0.0, 0.0, 0.0]))
-    
+
     def normalize(self) -> Quaternion:
         """Return a normalized version of this quaternion."""
         q = self.array / np.linalg.norm(self.array)
@@ -633,7 +633,7 @@ class Quaternion:
         if isinstance(other, Quaternion):
             return self.mul(other, normalize=True)
         elif np.isscalar(other):
-            return other * self  # __rmul__
+            return other * self  # type: ignore
         else:
             raise ValueError(
                 f"Multiplication not supported for Quaternion and {type(other)}"
