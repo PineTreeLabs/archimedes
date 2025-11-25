@@ -80,7 +80,7 @@ class TestIntegrator:
         assert np.allclose(xf, x0 * np.exp(-tf))
 
         # Should have recompiled with the new static arg
-        assert len(solver._compiled) == 2
+        assert len(solver._cache) == 2
 
 
 class TestOdeint:

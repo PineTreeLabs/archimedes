@@ -1,5 +1,5 @@
 from ._array_impl import (
-    _as_casadi_array,
+    _unwrap_sym_array,
     array,
     eye,  # noqa: F401
     ones,
@@ -17,6 +17,7 @@ from ._array_ops import SymbolicArray
 from ._autodiff import grad, hess, jac, jvp, vjp
 from ._codegen import CodegenError, codegen
 from ._function import (
+    BufferedFunction,
     FunctionCache,
     callback,
     compile,
@@ -35,7 +36,8 @@ __all__ = [
     "zeros_like",
     "ones_like,eye",
     "SymbolicArray",
-    "_as_casadi_array",
+    "_unwrap_sym_array",
+    "BufferedFunction",
     "compile",
     "FunctionCache",
     "callback",

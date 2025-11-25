@@ -14,7 +14,7 @@ from archimedes import tree
 from archimedes._core import (
     FunctionCache,
     SymbolicArray,
-    _as_casadi_array,
+    _unwrap_sym_array,
     sym_like,
 )
 from archimedes.error import ShapeDtypeError
@@ -243,7 +243,7 @@ def implicit(
         # Before calling the CasADi rootfinder, we have to make sure
         # the input data is either a CasADi symbol or a NumPy array
         z_arg = False if z is None else z
-        x0, z_arg = map(_as_casadi_array, (x0, z_arg))  # type: ignore[assignment]
+        x0, z_arg = map(_unwrap_sym_array, (x0, z_arg))  # type: ignore[assignment]
 
         # The return is a dict with keys for the outputs of the residual
         # function.  The key "x" will contain the root of the function.

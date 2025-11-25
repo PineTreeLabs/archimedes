@@ -18,7 +18,7 @@ from archimedes import tree
 from archimedes._core import (
     FunctionCache,
     SymbolicArray,
-    _as_casadi_array,
+    _unwrap_sym_array,
     array,
     compile,
     grad,
@@ -133,7 +133,7 @@ def _make_nlp_solver(
         # either a CasADi symbol or a NumPy array
         p_arg = False if p is None else p
         x0, lbx, ubx, lbg, ubg, p_arg = map(
-            _as_casadi_array,
+            _unwrap_sym_array,
             (x0, lbx, ubx, lbg, ubg, p_arg),
         )
 

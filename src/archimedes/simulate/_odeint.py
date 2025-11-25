@@ -18,7 +18,7 @@ from archimedes import tree
 from archimedes._core import (
     FunctionCache,
     SymbolicArray,
-    _as_casadi_array,
+    _unwrap_sym_array,
     sym,
     sym_like,
 )
@@ -261,7 +261,7 @@ def integrator(
         # Before calling the CasADi solver interface, make sure everything is
         # either a CasADi symbol or a NumPy array
         p_arg = False if p_orig is None else p_orig
-        x0, p_arg = map(_as_casadi_array, (x0, p_arg))  # type: ignore[assignment]
+        x0, p_arg = map(_unwrap_sym_array, (x0, p_arg))  # type: ignore[assignment]
 
         # The return is a dictionary with the final state of the system
         # and other information.  We will only return the final state.

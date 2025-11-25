@@ -11,7 +11,7 @@ from archimedes import tree
 from archimedes._core import (
     FunctionCache,
     SymbolicArray,
-    _as_casadi_array,
+    _unwrap_sym_array,
     array,
     sym_like,
 )
@@ -223,7 +223,7 @@ def qpsol(
     # Before calling the CasADi solver interface, make sure everything is
     # either a CasADi symbol or a NumPy array
     x0, lba, uba = map(
-        _as_casadi_array,
+        _unwrap_sym_array,
         (x0, lba, uba),
     )
 
@@ -234,11 +234,11 @@ def qpsol(
     }
 
     if p_flat.size != 0:
-        kwargs["p"] = _as_casadi_array(p_flat)
+        kwargs["p"] = _unwrap_sym_array(p_flat)
 
     # Add dual variables if provided
     if lam_a0 is not None:
-        kwargs["lam_g0"] = _as_casadi_array(lam_a0)
+        kwargs["lam_g0"] = _unwrap_sym_array(lam_a0)
 
     # The return is a dict with keys `f`, `g`, `x` (and dual variables)
     sol = solver(**kwargs)

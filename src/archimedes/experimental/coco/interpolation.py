@@ -5,7 +5,7 @@ from scipy.special import roots_jacobi, roots_legendre
 import casadi as cs
 
 import archimedes as arc
-from archimedes._core._array_impl import _as_casadi_array, SymbolicArray
+from archimedes._core._array_impl import _unwrap_sym_array, SymbolicArray
 from archimedes._core.utils import find_equal
 
 __all__ = [
