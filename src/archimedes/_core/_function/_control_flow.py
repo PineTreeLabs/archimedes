@@ -41,7 +41,7 @@ import numpy as np
 from archimedes import tree
 from archimedes._core._array_impl import (
     DEFAULT_SYM_NAME,
-    _as_casadi_array,
+    _unwrap_sym_array,
     array,
 )
 
@@ -251,7 +251,7 @@ def scan(
     # Convert arguments to either CasADi expressions or NumPy arrays
     # Note that CasADi will map over the _second_ axis of `xs`, so we need to
     # transpose the array before passing it.
-    cs_args = tuple(_as_casadi_array(arg) for arg in (init_carry_flat, xs.T))
+    cs_args = tuple(_unwrap_sym_array(arg) for arg in (init_carry_flat, xs.T))
     cs_carry, cs_ys = scan_func(*cs_args)
 
     # Ensure that the return has shape and dtype consistent with the inputs
@@ -432,8 +432,8 @@ def switch(
             cs_branches.append(
                 cs.Function(
                     branch.name,
-                    [_as_casadi_array(args_flat)],
-                    [_as_casadi_array(results_flat)],
+                    [_unwrap_sym_array(args_flat)],
+                    [_unwrap_sym_array(results_flat)],
                 )
             )
 
@@ -442,7 +442,7 @@ def switch(
 
         # Evaluate the CasADi function symbolically
         index = np.fmax(np.fmin(index, len(branches) - 1), 0)  # Clamp to valid range
-        cs_results = cs_switch(_as_casadi_array(index), _as_casadi_array(args_flat))
+        cs_results = cs_switch(_unwrap_sym_array(index), _unwrap_sym_array(args_flat))
 
         # Convert back to a flat SymbolicArray
         results_flat = array(cs_results, dtype=results_flat.dtype)

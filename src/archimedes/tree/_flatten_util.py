@@ -32,7 +32,6 @@
 from __future__ import annotations
 
 import inspect
-import warnings
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -45,6 +44,9 @@ if TYPE_CHECKING:
     from archimedes.typing import ArrayLike, Tree
 
 
+_SIGNATURE_CACHE = {}
+
+
 # Original: jax._src.util.HashablePartial
 class HashablePartial:
     def __init__(self, f, *args, **kwargs):
@@ -53,7 +55,11 @@ class HashablePartial:
         self.kwargs = kwargs
 
         # Create a new call signature that doesn't include any of the provided args
-        signature = inspect.signature(f)
+        f_id = id(f)
+        if f_id not in _SIGNATURE_CACHE:
+            _SIGNATURE_CACHE[f_id] = inspect.signature(f)
+        signature = _SIGNATURE_CACHE[f_id]
+
         parameters = []
         for i, (name, param) in enumerate(signature.parameters.items()):
             if i < len(args) or name in kwargs:
@@ -184,27 +190,37 @@ def unravel_tree(treedef, unravel_list, flat):
 def _ravel_list(lst):
     if not lst:
         return np.array([], np.float32), lambda _: []
+
     from_dtypes = tuple(map(_result_type, lst))
     to_dtype = _result_type(*from_dtypes)
     sizes, shapes = unzip2((np.size(x), np.shape(x)) for x in lst)
     indices = tuple(np.cumsum(sizes).astype(int))
     shapes = tuple(shapes)
 
-    # When there is more than one distinct input dtype, we perform type
-    # conversions and produce a dtype-specific unravel function.
-    def _ravel(e):
-        return np.ravel(array(e, dtype=to_dtype))  # type: ignore
+    # Faster version for trivial case with only one element
+    if len(lst) == 1:
+        raveled = np.atleast_1d(np.ravel(lst[0]))
 
-    raveled = np.atleast_1d(np.concatenate([_ravel(e) for e in lst]))
+    else:
+        # When there is more than one distinct input dtype, perform type
+        # conversions and produce a dtype-specific unravel function.
+        def _ravel(e):
+            return np.ravel(array(e, dtype=to_dtype))  # type: ignore
+
+        raveled = np.atleast_1d(np.concatenate([_ravel(e) for e in lst]))
+
     unrav = HashablePartial(_unravel_list, indices, shapes, from_dtypes, to_dtype)
+
     return raveled, unrav
 
 
 def _unravel_list(indices, shapes, from_dtypes, to_dtype, arr):
+    # Fast version for trivial case with only one element
+    if len(shapes) == 1:
+        return [arr.reshape(shapes[0]).astype(from_dtypes[0])]
+
     chunks = np.split(arr, indices[:-1])
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")  # ignore complex-to-real cast warning
-        return [
-            chunk.reshape(shape).astype(dtype)
-            for chunk, shape, dtype in zip(chunks, shapes, from_dtypes)
-        ]
+    return [
+        chunk.reshape(shape).astype(dtype)
+        for chunk, shape, dtype in zip(chunks, shapes, from_dtypes)
+    ]

@@ -406,31 +406,3 @@ def discretize(func=None, dt=None, method="rk4", n_steps=1, name=None, **options
             raise ValueError("dt must be specified")
 
         return _discretize_impl(func, dt)
-
-    # h = dt / n_steps
-
-    # if not isinstance(func, FunctionCache):
-    #     func = FunctionCache(func)
-
-    # if name is None:
-    #     name = f"{method}_{func.name}"
-
-    # h = dt / n_steps
-    # scan_fun = {
-    #     "rk4": _rk4,
-    #     "radau5": _radau5,
-    # }[method](func, h, **options)
-
-    # def step(t0, x0, u, p):
-    #     carry = (t0, x0, u, p)
-
-    #     if n_steps == 1:
-    #         # Slightly faster compilation if scan is not used
-    #         carry, _ = scan_fun(carry, 0)
-    #     else:
-    #         carry, _ = scan(scan_fun, carry, length=n_steps)
-
-    #     _, xf, _, _ = carry
-    #     return xf
-
-    # return FunctionCache(step, name=name, arg_names=["t", "x", "u", "p"])
