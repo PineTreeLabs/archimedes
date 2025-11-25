@@ -32,7 +32,6 @@
 from __future__ import annotations
 
 import inspect
-import warnings
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -46,6 +45,7 @@ if TYPE_CHECKING:
 
 
 _SIGNATURE_CACHE = {}
+
 
 # Original: jax._src.util.HashablePartial
 class HashablePartial:

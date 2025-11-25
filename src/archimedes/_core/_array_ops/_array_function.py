@@ -51,10 +51,10 @@ import numpy.exceptions as npex
 
 from .._array_impl import (
     SymbolicArray,
-    _unwrap_sym_array,
     _dispatch_array,
     _empty_like,
     _result_type,
+    _unwrap_sym_array,
     array,
     eye,
     ones,

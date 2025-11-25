@@ -1,9 +1,18 @@
 from __future__ import annotations
-import abc
 
+import abc
 import inspect
 from functools import partial
-from typing import TYPE_CHECKING, Any, Callable, Hashable, NamedTuple, Sequence, Tuple
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Callable,
+    Hashable,
+    NamedTuple,
+    Sequence,
+    Tuple,
+    cast,
+)
 
 import casadi as cs
 import numpy as np
@@ -101,21 +110,16 @@ class FunctionCacheBase(metaclass=abc.ABCMeta):
         # Determine the signature of the original function.  If not
         # specified explicitly, it will be inferred using `inspect.signature`
         self.signature = _resolve_signature(func, arg_names)
-        self._validate_signature()
 
         self.default_return_names = return_names is None
         self.return_names = return_names  # Can still be None at this point
 
         self._process_static_arg_spec(static_argnums, static_argnames)
 
-    def _validate_signature(self):
-        # Hook for checking signature properties
-        return
-
     @abc.abstractmethod
     def _process_static_arg_spec(self, static_argnums, static_argnames):
         pass
-    
+
     @abc.abstractmethod
     def _initialize_cache(self):
         pass
@@ -130,7 +134,6 @@ class FunctionCacheBase(metaclass=abc.ABCMeta):
     @abc.abstractmethod
     def __call__(self, *args, **kwargs):
         pass
-
 
 
 class CompiledFunction(NamedTuple):
@@ -312,7 +315,7 @@ class FunctionCache(FunctionCacheBase):
                 dynamic_args.append(x_flat)
                 args_unravel.append(unravel)
         return static_args, dynamic_args, args_unravel
-    
+
     def _bind_args(self, *args, **kwargs):
         if not kwargs and len(args) == len(self.arg_names):
             # Fast path: all arguments are provided positionally
@@ -361,30 +364,14 @@ class FunctionCache(FunctionCacheBase):
 
 
 class BufferedFunction(FunctionCacheBase):
-    def _validate_signature(self):
-        # Check there are no keyword args
-        for param in self.signature.parameters.values():
-            if param.kind in {
-                inspect.Parameter.VAR_POSITIONAL,
-                inspect.Parameter.VAR_KEYWORD,
-                inspect.Parameter.KEYWORD_ONLY,
-            }:
-                raise ValueError(
-                    "Buffered functions do not support *args, **kwargs, or "
-                    f"keyword-only arguments. Found parameter {param.name} of "
-                    f"kind {param.kind}"
-                )
-
     def _process_static_arg_spec(self, static_argnums, static_argnames):
         if static_argnums is not None or static_argnames is not None:
-            raise ValueError(
-                "Static args not supported for buffered functions"
-            )
-        
+            raise ValueError("Static args not supported for buffered functions")
+
     def _initialize_cache(self):
         self._cache = None
-        self._arg_buffer = None
-        self._return_buffer = None
+        self._arg_buffer = []
+        self._return_buffer = []
 
     def _compile(self, *args) -> cs.Function:
         # Create a casadi.Function for the particular argument types
@@ -424,54 +411,55 @@ class BufferedFunction(FunctionCacheBase):
 
         func_buffer = self._cache[0]
         self._arg_buffer = []
-        for (i, x) in enumerate(sym_args):
+        for i, x in enumerate(sym_args):
             np_arg = np.zeros(x.shape)
             func_buffer.set_arg(i, memoryview(np_arg))
             self._arg_buffer.append(np_arg)
 
         self._return_buffer = []
-        for (i, x) in enumerate(sym_ret):
+        for i, x in enumerate(sym_ret):
             np_ret = np.zeros(x.shape)
             func_buffer.set_res(i, memoryview(np_ret))
             self._return_buffer.append(np_ret)
 
     def __call__(self, *args, **kwargs):
         if kwargs or len(args) != len(self.arg_names):
-            raise ValueError(
-                "Buffered functions only support positional arguments"
-            )
+            raise ValueError("Buffered functions only support positional arguments")
 
         if self._cache is None:
             self._compile(*args)
 
         # Note that this implementation implicitly assumes that all arguments
         # are numeric.  For performance, this is not checked at runtime.
-        func_buffer, func_eval = self._cache
-        for (i, arg) in enumerate(args):
+        # Also note we have to transpose the arg/return arrays because casadi expects
+        # Fortran-style ordering
+        # https://github.com/casadi/casadi/issues/4255
+        _, func_eval = cast(tuple[Any, cs.Function], self._cache)
+        for i, arg in enumerate(args):
             arg = np.asarray(arg)
             if len(self._arg_buffer[i].shape) > 0:
-                self._arg_buffer[i][:] = arg
+                self._arg_buffer[i][:] = arg.T
             else:
-                self._arg_buffer[i] = arg
+                self._arg_buffer[i][()] = arg
 
         func_eval()
         result = [np.copy(x).T for x in self._return_buffer]
 
         if len(result) == 1:
-            result = result[0]
+            result = result[0]  # type: ignore
 
         return result
 
 
-def _inner_compile(func, **kwargs):
+def _inner_compile(func, **kwargs) -> FunctionCacheBase:
     if isinstance(func, FunctionCacheBase):
         return func
-    
+
     buffered = kwargs.pop("buffered", False)
 
     if buffered:
         return BufferedFunction(func, **kwargs)
-    
+
     return FunctionCache(func, **kwargs)
 
 
@@ -587,7 +575,7 @@ def compile(
     execution. However, this flexibility comes with some Python overhead at runtime,
     and can mean that "compiled" functions perform worse than their pure-NumPy
     counterparts.
-    
+
     The ``buffered`` flag optimizes for Python runtime execution by disallowing
     keyword args, static args, and repeated execution with different shapes/dtypes.
     In ``buffered`` mode, all arguments and returns must be numeric arrays.  This

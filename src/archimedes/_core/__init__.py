@@ -17,6 +17,7 @@ from ._array_ops import SymbolicArray
 from ._autodiff import grad, hess, jac, jvp, vjp
 from ._codegen import CodegenError, codegen
 from ._function import (
+    BufferedFunction,
     FunctionCache,
     callback,
     compile,
@@ -36,6 +37,7 @@ __all__ = [
     "ones_like,eye",
     "SymbolicArray",
     "_unwrap_sym_array",
+    "BufferedFunction",
     "compile",
     "FunctionCache",
     "callback",

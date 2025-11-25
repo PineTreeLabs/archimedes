@@ -44,7 +44,7 @@ __all__ = [
 
 
 def _unwrap_sym_array(x: Any) -> CasadiMatrix | ArrayLike:
-    """Convert to a CasADi-friendly type (SX, MX, or ndarray)"""
+    """Convert to a CasADi type (SX, MX, or ndarray)"""
     if isinstance(x, SymbolicArray):
         return x._sym
     return x
@@ -630,25 +630,18 @@ def array(x: Any, dtype: DTypeLike | None = None) -> ArrayLike:
     ones : Create an array of ones
     sym : Create a symbolic variable
     """
-    # x is already a numeric array
-    if isinstance(x, (np.ndarray, cs.DM)):
-        x = np.asarray(x)
-        if dtype is not None:
-            x = x.astype(dtype)
-        return x
 
-    # x is a scalar
-    if (np.isscalar(x) and np.isreal(x)):
-        return np.asarray(x, dtype=dtype)
-
-    # x is already a SymbolicArray
-    if isinstance(x, SymbolicArray):
+    # Case 1. x is already an array
+    if isinstance(x, (SymbolicArray, np.ndarray)):
         if dtype is not None:
             x = x.astype(dtype)
         return x  # type: ignore
 
     if isinstance(x, (cs.SX, cs.MX)):
         return SymbolicArray(x, dtype=dtype)
+
+    if (np.isscalar(x) and np.isreal(x)) or isinstance(x, cs.DM):
+        return np.array(x, dtype=dtype)
 
     return _dispatch_array(x, dtype=dtype)
 
@@ -678,7 +671,7 @@ def _dispatch_array(x: Any, dtype: DTypeLike | None = None) -> ArrayLike:
 
     # Case 1: x is already an array
     # This is handled by `array`, so we don't need to do anything here.
-    # Confirmed by code coverage analysis.
+    # Confirmed by code coverage analysis
 
     if isinstance(x, (list, tuple)):
         if len(x) == 0:
@@ -1024,12 +1017,12 @@ def zeros_like(
     ones_like : Create a symbolic array of ones with same shape as input
     array : Create an array from data
     """
-    x = array(x)  # Should be SymbolicArray or ndarray
     if kind is None:
         if isinstance(x, SymbolicArray):
             kind = x.kind
         else:
             kind = DEFAULT_SYM_NAME
+    x = array(x)  # Should be SymbolicArray or ndarray
     return zeros(x.shape, dtype=dtype or x.dtype, sparse=sparse, kind=kind)
 
 
