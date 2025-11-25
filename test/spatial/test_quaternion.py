@@ -207,6 +207,24 @@ class TestQuaternionWrapper:
         R2 = q_restored.as_matrix()
         assert np.allclose(R1, R2)
 
+    def test_normalize(self):
+        q = Quaternion(np.array([10.0, 0.0, 0.0, 0.0]))
+        q_normalized = q.normalize()
+        q_identity = Quaternion.identity()
+        assert np.allclose(q_normalized.array, q_identity.array)
+
+    def test_arithmetic(self):
+        q1 = Quaternion.from_euler([0.1, 0.2, 0.3], "xyz")
+        q2 = Quaternion.from_euler([0.4, 0.5, 0.6], "xyz")
+
+        q_sum = q1 + q2
+        q_diff = q1 - q2
+        q_scaled = q1 * 2.0
+
+        assert np.allclose(q_sum.array, q1.array + q2.array)
+        assert np.allclose(q_diff.array, q1.array - q2.array)
+        assert np.allclose(q_scaled.array, 2.0 * q1.array)
+
     def test_errors(self):
         # Invalid output sequence
         with pytest.raises(ValueError, match="Expected `seq` to be a string"):
@@ -224,3 +242,8 @@ class TestQuaternionWrapper:
         # Invalid matrix shape
         with pytest.raises(ValueError, match="Rotation matrix must be 3x3"):
             Quaternion.from_matrix(np.eye(4))
+
+        # Invalid multiplication
+        q = Quaternion.identity()
+        with pytest.raises(ValueError, match="Multiplication not supported"):
+            q * np.array([1.0, 2.0, 3.0])

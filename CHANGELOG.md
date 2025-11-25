@@ -74,3 +74,4 @@ New version tag for release to PyPI (previous "Archimedes" project tagged with v
 ## [0.4.1] - WIP
 - Performance improvements to `@compile` calls from Python runtime
 - Add `buffered` mode to `@compile`
+- Support addition and scalar multiplication for `Quaternion`
