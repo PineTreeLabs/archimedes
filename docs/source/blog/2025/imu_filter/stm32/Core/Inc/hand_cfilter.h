@@ -12,10 +12,10 @@ static inline int qv_mult(const float *q, const float *v, float *result) {
 }
 
 static inline int quaternion_derivative(const float *q, const float *omega, float *q_dot) {
-    qv_mult(q, omega, q_dot);
-    for (int i = 0; i < 4; i++) {
-        q_dot[i] = 0.5f * q_dot[i];
-    }
+    q_dot[0] = 0.5f * (-q[1] * omega[0] - q[2] * omega[1] - q[3] * omega[2]);
+    q_dot[1] =  0.5f * (q[0] * omega[0] + q[2] * omega[2] - q[3] * omega[1]);
+    q_dot[2] =  0.5f * (q[0] * omega[1] - q[1] * omega[2] + q[3] * omega[0]);
+    q_dot[3] =  0.5f * (q[0] * omega[2] + q[1] * omega[1] - q[2] * omega[0]);
     return 0;
 }
 

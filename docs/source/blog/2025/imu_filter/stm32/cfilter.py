@@ -63,7 +63,6 @@ def quaternion_to_euler(q: np.ndarray) -> np.ndarray:
     return np.hstack([roll, pitch, yaw])
 
 
-@arc.compile(kind="SX")
 def cfilter(att: Attitude, gyro: np.ndarray, accel: np.ndarray, alpha: float, dt: float) -> Attitude:
     # Integrate gyro to update quaternion
     qdot = quaternion_derivative(att.q, gyro)
@@ -83,7 +82,6 @@ def cfilter(att: Attitude, gyro: np.ndarray, accel: np.ndarray, alpha: float, dt
 
 
 if __name__ == "__main__":
-    # Example usage
     q = np.array([1, 0, 0, 0])
     rpy = np.array([0, 0, 0])
     gyro = np.array([0.01, 0.02, 0.03])
