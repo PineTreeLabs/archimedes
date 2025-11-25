@@ -613,6 +613,11 @@ class Quaternion:
     def identity(cls) -> Quaternion:
         """Return a quaternion representing the identity rotation."""
         return cls(np.array([1.0, 0.0, 0.0, 0.0]))
+    
+    def normalize(self) -> Quaternion:
+        """Return a normalized version of this quaternion."""
+        q = self.array / np.linalg.norm(self.array)
+        return Quaternion(q)
 
     def mul(self, other: Quaternion, normalize: bool = False) -> Quaternion:
         """Compose (multiply) this quaternion with another"""
@@ -623,6 +628,25 @@ class Quaternion:
             q = q / np.linalg.norm(q)
         return Quaternion(q)
 
-    def __mul__(self, other: Quaternion) -> Quaternion:
+    def __mul__(self, other: Quaternion | float) -> Quaternion:
         """Compose (multiply) this quaternion with another and normalize the result"""
-        return self.mul(other, normalize=True)
+        if isinstance(other, Quaternion):
+            return self.mul(other, normalize=True)
+        elif np.isscalar(other):
+            return other * self  # __rmul__
+        else:
+            raise ValueError(
+                f"Multiplication not supported for Quaternion and {type(other)}"
+            )
+
+    def __rmul__(self, other: float) -> Quaternion:
+        """Right multiplication to support scalar * Quaternion"""
+        return Quaternion(other * self.array)
+
+    def __add__(self, other: Quaternion) -> Quaternion:
+        """Add this quaternion to another quaternion."""
+        return Quaternion(self.array + other.array)
+
+    def __sub__(self, other: Quaternion) -> Quaternion:
+        """Subtract another quaternion from this quaternion."""
+        return Quaternion(self.array - other.array)
