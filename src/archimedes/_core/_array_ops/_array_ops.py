@@ -215,13 +215,7 @@ def _broadcast_binary_operation(operation, arr1, arr2, shape1, shape2, common_sh
     if len(shape1) == 0 or len(shape2) == 0 or shape1 == (1,) or shape2 == (1,):
         return operation(arr1, arr2)
 
-    # Case 6 is a duplicate of case 5 with arguments reversed
-    if len(shape1) == 2 and len(shape2) == 1:
-        return _broadcast_binary_operation(
-            operation, arr2, arr1, shape2, shape1, common_shape
-        )
-
-    # Case 5a. First array is a vector: shape1 = (n,) and shape2 = (p, q) with n == q
+    # Case 5. First array is a vector: shape1 = (n,) and shape2 = (p, q) with n == q
     #       ==> broadcast to (p, n)
     if len(shape1) == 1 and len(shape2) == 2 and shape2[1] in {1, shape1[0]}:
         # Expand to a consistent shape (note this is not how it's done in numpy,
@@ -236,6 +230,33 @@ def _broadcast_binary_operation(operation, arr1, arr2, shape1, shape2, common_sh
         # supports both row-major and column-major ordering (NumPy uses row-major).
         arr1 = _repmat(arr1, (shape2[0], 1))
         arr1 = _cs_reshape(arr1, common_shape)
+        return operation(arr1, arr2)
+
+    # Case 6. First array is a matrix, second is a vector: shape1 = (p, q) and shape2 = (n,)
+    if len(shape1) == 2 and len(shape2) == 1 and shape1[1] in {1, shape2[0]}:
+        # Case 6a: n == q (vector matches matrix columns)
+        # Use transpose trick: op(A, b) = op(A.T, b).T
+        # CasADi can broadcast (n, 1) with (n, p) natively
+        if shape2[0] == shape1[1]:
+            return operation(arr1.T, arr2).T
+        # Case 6b: q == 1 (matrix column singleton, vector matches rows)
+        # (p, 1) op (n,) -> (p, n) where each needs expansion
+        # Use mtimes with ones vectors to expand: A @ ones(1,n) and ones(p,1) @ b.T
+        p, n = shape1[0], shape2[0]
+        # Determine CasADi type (one of them may be a numpy array)
+        cs_type = None
+        if isinstance(arr1, cs.SX) or isinstance(arr2, cs.SX):
+            cs_type = cs.SX
+        elif isinstance(arr1, cs.MX) or isinstance(arr2, cs.MX):
+            cs_type = cs.MX
+        if cs_type is not None:
+            ones_row = cs_type.ones(1, n)
+            ones_col = cs_type.ones(p, 1)
+            arr1 = cs.mtimes(cs_type(arr1), ones_row)
+            arr2 = cs.mtimes(ones_col, cs_type(arr2).T)
+        else:
+            arr1 = np.tile(arr1, (1, n))
+            arr2 = np.tile(arr2, (p, 1))
         return operation(arr1, arr2)
 
     # Case 7b. Both arrays are matrices with some combination of singleton dimensions
