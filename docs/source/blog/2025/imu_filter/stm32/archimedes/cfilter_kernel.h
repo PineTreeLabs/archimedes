@@ -34,10 +34,10 @@ const casadi_int* cfilter_sparsity_in(casadi_int i);
 const casadi_int* cfilter_sparsity_out(casadi_int i);
 int cfilter_work(casadi_int *sz_arg, casadi_int* sz_res, casadi_int *sz_iw, casadi_int *sz_w);
 int cfilter_work_bytes(casadi_int *sz_arg, casadi_int* sz_res, casadi_int *sz_iw, casadi_int *sz_w);
-#define cfilter_SZ_ARG 5
-#define cfilter_SZ_RES 1
+#define cfilter_SZ_ARG 9
+#define cfilter_SZ_RES 3
 #define cfilter_SZ_IW 0
-#define cfilter_SZ_W 0
+#define cfilter_SZ_W 32
 #ifdef __cplusplus
 } /* extern "C" */
 #endif

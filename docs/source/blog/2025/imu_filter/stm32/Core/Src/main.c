@@ -39,7 +39,22 @@
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
 #define SAMPLE_COUNT 6000
-#define DT_IMU  1.0f/104.0f  // IMU sample period in seconds
+
+/*
+With 240 MHz timer clock and 479 period:
+
+Prescaler | Timer Frequency | Sample Period |
+---------------------------------------------
+   149    |     3.333 kHz   |    300 µs     |
+   299    |     1.666 kHz   |    600 µs     |
+   599    |     833 Hz      |    1.2 ms     |
+  1199    |     416 Hz      |    2.4 ms     |
+  2399    |     208 Hz      |    4.8 ms     |
+  4799    |     104 Hz      |    9.6 ms     |
+
+*/
+#define DT_IMU  0.0024  // IMU sample period in seconds
+// #define DT_IMU  0.0003f  // IMU sample period in seconds (300 µs - 3.333 kHz)
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -143,17 +158,21 @@ int main(void)
   dev.handle = &spi_handle;
   dev.read = stm32_spi_read;
   dev.write = stm32_spi_write;
-  dev.accel_odr = LSM6DSOX_RATE_104_HZ;
-  dev.accel_range = LSM6DSOX_ACCEL_RANGE_2_G;
-  dev.gyro_odr = LSM6DSOX_RATE_104_HZ;
-  dev.gyro_range = LSM6DSOX_GYRO_RANGE_250_DPS;
+  dev.accel_odr = LSM6DSOX_RATE_416_HZ;
+  dev.accel_range = LSM6DSOX_ACCEL_RANGE_8_G;
+  dev.gyro_odr = LSM6DSOX_RATE_416_HZ;
+  dev.gyro_range = LSM6DSOX_GYRO_RANGE_2000_DPS;
 
   int ret = lsm6dsox_init(&dev);
 
   // Initialize filter
+  cfilter_init(&cfilter_arg, &cfilter_res, &cfilter_w);
   cfilter_arg.dt = DT_IMU;
   cfilter_arg.alpha = 0.98f;
-  cfilter_init(&cfilter_arg, &cfilter_res, &cfilter_w);
+
+  // Check gyro configuration
+  uint8_t ctrl2;
+  dev.read(dev.handle, LSM6DSOX_CTRL2_G, &ctrl2, 1);
 
   if (ret != 0)
   {
@@ -184,8 +203,8 @@ int main(void)
   HAL_GPIO_WritePin(ONBOARD_LED_GREEN_GPIO_Port, ONBOARD_LED_GREEN_Pin, GPIO_PIN_SET);
   while (1)
   {
-    if (sample_idx >= SAMPLE_COUNT)
-        break;
+    // if (sample_idx >= SAMPLE_COUNT)
+    //     break;
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -202,7 +221,7 @@ int main(void)
       loop_cycles += (end_cycles - start_cycles); // Count cycles
       sample_idx++;
 
-      if (sample_idx % 1 == 0){
+      if (sample_idx % 4 == 0){
         printf("Roll: %d  Pitch: %d  Yaw: %d\r\n",
                 (int)(1000 * cfilter_res.att_fused.rpy[0]*57.3f),
                 (int)(1000 * cfilter_res.att_fused.rpy[1]*57.3f),
@@ -343,7 +362,7 @@ static void MX_TIM6_Init(void)
 
   /* USER CODE END TIM6_Init 1 */
   htim6.Instance = TIM6;
-  htim6.Init.Prescaler = 4807;
+  htim6.Init.Prescaler = 1199;
   htim6.Init.CounterMode = TIM_COUNTERMODE_UP;
   htim6.Init.Period = 479;
   htim6.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
