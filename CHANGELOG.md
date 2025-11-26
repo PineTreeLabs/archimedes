@@ -75,3 +75,4 @@ New version tag for release to PyPI (previous "Archimedes" project tagged with v
 - Performance improvements to `@compile` calls from Python runtime
 - Add `buffered` mode to `@compile`
 - Support addition and scalar multiplication for `Quaternion`
+- Bugfix for non-commutative broadcasting (PR [#122](https://github.com/PineTreeLabs/archimedes/pull/122) and [#123](https://github.com/PineTreeLabs/archimedes/pull/123))
