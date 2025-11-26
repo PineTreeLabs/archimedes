@@ -10,7 +10,6 @@ import casadi as ca
 import numpy as np
 import pytest
 
-import archimedes as arc
 from archimedes._core import sym as _sym
 
 
@@ -124,8 +123,6 @@ def evaluate_arc_operation(op_func, shape_a, shape_b, val_a, val_b):
     """
     Evaluate an archimedes operation by creating symbolic arrays,
     applying the operation, then building a CasADi function to evaluate.
-
-    This follows the approach from manual_casadi_compilation in personal_tests.py.
     """
     # Create symbolic arrays
     sym_a = sym("a", shape_a, dtype=np.float64)
