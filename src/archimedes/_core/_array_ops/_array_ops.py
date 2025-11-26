@@ -193,7 +193,8 @@ def _broadcast_binary_operation(operation, arr1, arr2, shape1, shape2, common_sh
     #      a. If n == q or q == 1, broadcast to (p, n)
     #      b. raise error
     #   6. Second array is a vector: shape1 = (n, m) and shape2 = (p,)
-    #      ==> Same as case 5 with arguments reversed
+    #      a. If m == p or n == 1, broadcast to (n, m)
+    #      b. raise error
     #   7. Both arrays are matrices: shape1 = (n, m) and shape2 = (p, q)
     #      a. If shapes are equal (n=m, p=q), no broadcasting necessary
     #      b. Some combination of n, m, p, q are equal to 1
@@ -215,13 +216,7 @@ def _broadcast_binary_operation(operation, arr1, arr2, shape1, shape2, common_sh
     if len(shape1) == 0 or len(shape2) == 0 or shape1 == (1,) or shape2 == (1,):
         return operation(arr1, arr2)
 
-    # Case 6 is a duplicate of case 5 with arguments reversed
-    if len(shape1) == 2 and len(shape2) == 1:
-        return _broadcast_binary_operation(
-            operation, arr2, arr1, shape2, shape1, common_shape
-        )
-
-    # Case 5a. First array is a vector: shape1 = (n,) and shape2 = (p, q) with n == q
+    # Case 5. First array is a vector: shape1 = (n,) and shape2 = (p, q) with n == q
     #       ==> broadcast to (p, n)
     if len(shape1) == 1 and len(shape2) == 2 and shape2[1] in {1, shape1[0]}:
         # Expand to a consistent shape (note this is not how it's done in numpy,
@@ -236,6 +231,19 @@ def _broadcast_binary_operation(operation, arr1, arr2, shape1, shape2, common_sh
         # supports both row-major and column-major ordering (NumPy uses row-major).
         arr1 = _repmat(arr1, (shape2[0], 1))
         arr1 = _cs_reshape(arr1, common_shape)
+        return operation(arr1, arr2)
+
+    # Case 6. Second array is a vector: shape1 = (p, q) and shape2 = (n,)
+    if len(shape1) == 2 and len(shape2) == 1 and shape1[1] in {1, shape2[0]}:
+        # Case 6a: n == q (vector matches matrix columns)
+        # Use transpose trick: op(A, b) = op(A.T, b).T
+        # CasADi can broadcast (n, 1) with (n, p) natively
+        if shape2[0] == shape1[1]:
+            return operation(arr1.T, arr2).T
+        # Case 6b: q == 1 (matrix column singleton, vector matches rows)
+        # (p, 1) op (n,) -> (p, n)
+        arr2 = _repmat(arr2, (shape1[0], 1))
+        arr2 = _cs_reshape(arr2, common_shape)
         return operation(arr1, arr2)
 
     # Case 7b. Both arrays are matrices with some combination of singleton dimensions
