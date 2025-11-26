@@ -71,7 +71,7 @@ New version tag for release to PyPI (previous "Archimedes" project tagged with v
 - Overhaul `spatial` module: `Attitude` protocol, low-level functions, wrapper classes, `RigidBody` singleton ([Issue #114](https://github.com/PineTreeLabs/archimedes/issues/114))
 - Bugfix for struct type name resolution with inner classes ([Issue #115](https://github.com/PineTreeLabs/archimedes/issues/115))
 
-## [0.4.1] - WIP
+## [0.4.1] - 2025-11-26
 - Performance improvements to `@compile` calls from Python runtime
 - Add `buffered` mode to `@compile`
 - Support addition and scalar multiplication for `Quaternion`
