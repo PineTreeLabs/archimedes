@@ -5,6 +5,7 @@ Exhaustive tests for broadcasting rules in binary operations.
 This module verifies that archimedes broadcasting produces the same results
 as numpy by creating symbolic functions and evaluating them with concrete values.
 """
+
 import numpy as np
 import pytest
 
@@ -12,6 +13,7 @@ import archimedes as arc
 from archimedes._core import sym as _sym
 
 rng = np.random.default_rng(0)
+
 
 # Override the default symbolic kind to use SX for easier testing
 def sym(*args, kind="SX", **kwargs):
@@ -94,7 +96,7 @@ def _test_broadcast(op_name, op_func, val_a, val_b):
         return op_func(a, b)
 
     arc_result = func(val_a, val_b)
-    
+
     # Compare results
     shape_a = val_a.shape if isinstance(val_a, np.ndarray) else ()
     shape_b = val_b.shape if isinstance(val_b, np.ndarray) else ()
@@ -119,7 +121,9 @@ class TestBroadcastingBinaryOps:
 
     @pytest.mark.parametrize("op_name,op_func", BINARY_OPS)
     @pytest.mark.parametrize("shape_a,shape_b,expected_shape", BROADCAST_SHAPES)
-    def test_broadcasting_binary_op(self, op_name, op_func, shape_a, shape_b, expected_shape):
+    def test_broadcasting_binary_op(
+        self, op_name, op_func, shape_a, shape_b, expected_shape
+    ):
         """Test that archimedes broadcasting matches numpy for binary operations."""
         # Create test values
         val_a = create_test_values(shape_a)
@@ -137,6 +141,7 @@ class TestBroadcastingBinaryOps:
         with pytest.raises(ValueError):
             op_func(sym_a, sym_b)
 
+
 class TestBroadcastingWithMixedTypes:
     """Test broadcasting when mixing symbolic arrays with numpy arrays and scalars."""
 
@@ -149,7 +154,7 @@ class TestBroadcastingWithMixedTypes:
         @arc.compile
         def func(a):
             return a + val_b
-        
+
         arc_result = func(val_a)
         np_result = val_a + val_b
 
@@ -170,7 +175,7 @@ class TestBroadcastingWithMixedTypes:
         @arc.compile
         def func(a):
             return a + scalar
-        
+
         arc_result = func(val)
         np_result = val + scalar
 
@@ -200,7 +205,9 @@ class TestBroadcastingReversedOperands:
         # b - a (reverse)
         arc_result_rev = _test_broadcast("sub", lambda a, b: a - b, val_b, val_a)
         np_result_rev = val_b - val_a
-        np.testing.assert_allclose(arc_result_rev, np_result_rev, rtol=1e-10, atol=1e-10)
+        np.testing.assert_allclose(
+            arc_result_rev, np_result_rev, rtol=1e-10, atol=1e-10
+        )
 
     @pytest.mark.parametrize("shape_a,shape_b,expected_shape", BROADCAST_SHAPES)
     def test_div_and_rdiv(self, shape_a, shape_b, expected_shape):
@@ -216,4 +223,6 @@ class TestBroadcastingReversedOperands:
         # b / a (reverse)
         arc_result_rev = _test_broadcast("div", lambda a, b: a / b, val_b, val_a)
         np_result_rev = val_b / val_a
-        np.testing.assert_allclose(arc_result_rev, np_result_rev, rtol=1e-10, atol=1e-10)
+        np.testing.assert_allclose(
+            arc_result_rev, np_result_rev, rtol=1e-10, atol=1e-10
+        )

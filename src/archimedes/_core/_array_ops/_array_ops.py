@@ -233,7 +233,7 @@ def _broadcast_binary_operation(operation, arr1, arr2, shape1, shape2, common_sh
         arr1 = _cs_reshape(arr1, common_shape)
         return operation(arr1, arr2)
 
-    # Case 6. First array is a matrix, second is a vector: shape1 = (p, q) and shape2 = (n,)
+    # Case 6. Second array is a vector: shape1 = (p, q) and shape2 = (n,)
     if len(shape1) == 2 and len(shape2) == 1 and shape1[1] in {1, shape2[0]}:
         # Case 6a: n == q (vector matches matrix columns)
         # Use transpose trick: op(A, b) = op(A.T, b).T

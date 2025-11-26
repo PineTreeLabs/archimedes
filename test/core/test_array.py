@@ -210,6 +210,7 @@ class TestSymbolicArrayNotImplemented:
         with pytest.raises(NotImplementedError):
             arc._core._array_ops._array_ops._repmat(x, (3, 2))
 
+
 class TestSymbolicArrayIndexing:
     def test_vec_index(self):
         # Test get
