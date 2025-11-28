@@ -632,8 +632,8 @@ class Quaternion:
         """Compose (multiply) this quaternion with another and normalize the result"""
         if isinstance(other, Quaternion):
             return self.mul(other, normalize=True)
-        elif np.isscalar(other):
-            return other * self  # type: ignore
+        elif np.isscalar(other) or (hasattr(other, "shape") and other.shape == ()):
+            return Quaternion(other * self.array)
         else:
             raise ValueError(
                 f"Multiplication not supported for Quaternion and {type(other)}"
@@ -645,7 +645,9 @@ class Quaternion:
 
     def __add__(self, other: Quaternion) -> Quaternion:
         """Add this quaternion to another quaternion."""
-        return Quaternion(self.array + other.array)
+        if isinstance(other, Quaternion):
+            other = other.array
+        return Quaternion(self.array + other)
 
     def __sub__(self, other: Quaternion) -> Quaternion:
         """Subtract another quaternion from this quaternion."""

@@ -10,7 +10,7 @@
 
 6 Oct 2025 · Announcements
 
-A Python toolkit for hardware engineering
+A Python toolkit for deployable control systems engineering
 :::
 
 :::{grid-item-card} Spatial Mechanics

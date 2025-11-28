@@ -10,7 +10,7 @@ author: Jared Callaham
 :alt: Introducing Archimedes
 ```
 
-**_A Python toolkit for hardware engineering_**
+**_A Python toolkit for deployable control systems engineering_**
 
 By Jared Callaham • 6 Oct 2025
 

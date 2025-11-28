@@ -285,6 +285,25 @@ def quaternion_to_dcm(quat: np.ndarray) -> np.ndarray:
     ).T
 
 
+def _quat_to_rpy(q: np.ndarray) -> np.ndarray:
+    """Simpler conversion for roll-pitch-yaw (xyz) sequence."""
+    # Roll
+    sinr_cosp = 2.0 * (q[0] * q[1] + q[2] * q[3])
+    cosr_cosp = 1.0 - 2.0 * (q[1] * q[1] + q[2] * q[2])
+    roll = np.arctan2(sinr_cosp, cosr_cosp)
+
+    # Pitch
+    sinp = 2.0 * (q[0] * q[2] - q[3] * q[1])
+    pitch = np.where(abs(sinp) >= 1.0, np.sign(sinp) * (np.pi / 2), np.arcsin(sinp))
+
+    # Yaw
+    siny_cosp = 2.0 * (q[0] * q[3] + q[1] * q[2])
+    cosy_cosp = 1.0 - 2.0 * (q[2] * q[2] + q[3] * q[3])
+    yaw = np.arctan2(siny_cosp, cosy_cosp)
+    return np.hstack([roll, pitch, yaw])
+
+
+
 # See: https://github.com/scipy/scipy/blob/3ead2b543df7c7c78619e20f0cb6139e344a8866/scipy/spatial/transform/_rotation_cy.pyx#L774-L851  # ruff: noqa: E501
 def quaternion_to_euler(q: np.ndarray, seq: str = "xyz") -> np.ndarray:
     """Convert unit quaternion to roll-pitch-yaw Euler angles.
@@ -314,6 +333,9 @@ def quaternion_to_euler(q: np.ndarray, seq: str = "xyz") -> np.ndarray:
             method. PLoS ONE 17(11): e0276302.
             https://doi.org/10.1371/journal.pone.0276302
     """
+    if seq == "xyz":
+        return _quat_to_rpy(q)
+
     if len(seq) != 3:
         raise ValueError("Expected `seq` to be a string of 3 characters")
 

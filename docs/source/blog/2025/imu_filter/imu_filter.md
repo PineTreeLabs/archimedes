@@ -15,15 +15,31 @@ kernelspec:
 
 Jared Callaham • 25 Nov 2025
 
+:::{note}
+This is the first post in a series that will document the process of building a high-performance quadrotor drone from scratch, highlighting how Archimedes can be used to "close the loop" with simulation, HIL testing, and deployment. [Subscribe](https://jaredcallaham.substack.com/embed) to the mailing list to see the progress!
+:::
+
 ---
+
+<!-- This post is supposed to:
+
+- Demonstrate a clean development/deployment workflow
+- Serve as a reference point for more advanced projects in the future
+
+-->
 
 One of the most basic tasks in a flight control system is _attitude estimation_ - how is the vehicle oriented in the world?
 The difficulty with this is that it's not directly measurable, and available sensors have noise, bias, and drift.
 The solution is _sensor fusion_, combining data from multiple sources to get a better estimate than from any one sensor.
 
 Here we'll walk through a workflow for developing one of the simplest sensor fusion algorithms: a _complementary IMU filter_, with the goal of showing an end-to-end example of developing an algorithm in Python, deploying it, and getting streaming data back into Python.
+In all honesty, for an algorithm this simple you're probably better off just writing the C code yourself (in this case I spent much more time writing the sensor driver and communication layer than the filter itself).
+On the other hand, it can be easier to develop, test, maintain, and reuse Python code, especially for more complicated algorithms and physics models.
+What we'll see here is a replicable _workflow_ that can scale to more complex systems and algorithms.
 
-This will be a quick overview that skims over the underlying principles of the algorithm and assumes familiarity with and basic Archimedes functionality, including C code generation.
+The primary goal of this post is to show a relatively simple and self-contained example of the "write in Python, deploy in C" workflow. In this particular case the logic is simple enough that it would realistically be more efficient to just write the whole thing in C, but the general process can be replicated for much more complicated algorithms. A second goal of the post is to introduce the "drone build" project described at the top, which will be a recurring theme in several upcoming posts and will illustrate a number of different aspects of the develop/deploy cycle in Archimedes.
+
+This will be a quick overview that assumes familiarity with basic Archimedes functionality, including C code generation.
 If you're new to Archimedes, check out these guides for background info:
 
 - [Getting Started](../../../getting-started.md)
@@ -50,134 +66,10 @@ I won't show it here, but this acts like a high-pass filter on the gyro measurem
 This is conceptually simple enough - the hard part is calculating the two attitude estimates.
 This just involves some trigonometry for the accelerometer tilt angles and quaternion/Euler kinematics for the gyro integration.
 Here we'll use quaternion kinematics for stability and also output the redundant Euler angles (e.g. for feedback attitude control).
-Technically, quaternions can't be linearly interpolated and we should be using SLERP, but at fast sampling rates this is probably not worth the extra complexity.
-
+Technically, quaternions can't be linearly interpolated and we should be using [spherical linear interpolation (SLERP)](https://en.wikipedia.org/wiki/Slerp), but at reasonably fast sampling rates this is probably not worth the extra complexity.
 These calculations are standard and not very illuminating for our purposes, so let's just skip to the implementation.
-Our goal will be to just develop the algorithm in Python and deploy, but for the sake of comparison I'll show a side-by-side in handwritten C and Archimedes-compatible Python.
 
-:::::{dropdown}  **Code Comparison**
-
-::::{grid} 1 1 2 2
-:gutter: 3
-
-:::{grid-item-card}  **Handwritten C**
-
-```c
-/* Complementary filter for 3-axis accelerometer */
-
-#ifndef CFILT_H
-#define CFILT_H
-
-
-static inline int quaternion_derivative(const float *q, const float *omega, float *q_dot) {
-    q_dot[0] = 0.5f * (-q[1] * omega[0] - q[2] * omega[1] - q[3] * omega[2]);
-    q_dot[1] =  0.5f * (q[0] * omega[0] + q[2] * omega[2] - q[3] * omega[1]);
-    q_dot[2] =  0.5f * (q[0] * omega[1] - q[1] * omega[2] + q[3] * omega[0]);
-    q_dot[3] =  0.5f * (q[0] * omega[2] + q[1] * omega[1] - q[2] * omega[0]);
-    return 0;
-}
-
-static inline int quaternion_update(float *q, const float *omega, float dt) {
-    float q_dot[4];
-    quaternion_derivative(q, omega, q_dot);
-    for (int i = 0; i < 4; i++) {
-        q[i] += q_dot[i] * dt;
-    }
-    return 0;
-}
-
-static inline int quaternion_normalize(float *q) {
-    float norm = 0.0f;
-    for (int i = 0; i < 4; i++) {
-        norm += q[i] * q[i];
-    }
-    norm = sqrtf(norm);
-    if (norm > 0.0f) {
-        for (int i = 0; i < 4; i++) {
-            q[i] /= norm;
-        }
-    }
-    return 0;
-}
-
-static inline int quaternion_from_accel(const float *accel, float *q_accel, float yaw) {
-    float ax = accel[0];
-    float ay = accel[1];
-    float az = accel[2];
-
-    // Normalize (set to 1g magnitude)
-    float norm = sqrtf(ax * ax + ay * ay + az * az);
-    ax /= norm;
-    ay /= norm;
-    az /= norm;
-
-    float roll = atan2f(-ay, -az);
-    float pitch = atan2f(ax, sqrtf(ay * ay + az * az));
-
-    // Convert to quaternion
-    float cy = cosf(yaw * 0.5f);
-    float sy = sinf(yaw * 0.5f);
-    float cr = cosf(roll * 0.5f);
-    float sr = sinf(roll * 0.5f);
-    float cp = cosf(pitch * 0.5f);
-    float sp = sinf(pitch * 0.5f);
-
-    q_accel[0] = cy * cr * cp + sy * sr * sp;
-    q_accel[1] = cy * sr * cp - sy * cr * sp;
-    q_accel[2] = cy * cr * sp + sy * sr * cp;
-    q_accel[3] = sy * cr * cp - cy * sr * sp;
-
-    return 0;
-}
-
-
-static inline int quaternion_to_euler(const float *q, float *euler) {
-    // Roll (x-axis rotation)
-    float sinr_cosp = 2.0f * (q[0] * q[1] + q[2] * q[3]);
-    float cosr_cosp = 1.0f - 2.0f * (q[1] * q[1] + q[2] * q[2]);
-    euler[0] = atan2f(sinr_cosp, cosr_cosp);
-
-    // Pitch (y-axis rotation)
-    float sinp = 2.0f * (q[0] * q[2] - q[3] * q[1]);
-    if (fabsf(sinp) >= 1)
-        euler[1] = copysignf(M_PI / 2.0f, sinp); // use 90 degrees if out of range
-    else
-        euler[1] = asinf(sinp);
-
-    // Yaw (z-axis rotation)
-    float siny_cosp = 2.0f * (q[0] * q[3] + q[1] * q[2]);
-    float cosy_cosp = 1.0f - 2.0f * (q[2] * q[2] + q[3] * q[3]);
-    euler[2] = atan2f(siny_cosp, cosy_cosp);
-
-    return 0;
-}
-
-static inline int cfilter(float *q, const float *gyro, const float *accel, float alpha, float dt) {
-    // Calculate current yaw since the accel cannot correct
-    float siny_cosp = 2.0f * (q[0] * q[3] + q[1] * q[2]);
-    float cosy_cosp = 1.0f - 2.0f * (q[2] * q[2] + q[3] * q[3]);
-    float yaw = atan2f(siny_cosp, cosy_cosp);
-
-    quaternion_update(q, gyro, dt);
-    quaternion_normalize(q);
-
-    float q_accel[4];
-    quaternion_from_accel(accel, q_accel, yaw); // Use current yaw for accel estimate
-    quaternion_normalize(q_accel);
-
-    for (int i = 0; i < 4; i++) {
-        q[i] = alpha * q[i] + (1.0f - alpha) * q_accel[i];
-    }
-
-    return 0;
-}
-
-#endif // CFILT_H
-```
-
-:::
-
-:::{grid-item-card} **Python**
+:::{dropdown}  **Python Implementation**
 
 ```python
 import numpy as np
@@ -262,11 +154,12 @@ def cfilter(att: Attitude, gyro: np.ndarray, accel: np.ndarray, alpha: float, dt
     rpy = quaternion_to_euler(q_fused)
     return Attitude(q_fused, rpy)
 ```
-:::
-::::
 
-Both of these are around 100 lines, so in a sense we don't really gain much by working in Python here.
-Personally, I feel that it's easier to develop and test Python code, and easier to grow it to more complicated projects, but that's just personal preference.
+If you want to see what the same algorithm looks like in handwritten C, there's also an implementation in the [source code](https://github.com/PineTreeLabs/archimedes/tree/main/docs/source/blog/2025/imu_filter/stm32/Core/Inc/hand_cfilter.h) on GitHub.
+For something simple like the C code is really no harder to read or write than the Python, though the workflow we're illustrating here scales to more complicated algorithms where development, testing, and code reuse can be easier in Python.
+:::
+
+This uses a "scratch" implementation to keep the example self-contained, though we could also have used the [sptial](../spatial.md) module here to do the attitude conversions and quaternion kinematics.
 
 ## Python -> C code
 
@@ -378,12 +271,20 @@ int main(void)
 }
 ```
 
+It's equally important to note what this auto-generated code _doesn't_ do:
+
+- MCU and peripheral configuration (clocks, pins, interrupts)
+- HAL function calls
+- Communication protocols (SPI, I2C, CAN)
+- Device drivers (which registers do we read/write?)
+
+Archimedes generates code for the mathematical algorithm and leaves the embedded implementation details to you.
+
+For me, the low-level embedded configuration is still the hard part, but the good news is that this is mostly a one-time cost.  If your drivers and communication functionality are properly abstracted from the controller logic, once the integrates system is working you can tinker with the algorithms and re-deploy into your runtime with little-to-no changes to the C code.
 
 <!-- 
-- TODO: kHz+ sampling rates
 - TODO: Add a figure for workflow
 - Real-time streaming
-- Hard part: drivers and board configuration (but one-time!)
  -->
 
 ---
