@@ -1,4 +1,5 @@
 import numpy as np
+
 import archimedes as arc
 
 
@@ -9,12 +10,14 @@ class Attitude:
 
 
 def quaternion_derivative(q: np.ndarray, w: np.ndarray) -> np.ndarray:
-    return 0.5 * np.hstack([
-        -q[1] * w[0] - q[2] * w[1] - q[3] * w[2],
-         q[0] * w[0] + q[2] * w[2] - q[3] * w[1],
-         q[0] * w[1] - q[1] * w[2] + q[3] * w[0],
-         q[0] * w[2] + q[1] * w[1] - q[2] * w[0]
-    ])
+    return 0.5 * np.hstack(
+        [
+            -q[1] * w[0] - q[2] * w[1] - q[3] * w[2],
+            q[0] * w[0] + q[2] * w[2] - q[3] * w[1],
+            q[0] * w[1] - q[1] * w[2] + q[3] * w[0],
+            q[0] * w[2] + q[1] * w[1] - q[2] * w[0],
+        ]
+    )
 
 
 def quat_from_accel(accel: np.ndarray, yaw: float) -> np.ndarray:
@@ -50,11 +53,7 @@ def quaternion_to_euler(q: np.ndarray) -> np.ndarray:
 
     # Pitch
     sinp = 2.0 * (q[0] * q[2] - q[3] * q[1])
-    pitch = np.where(
-        abs(sinp) >= 1.0,
-        np.sign(sinp) * (np.pi / 2),
-        np.arcsin(sinp)
-    )
+    pitch = np.where(abs(sinp) >= 1.0, np.sign(sinp) * (np.pi / 2), np.arcsin(sinp))
 
     # Yaw
     siny_cosp = 2.0 * (q[0] * q[3] + q[1] * q[2])
@@ -63,13 +62,15 @@ def quaternion_to_euler(q: np.ndarray) -> np.ndarray:
     return np.hstack([roll, pitch, yaw])
 
 
-def cfilter(att: Attitude, gyro: np.ndarray, accel: np.ndarray, alpha: float, dt: float) -> Attitude:
+def cfilter(
+    att: Attitude, gyro: np.ndarray, accel: np.ndarray, alpha: float, dt: float
+) -> Attitude:
     # Integrate gyro to update quaternion
     qdot = quaternion_derivative(att.q, gyro)
 
     q_gyro = att.q + qdot * dt
     q_gyro = q_gyro
-    
+
     # Estimate quaternion from accelerometer (use current yaw)
     q_accel = quat_from_accel(accel, att.rpy[2])
     q_accel = q_accel
@@ -100,6 +101,4 @@ if __name__ == "__main__":
     args = (att, gyro, accel, alpha, dt)
     return_names = ("att_fused",)
     output_dir = "stm32/archimedes"
-    arc.codegen(
-        cfilter, args, return_names=return_names, output_dir=output_dir
-    )
+    arc.codegen(cfilter, args, return_names=return_names, output_dir=output_dir)

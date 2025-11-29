@@ -53,7 +53,7 @@ Some basic Python knowledge will also be beneficial. Our code makes extensive us
 - [Callable objects](https://realpython.com/python-callable-instances/)
 
 To run the code, you'll need a Python environment configured with Archimedes and its dependencies (NumPy, SciPy, Matplotlib, and CasADi).
-You'll also need the [multirotor.py](https://github.com/jcallaham/archimedes/tree/main/docs/source/notebooks/multirotor/multirotor.py) source code for the models.
+You'll also need the [multirotor.py](https://github.com/pinetreelabs/archimedes/tree/main/docs/source/notebooks/multirotor/multirotor.py) source code for the models.
 
 ## Demo contents
 

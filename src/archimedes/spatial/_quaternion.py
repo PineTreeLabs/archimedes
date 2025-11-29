@@ -303,7 +303,6 @@ def _quat_to_rpy(q: np.ndarray) -> np.ndarray:
     return np.hstack([roll, pitch, yaw])
 
 
-
 # See: https://github.com/scipy/scipy/blob/3ead2b543df7c7c78619e20f0cb6139e344a8866/scipy/spatial/transform/_rotation_cy.pyx#L774-L851  # ruff: noqa: E501
 def quaternion_to_euler(q: np.ndarray, seq: str = "xyz") -> np.ndarray:
     """Convert unit quaternion to roll-pitch-yaw Euler angles.
