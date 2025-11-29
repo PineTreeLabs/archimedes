@@ -1,14 +1,3 @@
----
-jupytext:
-  text_representation:
-    extension: .md
-    format_name: myst
-kernelspec:
-  display_name: Python 3
-  language: python
-  name: archimedes
----
-
 # Complementary IMU Filter
 
 **_An end-to-end example of simple sensor fusion with Archimedes_**
@@ -21,19 +10,14 @@ This is the first post in a series that will document the process of building a 
 
 ---
 
-<!-- This post is supposed to:
-
-- Demonstrate a clean development/deployment workflow
-- Serve as a reference point for more advanced projects in the future
-
--->
-
-
 One of the most basic tasks in a flight control system is _attitude estimation_ - how is the vehicle oriented in the world?
 The difficulty with this is that it's not directly measurable, and available sensors have noise, bias, and drift.
-The solution is _sensor fusion_, combining data from multiple sources to get a better estimate than from any one sensor.
+To handle this we do _sensor fusion_, combining data from multiple sources to get a better estimate than from any one sensor.
 
 Here we'll walk through a workflow for developing one of the simplest sensor fusion algorithms: a _complementary IMU filter_, with the goal of showing an end-to-end example of developing an algorithm in Python, deploying it, and getting streaming data back into Python.
+
+```{image} _static/streaming_imu.gif
+```
 
 The primary goal of this post is to show a relatively simple and self-contained example of this "write in Python, deploy in C" paradigm. In this particular case the logic is simple enough that it would realistically be more efficient to just write the whole thing in C, but the general process can be replicated for much more complicated algorithms. A second goal of the post is to introduce the "drone build" project, which will be a recurring theme in several upcoming posts and will illustrate a number of different aspects of the develop/deploy cycle in Archimedes.
 
@@ -164,10 +148,14 @@ If you want to see what the same algorithm looks like in handwritten C, there's 
 For something simple like the C code is really no harder to read or write than the Python, though the workflow we're illustrating here scales to more complicated algorithms where development, testing, and code reuse can be easier in Python.
 :::
 
-This uses a "scratch" implementation to keep the example self-contained, though we could also have used the [sptial](../spatial.md) module here to do the attitude conversions and quaternion kinematics.
+This uses a "scratch" implementation to keep the example self-contained, though we could also have used the [spatial](../spatial.md) module here to do the attitude conversions and quaternion kinematics.
 
 Since we'll be autogenerating and deploying C code from this Python, we can also easily write [test and validation cases](https://github.com/PineTreeLabs/archimedes/tree/main/docs/source/blog/2025/imu_filter/test_cfilter.py) to make sure the algorithm is working as intended.
-Combining Python-level unit testing with hardware-in-the-loop (HIL) testing of the integrated embedded controller can be a powerful way to test and validate complex controller logic.
+Combining Python-level unit testing with hardware-in-the-loop (HIL) testing of the integrated embedded controller can be a powerful way to test and validate complex codes.
+
+In practice, you'd also typically validate this filter in simulation before deploying to hardware - which is easy to do, since the filter is written in Python.
+Then the same logic that runs in simulation gets deployed to the STM32.
+For this simple example I went straight to deployment, but for more complex algorithms (as we'll see in future posts), simulation is essential for debugging and parameter tuning before you flash firmware.
 
 ## Python -> C code
 
@@ -341,13 +329,13 @@ Beyond the complementary IMU filter, you can apply this workflow to a wide range
 If you're interested in trying this out for yourself, you can:
 
 - Check out the [source code](https://github.com/PineTreeLabs/archimedes/tree/main/docs/source/blog/2025/imu_filter/) for this post on GitHub
-- Work through the [codegen](../../../tutorials/codegen/codegen00.m) and [hardware deployment](../../../tutorials/deployment/deployment00.md) tutorials
+- Work through the [codegen](../../../tutorials/codegen/codegen00.md) and [hardware deployment](../../../tutorials/deployment/deployment00.md) tutorials
 - [Post a discussion thread](https://github.com/pinetreelabs/archimedes/discussions) to share what you did
 
 Community feedback on this process is invaluable, so if you do try it please consider sharing what you found: what worked (or didn't), what you liked (or didn't), and above all any bug reports.
 All of this will help make Archimedes a more useful and reliable tool to help you build better.
 
-Thanks for reading, and checking out Archimedes!
+Thanks for checking out Archimedes!
 
 ---
 
