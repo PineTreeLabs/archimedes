@@ -2,7 +2,7 @@
 
 **_An end-to-end example of simple sensor fusion with Archimedes_**
 
-Jared Callaham • 25 Nov 2025
+Jared Callaham • 26 Nov 2025
 
 :::{note}
 This is the first post in a series that will document the process of building a high-performance quadrotor drone from scratch, highlighting how Archimedes can be used to "close the loop" with simulation, HIL testing, and deployment. [Subscribe](https://jaredcallaham.substack.com/embed) to the mailing list to see the progress!
