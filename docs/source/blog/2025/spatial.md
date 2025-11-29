@@ -23,6 +23,7 @@ kernelspec:
 
 Jared Callaham • 16 Oct 2025 (Updated 5 Nov 2025)
 
+---
 <!-- Graphic: 6dof gimbal with graduation cap -->
 
 Release v0.3.1 marks the graduation of the [`spatial`](#archimedes.spatial) module out of experimental status and into production.
@@ -973,5 +974,5 @@ Bug reports, feature requests, and complaints about documentation quality are in
 **Jared Callaham** is the creator of Archimedes and principal at Pine Tree Labs.
 He is a consulting engineer on modeling, simulation, optimization, and control systems with a particular focus on applications in aerospace engineering.
 
-*Have questions or feedback? [Open a discussion on GitHub](https://github.com/jcallaham/archimedes/discussions)*
+*Have questions or feedback? [Open a discussion on GitHub](https://github.com/pinetreelabs/archimedes/discussions)*
 :::

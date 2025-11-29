@@ -77,6 +77,14 @@ class TestQuaternionWrapper:
         assert q.as_quat() is q
         np.testing.assert_allclose(Quaternion.from_quat(q).array, q.array)
 
+        # Scalar multiplication
+        q2 = 2.0 * q
+        np.testing.assert_allclose(q2.array, 2.0 * q.array)
+
+        # __rmul__
+        q3 = q * 3.0
+        np.testing.assert_allclose(q3.array, 3.0 * q.array)
+
     def test_identity(self):
         q = Quaternion.identity()
         assert np.allclose(q.as_matrix(), np.eye(3))

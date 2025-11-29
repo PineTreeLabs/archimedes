@@ -465,7 +465,7 @@ Besides writing pure functions, keep in mind the usual [gotchas](../../../gotcha
 ## Built-in `FlightVehicle`
 
 Finally, although we have included `FlightVehicle` as part of our class hierarchy here, there is actually a generic `FlightVehicle` included with Archimedes that implements 6dof dynamics using either Euler angles or (by default) quaternions for attitude representation.
-The interface is the same as what we've shown here, and you can look at the source code in [multirotor.py](https://github.com/jcallaham/archimedes/tree/main/docs/source/notebooks/multirotor/multirotor.py) to see how exactly it builds on the generic `FlightVehicle`.
+The interface is the same as what we've shown here, and you can look at the source code in [multirotor.py](https://github.com/pinetreelabs/archimedes/tree/main/docs/source/notebooks/multirotor/multirotor.py) to see how exactly it builds on the generic `FlightVehicle`.
 
 One difference with what we've shown here is that instead of using a flat 12-element vector to represent the state of the vehicle, the built-in `FlightVehicle` defines its own `State` class.
 This is another [`struct`](#archimedes.tree.struct) with fields for each of the four groups of state variables: position (`State.pos`), attitude (`State.att`), velocity (`State.v_B`), angular velocity (`State.w_B`), and any additional state variables (`State.aux`).

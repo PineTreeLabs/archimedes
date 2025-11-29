@@ -10,7 +10,7 @@ author: Jared Callaham
 :alt: Introducing Archimedes
 ```
 
-**_A Python toolkit for hardware engineering_**
+**_A Python toolkit for deployable control systems engineering_**
 
 By Jared Callaham • 6 Oct 2025
 
@@ -504,5 +504,5 @@ Thanks for checking out the project!
 **Jared Callaham** is the creator of Archimedes and principal at Pine Tree Labs.
 He is a consulting engineer on modeling, simulation, optimization, and control systems with a particular focus on applications in aerospace engineering.
 
-*Have questions or feedback? [Open a discussion on GitHub](https://github.com/jcallaham/archimedes/discussions)*
+*Have questions or feedback? [Open a discussion on GitHub](https://github.com/pinetreelabs/archimedes/discussions)*
 :::

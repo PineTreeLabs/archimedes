@@ -10,7 +10,7 @@
 
 6 Oct 2025 · Announcements
 
-A Python toolkit for hardware engineering
+A Python toolkit for deployable control systems engineering
 :::
 
 :::{grid-item-card} Spatial Mechanics
@@ -20,6 +20,15 @@ A Python toolkit for hardware engineering
 20 Oct 2025 · Announcements
 
 Inside the new `spatial` module
+:::
+
+:::{grid-item-card} Complementary IMU Filter
+:link: 2025/imu_filter/imu_filter
+:link-type: doc
+
+26 Nov 2025 · Examples
+
+An end-to-end example of simple sensor fusion with Archimedes
 :::
 
 ::::
