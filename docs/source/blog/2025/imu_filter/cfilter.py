@@ -68,14 +68,15 @@ def cfilter(att: Attitude, gyro: np.ndarray, accel: np.ndarray, alpha: float, dt
     qdot = quaternion_derivative(att.q, gyro)
 
     q_gyro = att.q + qdot * dt
-    q_gyro = q_gyro / np.linalg.norm(q_gyro)
+    q_gyro = q_gyro
     
     # Estimate quaternion from accelerometer (use current yaw)
     q_accel = quat_from_accel(accel, att.rpy[2])
-    q_accel = q_accel / np.linalg.norm(q_accel)
+    q_accel = q_accel
 
     # Complementary filter
     q_fused = alpha * q_gyro + (1 - alpha) * q_accel
+    q_fused = q_fused / np.linalg.norm(q_fused)
 
     rpy = quaternion_to_euler(q_fused)
     return Attitude(q_fused, rpy)
@@ -98,6 +99,7 @@ if __name__ == "__main__":
     # Codegen
     args = (att, gyro, accel, alpha, dt)
     return_names = ("att_fused",)
+    output_dir = "stm32/archimedes"
     arc.codegen(
-        cfilter, args, return_names=return_names, output_dir="archimedes"
+        cfilter, args, return_names=return_names, output_dir=output_dir
     )

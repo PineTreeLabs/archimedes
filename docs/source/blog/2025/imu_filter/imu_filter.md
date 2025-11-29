@@ -28,16 +28,14 @@ This is the first post in a series that will document the process of building a 
 
 -->
 
+
 One of the most basic tasks in a flight control system is _attitude estimation_ - how is the vehicle oriented in the world?
 The difficulty with this is that it's not directly measurable, and available sensors have noise, bias, and drift.
 The solution is _sensor fusion_, combining data from multiple sources to get a better estimate than from any one sensor.
 
 Here we'll walk through a workflow for developing one of the simplest sensor fusion algorithms: a _complementary IMU filter_, with the goal of showing an end-to-end example of developing an algorithm in Python, deploying it, and getting streaming data back into Python.
-In all honesty, for an algorithm this simple you're probably better off just writing the C code yourself (in this case I spent much more time writing the sensor driver and communication layer than the filter itself).
-On the other hand, it can be easier to develop, test, maintain, and reuse Python code, especially for more complicated algorithms and physics models.
-What we'll see here is a replicable _workflow_ that can scale to more complex systems and algorithms.
 
-The primary goal of this post is to show a relatively simple and self-contained example of the "write in Python, deploy in C" workflow. In this particular case the logic is simple enough that it would realistically be more efficient to just write the whole thing in C, but the general process can be replicated for much more complicated algorithms. A second goal of the post is to introduce the "drone build" project described at the top, which will be a recurring theme in several upcoming posts and will illustrate a number of different aspects of the develop/deploy cycle in Archimedes.
+The primary goal of this post is to show a relatively simple and self-contained example of this "write in Python, deploy in C" paradigm. In this particular case the logic is simple enough that it would realistically be more efficient to just write the whole thing in C, but the general process can be replicated for much more complicated algorithms. A second goal of the post is to introduce the "drone build" project, which will be a recurring theme in several upcoming posts and will illustrate a number of different aspects of the develop/deploy cycle in Archimedes.
 
 This will be a quick overview that assumes familiarity with basic Archimedes functionality, including C code generation.
 If you're new to Archimedes, check out these guides for background info:
@@ -63,10 +61,17 @@ att_fused = alpha * att_gyro + (1 - alpha) att_accel
 
 I won't show it here, but this acts like a high-pass filter on the gyro measurements (filtering drift) and a low-pass filter on the accelerometer (filtering noise).
 
-This is conceptually simple enough - the hard part is calculating the two attitude estimates.
+:::{note}
+Using the accelerometer to estimate tilt angles only makes sense when the IMU is held steady.
+Hence, this sensor fusion approach won't work well in general, especially for aggressive flight maneuvers.
+Still, it's a simple way to get end-to-end attitude estimation and we can always replace it with more sophisticated sensor fusion when needed.
+:::
+
+This filter is conceptually simple enough - the hard part is calculating the two attitude estimates.
 This just involves some trigonometry for the accelerometer tilt angles and quaternion/Euler kinematics for the gyro integration.
 Here we'll use quaternion kinematics for stability and also output the redundant Euler angles (e.g. for feedback attitude control).
-Technically, quaternions can't be linearly interpolated and we should be using [spherical linear interpolation (SLERP)](https://en.wikipedia.org/wiki/Slerp), but at reasonably fast sampling rates this is probably not worth the extra complexity.
+<!-- 
+Technically, quaternions can't be linearly interpolated and we should be using [spherical linear interpolation (SLERP)](https://en.wikipedia.org/wiki/Slerp), but at reasonably fast sampling rates this is probably not worth the extra complexity. -->
 These calculations are standard and not very illuminating for our purposes, so let's just skip to the implementation.
 
 :::{dropdown}  **Python Implementation**
@@ -160,6 +165,9 @@ For something simple like the C code is really no harder to read or write than t
 :::
 
 This uses a "scratch" implementation to keep the example self-contained, though we could also have used the [sptial](../spatial.md) module here to do the attitude conversions and quaternion kinematics.
+
+Since we'll be autogenerating and deploying C code from this Python, we can also easily write [test and validation cases](https://github.com/PineTreeLabs/archimedes/tree/main/docs/source/blog/2025/imu_filter/test_cfilter.py) to make sure the algorithm is working as intended.
+Combining Python-level unit testing with hardware-in-the-loop (HIL) testing of the integrated embedded controller can be a powerful way to test and validate complex controller logic.
 
 ## Python -> C code
 
@@ -271,7 +279,9 @@ int main(void)
 }
 ```
 
-It's equally important to note what this auto-generated code _doesn't_ do:
+### Drivers not included
+
+It's also important to note what this auto-generated code _doesn't_ do:
 
 - MCU and peripheral configuration (clocks, pins, interrupts)
 - HAL function calls
@@ -279,13 +289,65 @@ It's equally important to note what this auto-generated code _doesn't_ do:
 - Device drivers (which registers do we read/write?)
 
 Archimedes generates code for the mathematical algorithm and leaves the embedded implementation details to you.
+For me, the low-level embedded is the hard part, but the good news is that this is mostly a one-time cost.  If your drivers and communication functionality are properly abstracted from the controller logic, once the integrates system is working you can tinker with the algorithms and re-deploy into your runtime with little-to-no changes to the C code.
 
-For me, the low-level embedded configuration is still the hard part, but the good news is that this is mostly a one-time cost.  If your drivers and communication functionality are properly abstracted from the controller logic, once the integrates system is working you can tinker with the algorithms and re-deploy into your runtime with little-to-no changes to the C code.
+The GitHub repo has a custom, portable [driver](https://github.com/PineTreeLabs/archimedes/tree/main/docs/source/blog/2025/imu_filter/stm32/Core/Inc/lsm6dsox.h) for the [LSM6DSOX](https://www.st.com/en/mems-and-sensors/lsm6dsox.html) IMU and a semi-portable (across STM32s) [SPI communication layer](https://github.com/PineTreeLabs/archimedes/tree/main/docs/source/blog/2025/imu_filter/stm32/Core/Inc/stm32_spi_dev.h).
 
-<!-- 
-- TODO: Add a figure for workflow
-- Real-time streaming
- -->
+## Board configuration
+
+Since this is a prototype of a system ultimately intended to be a full flight computer, I built it on an STM32H753ZI Nucleo dev board.
+The full STM32CubeMX configuration is available on the [GitHub repo](https://github.com/PineTreeLabs/archimedes/tree/main/docs/source/blog/2025/imu_filter/stm32/), but the basic configuration is:
+
+- 480 MHz clock speed for the STM32
+- SPI communication to the IMU chip at 10 MHz
+- Configure the IMU for data rates up to 6.7 kHz
+- Timed interrupt to match the IMU data rate
+- USART for streaming data back to the computer
+- Cycle counter for profiling the filter performance
+
+For the streaming demo below I lowered the data rate to ~400 Hz so that the streaming output over USB wasn't likely to cause missed samples, but for the real thing I'm planning to push to the maximum sampling rate (and move any slow serial work to DMA).
+
+## Streaming telemetry
+
+With everything in place, the last step in this demo is a real-time visualization of the attitude estimate.
+This is convenient (but definitely not necessary) for basic debugging (do your sensor axes match your vehicle coordinate system?), but also it's just generally nice to get the visual feedback.
+
+I used [VisPy](https://vispy.org/) for this demo to get real-time 3D and pyserial to stream the data.
+VisPy might be overkill for something like this, but the OpenGL backend makes it snappy for 3D rendering, and the interactivity is also very nice.
+The full animation script is [here](https://github.com/PineTreeLabs/archimedes/tree/main/docs/source/blog/2025/imu_filter/stream3d.py)
+
+```{image} _static/streaming_imu.gif
+```
+
+## Conclusion
+
+The complementary filter is a rough-and-ready way to do attitude estimation that's not really suitable for aggressive maneuvers.
+Still, at this point we can be fairly confident in the board configuration, driver implementation, peripheral communication, and overall runtime logic.
+And because we've fully abstracted the control logic from all of these low-level embedded details, we could now move on to more sophisticated sensor fusion algorithms.
+
+For the "build-a-drone-from-scratch" project, the first real milestone will be attitude/rate control for stable hovering, so the complementary filter is a totally reasonable place to start.
+The next steps will be setting up the power distribution and motor controllers, building a simple gimbal for bench testing, and testing a stablization controller.
+In these blog posts we'll also be exploring several other ways you can use Archimedes in the development process, including for controller design, parameter estimation, and low-cost DIY hardware-in-the-loop (HIL) testing.
+
+For more on this project, including Archimedes release announcements, blog posts, application examples, and case studies, subscribe to the free newsletter:
+
+<iframe src="https://jaredcallaham.substack.com/embed" width="480" height="320" style="border:1px solid #EEE; background:white;" frameborder="0" scrolling="no"></iframe>
+
+### Try it out!
+
+Zooming out, what we've seen here is a simple but complete example of how you can define an algorithm in Python, autogenerate C code, and deploy to a microcontroller.
+Beyond the complementary IMU filter, you can apply this workflow to a wide range of control systems and algorithm types.
+
+If you're interested in trying this out for yourself, you can:
+
+- Check out the [source code](https://github.com/PineTreeLabs/archimedes/tree/main/docs/source/blog/2025/imu_filter/) for this post on GitHub
+- Work through the [codegen](../../../tutorials/codegen/codegen00.m) and [hardware deployment](../../../tutorials/deployment/deployment00.md) tutorials
+- [Post a discussion thread](https://github.com/pinetreelabs/archimedes/discussions) to share what you did
+
+Community feedback on this process is invaluable, so if you do try it please consider sharing what you found: what worked (or didn't), what you liked (or didn't), and above all any bug reports.
+All of this will help make Archimedes a more useful and reliable tool to help you build better.
+
+Thanks for reading, and checking out Archimedes!
 
 ---
 
@@ -295,5 +357,5 @@ For me, the low-level embedded configuration is still the hard part, but the goo
 **Jared Callaham** is the creator of Archimedes and principal at Pine Tree Labs.
 He is a consulting engineer on modeling, simulation, optimization, and control systems with a particular focus on applications in aerospace engineering.
 
-*Have questions or feedback? [Open a discussion on GitHub](https://github.com/jcallaham/archimedes/discussions)*
+*Have questions or feedback? [Open a discussion on GitHub](https://github.com/pinetreelabs/archimedes/discussions)*
 :::

@@ -160,8 +160,6 @@ static int casadi_f0(const casadi_real** arg, casadi_real** res, casadi_int* iw,
     w04 = arg[4] ? arg[4][0] : 0;
     for (i=0, rr=w12; i<4; ++i) (*rr++) *= w04;
     for (i=0, rr=w02, cs=w12; i<4; ++i) (*rr++) += (*cs++);
-    w04 = casadi_norm_2(4, w02);
-    for (i=0, rr=w02; i<4; ++i) (*rr++) /= w04;
     for (i=0, rr=w02, cs=w02; i<4; ++i) (*rr++)  = (w00*(*cs++));
     w04 = 1.;
     w04 -= w00;
@@ -223,10 +221,10 @@ static int casadi_f0(const casadi_real** arg, casadi_real** res, casadi_int* iw,
     *rr++ = w10;
     *rr++ = w11;
     *rr++ = w00;
-    w05 = casadi_norm_2(4, w12);
-    for (i=0, rr=w12; i<4; ++i) (*rr++) /= w05;
     for (i=0, rr=w12, cs=w12; i<4; ++i) (*rr++)  = (w04*(*cs++));
     for (i=0, rr=w02, cs=w12; i<4; ++i) (*rr++) += (*cs++);
+    w04 = casadi_norm_2(4, w02);
+    for (i=0, rr=w02; i<4; ++i) (*rr++) /= w04;
     casadi_copy(w02, 4, res[0]);
     for (rr=(&w04), cs=w02+0; cs!=w02+1; cs+=1) *rr++ = *cs;
     for (rr=(&w05), cs=w02+1; cs!=w02+2; cs+=1) *rr++ = *cs;
