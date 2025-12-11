@@ -1,6 +1,6 @@
 [project]
 name = "archimedes"
-version = "0.4.1"
+version = "0.4.2"
 description = "Python framework for modeling, simulation, and controls development"
 readme = "README.md"
 authors = [
