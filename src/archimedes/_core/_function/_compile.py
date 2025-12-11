@@ -444,7 +444,9 @@ class BufferedFunction(FunctionCacheBase):
                 self._arg_buffer[i][()] = arg
 
         func_eval()
-        result = [np.copy(x).T for x in self._return_buffer]
+        result = [np.copy(x) for x in self._return_buffer]
+        # Reorder into column-major order
+        result = [x.flatten(order="F").reshape(x.shape) for x in result]
 
         if len(result) == 1:
             result = result[0]  # type: ignore
