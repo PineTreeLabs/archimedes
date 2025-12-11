@@ -264,6 +264,13 @@ class TestBufferedCompile:
         g_sym = compile(g, buffered=True)
         assert np.allclose(g_sym(A, x, b), g(A, x, b))
 
+        # Test with non-square A
+        A = np.array([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])
+        x = np.array([7.0, 8.0, 9.0])
+        b = np.array([10.0, 11.0])
+        g_sym = compile(g, buffered=True)
+        assert np.allclose(g_sym(A, x, b), g(A, x, b))
+
         # 0d array
         b = np.array(4.0)
         assert np.allclose(g_sym(A, x, b), g(A, x, b))
