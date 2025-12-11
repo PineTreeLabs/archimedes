@@ -41,7 +41,10 @@ def f(x):
 
 
 x = 1.0
-f(x), np.sin(x)  # Incorrect!
+try:
+    f(x)
+except TypeError as e:
+    print("Error:", e)
 ```
 
 This fails because `x > 0` produces a symbolic expression representing the condition, not a concrete `True` or `False` value that Python's `if` statement requires.
