@@ -10,6 +10,8 @@ from archimedes._core import (
     sym,
 )
 
+np.random.seed(0)
+
 
 def f(x):
     return x**2 + 1
@@ -264,10 +266,10 @@ class TestBufferedCompile:
         g_sym = compile(g, buffered=True)
         assert np.allclose(g_sym(A, x, b), g(A, x, b))
 
-        # Test with non-square A
-        A = np.array([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])
-        x = np.array([7.0, 8.0, 9.0])
-        b = np.array([10.0, 11.0])
+        # Test with non-square A and 2d x
+        A = np.random.randn(2, 3)
+        x = np.random.randn(3, 4)
+        b = np.random.randn(2, 4)
         g_sym = compile(g, buffered=True)
         assert np.allclose(g_sym(A, x, b), g(A, x, b))
 
