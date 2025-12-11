@@ -76,3 +76,6 @@ New version tag for release to PyPI (previous "Archimedes" project tagged with v
 - Add `buffered` mode to `@compile`
 - Support addition and scalar multiplication for `Quaternion`
 - Bugfix for non-commutative broadcasting (PR [#122](https://github.com/PineTreeLabs/archimedes/pull/122) and [#123](https://github.com/PineTreeLabs/archimedes/pull/123))
+
+## [0.4.2] - 2025-12-11
+- Bump urllib3 to 2.6.0 to resolve vulnerabilities ([Issue #126](https://github.com/PineTreeLabs/archimedes/issues/126))
