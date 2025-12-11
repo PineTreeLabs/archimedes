@@ -389,7 +389,9 @@ def test_lon_stability():
 
     # Signs are arbitrary for eigenvectors; just check magnitudes
     v_phugoid = evecs[:, phugoid_idx]
-    v_phugoid_ex = np.array([-1.0, 9.6e-5 + 5e-7j, 3.8e-4 + 2.3e-3j, -1.7e-4 + 8.4e-6j, 0])
+    v_phugoid_ex = np.array(
+        [-1.0, 9.6e-5 + 5e-7j, 3.8e-4 + 2.3e-3j, -1.7e-4 + 8.4e-6j, 0]
+    )
     npt.assert_allclose(
         abs(v_phugoid.real),
         abs(v_phugoid_ex.real),
@@ -417,6 +419,7 @@ def test_lon_stability():
         rtol=5e-2,
         atol=1e-5,
     )
+
 
 def test_lat_stability():
     """Test case for lateral-directional stability"""
