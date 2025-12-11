@@ -79,3 +79,6 @@ New version tag for release to PyPI (previous "Archimedes" project tagged with v
 
 ## [0.4.2] - 2025-12-11
 - Bump urllib3 to 2.6.0 to resolve vulnerabilities ([Issue #126](https://github.com/PineTreeLabs/archimedes/issues/126))
+
+## [0.4.3]
+- Raise error instead of silently incorrect result on `__bool__` evaluation ([Issue #128](https://github.com/PineTreeLabs/archimedes/issues/128))

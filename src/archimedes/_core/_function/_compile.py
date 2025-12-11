@@ -438,7 +438,8 @@ class BufferedFunction(FunctionCacheBase):
         for i, arg in enumerate(args):
             arg = np.asarray(arg)
             if len(self._arg_buffer[i].shape) > 0:
-                self._arg_buffer[i][:] = arg.T
+                arg = arg.flatten(order="F").reshape(arg.shape)
+                self._arg_buffer[i][:] = arg
             else:
                 self._arg_buffer[i][()] = arg
 
