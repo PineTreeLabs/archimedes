@@ -185,6 +185,15 @@ def good_conditional(x):
     return np.where(x > 0, np.sin(x), np.cos(x))
 ```
 
+In general this is the "truthiness problem" of symbolic arrays - native Python expects that certain things can definitively be evaluated as `True` or `False`, and when they can't the behavior is sometimes unexpected.
+Other problematic native Python statements and workarounds include:
+
+- `max()` and `min()` - use `np.max()` and `np.min()` instead
+- `while` - avoid if possible, or use bounded for loops
+- Short-circuiting logical operators (`a and b`, `not a`, etc.) - use `np.logical_and`, etc.
+- `any`, `all` - use NumPy equivalents
+- `filter` - avoid if possible, of use loops with `np.where`
+
 For loops:
 1. Ensure loop bounds are static (not symbolic expressions)
 2. Consider using `arc.scan` for more complex loops

@@ -884,6 +884,9 @@ class TestSymbolicArrayArithmetic:
         with pytest.raises(NotImplementedError):
             np.max(x, axis=0)
 
+        with pytest.raises(TypeError, match="Cannot convert symbolic array to bool"):
+            max(*x)
+
     def test_min(self):
         x = sym("x", (3,), dtype=np.int32)
         result = np.min(x)
@@ -894,6 +897,9 @@ class TestSymbolicArrayArithmetic:
         # Unsupported axis specification
         with pytest.raises(NotImplementedError):
             np.min(x, axis=0)
+
+        with pytest.raises(TypeError, match="Cannot convert symbolic array to bool"):
+            min(*x)
 
     def test_diag(self):
         # Vector to diagonal

@@ -178,6 +178,10 @@ class SymbolicArray:
     def size(self) -> int:
         return int(np.prod(self.shape))
 
+    def __bool__(self):
+        # This will get called for if/else/max/min statements
+        raise TypeError("Cannot convert symbolic array to bool.")
+
     def __add__(self, other: Any) -> SymbolicArray:
         return np.add(self, other)  # type: ignore
 
