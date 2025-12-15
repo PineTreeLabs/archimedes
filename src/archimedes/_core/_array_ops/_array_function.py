@@ -48,6 +48,7 @@ from typing import TYPE_CHECKING
 import casadi as cs
 import numpy as np
 import numpy.exceptions as npex
+from numpy._core.shape_base import _block_setup  # type: ignore
 
 from .._array_impl import (
     SymbolicArray,
@@ -376,6 +377,39 @@ def _stack(arrays, axis=0, dtype=None):
     sl = (slice(None),) * axis + (None,)
     expanded_arrays = [arr[sl] for arr in arrays]
     return np.concatenate(expanded_arrays, axis=axis, dtype=dtype)
+
+
+def _block(arrays):
+    arrays, list_ndim, result_ndim, final_size = _block_setup(arrays)
+    if result_ndim > 2:
+        raise ValueError(
+            "Only 0-2D arrays are supported for block, but got "
+            f"{result_ndim} dimensions."
+        )
+    return _block_inner(arrays, list_ndim, result_ndim)
+
+
+# https://github.com/numpy/numpy/blob/v2.2.0/numpy/_core/shape_base.py#L754-L770
+def _block_inner(arrays, max_depth, result_ndim, depth=0):
+    """
+    Internal implementation of block based on repeated concatenation.
+    `arrays` is the argument passed to
+    block. `max_depth` is the depth of nested lists within `arrays` and
+    `result_ndim` is the greatest of the dimensions of the arrays in
+    `arrays` and the depth of the lists in `arrays` (see block docstring
+    for details).
+    """
+    if depth < max_depth:
+        arrs = [_block_inner(arr, max_depth, result_ndim, depth + 1) for arr in arrays]
+        return _concatenate(arrs, axis=-(max_depth - depth))
+    else:
+        arr = arrays  # Single element, no nesting
+        # Extend shape to result_ndim
+        if result_ndim == 1:
+            arr = np.atleast_1d(arr)
+        else:
+            arr = np.atleast_2d(arr)
+        return arr
 
 
 def _array_split(arr, indices_or_sections, axis=0):
@@ -917,7 +951,7 @@ SUPPORTED_FUNCTIONS = {
     "can_cast": NotImplemented,
     "append_fields": NotImplemented,
     "ljust": NotImplemented,
-    "block": NotImplemented,
+    "block": _block,
     "flip": NotImplemented,
     "arccos": NotImplemented,
     "histogram2d": NotImplemented,

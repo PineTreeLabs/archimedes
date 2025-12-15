@@ -613,6 +613,91 @@ class TestSymbolicArrayFunctions:
         with pytest.raises(ValueError):
             np.stack((x, y))
 
+    def test_block(self):
+        # Test 0D arrays -> 1D array
+        x = sym("x", shape=(), dtype=np.int32)
+        y = sym("y", shape=(), dtype=np.int32)
+        result = np.block([x, y])
+        assert isinstance(result, SymbolicArray)
+        assert result.dtype == np.int32
+        assert result.shape == (2,)
+        assert cs.is_equal(result._sym, cs.vertcat(x._sym, y._sym), 1)
+
+        # Test 0D arrays -> 2D array
+        result = np.block([[x, y]])
+        assert isinstance(result, SymbolicArray)
+        assert result.dtype == np.int32
+        assert result.shape == (1, 2)
+        assert cs.is_equal(result._sym, cs.horzcat(x._sym, y._sym), 1)
+
+        result = np.block([[x], [y]])
+        assert isinstance(result, SymbolicArray)
+        assert result.dtype == np.int32
+        assert result.shape == (2, 1)
+        assert cs.is_equal(result._sym, cs.vertcat(x._sym, y._sym), 1)
+
+        # Test 1D arrays -> 1D array
+        x = sym("x", shape=(3,), dtype=np.int32)
+        y = sym("y", shape=(4,), dtype=np.int32)
+        result = np.block([x, y])
+        assert isinstance(result, SymbolicArray)
+        assert result.dtype == np.int32
+        assert result.shape == (7,)
+        assert cs.is_equal(result._sym, cs.vertcat(x._sym, y._sym), 1)
+
+        # Test 1D arrays -> 2D array
+        x = sym("x", shape=(3,), dtype=np.int32)
+        y = sym("y", shape=(3,), dtype=np.int32)
+        result = np.block([[x, y]])
+        assert isinstance(result, SymbolicArray)
+        assert result.dtype == np.int32
+        assert result.shape == (1, 6)
+        assert cs.is_equal(result._sym, cs.vertcat(x._sym, y._sym).T, 1)
+
+        result = np.block([[x], [y]])
+        assert isinstance(result, SymbolicArray)
+        assert result.dtype == np.int32
+        assert result.shape == (2, 3)
+        assert cs.is_equal(result._sym, cs.horzcat(x._sym, y._sym).T, 1)
+
+        # Test 2D arrays
+        x = sym("x", shape=(2, 3), dtype=np.int32)
+        y = sym("y", shape=(2, 4), dtype=np.int32)
+        result = np.block([[x, y]])
+        assert isinstance(result, SymbolicArray)
+        assert result.dtype == np.int32
+        assert result.shape == (2, 7)
+        assert cs.is_equal(result._sym, cs.horzcat(x._sym, y._sym), 1)
+
+        # Test nested blocks
+        result = np.block([[x, y], [y, x]])
+        assert isinstance(result, SymbolicArray)
+        assert result.dtype == np.int32
+        assert result.shape == (4, 7)
+        expected = cs.vertcat(
+            cs.horzcat(x._sym, y._sym),
+            cs.horzcat(y._sym, x._sym),
+        )
+        assert cs.is_equal(result._sym, expected, 1)
+
+        # Test case for 4x4 homgeneous transform matrix
+        R = sym("R", shape=(3, 3), dtype=np.float64)
+        p = sym("p", shape=(3, 1), dtype=np.float64)
+        last_row = sym("lr", shape=(1, 4), dtype=np.float64)
+        result = np.block([[R, p], [last_row]])
+        assert isinstance(result, SymbolicArray)
+        assert result.dtype == np.float64
+        assert result.shape == (4, 4)
+        expected = cs.vertcat(
+            cs.horzcat(R._sym, p._sym),
+            last_row._sym,
+        )
+        assert cs.is_equal(result._sym, expected, 1)
+
+        # Test error: too many dimensions
+        with pytest.raises(ValueError, match="Only 0-2D arrays are supported"):
+            result = np.block([[[x], [y]], [[y], [x]]])
+
     def test_split(self):
         dtype = np.int32
 
