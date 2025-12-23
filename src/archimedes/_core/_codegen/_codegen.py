@@ -55,8 +55,30 @@ class CodegenError(ValueError):
 
 
 def _to_snake_case(name: str) -> str:
+    """Convert CamelCase to snake_case, handling acronyms intelligently.
+
+    The acronym heuristic is: When consecutive capitals are followed by a lowercase
+    letter, the last capital starts a new word, not part of the acronym (e.g.
+    PIDController -> pid_controller).
+
+    Examples:
+        TypicalPythonClass -> typical_python_class
+        IIRFilter -> iir_filter
+        myFilterClass -> my_filter_class
+    """
     parts = name.split(".")
-    snake_parts = [re.sub(r"(?<!^)(?=[A-Z])", "_", part).lower() for part in parts]
+    snake_parts = []
+    for part in parts:
+        # Insert underscore before capitals followed by lowercase (handles acronyms)
+        # e.g., "IIRFilter" -> "IIR_Filter"
+        s1 = re.sub("(.)([A-Z][a-z]+)", r"\1_\2", part)
+
+        # Insert underscore between lowercase and uppercase
+        # e.g., "myFilterClass" -> "my_FilterClass"
+        s2 = re.sub("([a-z0-9])([A-Z])", r"\1_\2", s1)
+
+        snake_parts.append(s2.lower())
+
     return "_".join(snake_parts)
 
 

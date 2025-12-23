@@ -7,17 +7,12 @@ import numpy as np
 import pytest
 
 import archimedes as arc
+from archimedes._core._codegen._codegen import _to_snake_case
 from archimedes._core._codegen._renderer import (
     ArduinoRenderer,
     _extract_protected_regions,
     _render_template,
 )
-
-# TODO:
-# - Test data type explicit specification
-# - Test data type inference
-# - Test with static args
-# - Test re-importing with casadi extern
 
 
 @pytest.fixture
@@ -344,6 +339,22 @@ class TestCodegen:
 
         os.remove("invalid_arg_func_kernel.c")
         os.remove("invalid_arg_func_kernel.h")
+
+    def test_snake_case(self):
+        assert _to_snake_case("IIRFilter") == "iir_filter"
+        assert _to_snake_case("PIDController") == "pid_controller"
+        assert _to_snake_case("IO") == "io"  # Just acronym
+        assert _to_snake_case("myFilterClass") == "my_filter_class"
+        assert _to_snake_case("TypicalPythonClass") == "typical_python_class"
+
+        # Edge cases
+        assert _to_snake_case("A") == "a"
+        assert _to_snake_case("AB") == "ab"
+        assert _to_snake_case("ABC") == "abc"
+        assert _to_snake_case("ABCDef") == "abc_def"
+
+        # Nested paths (your existing feature)
+        assert _to_snake_case("Module.IIRFilter") == "module_iir_filter"
 
 
 class TestExtractProtectedRegions:
