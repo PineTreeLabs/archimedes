@@ -80,7 +80,10 @@ New version tag for release to PyPI (previous "Archimedes" project tagged with v
 ## [0.4.2] - 2025-12-11
 - Bump urllib3 to 2.6.0 to resolve vulnerabilities ([Issue #126](https://github.com/PineTreeLabs/archimedes/issues/126))
 
-## [0.4.3]
+## [0.4.3] - 2025-12-23
 - Raise error instead of silently incorrect result on `__bool__` evaluation ([Issue #128](https://github.com/PineTreeLabs/archimedes/issues/128))
 - Fix transpose error for nonsquare matrices in buffered compile ([Issue #130](https://github.com/PineTreeLabs/archimedes/issues/130))
 - Add support for `np.block`
+- Add logic for creating additional struct types in codegen if they have differently-sized children ([Issue #135](https://github.com/PineTreeLabs/archimedes/issues/135))
+- Add acronym handling to snake case conversion in codegen (`IIRFilter` -> `iir_filter_t`, not `i_i_r_filter_t`) - ([Issue #136](https://github.com/PineTreeLabs/archimedes/issues/136))
+- Bump filelock to 3.20.1 to resolve vulnerabilities ([Issue #138](https://github.com/PineTreeLabs/archimedes/issues/138))

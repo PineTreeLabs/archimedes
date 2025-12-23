@@ -12,7 +12,6 @@ from archimedes.experimental.aero import (
 )
 
 if TYPE_CHECKING:
-    from archimedes.typing import ArrayLike
     from archimedes.spatial import RigidBody
 
 __all__ = [
@@ -30,33 +29,38 @@ class Accelerometer:
     """Basic three-axis accelerometer model
 
     Currently assumes that the accel is located at the center of mass (CM) of the vehicle.
+
+    Outputs the specific force (proper acceleration) measured by the accelerometer in units
+    of g's as defined by standard gravity on Earth's surface
     """
 
     gravity: GravityModel = field(default_factory=ConstantGravity)
-    noise: float = 0.0  # Noise standard deviation [m/s^2]
+    g0: float = 9.80665  # Standard gravity [m/s^2]
+    noise: float = 0.0  # Noise standard deviation [g's]
 
     def __call__(
         self,
         x: RigidBody.State,
-        a_B: ArrayLike,
-        w: ArrayLike,
-    ) -> ArrayLike:
+        a_B: np.ndarray,
+        w: np.ndarray,
+    ) -> np.ndarray:
         g_N = self.gravity(x.pos)  # Inertial gravity vector
-        C_BN = x.att.as_dcm()
+
+        C_BN = x.att.as_matrix()
 
         # Measure inertial acceleration in body coordinates
-        a_N_B = a_B + np.cross(x.w_B, x.v_B)
-        a_meas_B = a_N_B - C_BN @ g_N  # "proper" inertial acceleration
+        a_meas_B = (a_B - C_BN @ g_N) / self.g0  # "proper" inertial acceleration
 
         return a_meas_B + self.noise * w
 
 
 class AccelerometerConfig(StructConfig, type="basic"):
     gravity: GravityConfig = field(default_factory=ConstantGravityConfig)
-    noise: float = 0.0  # Noise standard deviation [m/s^2]
+    g0: float = 9.80665  # Standard gravity [m/s^2]
+    noise: float = 0.0  # Noise standard deviation [g's]
 
     def build(self) -> Accelerometer:
-        return Accelerometer(gravity=self.gravity.build(), noise=self.noise)
+        return Accelerometer(gravity=self.gravity.build(), g0=self.g0, noise=self.noise)
 
 
 @struct
@@ -71,8 +75,8 @@ class Gyroscope:
     def __call__(
         self,
         x: RigidBody.State,
-        w: ArrayLike,
-    ) -> ArrayLike:
+        w: np.ndarray,
+    ) -> np.ndarray:
         # Measure angular velocity in body coordinates
         return x.w_B + self.noise * w
 
@@ -94,9 +98,9 @@ class LineOfSight:
         self,
         vehicle: RigidBody.State,
         target: RigidBody.State,
-        w: ArrayLike,
-    ) -> ArrayLike:
-        C_BN = dcm_from_quaternion(vehicle.att)
+        w: np.ndarray,
+    ) -> np.ndarray:
+        C_BN = vehicle.att.as_matrix()
 
         r_N = target.pos - vehicle.pos  # Relative position in inertial coordinates
         r_B = C_BN @ r_N  # Relative position in body-fixed coordinates

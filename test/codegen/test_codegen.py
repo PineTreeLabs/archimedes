@@ -7,17 +7,12 @@ import numpy as np
 import pytest
 
 import archimedes as arc
+from archimedes._core._codegen._codegen import _to_snake_case
 from archimedes._core._codegen._renderer import (
     ArduinoRenderer,
     _extract_protected_regions,
     _render_template,
 )
-
-# TODO:
-# - Test data type explicit specification
-# - Test data type inference
-# - Test with static args
-# - Test re-importing with casadi extern
 
 
 @pytest.fixture
@@ -270,6 +265,50 @@ class TestCodegen:
         arc.codegen(func, args, **kwargs, debug=True)
         self._check_files(temp_dir, func.name)
 
+    def test_repeated_structs(self, temp_dir):
+        # Test that structs used multiple times with different sizes are
+        # handled correctly by generating unique type names.  For example,
+        # Container(a: array[3]) vs Container(a: array[2])
+
+        kwargs = {
+            "float_type": np.float32,
+            "output_dir": temp_dir,
+        }
+
+        @arc.struct
+        class Container:
+            data: np.ndarray
+            more_data: np.ndarray | None = None
+
+        def combine_func(
+            c1: Container,  # container_3_t
+            c2: Container,  # container_2_t
+        ) -> Container:
+            combined_data = np.hstack([c1.data, c2.data])
+            extra_data1 = Container(data=c1.data, more_data=c2.data)
+            extra_data2 = Container(data=c2.data, more_data=c1.data)
+            return (
+                Container(data=combined_data),  # container_5_t
+                c2,  # container_2_t (reused!)
+                extra_data1,  # container_3_2_t
+                extra_data2,  # container_2_3_t
+            )
+
+        # Pre-compile the function
+        func = arc.compile(
+            combine_func,
+            name=combine_func.__name__,
+            return_names=("combined", "c2_out", "extra1", "extra2"),
+        )
+
+        args = (
+            Container(data=np.array([1.0, 2.0, 3.0])),
+            Container(data=np.array([4.0, 5.0])),
+        )
+
+        arc.codegen(func, args, **kwargs, debug=True)
+        self._check_files(temp_dir, func.name)
+
     def test_error_handling(self, scalar_func, temp_dir):
         # Test with unknown return names.  By design choice, this raises an error
         # in order to help generate more readable code.
@@ -300,6 +339,22 @@ class TestCodegen:
 
         os.remove("invalid_arg_func_kernel.c")
         os.remove("invalid_arg_func_kernel.h")
+
+    def test_snake_case(self):
+        assert _to_snake_case("IIRFilter") == "iir_filter"
+        assert _to_snake_case("PIDController") == "pid_controller"
+        assert _to_snake_case("IO") == "io"  # Just acronym
+        assert _to_snake_case("myFilterClass") == "my_filter_class"
+        assert _to_snake_case("TypicalPythonClass") == "typical_python_class"
+
+        # Edge cases
+        assert _to_snake_case("A") == "a"
+        assert _to_snake_case("AB") == "ab"
+        assert _to_snake_case("ABC") == "abc"
+        assert _to_snake_case("ABCDef") == "abc_def"
+
+        # Nested paths (your existing feature)
+        assert _to_snake_case("Module.IIRFilter") == "module_iir_filter"
 
 
 class TestExtractProtectedRegions:

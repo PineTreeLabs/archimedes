@@ -17,5 +17,6 @@ def wind_frame(v_rel_B):
     u, v, w = v_rel_B
     vt = np.sqrt(u**2 + v**2 + w**2)
     alpha = np.arctan2(w, u)
-    beta = np.arcsin(v / vt)
+    # NaN protection: if vt = 0, then by definition v = 0 - limit the denominator
+    beta = np.arcsin(v / np.fmax(vt, 1e-6))
     return vt, alpha, beta
