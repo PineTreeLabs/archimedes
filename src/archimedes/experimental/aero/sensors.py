@@ -62,6 +62,7 @@ class AccelerometerConfig(StructConfig, type="basic"):
     def build(self) -> Accelerometer:
         return Accelerometer(gravity=self.gravity.build(), g0=self.g0, noise=self.noise)
 
+
 @struct
 class Gyroscope:
     """Basic three-axis gyroscope model

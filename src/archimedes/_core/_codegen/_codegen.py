@@ -434,7 +434,7 @@ class Context(Protocol):
 
     @property
     def size(self) -> int | None:
-        ...
+        """Number of elements in this context, or None if not applicable."""
 
 
 @dataclasses.dataclass
@@ -447,6 +447,7 @@ class NoneContext:
     @property
     def size(self) -> None:
         return None
+
 
 @dataclasses.dataclass
 class LeafContext:
@@ -471,6 +472,7 @@ class LeafContext:
 # unique struct types based on their child sizes and not just their names.
 StructIdentifier = tuple[str, tuple[int, ...]]
 
+
 @dataclasses.dataclass
 class StructContext:
     type_: str
@@ -484,11 +486,12 @@ class StructContext:
     def size(self) -> None:
         # Struct is a container - does not have a size itself
         return None
-    
+
     @property
     def type_id(self) -> StructIdentifier:
         """Unique identifier for this struct type based on name and sizes."""
         return (self.type_, self.sizes)
+
 
 @dataclasses.dataclass
 class ListContext(Context):
@@ -687,11 +690,11 @@ def _unique_types(
     contexts: list[StructContext | LeafContext],
 ) -> dict[str, StructContext]:
     """Collect all unique StructContext types.
-    
-    For structs with varying child sizes (e.g., Container(a: array[3]) vs 
-    Container(a: array[2])), generates distinct types (container_3_t and 
+
+    For structs with varying child sizes (e.g., Container(a: array[3]) vs
+    Container(a: array[2])), generates distinct types (container_3_t and
     container_2_t) to enable static memory allocation in C.
-    
+
     Returns a dict keyed by final type name (simplified where unambiguous).
     """
     unique_types: dict[StructIdentifier, StructContext] = OrderedDict()
@@ -721,7 +724,7 @@ def _unique_types(
 
     # Now if any type appears only once we can key it just by its name
     name_counts: dict[str, int] = {}
-    for (type_name, _) in unique_types.keys():
+    for type_name, _ in unique_types.keys():
         name_counts[type_name] = name_counts.get(type_name, 0) + 1
 
     # Rebuild the unique_types dictionary with simplified keys where possible
@@ -742,7 +745,7 @@ def _unique_types(
 
     # Update all struct references to use the simplified names
     for ctx in all_structs:
-        if name_counts[ctx.type_] > 1: 
+        if name_counts[ctx.type_] > 1:
             ctx.type_ = final_names[ctx.type_id]
 
     # Since the children are added last but need to be defined first,
