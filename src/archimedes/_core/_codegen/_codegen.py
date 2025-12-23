@@ -387,8 +387,7 @@ def codegen(
         output_context = output_helper(ret, name)
         context["outputs"].append(output_context)
 
-    context["unique_types"] = _unique_types(context["inputs"])
-    context["unique_types"].update(_unique_types(context["outputs"]))
+    context["unique_types"] = _unique_types(context["outputs"] + context["inputs"])
     context["assignments"] = _generate_assignments(context["inputs"], prefix="arg")
 
     if debug:
@@ -433,6 +432,10 @@ class Context(Protocol):
     description: str | None
     ctx_type: str
 
+    @property
+    def size(self) -> int | None:
+        ...
+
 
 @dataclasses.dataclass
 class NoneContext:
@@ -441,6 +444,9 @@ class NoneContext:
     description: str | None = None
     ctx_type: str = dataclasses.field(default="none")
 
+    @property
+    def size(self) -> None:
+        return None
 
 @dataclasses.dataclass
 class LeafContext:
@@ -452,15 +458,37 @@ class LeafContext:
     description: str | None
     ctx_type: str = "leaf"
 
+    @property
+    def size(self) -> int | None:
+        if self.dims is None:
+            return None  # Scalar - no need to track size
+        return self.dims
+
+
+# Python "struct" types (dicts, NamedTuples, @struct) will map to C structs.
+# However, Python will allow multiple instances to have different child sizes
+# (e.g. lists of different lengths).  To handle this, we need to track
+# unique struct types based on their child sizes and not just their names.
+StructIdentifier = tuple[str, tuple[int, ...]]
 
 @dataclasses.dataclass
 class StructContext:
     type_: str
     name: str
+    sizes: tuple[int, ...]
     children: list[Context]
     description: str | None = None
     ctx_type: str = "node"
 
+    @property
+    def size(self) -> None:
+        # Struct is a container - does not have a size itself
+        return None
+    
+    @property
+    def type_id(self) -> StructIdentifier:
+        """Unique identifier for this struct type based on name and sizes."""
+        return (self.type_, self.sizes)
 
 @dataclasses.dataclass
 class ListContext(Context):
@@ -470,6 +498,10 @@ class ListContext(Context):
     elements: list[Context] = dataclasses.field(default_factory=list)
     description: str | None = None
     ctx_type: str = "list"
+
+    @property
+    def size(self) -> int:
+        return self.length
 
 
 @dataclasses.dataclass
@@ -552,7 +584,7 @@ class ContextHelper:
             print(f"\tProcessing struct '{name}' ({arg}) for codegen...")
         # Note that all "static" data will be embedded in the computational
         # graph, so here we just need to process the child nodes and leaves
-        children = []
+        children: list[Context] = []
         for field in tree.fields(arg):
             if field.metadata.get("static", False):
                 continue
@@ -571,10 +603,14 @@ class ContextHelper:
             paths = paths[idx + 1 :]
         classname = ".".join(paths)
 
+        # Track sizes for identifying unique struct types
+        sizes = tuple(c.size for c in children if c.size is not None)
+
         return StructContext(
             type_=f"{_to_snake_case(classname)}_t",
             name=name,
             children=children,
+            sizes=sizes,
             description=self.descriptions.get(name, None),
         )
 
@@ -585,7 +621,7 @@ class ContextHelper:
             print(f"\tProcessing dict '{name}' ({arg}) for codegen...")
 
         # A dict is treated as a struct since it has named fields
-        children = []
+        children: list[Context] = []
         for key, value in arg.items():
             child_context = self._process_arg(value, key)
             children.append(child_context)
@@ -595,10 +631,14 @@ class ContextHelper:
 
         if type_ is None:
             type_ = name
+
+        sizes = tuple(c.size for c in children if c.size is not None)
+
         return StructContext(
             type_=f"{_to_snake_case(type_)}_t",
             name=name,
             children=children,
+            sizes=sizes,
             description=self.descriptions.get(name, None),
         )
 
@@ -646,28 +686,68 @@ class ContextHelper:
 def _unique_types(
     contexts: list[StructContext | LeafContext],
 ) -> dict[str, StructContext]:
-    """Collect all unique StructContext types, keyed by type_ field."""
-    unique_types = OrderedDict()
+    """Collect all unique StructContext types.
+    
+    For structs with varying child sizes (e.g., Container(a: array[3]) vs 
+    Container(a: array[2])), generates distinct types (container_3_t and 
+    container_2_t) to enable static memory allocation in C.
+    
+    Returns a dict keyed by final type name (simplified where unambiguous).
+    """
+    unique_types: dict[StructIdentifier, StructContext] = OrderedDict()
 
+    # References to all structs found (for updating names later if needed)
+    all_structs: list[StructContext] = []
+
+    # Recursive traversal to find all unique struct types
+    # For first pass, keep both the names and sizes to identify truly unique types
     def _traverse(ctx):
-        if isinstance(ctx, StructContext) and ctx.type_ not in unique_types:
-            unique_types[ctx.type_] = ctx
-            # Recursively traverse children to find nested types
-            for child in ctx.children:
-                _traverse(child)
+        if isinstance(ctx, StructContext):
+            all_structs.append(ctx)
+            if ctx.type_id not in unique_types:
+                unique_types[ctx.type_id] = ctx
+
+                # Recursively traverse children to find nested types
+                for child in ctx.children:
+                    _traverse(child)
 
         elif isinstance(ctx, ListContext):
-            if ctx.type_ not in unique_types:
-                # All elements share a type, so we only need to recursively
-                # traverse the first element's context for subtypes
-                _traverse(ctx.elements[0])
+            # All elements share a type, so we only need to recursively
+            # traverse the first element's context for subtypes
+            _traverse(ctx.elements[0])
 
     for ctx in contexts:
         _traverse(ctx)
 
+    # Now if any type appears only once we can key it just by its name
+    name_counts: dict[str, int] = {}
+    for (type_name, _) in unique_types.keys():
+        name_counts[type_name] = name_counts.get(type_name, 0) + 1
+
+    # Rebuild the unique_types dictionary with simplified keys where possible
+    # and update all struct references accordingly
+    simplified_types: dict[str, StructContext] = OrderedDict()
+    final_names: dict[StructIdentifier, str] = {}
+    for type_id, ctx in unique_types.items():
+        type_name, sizes = type_id
+        if name_counts[type_name] == 1:
+            # Unique name - can key by name only
+            simplified_types[type_name] = ctx
+            final_names[type_id] = type_name
+        else:
+            # Non-unique name - keep full identifier
+            new_name = f"{type_name[:-2]}_{'_'.join(map(str, sizes))}_t"
+            simplified_types[new_name] = ctx
+            final_names[type_id] = new_name
+
+    # Update all struct references to use the simplified names
+    for ctx in all_structs:
+        if name_counts[ctx.type_] > 1: 
+            ctx.type_ = final_names[ctx.type_id]
+
     # Since the children are added last but need to be defined first,
     # reverse the order of the unique_types dictionary.
-    return OrderedDict(reversed(list(unique_types.items())))
+    return OrderedDict(reversed(list(simplified_types.items())))
 
 
 @dataclasses.dataclass

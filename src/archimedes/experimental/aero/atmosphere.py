@@ -98,10 +98,15 @@ class StandardAtmosphere1976(AtmosphereModel):
         p1 = find_equal(alt, h_USSA1976, p_USSA1976)
         L = find_equal(alt, h_USSA1976, L_USSA1976)
 
+        # Add L == 0 protection to avoid divide-by-zero warnings during graph
+        # construction - this value should never be evaluated at runtime since it
+        # conflicts with the predicate of the final evaluation
+        L_val = np.where(L == 0, 1.0, L)  # Dummy value for graph construction
+
         return np.where(
             L == 0,
             p1 * np.exp(-self.g0 * (alt - h1) / (self.Rs * T1)),
-            p1 * (T1 / (T1 + L * (alt - h1))) ** (self.g0 / (self.Rs * L)),
+            p1 * (T1 / (T1 + L_val * (alt - h1))) ** (self.g0 / (self.Rs * L_val)),
         )
 
     def calc_T(self, alt: float) -> float:

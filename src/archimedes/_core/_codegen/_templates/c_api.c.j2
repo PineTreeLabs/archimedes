@@ -18,10 +18,10 @@ int {{ function_name }}_init({{ function_name }}_arg_t* arg, {{ function_name }}
     {{ assignment.path }} = {{ assignment.value }};
 {% endfor %}
 
-    _Static_assert(sizeof({{ function_name }}_arg_t) == {{ input_size }} * sizeof(float),
+    _Static_assert(sizeof({{ function_name }}_arg_t) == {{ input_size }} * sizeof({{ float_type }}),
         "Non-contiguous arg struct; please enable -fpack-struct or equivalent.");
 
-    _Static_assert(sizeof({{ function_name }}_res_t) == {{ output_size }} * sizeof(float),
+    _Static_assert(sizeof({{ function_name }}_res_t) == {{ output_size }} * sizeof({{ float_type }}),
         "Non-contiguous res struct; please enable -fpack-struct or equivalent.");
 
     return 0;
@@ -39,10 +39,10 @@ int {{ function_name }}_step({{ function_name }}_arg_t* arg, {{ function_name }}
     kernel_arg[{{ loop.index0 }}] = {% if input.is_addr %}&{% endif %}arg->{{ input.name }};
 {%- elif input.ctx_type == "list" %}
 {# Pointer casting - array decays to pointer #}
-    kernel_arg[{{ loop.index0 }}] = (float*)arg->{{ input.name }};
+    kernel_arg[{{ loop.index0 }}] = ({{ float_type }}*)arg->{{ input.name }};
 {%- elif input.ctx_type == "node" %}
 {# Pointer casting #}
-    kernel_arg[{{ loop.index0 }}] = (float*)&arg->{{ input.name }};
+    kernel_arg[{{ loop.index0 }}] = ({{ float_type }}*)&arg->{{ input.name }};
 {%- endif %}
 
 {% endfor %}
@@ -54,10 +54,10 @@ int {{ function_name }}_step({{ function_name }}_arg_t* arg, {{ function_name }}
     kernel_res[{{ loop.index0 }}] = {% if output.is_addr %}&{% endif %}res->{{ output.name }};
 {%- elif output.ctx_type == "list" %}
     {# Pointer casting - array decays to pointer #}
-    kernel_res[{{ loop.index0 }}] = (float*)res->{{ output.name }};
+    kernel_res[{{ loop.index0 }}] = ({{ float_type }}*)res->{{ output.name }};
 {%- elif output.ctx_type == "node" %}
     {# Pointer casting #}
-    kernel_res[{{ loop.index0 }}] = (float*)&res->{{ output.name }};
+    kernel_res[{{ loop.index0 }}] = ({{ float_type }}*)&res->{{ output.name }};
 {%- endif %}
 
 {% endfor %}
