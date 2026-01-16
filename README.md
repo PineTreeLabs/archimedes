@@ -3,6 +3,7 @@
 ![Build Status](https://github.com/pinetreelabs/archimedes/actions/workflows/ci.yaml/badge.svg)
 ![Security Scan](https://github.com/pinetreelabs/archimedes/actions/workflows/security.yaml/badge.svg)
 [![codecov](https://codecov.io/gh/pinetreelabs/archimedes/graph/badge.svg?token=37QNTHS42R)](https://codecov.io/gh/pinetreelabs/archimedes)
+[![PySimHub](https://pysimhub.io/badge.svg)](https://pysimhub.io/projects/archimedes)
 [![REUSE status](https://api.reuse.software/badge/github.com/PineTreeLabs/archimedes)](https://api.reuse.software/info/github.com/PineTreeLabs/archimedes)
 
 **Archimedes** is an open-source Python framework designed for deployment of control systems to hardware.
