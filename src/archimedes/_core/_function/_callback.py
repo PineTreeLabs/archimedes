@@ -62,7 +62,7 @@ def callback(func: Callable, result_shape_dtypes, *args) -> Any:
     which means:
 
     1. It won't benefit from symbolic optimization
-    2. It cannot be differentiated through automatically
+    2. It can only be differentiated with finite differences
     3. It may be slower than native symbolic operations
 
     Note that while it is _possible_ to use this function to circumvent the
@@ -147,7 +147,7 @@ def callback(func: Callable, result_shape_dtypes, *args) -> Any:
             return [ret]
 
     name = f"cb_{cache.name}"
-    cb = _Callback(name)
+    cb = _Callback(name, {"enable_fd": True})
 
     def _call(*args):
         arg_flat, _ = tree.ravel(args)
