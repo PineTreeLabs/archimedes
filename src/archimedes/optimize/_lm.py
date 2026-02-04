@@ -690,9 +690,9 @@ def lm_solve(
     # Auto-detect scaling: if diag is None, use automatic scaling
     auto_scale = diag is None
     if diag is None:
-        diag: np.ndarray = np.ones(n)  # type: ignore[no-redef]
+        _diag: np.ndarray = np.ones(n)
     else:
-        diag: np.ndarray = tree.ravel(diag)[0]  # type: ignore[no-redef]
+        _diag: np.ndarray = tree.ravel(diag)[0]  # type: ignore[no-redef]
 
     # Initialize counters and status variables
     nfev = 0  # Number of function evaluations
@@ -746,10 +746,10 @@ def lm_solve(
         # Update diagonal scaling if using automatic scaling
         if iter == 0 and auto_scale:
             # Use the diagonal of the Hessian for scaling
-            diag = np.sqrt(np.maximum(np.diag(hess), 1e-8))
+            _diag = np.sqrt(np.maximum(np.diag(hess), 1e-8))
 
         # Calculate scaled vector norm
-        xnorm = np.linalg.norm(diag * x)
+        xnorm = np.linalg.norm(_diag * x)
 
         # Check gradient convergence (constrained vs unconstrained)
         if bounds_flat is not None:
@@ -774,7 +774,7 @@ def lm_solve(
         while True:
             # Compute step using damped normal equations
             step = _compute_step(
-                hess, grad, diag, lambda_val, x, bounds_flat, qp_solver
+                hess, grad, _diag, lambda_val, x, bounds_flat, qp_solver
             )
 
             # Compute trial point
@@ -784,7 +784,7 @@ def lm_solve(
                 logger.debug(f"Trial point: {x_new}")
 
             # Compute scaled step norm
-            pnorm = np.linalg.norm(diag * step)
+            pnorm = np.linalg.norm(_diag * step)
 
             # Evaluate function at trial point
             cost_new, grad_new, hess_new = func_and_grads(x_new)
@@ -827,7 +827,7 @@ def lm_solve(
                 x = x_new
                 cost, grad, hess = cost_new, grad_new, hess_new
                 g_norm = np.linalg.norm(grad, np.inf)
-                xnorm = np.linalg.norm(diag * x)
+                xnorm = np.linalg.norm(_diag * x)
 
                 # Update effective gradient norm for progress reporting
                 if bounds_flat is not None:
