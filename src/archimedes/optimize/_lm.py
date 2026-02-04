@@ -690,7 +690,7 @@ def lm_solve(
     # Auto-detect scaling: if diag is None, use automatic scaling
     auto_scale = diag is None
     if diag is None:
-        _diag: np.ndarray = np.ones(n)
+        _diag: np.ndarray = np.ones(n)  # type: ignore[no-redef]
     else:
         _diag: np.ndarray = tree.ravel(diag)[0]  # type: ignore[no-redef]
 
