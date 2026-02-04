@@ -147,7 +147,7 @@ def callback(func: Callable, result_shape_dtypes, *args) -> Any:
             return [ret]
 
     name = f"cb_{cache.name}"
-    cb = _Callback(name)
+    cb = _Callback(name, {"enable_fd":True})
 
     def _call(*args):
         arg_flat, _ = tree.ravel(args)
