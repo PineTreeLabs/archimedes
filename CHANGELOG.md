@@ -86,9 +86,6 @@ New version tag for release to PyPI (previous "Archimedes" project tagged with v
 - Add support for `np.block`
 - Add logic for creating additional struct types in codegen if they have differently-sized children ([Issue #135](https://github.com/PineTreeLabs/archimedes/issues/135))
 - Add acronym handling to snake case conversion in codegen (`IIRFilter` -> `iir_filter_t`, not `i_i_r_filter_t`) - ([Issue #136](https://github.com/PineTreeLabs/archimedes/issues/136))
-<<<<<<< Updated upstream
-- Bump filelock to 3.20.1 to resolve vulnerabilities ([Issue #138](https://github.com/PineTreeLabs/archimedes/issues/138))
-=======
 - Bump filelock to 3.20.1 to resolve vulnerabilities ([Issue #138](https://github.com/PineTreeLabs/archimedes/issues/138))
 
 ## [0.4.4]
@@ -96,4 +93,4 @@ New version tag for release to PyPI (previous "Archimedes" project tagged with v
 - Bump pip version in uv.lock to 26.0 to resolve vulnerability GHSA-6vgw-5pg2-w6jp
 - Enable finite differencing for `callback` functions
 - Fix bug in `switch` where args were passed directly during `Function` creation
->>>>>>> Stashed changes
+
