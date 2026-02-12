@@ -92,3 +92,5 @@ New version tag for release to PyPI (previous "Archimedes" project tagged with v
 - Bump control requirement to 0.10.2 (required for Lynx diagram export compatibility)
 - Bump pip version in uv.lock to 26.0 to resolve vulnerability GHSA-6vgw-5pg2-w6jp
 - Enable finite differencing for `callback` functions
+- Fix bug in `switch` where args were passed directly during `Function` creation
+

@@ -43,6 +43,7 @@ from archimedes._core._array_impl import (
     DEFAULT_SYM_NAME,
     _unwrap_sym_array,
     array,
+    sym_like,
 )
 
 from .._array_ops._array_ops import normalize_axis_index
@@ -383,9 +384,15 @@ def switch(
     if name is None:
         name = f"switch_{index}"
 
+    cached_branches = []
+    for branch in branches:
+        if not isinstance(branch, FunctionCache):
+            branch = FunctionCache(branch)
+        cached_branches.append(branch)
+
     # Wrap this within a compile decorator to ensure everything is symbolic
-    @compile(name=name, static_argnums=(1,))
-    def _switch(index, branches, args):
+    @compile(name=name)
+    def _switch(index, args):
         # Ravel all args to a single flat argument for constructing
         # an equivalent flattened CasADi function
         args_flat, args_unravel = tree.ravel(args)
@@ -397,12 +404,17 @@ def switch(
         results_treedef = None
         results_size = None
         cs_branches = []  # Flat inputs -> flat outputs
-        for branch in branches:
-            if not isinstance(branch, FunctionCache):
-                branch = FunctionCache(branch)
+        for branch in cached_branches:
+            # Cannot pass args_flat directly because they may not be pure
+            # symbolic.  So to compile the function we have to create temporary
+            # args with the same shape
+            branch_args_flat = sym_like(
+                args_flat, kind=kind, name=f"{branch.name}_args"
+            )
+            branch_args = args_unravel(branch_args_flat)
 
             # Evaluate the branch for type checking of results
-            results = branch(*args)
+            results = branch(*branch_args)
 
             # Flatten the results to a single array for each branch
             # Note that all branches must have the same treedef, so it
@@ -432,7 +444,7 @@ def switch(
             cs_branches.append(
                 cs.Function(
                     branch.name,
-                    [_unwrap_sym_array(args_flat)],
+                    [_unwrap_sym_array(branch_args_flat)],
                     [_unwrap_sym_array(results_flat)],
                 )
             )
@@ -441,7 +453,9 @@ def switch(
         cs_switch = cs.Function.conditional(name, cs_branches[:-1], cs_branches[-1])
 
         # Evaluate the CasADi function symbolically
-        index = np.fmax(np.fmin(index, len(branches) - 1), 0)  # Clamp to valid range
+        index = np.fmax(
+            np.fmin(index, len(cached_branches) - 1), 0
+        )  # Clamp to valid range
         cs_results = cs_switch(_unwrap_sym_array(index), _unwrap_sym_array(args_flat))
 
         # Convert back to a flat SymbolicArray
@@ -451,7 +465,7 @@ def switch(
         return results_unravel(results_flat)
 
     # Call the switch function with the provided arguments
-    return _switch(index, branches, args)
+    return _switch(index, args)
 
 
 def normalize_vmap_index(axis, data, insert=False):
