@@ -41,9 +41,9 @@ import numpy as np
 from archimedes import tree
 from archimedes._core._array_impl import (
     DEFAULT_SYM_NAME,
-    sym_like,
     _unwrap_sym_array,
     array,
+    sym_like,
 )
 
 from .._array_ops._array_ops import normalize_axis_index
@@ -405,7 +405,9 @@ def switch(
             # Cannot pass args_flat directly because they may not be pure
             # symbolic.  So to compile the function we have to create temporary
             # args with the same shape
-            branch_args_flat = sym_like(args_flat, kind=kind, name=f"{branch.name}_args")
+            branch_args_flat = sym_like(
+                args_flat, kind=kind, name=f"{branch.name}_args"
+            )
             branch_args = args_unravel(branch_args_flat)
 
             # Evaluate the branch for type checking of results
@@ -434,7 +436,7 @@ def switch(
                         f"structure, but got {results_treedef} for branch 0 and "
                         f"{results_treedef_i} for branch {branch.name}."
                     )
-        
+
             # Save a flattened version of the branch function
             cs_branches.append(
                 cs.Function(
