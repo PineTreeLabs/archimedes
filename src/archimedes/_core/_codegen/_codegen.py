@@ -724,17 +724,25 @@ def _unique_types(
     # References to all structs found (for updating names later if needed)
     all_structs: list[StructContext] = []
 
-    # Recursive traversal to find all unique struct types
-    # For first pass, keep both the names and sizes to identify truly unique types
+    # Recursive traversal to find all unique struct types in post-order
+    # (children before parents), so that leaf structs are always defined
+    # before the structs that contain them.  A separate visited set prevents
+    # re-entrance; we cannot use presence in unique_types as the guard
+    # because the struct is only added after its children are processed.
+    visited: set[StructIdentifier] = set()
+
     def _traverse(ctx):
         if isinstance(ctx, StructContext):
             all_structs.append(ctx)
-            if ctx.type_id not in unique_types:
-                unique_types[ctx.type_id] = ctx
+            if ctx.type_id not in visited:
+                visited.add(ctx.type_id)
 
-                # Recursively traverse children to find nested types
+                # Recursively traverse children first (post-order)
                 for child in ctx.children:
                     _traverse(child)
+
+                # Add this struct after its children are processed
+                unique_types[ctx.type_id] = ctx
 
         elif isinstance(ctx, ListContext):
             # All elements share a type, so we only need to recursively
@@ -770,9 +778,7 @@ def _unique_types(
         if name_counts[ctx.type_] > 1:
             ctx.type_ = final_names[ctx.type_id]
 
-    # Since the children are added last but need to be defined first,
-    # reverse the order of the unique_types dictionary.
-    return OrderedDict(reversed(list(simplified_types.items())))
+    return simplified_types
 
 
 @dataclasses.dataclass

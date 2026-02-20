@@ -309,6 +309,50 @@ class TestCodegen:
         arc.codegen(func, args, **kwargs, debug=True)
         self._check_files(temp_dir, func.name)
 
+    def test_leaf_struct_ordering(self, temp_dir):
+        # Regression test: when a "leaf" struct type (Inner) is also a direct
+        # top-level argument that appears *before* an outer struct (Outer)
+        # containing it, Inner's typedef must still be generated before
+        # Outer's typedef in the header.  With the old pre-order traversal +
+        # reversed() approach, the simple reversal broke when the leaf struct
+        # was encountered first as a standalone top-level context.
+        kwargs = {
+            "float_type": np.float32,
+            "output_dir": temp_dir,
+        }
+
+        @arc.struct
+        class Inner:
+            value: float
+
+        @arc.struct
+        class Outer:
+            inner: Inner
+            scale: float
+
+        def leaf_order_func(inner_arg: Inner, outer_arg: Outer) -> float:
+            return inner_arg.value + outer_arg.inner.value * outer_arg.scale
+
+        func = arc.compile(
+            leaf_order_func,
+            name=leaf_order_func.__name__,
+            return_names=("result",),
+        )
+
+        # inner_arg (type Inner) comes before outer_arg (type Outer which
+        # contains Inner).  This is the ordering that triggered the bug.
+        args = (Inner(value=1.0), Outer(inner=Inner(value=2.0), scale=3.0))
+        arc.codegen(func, args, **kwargs)
+
+        h_file = f"{temp_dir}/{func.name}.h"
+        with open(h_file) as f:
+            content = f.read()
+
+        # inner_t must be defined before outer_t (which references inner_t)
+        assert content.index("} inner_t;") < content.index("} outer_t;"), (
+            "inner_t typedef must appear before outer_t in the generated header"
+        )
+
     def test_error_handling(self, scalar_func, temp_dir):
         # Test with unknown return names.  By design choice, this raises an error
         # in order to help generate more readable code.

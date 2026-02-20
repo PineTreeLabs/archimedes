@@ -9,13 +9,13 @@ extern "C" {
 #endif
 
 typedef struct {
-    float value;
-} empty_struct_inner_struct_t;
-
-typedef struct {
     float x;
     float y;
 } point_t;
+
+typedef struct {
+    float value;
+} empty_struct_inner_struct_t;
 
 typedef struct {
     point_t center;
