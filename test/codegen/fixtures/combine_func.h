@@ -9,14 +9,14 @@ extern "C" {
 #endif
 
 typedef struct {
-    float data[3];
+    float data[5];
     // more_data was empty, no fields generated
-} container_3_t;
+} container_5_t;
 
 typedef struct {
     float data[2];
-    float more_data[3];
-} container_2_3_t;
+    // more_data was empty, no fields generated
+} container_2_t;
 
 typedef struct {
     float data[3];
@@ -25,13 +25,13 @@ typedef struct {
 
 typedef struct {
     float data[2];
-    // more_data was empty, no fields generated
-} container_2_t;
+    float more_data[3];
+} container_2_3_t;
 
 typedef struct {
-    float data[5];
+    float data[3];
     // more_data was empty, no fields generated
-} container_5_t;
+} container_3_t;
 
 // Input arguments struct
 typedef struct {

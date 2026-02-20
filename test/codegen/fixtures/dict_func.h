@@ -9,14 +9,14 @@ extern "C" {
 #endif
 
 typedef struct {
-    float lr;
-    float momentum;
-} config_t;
-
-typedef struct {
     // none_res was empty, no fields generated
     float result;
 } output_t;
+
+typedef struct {
+    float lr;
+    float momentum;
+} config_t;
 
 // Input arguments struct
 typedef struct {
