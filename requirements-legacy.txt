@@ -7,7 +7,7 @@
 #   .venv-legacy/bin/pip install -r requirements-legacy.txt
 #   .venv-legacy/bin/pytest test/
 
-# Pinned old versions (the point of this test)
+# Pinned old versions (minimum guaranteed versions)
 numpy==1.20.*
 scipy==1.10.*
 

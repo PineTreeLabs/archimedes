@@ -144,6 +144,18 @@ class TestSymbolicArrayCreate:
             assert y.kind == "SX"
             assert cs.is_equal(y._sym, np.ones(shape), 1)
 
+    @pytest.mark.skipif(                                                                                                       
+        not hasattr(np, "astype"),                                                                                           
+        reason="np.astype requires numpy >= 2.0",
+    )
+    def test_astype(self):
+        x = sym("x", shape=(3,), dtype=np.float64)
+        y = np.astype(x, np.float32)
+        assert isinstance(y, SymbolicArray)
+        assert y.shape == x.shape
+        assert y.dtype == np.float32
+        assert cs.is_equal(y._sym, x._sym, 1)
+
     def test_error_handling(self):
         with pytest.raises(ValueError, match=r"Unknown symbolic kind.*"):
             sym("x", kind="abc")
