@@ -51,10 +51,13 @@ import numpy as np
 try:
     import numpy.exceptions as npex
 except ImportError:  # pragma: no cover
-    import numpy as npex  # type: ignore[no-redef]  # AxisError lives at numpy.AxisError in <1.25
+    # AxisError lives at numpy.AxisError in <1.25
+    import numpy as npex  # type: ignore[no-redef]
 
 try:
-    from numpy._core.shape_base import _block_setup  # type: ignore[no-redef, attr-defined]
+    from numpy._core.shape_base import (  # type: ignore[no-redef, attr-defined]
+        _block_setup,
+    )
 except ImportError:  # pragma: no cover
     from numpy.core.shape_base import _block_setup  # type: ignore[no-redef]
 
