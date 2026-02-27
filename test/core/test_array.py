@@ -144,8 +144,8 @@ class TestSymbolicArrayCreate:
             assert y.kind == "SX"
             assert cs.is_equal(y._sym, np.ones(shape), 1)
 
-    @pytest.mark.skipif(                                                                                                       
-        not hasattr(np, "astype"),                                                                                           
+    @pytest.mark.skipif(
+        not hasattr(np, "astype"),
         reason="np.astype requires numpy >= 2.0",
     )
     def test_astype(self):
