@@ -390,6 +390,24 @@ class TestCodegen:
         assert "float x[3];" in content
         assert "float offset;" in content
 
+        # --- Static arg passed via the kwargs= dict (not positionally) ---
+        # This exercises the `continue` branch in the kwargs loop in codegen.py.
+        arc.codegen(
+            compiled,
+            (np.zeros(3),),
+            kwargs={"scale": 2.0, "offset": 1.0},
+            **kwargs,
+        )
+
+        with open(f"{temp_dir}/scaled_shift.h") as f:
+            content3 = f.read()
+
+        assert "float scale;" not in content3, (
+            "Static kwarg 'scale' must not appear as a field in the C arg struct"
+        )
+        assert "float x[3];" in content3
+        assert "float offset;" in content3
+
         # --- Struct static arg (the "deeply nested" case) ---
         @arc.struct
         class Config:
