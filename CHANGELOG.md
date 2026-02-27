@@ -93,4 +93,5 @@ New version tag for release to PyPI (previous "Archimedes" project tagged with v
 - Bump pip version in uv.lock to 26.0 to resolve vulnerability GHSA-6vgw-5pg2-w6jp
 - Enable finite differencing for `callback` functions
 - Fix bug in `switch` where args were passed directly during `Function` creation
-
+- Implement DFS for sorting struct order in codegen (fixes struct definition bug)
+- Remove Python 3.10+ features to allow for force-installing into legacy environments (3.9 + NumPy 1.20, in particular)

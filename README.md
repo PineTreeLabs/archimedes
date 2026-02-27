@@ -161,6 +161,19 @@ uv run ipython kernel install --user --env VIRTUAL_ENV $(pwd)/.venv --name=archi
 
 This will create a kernel named `archimedes` - you can change the name to whatever you'd like.
 
+### Legacy environments
+
+The default package configuration restricts to Python 3.11+, which in turn requires NumPy 2.0+ and cascades to other dependencies.
+This is primarily for supporting Sphinx 8.2+ for documentation, but isn't a hard constraint on the library itself.
+
+Archimedes itself is compatible back to at least Python 3.9 and NumPy 1.20 and can be force-installed with:
+
+```bash
+pip install --ignore-requires-python archimedes
+```
+
+This is considered a "legacy" configuration since it is not within the constraints of the actual `pyproject.toml` configuration, but 3.9/1.20 is tested as a special case in CI.
+
 ### Source installation
 
 To install from source locally (e.g. for development or building the docs), the recommended procedure is to create a UV virtual environment as described above and then run:
