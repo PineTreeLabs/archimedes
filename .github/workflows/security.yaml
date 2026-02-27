@@ -28,21 +28,6 @@ jobs:
     
     - name: Run pip-audit
       run: |
-        # === TEMPORARY SECURITY EXCEPTIONS ===
-        #
-        # CVE-2025-53000 (unauthorized nbconvert code execution)
-        # - ID: GHSA-xm59-rqc7-hhvf
-        # - Affects: jupyter nbconvert on Windows platforms
-        # - Resolution: Pending fix from upstream
-        # - Tracking: https://github.com/PineTreeLabs/archimedes/issues/139
-        # - Impact: Unauthorized code execution when using nbconvert on Windows platforms
-        #     Has no impact on CI or documentation generation in Archimedes, which run on Linux.
-        #     Users that are not building documentation locally are not affected.
-        EXPIRY_DATE="2026-03-01"
-        if [[ $(date +%Y-%m-%d) > $EXPIRY_DATE ]]; then
-          echo "ERROR: pip-audit exception has expired. Review issue #139."
-          exit 1
-        fi
         uv export --no-emit-project --format requirements-txt > requirements.txt
         uv run pip-audit -r requirements.txt --disable-pip --ignore-vuln GHSA-xm59-rqc7-hhvf
     
