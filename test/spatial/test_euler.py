@@ -62,7 +62,7 @@ class TestEulerLowLevel:
         angles = random_euler()
         for seq in TEST_SEQ:
             q1 = euler_to_quaternion(angles, seq=seq)
-            q2 = ScipyRotation.from_euler(seq, angles).as_quat(scalar_first=True)
+            q2 = np.roll(ScipyRotation.from_euler(seq, angles).as_quat(), 1)
             np.testing.assert_allclose(q1, q2)
 
     def test_euler_to_dcm(self):

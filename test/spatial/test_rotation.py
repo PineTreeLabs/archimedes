@@ -14,7 +14,9 @@ def random_rotation():
     """Generate a random rotation"""
     rand_quat = np.random.randn(4)
     rand_quat /= np.linalg.norm(rand_quat)
-    return Rotation.from_quat(rand_quat, scalar_first=True)
+    # Convert to scalar-last format
+    rand_quat = np.array([*rand_quat[1:], rand_quat[0]])
+    return Rotation.from_quat(rand_quat)
 
 
 class TestRotation:
@@ -26,9 +28,10 @@ class TestRotation:
     def test_multiplication(self):
         R1, R2 = random_rotation(), random_rotation()
         q1 = (R1 * R2).as_quat()
-        R1_scipy = ScipyRotation.from_quat(R1.as_quat(), scalar_first=True)
-        R2_scipy = ScipyRotation.from_quat(R2.as_quat(), scalar_first=True)
-        q2 = (R1_scipy * R2_scipy).as_quat(scalar_first=True)
+
+        R1_scipy = ScipyRotation.from_quat(np.roll(R1.as_quat(), -1))
+        R2_scipy = ScipyRotation.from_quat(np.roll(R2.as_quat(), -1))
+        q2 = np.roll((R1_scipy * R2_scipy).as_quat(), 1)
         assert np.allclose(q1, q2)
 
     def test_apply(self):
@@ -36,7 +39,7 @@ class TestRotation:
         v = np.array([0.1, 0.2, 0.3])
         w = R.apply(v)
 
-        R_scipy = ScipyRotation.from_quat(R.as_quat(), scalar_first=True)
+        R_scipy = ScipyRotation.from_quat(np.roll(R.as_quat(), -1))
         w_scipy = R_scipy.apply(v)
 
         assert np.allclose(w, w_scipy)
@@ -84,7 +87,7 @@ class TestRotation:
         if debug:
             R2 = ScipyRotation.from_euler(seq, euler_orig)
             print(f"quat:       {R.as_quat(scalar_first=True)}")
-            print(f"SciPy quat: {R2.as_quat(scalar_first=True)}")
+            print(f"SciPy quat: {np.roll(R2.as_quat(), 1)}")
 
             print(f"euler:       {euler2}")
             print(f"SciPy euler: {R2.as_euler(seq)}")
@@ -101,8 +104,8 @@ class TestRotation:
         if debug:
             R1_scipy = ScipyRotation.from_euler(seq, euler_orig)
             R2_scipy = ScipyRotation.from_matrix(R1.as_matrix())
-            print(f"quat:       {R1.as_quat(scalar_first=True)}")
-            print(f"SciPy quat: {R1_scipy.as_quat(scalar_first=True)}")
+            print(f"quat:       {R1.as_quat()}")
+            print(f"SciPy quat: {np.roll(R1_scipy.as_quat(), 1)}")
 
             print(f"euler:       {euler2}")
             print(f"SciPy euler: {R2_scipy.as_euler(seq)}")
@@ -113,8 +116,8 @@ class TestRotation:
         # Euler -> matrix -> quat -> euler
 
         R1 = Rotation.from_euler(seq, euler_orig)
-        q = R1.as_quat(scalar_first=True)
-        R3 = Rotation.from_quat(q, scalar_first=True)
+        q = R1.as_quat()
+        R3 = Rotation.from_quat(q)
         euler2 = R3.as_euler(seq)
 
         assert np.allclose(euler2, euler_orig)

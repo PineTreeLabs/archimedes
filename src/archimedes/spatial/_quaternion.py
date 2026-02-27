@@ -135,7 +135,7 @@ def dcm_to_quaternion(matrix: np.ndarray) -> np.ndarray:
     # system transformations rather than active rotations of vectors)
     matrix = matrix.T
 
-    t = np.linalg.trace(matrix)
+    t = np.trace(matrix)
 
     # If matrix[0, 0] is the largest diagonal element
     q0 = np.hstack(
