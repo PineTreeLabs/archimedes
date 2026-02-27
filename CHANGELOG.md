@@ -88,9 +88,10 @@ New version tag for release to PyPI (previous "Archimedes" project tagged with v
 - Add acronym handling to snake case conversion in codegen (`IIRFilter` -> `iir_filter_t`, not `i_i_r_filter_t`) - ([Issue #136](https://github.com/PineTreeLabs/archimedes/issues/136))
 - Bump filelock to 3.20.1 to resolve vulnerabilities ([Issue #138](https://github.com/PineTreeLabs/archimedes/issues/138))
 
-## [0.4.4]
+## [0.4.4] - 2026-02-27
 - Bump control requirement to 0.10.2 (required for Lynx diagram export compatibility)
 - Bump pip version in uv.lock to 26.0 to resolve vulnerability GHSA-6vgw-5pg2-w6jp
+- Bump nbconvert to 7.17.0 to resolve vulnerability GHSA-xm59-rqc7-hhvf
 - Enable finite differencing for `callback` functions
 - Fix bug in `switch` where args were passed directly during `Function` creation
 - Implement DFS for sorting struct order in codegen (fixes struct definition bug)
