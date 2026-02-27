@@ -169,8 +169,10 @@ This is primarily for supporting Sphinx 8.2+ for documentation, but isn't a hard
 Archimedes itself is compatible back to at least Python 3.9 and NumPy 1.20 and can be force-installed with:
 
 ```bash
-pip install --ignore-requires-python archimedes
+pip install --ignore-requires-python --no-deps archimedes
 ```
+
+The other dependencies can then be installed manually with specific versions as needed (you should be able to base these on the specific constraints in `pyproject.toml`).
 
 This is considered a "legacy" configuration since it is not within the constraints of the actual `pyproject.toml` configuration, but 3.9/1.20 is tested as a special case in CI.
 
