@@ -160,13 +160,12 @@ def euler_to_dcm(angles: np.ndarray, seq: str = "xyz") -> np.ndarray:
     # full matrix is built.
     R = np.eye(3, like=angles)
     for char, angle in zip(seq, angles):
-        match char:
-            case "x":
-                R = R @ _rot_x(angle)
-            case "y":
-                R = R @ _rot_y(angle)
-            case "z":
-                R = R @ _rot_z(angle)
+        if char == "x":
+            R = R @ _rot_x(angle)
+        elif char == "y":
+            R = R @ _rot_y(angle)
+        elif char == "z":
+            R = R @ _rot_z(angle)
     return R
 
 

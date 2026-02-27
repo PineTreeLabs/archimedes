@@ -280,7 +280,7 @@ class Rotation:
         if matrix.shape != (3, 3):
             raise ValueError("Rotation matrix must be 3x3")
 
-        t = np.linalg.trace(matrix)
+        t = np.trace(matrix)
 
         # If matrix[0, 0] is the largest diagonal element
         q0 = np.hstack(

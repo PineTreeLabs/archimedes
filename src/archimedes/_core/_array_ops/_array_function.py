@@ -47,8 +47,19 @@ from typing import TYPE_CHECKING
 
 import casadi as cs
 import numpy as np
-import numpy.exceptions as npex
-from numpy._core.shape_base import _block_setup  # type: ignore
+
+try:
+    import numpy.exceptions as npex
+except ImportError:  # pragma: no cover
+    # AxisError lives at numpy.AxisError in <1.25
+    import numpy as npex  # type: ignore[no-redef]
+
+try:
+    from numpy._core.shape_base import (  # type: ignore[no-redef, attr-defined]
+        _block_setup,
+    )
+except ImportError:  # pragma: no cover
+    from numpy.core.shape_base import _block_setup  # type: ignore[no-redef]
 
 from .._array_impl import (
     SymbolicArray,

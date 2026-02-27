@@ -1,6 +1,3 @@
-import matplotlib as mpl
-from cycler import cycler
-
 __all__ = ["color_schemes", "set_theme"]
 
 dark_charcoal = "#2A2A2A"
@@ -90,6 +87,14 @@ def set_theme(theme: str):
     --------
     matplotlib.pyplot.rcParams : The parameter dictionary that this function modifies
     """
+
+    try:
+        import matplotlib as mpl
+        from cycler import cycler
+    except ImportError:
+        raise ImportError(
+            "matplotlib is required to set the theme. Please install matplotlib."
+        )
 
     colors = color_schemes[theme]
 

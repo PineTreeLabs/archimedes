@@ -52,6 +52,8 @@ from __future__ import annotations
 
 import dataclasses
 import functools
+import sys
+import warnings
 from collections.abc import Callable
 from dataclasses import InitVar, fields, replace
 from typing import Any, TypeVar
@@ -264,6 +266,17 @@ def struct(cls: T | None = None, **kwargs) -> T | Callable:
 
     if "frozen" not in kwargs.keys():
         kwargs["frozen"] = True
+    if sys.version_info < (3, 10):  # pragma: no cover
+        for _kw in ("kw_only", "slots", "match_args"):
+            if _kw in kwargs:
+                warnings.warn(
+                    f"@struct argument '{_kw}' requires Python 3.10+ and will be "
+                    f"ignored on Python {sys.version_info.major}."
+                    f"{sys.version_info.minor}.",
+                    UserWarning,
+                    stacklevel=2,
+                )
+                kwargs.pop(_kw)
     data_cls = dataclasses.dataclass(**kwargs)(cls)  # type: ignore
     meta_fields = []
     data_fields = []

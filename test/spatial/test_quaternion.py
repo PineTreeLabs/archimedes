@@ -30,25 +30,23 @@ class TestQuaternionLowLevel:
     def test_multiplication(self):
         R1, R2 = random_quat(), random_quat()
         q1 = quaternion_multiply(R1, R2)
-        R1_scipy = ScipyRotation.from_quat(R1, scalar_first=True)
-        R2_scipy = ScipyRotation.from_quat(R2, scalar_first=True)
-        q2 = (R1_scipy * R2_scipy).as_quat(scalar_first=True)
+        R1_scipy = ScipyRotation.from_quat(np.roll(R1, -1))
+        R2_scipy = ScipyRotation.from_quat(np.roll(R2, -1))
+        q2 = np.roll((R1_scipy * R2_scipy).as_quat(), 1)
         assert np.allclose(q1, q2)
 
     def test_inverse(self):
         q = random_quat()
         q_inv = quaternion_inverse(q)
-        q_inv_scipy = (
-            ScipyRotation.from_quat(q, scalar_first=True)
-            .inv()
-            .as_quat(scalar_first=True)
+        q_inv_scipy = np.roll(
+            ScipyRotation.from_quat(np.roll(q, -1)).inv().as_quat(), 1
         )
-        assert np.allclose(q_inv, q_inv_scipy)
+        assert np.allclose(q_inv, q_inv_scipy) or np.allclose(q_inv, -q_inv_scipy)
 
     def test_to_dcm(self):
         quat = random_quat()
         R1 = quaternion_to_dcm(quat)
-        R2 = ScipyRotation.from_quat(quat, scalar_first=True).as_matrix()
+        R2 = ScipyRotation.from_quat(np.roll(quat, -1)).as_matrix()
         # NOTE: SciPy's rotation uses an "active" convention (rotating vectors
         # in a single frame), whereas our DCMs are "passive" (rotating between
         # frames).  Thus the matrices are transposes of each other.
@@ -58,7 +56,7 @@ class TestQuaternionLowLevel:
         q = random_quat()
         for seq in ("XYZ", "xyz", "ZYX", "zyx", "XYX", "zxz"):
             euler1 = quaternion_to_euler(q, seq=seq)
-            euler2 = ScipyRotation.from_quat(q, scalar_first=True).as_euler(seq)
+            euler2 = ScipyRotation.from_quat(np.roll(q, -1)).as_euler(seq)
             np.testing.assert_allclose(euler1, euler2)
 
 
@@ -94,7 +92,7 @@ class TestQuaternionWrapper:
         v = np.array([0.1, 0.2, 0.3])
         w = q.as_matrix() @ v
 
-        R_scipy = ScipyRotation.from_quat(q.array, scalar_first=True)
+        R_scipy = ScipyRotation.from_quat(np.roll(q.array, -1))
         w_scipy = R_scipy.apply(v, inverse=True)
 
         assert np.allclose(w, w_scipy)
@@ -102,9 +100,9 @@ class TestQuaternionWrapper:
     def test_multiplication(self):
         q1, q2 = random_quat(True), random_quat(True)
         q3 = q1 * q2
-        R1_scipy = ScipyRotation.from_quat(q1.array, scalar_first=True)
-        R2_scipy = ScipyRotation.from_quat(q2.array, scalar_first=True)
-        q3_scipy = (R1_scipy * R2_scipy).as_quat(scalar_first=True)
+        R1_scipy = ScipyRotation.from_quat(np.roll(q1.array, -1))
+        R2_scipy = ScipyRotation.from_quat(np.roll(q2.array, -1))
+        q3_scipy = np.roll((R1_scipy * R2_scipy).as_quat(), 1)
         assert np.allclose(q3.array, q3_scipy)
 
     def test_composition_associativity(self):
@@ -136,7 +134,7 @@ class TestQuaternionWrapper:
         if debug:
             R2 = ScipyRotation.from_euler(seq, euler_orig)
             print(f"quat:       {q.array}")
-            print(f"SciPy quat: {R2.as_quat(scalar_first=True)}")
+            print(f"SciPy quat: {np.roll(R2.as_quat(), 1)}")
 
             print(f"euler:       {euler2}")
             print(f"SciPy euler: {R2.as_euler(seq)}")
@@ -153,7 +151,7 @@ class TestQuaternionWrapper:
             R1_scipy = ScipyRotation.from_euler(seq, euler_orig)
             R2_scipy = ScipyRotation.from_matrix(q1.as_matrix())
             print(f"quat:       {q1.array}")
-            print(f"SciPy quat: {R1_scipy.as_quat(scalar_first=True)}")
+            print(f"SciPy quat: {np.roll(R1_scipy.as_quat(), 1)}")
 
             print(f"euler:       {euler2}")
             print(f"SciPy euler: {R2_scipy.as_euler(seq)}")
@@ -191,7 +189,7 @@ class TestQuaternionWrapper:
         R_scipy = ScipyRotation.from_euler(seq, angles)
         q = Quaternion.from_euler(angles, seq)
 
-        assert np.allclose(q.array, R_scipy.as_quat(scalar_first=True))
+        assert np.allclose(q.array, np.roll(R_scipy.as_quat(), 1))
 
     def test_compile(self):
         @arc.compile

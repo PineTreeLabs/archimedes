@@ -1,6 +1,6 @@
 [project]
 name = "archimedes"
-version = "0.4.3"
+version = "0.4.4"
 description = "Python framework for modeling, simulation, and controls development"
 readme = "README.md"
 authors = [
@@ -8,12 +8,12 @@ authors = [
 ]
 requires-python = ">=3.11"
 dependencies = [
-    "casadi>=3.6.7",
+    "casadi>=3.7.2",
     "jinja2>=3.1.6",
-    "numpy>=2.2.4",
+    "numpy>=1.20",
     "osqp>=1.0.4",
     "pydantic>=2.11.9",
-    "scipy>=1.15.2",
+    "scipy>=1.7",
     "typing-extensions>=4.12.2",
 ]
 license = "GPL-3.0-or-later"

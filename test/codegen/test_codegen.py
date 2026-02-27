@@ -1,7 +1,7 @@
 import os
 import shutil
 import tempfile
-from typing import NamedTuple
+from typing import NamedTuple, Union
 
 import numpy as np
 import pytest
@@ -213,7 +213,7 @@ class TestCodegen:
             empty_list: list[float],  # [] - empty
             single_tuple: tuple[float],  # (42.0,) - single element
             none_arg: None,  # empty
-        ) -> dict[str, float | None]:
+        ) -> dict[str, Union[float, None]]:
             return {"result": config["lr"] + bounds[0], "none_res": None}
 
         # Pre-compile the function
@@ -278,7 +278,7 @@ class TestCodegen:
         @arc.struct
         class Container:
             data: np.ndarray
-            more_data: np.ndarray | None = None
+            more_data: Union[np.ndarray, None] = None
 
         def combine_func(
             c1: Container,  # container_3_t

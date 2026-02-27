@@ -47,6 +47,25 @@ jobs:
         uv run ruff check .
         uv run ruff format --check .
 
+  legacy-deps:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        lfs: true
+
+    - uses: actions/setup-python@v5
+      with:
+        python-version: "3.9"
+
+    - name: Install with legacy dependencies
+      run: |
+        pip install --ignore-requires-python --no-deps -e .
+        pip install -r requirements-legacy.txt
+
+    - name: Run tests
+      run: pytest test/
+
   licensing-check:
     runs-on: ubuntu-latest
     steps:

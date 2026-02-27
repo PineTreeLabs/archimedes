@@ -1,16 +1,17 @@
+from __future__ import annotations
+
 import ast
 import re
-
-try:
-    from IPython.display import Markdown, display
-except ImportError:
-    raise ImportError("IPython is required to use these utilities")
-
 
 __all__ = ["display_text", "extract_c_function"]
 
 
 def display_text(content, show=True, language="c"):
+    try:
+        from IPython.display import Markdown, display
+    except ImportError:
+        raise ImportError("IPython is required to use these utilities")
+
     md = Markdown(f"```{language}\n{content}\n```")
 
     if show:

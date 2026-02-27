@@ -13,6 +13,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any, Callable, Sequence, cast
 
 import casadi as cs
+import numpy as np
 
 from archimedes import tree
 from archimedes._core import (
@@ -26,7 +27,7 @@ from archimedes._core import (
 __all__ = ["integrator", "odeint"]
 
 if TYPE_CHECKING:
-    from archimedes.typing import ArrayLike, NDArray
+    from archimedes.typing import ArrayLike
 
 
 def integrator(
@@ -35,7 +36,7 @@ def integrator(
     atol: float = 1e-6,
     rtol: float = 1e-3,
     static_argnames: str | Sequence[str] = (),
-    t_eval: NDArray | None = None,
+    t_eval: np.ndarray | None = None,
     name: str | None = None,
     **options,
 ) -> FunctionCache:
@@ -310,7 +311,7 @@ def odeint(
     t_span: tuple[float, float],
     x0: ArrayLike,
     method: str = "cvodes",
-    t_eval: NDArray | None = None,
+    t_eval: np.ndarray | None = None,
     atol: float = 1e-6,
     rtol: float = 1e-3,
     args: Sequence[Any] | None = None,

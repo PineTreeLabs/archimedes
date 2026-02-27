@@ -5,7 +5,12 @@ import re
 import casadi as cs
 import numpy as np
 import pytest
-from numpy import exceptions as npex
+
+try:
+    import numpy.exceptions as npex
+except ImportError:  # pragma: no cover
+    # AxisError lives at numpy.AxisError in <1.25
+    import numpy as npex  # type: ignore[no-redef]
 
 from archimedes._core import SymbolicArray, compile
 from archimedes._core import sym as _sym
