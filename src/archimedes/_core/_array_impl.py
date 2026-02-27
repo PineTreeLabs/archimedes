@@ -301,7 +301,7 @@ class SymbolicArray:
         return np.reshape(self, shape, order=order)  # type: ignore
 
     def astype(self, dtype: DTypeLike) -> SymbolicArray:
-        return np.astype(self, dtype)  # type: ignore
+        return SymbolicArray(self._sym, dtype=dtype, shape=self.shape)
 
     #
     # Autodiff operations not supported by NumPy

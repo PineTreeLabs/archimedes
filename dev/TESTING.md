@@ -90,6 +90,29 @@ We use [REUSE](https://reuse.software/) to track licensing.  By default all file
 uv run reuse lint
 ```
 
+### Testing legacy build
+
+One-time setup of legacy venv:
+
+```bash
+uv python install 3.9
+$(uv python find 3.9) -m venv .venv-legacy
+source .venv-legacy/bin/activate
+```
+
+Install with manual dependencies:
+
+```bash
+pip install --ignore-requires-python --no-deps -e .
+pip install -r requirements-legacy.txt
+```
+
+Run tests
+
+```bash
+pytest test/
+```
+
 ## `pip-audit` vulnerabilities
 
 If a security vulnerability is found that does not raise concerns for typical Archimedes usage patterns and cannot be resolved by temporarily rolling back the dependency, the "Security Scan" workflow can be configured to temporarily ignore the vulnerability:

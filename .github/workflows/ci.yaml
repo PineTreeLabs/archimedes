@@ -61,9 +61,7 @@ jobs:
     - name: Install with legacy dependencies
       run: |
         pip install --ignore-requires-python --no-deps -e .
-        pip install "numpy==1.20.*" "scipy==1.10.*"
-        pip install "casadi>=3.7.2" "osqp>=1.0.4" "pydantic>=2.11.9" "scipy>=1.7" "typing-extensions>=4.12.2"
-        pip install pytest pytest-cov
+        pip install -r requirements-legacy.txt
 
     - name: Run tests
       run: pytest test/

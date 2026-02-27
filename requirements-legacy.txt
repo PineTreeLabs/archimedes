@@ -1,0 +1,23 @@
+# Legacy environment compatibility test
+# Verifies archimedes works with older numpy/scipy
+#
+# Usage:
+#   $(uv python find 3.9) -m venv .venv-legacy
+#   .venv-legacy/bin/pip install --ignore-requires-python --no-deps -e .
+#   .venv-legacy/bin/pip install -r requirements-legacy.txt
+#   .venv-legacy/bin/pytest test/
+
+# Pinned old versions (the point of this test)
+numpy==1.20.*
+scipy==1.10.*
+
+# Remaining runtime deps — current minimums from pyproject.toml
+casadi>=3.7.2
+jinja2>=3.1.6
+osqp>=1.0.4
+pydantic>=2.11.9
+typing-extensions>=4.12.2
+
+# Test runner
+pytest
+pytest-cov
