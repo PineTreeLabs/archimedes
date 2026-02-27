@@ -390,12 +390,23 @@ def codegen(
         "output_size": tree.ravel(results)[0].size,
     }
 
+    # Static args are baked into the CasADi kernel as constants, so they must
+    # not appear in the C arg struct.  Including them would cause:
+    #   (a) sizeof(arg_t) > input_size * sizeof(float) → _Static_assert failure
+    #   (b) out-of-bounds write to kernel_arg[N] in _step (SZ_ARG excludes them)
+    static_argnums_set = set(func.static_argnums)
+    static_argnames_set = {func.arg_names[i] for i in static_argnums_set}
+
     input_helper = ContextHelper(float_type, int_type, input_descriptions, debug=debug)
-    for name, arg in zip(func.arg_names, args):
+    for i, (name, arg) in enumerate(zip(func.arg_names, args)):
+        if i in static_argnums_set:
+            continue
         input_context = input_helper(arg, name)
         context["inputs"].append(input_context)
 
     for name, val in kwargs.items():
+        if name in static_argnames_set:
+            continue
         input_context = input_helper(val, name)
         context["inputs"].append(input_context)
 

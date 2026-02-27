@@ -353,6 +353,88 @@ class TestCodegen:
             "inner_t typedef must appear before outer_t in the generated header"
         )
 
+    def test_static_arg_excluded_from_struct(self, temp_dir):
+        # Regression test: when a static arg is explicitly passed to codegen, it
+        # must NOT appear as a field in the C arg struct.  Static args are baked
+        # into the CasADi kernel as constants at trace time, so:
+        #   (a) input_size (from sym_args) does not count them
+        #   (b) SZ_ARG in the kernel does not include a slot for them
+        # Including them in the C struct causes sizeof(arg_t) > input_size *
+        # sizeof(float) (_Static_assert failure) and an out-of-bounds write to
+        # kernel_arg[N] in _step.
+        kwargs = {
+            "float_type": np.float32,
+            "output_dir": temp_dir,
+        }
+
+        # --- Simple scalar static arg ---
+        def scaled_shift(x: np.ndarray, scale: float, offset: float) -> np.ndarray:
+            return x * scale + offset
+
+        compiled = arc.compile(
+            scaled_shift,
+            name="scaled_shift",
+            return_names=("y",),
+            static_argnames=("scale",),
+        )
+
+        # Explicitly supply all args including the static one (the triggering pattern)
+        arc.codegen(compiled, (np.zeros(3), 2.0, 1.0), **kwargs)
+
+        with open(f"{temp_dir}/scaled_shift.h") as f:
+            content = f.read()
+
+        assert "float scale;" not in content, (
+            "Static arg 'scale' must not appear as a field in the C arg struct"
+        )
+        assert "float x[3];" in content
+        assert "float offset;" in content
+
+        # --- Static arg passed via the kwargs= dict (not positionally) ---
+        # This exercises the `continue` branch in the kwargs loop in codegen.py.
+        arc.codegen(
+            compiled,
+            (np.zeros(3),),
+            kwargs={"scale": 2.0, "offset": 1.0},
+            **kwargs,
+        )
+
+        with open(f"{temp_dir}/scaled_shift.h") as f:
+            content3 = f.read()
+
+        assert "float scale;" not in content3, (
+            "Static kwarg 'scale' must not appear as a field in the C arg struct"
+        )
+        assert "float x[3];" in content3
+        assert "float offset;" in content3
+
+        # --- Struct static arg (the "deeply nested" case) ---
+        @arc.struct
+        class Config:
+            gain: float
+            offset: float
+
+        def apply_config(x: np.ndarray, config: Config) -> np.ndarray:
+            return x * config.gain + config.offset
+
+        compiled2 = arc.compile(
+            apply_config,
+            name="apply_config",
+            return_names=("y",),
+            static_argnames=("config",),
+        )
+
+        config_val = Config(gain=2.0, offset=1.0)
+        arc.codegen(compiled2, (np.zeros(3), config_val), **kwargs)
+
+        with open(f"{temp_dir}/apply_config.h") as f:
+            content2 = f.read()
+
+        assert "config_t config;" not in content2, (
+            "Static struct arg 'config' must not appear in the C arg struct"
+        )
+        assert "float x[3];" in content2
+
     def test_error_handling(self, scalar_func, temp_dir):
         # Test with unknown return names.  By design choice, this raises an error
         # in order to help generate more readable code.
