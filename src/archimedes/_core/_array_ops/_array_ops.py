@@ -47,7 +47,12 @@ from functools import wraps
 
 import casadi as cs
 import numpy as np
-from numpy import exceptions as npex
+
+try:
+    import numpy.exceptions as npex
+except ImportError:  # pragma: no cover
+    # AxisError lives at numpy.AxisError in <1.25
+    import numpy as npex  # type: ignore[no-redef]
 
 from .._array_impl import SymbolicArray, _unwrap_sym_array, array
 from .._type_inference import shape_inference, type_inference
