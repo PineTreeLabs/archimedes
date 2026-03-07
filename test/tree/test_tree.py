@@ -433,6 +433,68 @@ class TestRavel:
         assert f(x, {"a": 1}) == x[0]
         assert f(x, {"b": 1}) == x[1]
 
+    def test_ravel_hashable_with_array_static_field(self):
+        # Regression test: ravel_tree returns a HashablePartial wrapping the
+        # TreeDef. When a struct has numpy arrays as static fields, those arrays
+        # end up in TreeDef.node_data. HashablePartial.__hash__ must handle them
+        # without raising "TypeError: unhashable type: 'numpy.ndarray'".
+
+        @struct
+        class LookupTable:
+            breakpoints: np.ndarray = field(static=True)
+            values: np.ndarray
+
+        t = LookupTable(
+            breakpoints=np.array([0.0, 1.0, 2.0]),
+            values=np.array([10.0, 20.0, 30.0]),
+        )
+
+        _, unravel = tree.ravel(t)
+        # Should not raise TypeError
+        h = hash(unravel)
+        assert isinstance(h, int)
+
+        # Two structs with identical static fields should produce equal unravel
+        # functions (same hash, same equality) so the compile cache hits.
+        t2 = LookupTable(
+            breakpoints=np.array([0.0, 1.0, 2.0]),
+            values=np.array([100.0, 200.0, 300.0]),
+        )
+        _, unravel2 = tree.ravel(t2)
+        assert hash(unravel) == hash(unravel2)
+        assert unravel == unravel2
+
+        # Structs with different static fields (different breakpoints) should
+        # produce different unravel functions so recompilation is triggered.
+        t3 = LookupTable(
+            breakpoints=np.array([0.0, 5.0, 10.0]),
+            values=np.array([10.0, 20.0, 30.0]),
+        )
+        _, unravel3 = tree.ravel(t3)
+        assert hash(unravel) != hash(unravel3)
+        assert unravel != unravel3
+
+    def test_ravel_compile_with_array_static_field(self):
+        # Integration test: a compiled function receiving a struct with numpy
+        # array static fields should not raise on the cache key hash check.
+
+        @struct
+        class LookupTable:
+            breakpoints: np.ndarray = field(static=True)
+            values: np.ndarray
+
+        @compile
+        def f(t):
+            return np.sum(t.values)
+
+        t = LookupTable(
+            breakpoints=np.array([0.0, 1.0, 2.0]),
+            values=np.array([10.0, 20.0, 30.0]),
+        )
+
+        result = f(t)
+        assert float(result) == 60.0
+
 
 def test_register_struct():
     # Mark static fields using `field`
