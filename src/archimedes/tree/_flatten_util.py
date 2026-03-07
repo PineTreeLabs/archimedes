@@ -47,6 +47,15 @@ if TYPE_CHECKING:
 _SIGNATURE_CACHE = {}
 
 
+def _make_hashable(x):
+    """Recursively convert unhashable types (e.g. numpy arrays) to hashable form."""
+    if isinstance(x, np.ndarray):
+        return (x.shape, x.dtype, x.tobytes())
+    if isinstance(x, (tuple, list)):  # covers NamedTuples (e.g. TreeDef) too
+        return tuple(_make_hashable(i) for i in x)
+    return x
+
+
 # Original: jax._src.util.HashablePartial
 class HashablePartial:
     def __init__(self, f, *args, **kwargs):
@@ -82,16 +91,18 @@ class HashablePartial:
         return (
             type(other) is HashablePartial
             and self.f.__code__ == other.f.__code__
-            and self.args == other.args
-            and self.kwargs == other.kwargs
+            and _make_hashable(self.args) == _make_hashable(other.args)
+            and _make_hashable(self.kwargs) == _make_hashable(other.kwargs)
         )
 
     def __hash__(self):
         return hash(
             (
                 self.f.__code__,
-                self.args,
-                tuple(sorted(self.kwargs.items(), key=lambda kv: kv[0])),
+                _make_hashable(self.args),
+                _make_hashable(
+                    tuple(sorted(self.kwargs.items(), key=lambda kv: kv[0]))
+                ),
             ),
         )
 
