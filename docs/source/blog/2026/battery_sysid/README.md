@@ -16,3 +16,11 @@ python process_ocv.py
 
 ## Running the script
 
+The script is written in MyST Markdown form so that it can either be converted into a Python script or rendered to HTML for the website using Sphinx.
+To convert to a script and execute, run:
+
+```bash
+jupytext battery-sysid.md --to py && python battery-sysid.py
+```
+
+You may need to `pip install jupytext` if it's not installed in your environment.

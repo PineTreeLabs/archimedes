@@ -9,36 +9,11 @@ kernelspec:
   name: archimedes
 execute:
   skip: true
+
+mystnb:
+  execution_mode: "off"  
 ---
 
-
-<!--
-  Add to the page frontmatter:                                                                                  
-  mystnb:
-    execution_mode: "off"                                                                
-  --- 
-                                  
-  Replace plt.show() calls with plt.savefig("_static/battery_fig1.png"), commit the PNGs
-  (or put them in LFS if large), and reference them with {figure} directives in the      
-  prose. Numerical outputs (like np.std() results) get written inline in text.
-
-Add to nb_execution_excludepatterns in conf.py:
-  nb_execution_excludepatterns = [                  
-      "**/*.ipynb",                                                                      
-      "blog/2026/battery-sysid*",  # requires CALCE data                               
-      ...
-  ]
-
-jupytext --execute --to notebook battery-sysid.md
-
-  # 1. Edit battery-sysid.md
-  # 2. Execute to regenerate figures                                                     
-  uv run jupytext --execute --to notebook battery-sysid.md
-  # 3. Figures are in _static/ (or wherever plt.savefig points)                          
-  # 4. git add the updated PNGs + .md                                                    
-  # 5. Discard the ipynb                                                                
-  rm battery-sysid.ipynb
- -->
 
  # Parameter Estimation for a Li-ion Battery Cell
 
@@ -57,7 +32,7 @@ The challenge with constructing an ECM is choosing the right circuit component p
 In this post we'll walk through a simple way to automate this process with parameter estimation.
 
 For more background on Li-ion battery dynamics, [Gregory Plett's ECE 5710 course notes](http://mocha-java.uccs.edu/ECE5710/index.html) are an excellent overview.
-Parameter estimation in Archimedes is covered in [a tutorial using a simple ODE model](../../tutorials/sysid/parameter-estimation.md), but it's not necessary to read the tutorial in order to follow this post.
+Parameter estimation in Archimedes is covered in [a tutorial using a simple ODE model](../../../tutorials/sysid/parameter-estimation.md), but it's not necessary to read the tutorial in order to follow this post.
 
 We'll be using real data from the University of Maryland's [CALCE dataset](https://calce.umd.edu/battery-data) based on tests of an INR 18650-20R 2 Ah NMC Li-ion battery cell.
 To run this yourself, see the [GitHub repository](https://github.com/PineTreeLabs/archimedes/tree/main/docs/source/blog/2026/battery-sysid/), which includes scripts for downloading and pre-processing the raw CALCE data.
@@ -296,7 +271,7 @@ class BatteryECM:
 
 
 There are a number of ways to proceed from here with system identification.  For example, Archimedes has a [nonlinear prediction error method implementation](#archimedes.sysid) that uses Kalman filtering and least-squares to deal with process/measurement noise and partial observation.
-This is also demonstrated in the [parameter estimation tutorial](../../tutorials/sysid/parameter-estimation.md)
+This is also demonstrated in the [parameter estimation tutorial](../../../tutorials/sysid/parameter-estimation.md)
 
 However, for this almost-linear single-input, single-output system prediction error methods are overkill, and the simplest approach is to simply simulate the model forward using an ODE solver, minimize the difference against the experimental data, and use CVODES' native adjoint solve to get the necessary gradients.
 
