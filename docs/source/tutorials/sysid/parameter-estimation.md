@@ -35,6 +35,8 @@ This page shows how to implement nonlinear system identification workflows in Py
 System identification in Archimedes combines a flexible prediction error method (PEM) workflow with automatic differentiation and structured parameter handling.
 Instead of manually coding gradients or managing flat parameter vectors, you can focus on your model physics while Archimedes handles the optimization details automatically.
 
+For an application with real data, also see the blog post on [Li-ion battery cell modeling](../../blog/2026/battery_sysid/battery_sysid).
+
 
 ```{image} _static/sysid_workflow.png
 :class: only-light

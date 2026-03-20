@@ -17,7 +17,7 @@ mystnb:
 
  # Parameter Estimation for a Li-ion Battery Cell
 
-Lithium-ion batteries are everywhere today, part of the broader efforts in electrification.
+Lithium-ion batteries are everywhere today, part of broader efforts in electrification.
 One of the most important emerging battery applications is energy storage in electric vehicles (EV).
 Compared to typical consumer electronics battery usage, this is actually an extremely demanding environment for batteries; large and unpredictable current draws, regenerative braking, load balancing across cells, and fast charging are taxing and can quickly degrade battery health if not managed properly.
 
