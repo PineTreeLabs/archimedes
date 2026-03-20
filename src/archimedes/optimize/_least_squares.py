@@ -209,19 +209,22 @@ def least_squares(
     if flat_bounds is None:
         flat_bounds = (-np.inf, np.inf)
 
-    # Compile the function and Jacobian
-    @arc.compile
+    # Compile the function and Jacobian.
+    # The buffered version is used for fast repeated numeric evaluation by scipy.
+    @arc.compile(buffered=True)
     def obj_func(x_flat):
         x = unravel(x_flat)
         r = func(x, *args)
         return tree.ravel(r)[0]  # Return flattened residuals
 
-    # Call the scipy least_squares function
+    jac_func = arc.compile(arc.jac(obj_func), buffered=True)
+
+    # Call the scipy least_squares function.
+    # Note: args are already captured in the closures above.
     result = scipy_lstsq(
         obj_func,
         x0_flat,
-        args=args,
-        jac=arc.jac(obj_func),
+        jac=jac_func,
         method=method,
         bounds=flat_bounds,
         **options,
