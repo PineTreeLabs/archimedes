@@ -31,4 +31,14 @@ Inside the new `spatial` module
 An end-to-end example of simple sensor fusion with Archimedes
 :::
 
+
+:::{grid-item-card} Battery Parameter Estimation
+:link: 2026/battery_sysid/battery_sysid
+:link-type: doc
+
+20 Mar 2026 · Examples
+
+Parameter estimation for a Li-ion battery cell
+:::
+
 ::::

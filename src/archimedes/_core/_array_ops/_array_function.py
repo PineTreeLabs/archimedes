@@ -743,6 +743,13 @@ def _roll(a, shift, axis=None):
         return np.concatenate((left, right), axis=1)
 
 
+def _polyval(p: np.ndarray, x: np.ndarray) -> np.ndarray:
+    y = np.zeros_like(x)
+    for pv in p:
+        y = y * x + pv
+    return y
+
+
 # List from numpy.testing.overrides.get_overridable_numpy_array_functions()
 SUPPORTED_FUNCTIONS = {
     "array": _dispatch_array,
@@ -809,7 +816,7 @@ SUPPORTED_FUNCTIONS = {
     "polyfit": NotImplemented,
     "ndim": NotImplemented,
     "fix": NotImplemented,
-    "polyval": NotImplemented,
+    "polyval": _polyval,
     "union1d": NotImplemented,
     "append": _append,
     "repeat": NotImplemented,

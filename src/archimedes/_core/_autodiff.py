@@ -5,7 +5,30 @@ from __future__ import annotations
 from typing import Callable, Sequence
 
 from . import SymbolicArray
-from ._function import FunctionCache
+from ._function import BufferedFunction, FunctionCache
+
+
+def _ensure_function_cache(
+    func: Callable,
+    static_argnums=None,
+    static_argnames=None,
+) -> FunctionCache:
+    """Return a FunctionCache suitable for symbolic tracing.
+
+    If func is already a FunctionCache, return it unchanged.  If it is a
+    BufferedFunction, rebuild it as a FunctionCache (buffered functions cannot
+    be called with symbolic arguments).  Otherwise, wrap func in a new
+    FunctionCache.
+    """
+    if isinstance(func, BufferedFunction):
+        return FunctionCache(func._func, arg_names=func.arg_names, kind=func._kind)
+    if not isinstance(func, FunctionCache):
+        return FunctionCache(
+            func,
+            static_argnums=static_argnums,
+            static_argnames=static_argnames,
+        )
+    return func
 
 
 def grad(
@@ -114,12 +137,7 @@ def grad(
     hess : Compute the Hessian matrix of a scalar function
     """
 
-    if not isinstance(func, FunctionCache):
-        func = FunctionCache(
-            func,
-            static_argnums=static_argnums,
-            static_argnames=static_argnames,
-        )
+    func = _ensure_function_cache(func, static_argnums, static_argnames)
 
     if isinstance(argnums, int):
         argnums = (argnums,)
@@ -291,12 +309,7 @@ def jac(
     """
     # TODO: Support multiple returns using trees?
 
-    if not isinstance(func, FunctionCache):
-        func = FunctionCache(
-            func,
-            static_argnums=static_argnums,
-            static_argnames=static_argnames,
-        )
+    func = _ensure_function_cache(func, static_argnums, static_argnames)
 
     if isinstance(argnums, int):
         argnums = (argnums,)
@@ -443,12 +456,7 @@ def hess(
     """
     # TODO: Support multiple returns using trees?
 
-    if not isinstance(func, FunctionCache):
-        func = FunctionCache(
-            func,
-            static_argnums=static_argnums,
-            static_argnames=static_argnames,
-        )
+    func = _ensure_function_cache(func, static_argnums, static_argnames)
 
     if isinstance(argnums, int):
         argnums = (argnums,)
@@ -611,12 +619,7 @@ def jvp(
     # is computed symbolically up front and can then be evaluated efficiently for
     # every primal/tangent pair.
 
-    if not isinstance(func, FunctionCache):
-        func = FunctionCache(
-            func,
-            static_argnums=static_argnums,
-            static_argnames=static_argnames,
-        )
+    func = _ensure_function_cache(func, static_argnums, static_argnames)
 
     # Function to evaluate the JVP using the underlying CasADi function,
     # assuming that the arguments are already symbolic arrays. This can then
@@ -775,12 +778,7 @@ def vjp(
     # symbolically up front and can then be evaluated efficiently for every
     # primal/cotangent pair.
 
-    if not isinstance(func, FunctionCache):
-        func = FunctionCache(
-            func,
-            static_argnums=static_argnums,
-            static_argnames=static_argnames,
-        )
+    func = _ensure_function_cache(func, static_argnums, static_argnames)
 
     # For now, only support functions with a single argument and return value
     if len(func.arg_names) != 1:
