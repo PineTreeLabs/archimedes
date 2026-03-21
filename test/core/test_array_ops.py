@@ -496,6 +496,38 @@ class TestSymbolicArrayFunctions:
         expected = cs.horzcat(x._sym[:, 1:], x._sym[:, :1])
         assert cs.is_equal(result._sym, expected, 1)
 
+    def test_polyval(self):
+        p = np.array([3.0, 0.0, 1.0])  # 3x^2 + 1
+
+        # Scalar x
+        x = sym("x", shape=(), dtype=np.float64)
+        result = np.polyval(p, x)
+        assert isinstance(result, SymbolicArray)
+        assert result.shape == ()
+
+        # 1D x
+        x = sym("x", shape=(3,), dtype=np.float64)
+        result = np.polyval(p, x)
+        assert isinstance(result, SymbolicArray)
+        assert result.shape == (3,)
+
+        # 2D x
+        x = sym("x", shape=(2, 3), dtype=np.float64)
+        result = np.polyval(p, x)
+        assert isinstance(result, SymbolicArray)
+        assert result.shape == (2, 3)
+
+        # Numeric correctness via compile
+        def polyval(x):
+            return np.polyval(p, x)
+
+        f = compile(polyval)
+        x_num = np.array([0.0, 1.0, 5.0])
+        np.testing.assert_allclose(f(x_num), np.polyval(p, x_num))
+
+        # Scalar numeric correctness
+        np.testing.assert_allclose(f(np.float64(5.0)), np.polyval(p, 5.0))
+
     def test_append(self):
         x = sym("x", shape=(2, 3), dtype=np.int32)
         y = sym("y", shape=(2, 3), dtype=np.int32)

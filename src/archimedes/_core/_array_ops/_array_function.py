@@ -744,10 +744,10 @@ def _roll(a, shift, axis=None):
 
 
 def _polyval(p: np.ndarray, x: np.ndarray) -> np.ndarray:
-    exps = np.arange(len(p))[::-1]
-    shape = x.shape
-    x = np.atleast_1d(x)
-    return np.sum(p * x[:, None]**exps, axis=1).reshape(shape)
+    y = np.zeros_like(x)
+    for pv in p:
+        y = y * x + pv
+    return y
 
 
 # List from numpy.testing.overrides.get_overridable_numpy_array_functions()
