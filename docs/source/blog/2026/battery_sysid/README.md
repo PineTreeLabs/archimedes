@@ -20,7 +20,7 @@ The script is written in MyST Markdown form so that it can either be converted i
 To convert to a script and execute, run:
 
 ```bash
-jupytext battery-sysid.md --to py && python battery-sysid.py
+jupytext battery_sysid.md --to py && python battery_sysid.py
 ```
 
 You may need to `pip install jupytext` if it's not installed in your environment.
