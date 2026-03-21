@@ -15,7 +15,11 @@ mystnb:
 ---
 
 
- # Parameter Estimation for a Li-ion Battery Cell
+# Parameter Estimation for a Li-ion Battery Cell
+
+Jared Callaham • 20 Mar 2026 (Updated 5 Nov 2025)
+
+---
 
 Lithium-ion batteries are everywhere today, part of broader efforts in electrification.
 One of the most important emerging battery applications is energy storage in electric vehicles (EV).
@@ -39,7 +43,13 @@ To run this yourself, see the [GitHub repository](https://github.com/PineTreeLab
 
 ## The Equivalent Circuit Model
 
-<!-- TODO: ECM diagram -->
+```{image} _static/battery_ecm_light.png
+:class: only-light
+```
+
+```{image} _static/battery_ecm_dark.png
+:class: only-dark
+```
 
 Equivalent circuit models can vary somewhat in structure, but have a common parallel-RC form.
 The key internal variable is the "state of charge" (SOC) $z$, a dimensionless number ranging from 0-1 that correlates with the remaining charge in the battery.
@@ -220,6 +230,10 @@ We *could* optimize all of the parameters together, but experience shows that an
 
 With that in mind, we'll define a simple `struct` with the model parameters and dynamics model, declaring the OCV coefficients as `static`.
 The `static` tag tells Archimedes to basically treat the coefficients as numeric constants in the computational graph, not as symbolic inputs or optimization variables.
+
+As a reminder [`struct`](#archimedes.struct) is a simple class decorator that adds dataclass-like behavior, but with support for "tree" operations like flattening/unflattening non-static fields to a single array.
+Otherwise `struct` doesn't enforce or require any particular methods, properties, or fields - think of it like a PyTorch `Module` crossed with a JAX PyTree, if that means anything to you.
+For a primer on structs in Archimedes, see the tutorial on [Structured Data Types](../../../trees.md).
 
 ```{code-cell} python
 @arc.struct
