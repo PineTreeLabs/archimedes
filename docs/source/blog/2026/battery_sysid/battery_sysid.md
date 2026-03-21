@@ -17,7 +17,9 @@ mystnb:
 
 # Parameter Estimation for a Li-ion Battery Cell
 
-Jared Callaham • 20 Mar 2026 (Updated 5 Nov 2025)
+**_Equivalent circuit modeling with Archimedes_**
+
+Jared Callaham • 20 Mar 2026
 
 ---
 
