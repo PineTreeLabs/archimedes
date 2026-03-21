@@ -96,3 +96,7 @@ New version tag for release to PyPI (previous "Archimedes" project tagged with v
 - Fix bug in `switch` where args were passed directly during `Function` creation
 - Implement DFS for sorting struct order in codegen (fixes struct definition bug)
 - Remove Python 3.10+ features to allow for force-installing into legacy environments (3.9 + NumPy 1.20, in particular)
+
+## [0.4.5] - WIP
+- Support `np.polyval` for symbolic arrays/compiled functions (uses Horner's method, same as NumPy)
+- Support autodiff of `compile(buffered=True)`

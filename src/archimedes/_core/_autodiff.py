@@ -8,7 +8,11 @@ from . import SymbolicArray
 from ._function import BufferedFunction, FunctionCache
 
 
-def _ensure_function_cache(func, static_argnums=None, static_argnames=None):
+def _ensure_function_cache(
+    func: Callable,
+    static_argnums=None,
+    static_argnames=None,
+) -> FunctionCache:
     """Return a FunctionCache suitable for symbolic tracing.
 
     If func is already a FunctionCache, return it unchanged.  If it is a
