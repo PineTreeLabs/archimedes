@@ -1,44 +1,29 @@
 """Utilities for working with hierarchical tree-structured data."""
+# Re-exports from structree
+# github.com/pinetreelabs/structree
 
-from ._config import (
+from structree import (
     StructConfig,
     UnionConfig,
-)
-from ._flatten_util import ravel_tree as ravel
-from ._registry import (
+    ravel,
     register_dataclass,
     register_struct,
-)
-from ._struct import (
     InitVar,
     field,
     fields,
     is_struct,
     replace,
     struct,
+    is_leaf,
+    all,
+    flatten,
+    leaves,
+    map,
+    reduce,
+    structure,
+    unflatten,
 )
-from ._tree_util import is_leaf
-from ._tree_util import (
-    tree_all as all,
-)
-from ._tree_util import (
-    tree_flatten as flatten,
-)
-from ._tree_util import (
-    tree_leaves as leaves,
-)
-from ._tree_util import (
-    tree_map as map,
-)
-from ._tree_util import (
-    tree_reduce as reduce,
-)
-from ._tree_util import (
-    tree_structure as structure,
-)
-from ._tree_util import (
-    tree_unflatten as unflatten,
-)
+
 
 __all__ = [
     "register_struct",
