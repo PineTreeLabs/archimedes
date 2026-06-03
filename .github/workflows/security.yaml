@@ -28,7 +28,7 @@ jobs:
     
     - name: Run pip-audit
       run: |
-        uv export --no-emit-project --format requirements-txt > requirements.txt
+        uv export --no-emit-project --no-emit-package structree --format requirements-txt > requirements.txt
         uv run pip-audit -r requirements.txt --disable-pip --ignore-vuln GHSA-xm59-rqc7-hhvf
     
     - name: Run Bandit scan

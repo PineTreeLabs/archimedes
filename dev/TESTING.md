@@ -71,7 +71,7 @@ Instead, the source `.md` files have to be edited following the feedback from th
 First, scan the project requirements for known vulnerabilities:
 
 ```bash
-uv export --no-emit-project --format requirements-txt > requirements.txt
+uv export --no-emit-project --no-emit-package structree --format requirements-txt > requirements.txt
 uv run pip-audit -r requirements.txt --disable-pip
 rm requirements.txt
 ```
