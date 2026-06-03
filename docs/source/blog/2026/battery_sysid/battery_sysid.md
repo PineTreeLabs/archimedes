@@ -118,7 +118,7 @@ import archimedes as arc
 ```python
 df = pd.read_excel("calce/12_2_2015_Incremental OCV test_SP20-1.xlsx", sheet_name="Channel_1-005_1", usecols="B,G:J")
 
-fig, ax = plt.subplots(2, 1, figsize=(7, 5), sharex=True)
+fig, ax = plt.subplots(2, 1, figsize=(7, 4), sharex=True)
 ax[0].plot(df["Test_Time(s)"], -df["Current(A)"])
 ax[0].grid()
 ax[0].set_ylabel("Current [A]")
@@ -141,7 +141,7 @@ df = pd.read_excel("calce/12_2_2015_Incremental OCV test_SP20-1.xlsx", sheet_nam
 for theme in {"light", "dark"}:
     arc.set_theme(theme)
 
-    fig, ax = plt.subplots(2, 1, figsize=(7, 5), sharex=True)
+    fig, ax = plt.subplots(2, 1, figsize=(7, 4), sharex=True)
     ax[0].plot(df["Test_Time(s)"], -df["Current(A)"])
     ax[0].grid()
     ax[0].set_ylabel("Current [A]")
@@ -520,7 +520,7 @@ xs_test, ys_test = forward_test(model_opt, x0_fuds)
 ```
 
 ```python
-fig, ax = plt.subplots(2, 1, sharex=True, figsize=(7, 5))
+fig, ax = plt.subplots(2, 1, sharex=True, figsize=(7, 4))
 
 ax[0].plot(train_data.ts, train_data.us[0, :])
 ax[0].set_ylabel("Current [A]")
@@ -542,7 +542,7 @@ plt.show()
 :tags: [remove-cell]
 for theme in ("light", "dark"):
     arc.set_theme(theme)
-    fig, ax = plt.subplots(2, 1, sharex=True, figsize=(7, 5))
+    fig, ax = plt.subplots(2, 1, sharex=True, figsize=(7, 4))
 
     ax[0].plot(train_data.ts, train_data.us[0, :])
     ax[0].set_ylabel("Current [A]")
@@ -570,7 +570,7 @@ for theme in ("light", "dark"):
 
 
 ```python
-fig, ax = plt.subplots(2, 1, sharex=True, figsize=(7, 5))
+fig, ax = plt.subplots(2, 1, sharex=True, figsize=(7, 4))
 
 ax[0].plot(fuds_data.ts, fuds_data.us[0, :])
 ax[0].set_ylabel("Current [A]")
@@ -592,7 +592,7 @@ plt.show()
 :tags: [remove-cell]
 for theme in ("light", "dark"):
     arc.set_theme(theme)
-    fig, ax = plt.subplots(2, 1, sharex=True, figsize=(7, 5))
+    fig, ax = plt.subplots(2, 1, sharex=True, figsize=(7, 4))
 
     ax[0].plot(fuds_data.ts, fuds_data.us[0, :])
     ax[0].set_ylabel("Current [A]")
@@ -652,7 +652,7 @@ forward_us06 = make_forward(us06_data.ts, us06_data.us)
 xs_pred, ys_pred = forward_us06(model_opt, x0_us06)
 rmse(us06_data.ys, ys_pred, xs_pred)
 
-fig, ax = plt.subplots(2, 1, sharex=True, figsize=(7, 6))
+fig, ax = plt.subplots(2, 1, sharex=True, figsize=(7, 4))
 
 ax[0].plot(us06_data.ts, us06_data.us[0, :])
 ax[0].set_ylabel("Current [A]")
@@ -683,7 +683,7 @@ rmse(us06_data.ys, ys_pred, xs_pred)
 
 for theme in ("light", "dark"):
     arc.set_theme(theme)
-    fig, ax = plt.subplots(2, 1, sharex=True, figsize=(7, 6))
+    fig, ax = plt.subplots(2, 1, sharex=True, figsize=(7, 4))
 
     ax[0].plot(us06_data.ts, us06_data.us[0, :])
     ax[0].set_ylabel("Current [A]")
@@ -716,7 +716,7 @@ forward_dst = make_forward(dst_data.ts, dst_data.us)
 xs_pred, ys_pred = forward_dst(model_opt, x0_dst)
 rmse(dst_data.ys, ys_pred, xs_pred)
 
-fig, ax = plt.subplots(2, 1, sharex=True, figsize=(7, 6))
+fig, ax = plt.subplots(2, 1, sharex=True, figsize=(7, 4))
 
 ax[0].plot(dst_data.ts, dst_data.us[0, :])
 ax[0].set_ylabel("Current [A]")
@@ -747,7 +747,7 @@ rmse(dst_data.ys, ys_pred, xs_pred)
 
 for theme in ("light", "dark"):
     arc.set_theme(theme)
-    fig, ax = plt.subplots(2, 1, sharex=True, figsize=(7, 6))
+    fig, ax = plt.subplots(2, 1, sharex=True, figsize=(7, 4))
 
     ax[0].plot(dst_data.ts, dst_data.us[0, :])
     ax[0].set_ylabel("Current [A]")
