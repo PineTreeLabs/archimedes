@@ -1,5 +1,3 @@
-import structree as tree  # isort: skip
-
 from ._core import (
     CodegenError,
     array,
