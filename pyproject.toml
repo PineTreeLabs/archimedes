@@ -14,7 +14,7 @@ dependencies = [
     "osqp>=1.0.4",
     "pydantic>=2.11.9",
     "scipy>=1.7",
-    "structree>=0.1.0",
+    "structree>=v1.0.0rc1",
     "typing-extensions>=4.12.2",
 ]
 license = "GPL-3.0-or-later"
