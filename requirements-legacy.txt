@@ -8,7 +8,7 @@
 #   .venv-legacy/bin/pytest test/
 
 # Install "structree" directly from git, since it's not on pypi
-structree @ git+https://github.com/pinetreelabs/structree@868dc89
+structree @ git+https://github.com/pinetreelabs/structree@664c930
 
 # Pinned old versions (minimum guaranteed versions)
 numpy==1.20.*
