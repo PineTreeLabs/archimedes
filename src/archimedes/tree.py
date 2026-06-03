@@ -3,27 +3,26 @@
 # github.com/pinetreelabs/structree
 
 from structree import (
+    InitVar,
     StructConfig,
     UnionConfig,
-    ravel,
-    register_dataclass,
-    register_struct,
-    InitVar,
+    all,
     field,
     fields,
-    is_struct,
-    replace,
-    struct,
-    is_leaf,
-    all,
     flatten,
+    is_leaf,
+    is_struct,
     leaves,
     map,
+    ravel,
     reduce,
+    register_dataclass,
+    register_struct,
+    replace,
+    struct,
     structure,
     unflatten,
 )
-
 
 __all__ = [
     "register_struct",
