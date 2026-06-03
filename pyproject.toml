@@ -1,6 +1,6 @@
 [project]
 name = "archimedes"
-version = "0.4.4"
+version = "0.4.5"
 description = "Python framework for modeling, simulation, and controls development"
 readme = "README.md"
 authors = [
@@ -14,6 +14,7 @@ dependencies = [
     "osqp>=1.0.4",
     "pydantic>=2.11.9",
     "scipy>=1.7",
+    "structree>=0.1.0",
     "typing-extensions>=4.12.2",
 ]
 license = "GPL-3.0-or-later"
@@ -36,15 +37,21 @@ all = [
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
+[tool.uv.sources]
+structree = { git = "https://github.com/PineTreeLabs/structree" }
+
 [dependency-groups]
 dev = [
     "bandit[toml]>=1.8.3",
     "furo>=2024.8.6",
+    "jupytext>=1.19.1",
     "mypy>=1.15.0",
     "myst-nb>=1.3.0",
     "myst-parser[linkify]>=4.0.1",
     "nbconvert>=7.17.1",
     "nbmake>=1.5.5",
+    "openpyxl>=3.1.5",
+    "pandas>=3.0.1",
     "pip-audit>=2.9.0",
     "pytest>=9.0.3",
     "pytest-cov>=6.0.0",

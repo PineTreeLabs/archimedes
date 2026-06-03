@@ -23,7 +23,7 @@ from archimedes._core._array_impl import DEFAULT_SYM_NAME, _unwrap_sym_array, ar
 from .. import sym_like
 
 if TYPE_CHECKING:
-    from archimedes.tree._flatten_util import HashablePartial
+    from structree._flatten_util import HashablePartial
 
     # Type alias for the key in the compiled dictionary
     # This will be first the shape/dtype of all arguments and then a tuple
