@@ -102,3 +102,6 @@ New version tag for release to PyPI (previous "Archimedes" project tagged with v
 - Support autodiff of `compile(buffered=True)`
 - Bump nbconvert and pytest versions [PR #154](https://github.com/PineTreeLabs/archimedes/pull/154)
 - Extract struct/pytree functionality into a new standalone package [structree](https://github.com/PineTreeLabs/structree)
+
+## [0.4.6] - 2026-07-18
+- Bump tornado, mistune, click, setuptools, soupsieve, tornado to resolve vulnerabilities (not expected to be relevant to Archimedes specifically)
