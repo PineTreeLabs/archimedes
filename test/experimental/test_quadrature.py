@@ -3,12 +3,13 @@ import math
 import numpy as np
 import pytest
 from scipy.special import beta as beta_fn
-from scipy.special import roots_hermite, roots_jacobi, roots_laguerre
+from scipy.special import roots_hermite, roots_hermitenorm, roots_jacobi, roots_laguerre
 
 import archimedes as arc
 from archimedes.experimental.quadrature import QuadratureRule
 from archimedes.experimental.quadrature._quadrature_rule import (
     _HermiteFamily,
+    _HermiteNormFamily,
     _JacobiFamily,
     _LaguerreFamily,
     _LegendreFamily,
@@ -149,6 +150,22 @@ def test_hermite_family():
         family.affine_params(std=-1.0)
 
 
+def test_hermite_norm_family():
+    family = _HermiteNormFamily()
+    assert family.uniform_weight is False
+    assert family.reference_domain == (-np.inf, np.inf)
+    np.testing.assert_allclose(family.weight(np.array([0.0, 1.0])), [1.0, np.exp(-0.5)])
+
+    assert family.affine_params() == (1.0, 0.0)
+
+    scale, shift = family.affine_params(mean=1.0, std=2.0)
+    assert np.isclose(scale, 2.0)
+    assert np.isclose(shift, 1.0)
+
+    with pytest.raises(ValueError):
+        family.affine_params(std=-1.0)
+
+
 # -- Known rules: node generation and exact integration --
 
 
@@ -268,6 +285,34 @@ def test_gauss_hermite_mean_std_scaling():
     assert np.isclose(integral, std * np.sqrt(np.pi))
 
 
+def test_gauss_hermitenorm_exact_moments():
+    n = 5
+    x, w = roots_hermitenorm(n)
+    rule = QuadratureRule(x, w, name="gauss_hermitenorm_5", family=_HermiteNormFamily())
+
+    assert np.isclose(rule.integrate(lambda x: np.ones_like(x)), np.sqrt(2 * np.pi))
+    assert np.isclose(rule.integrate(lambda x: x**2), np.sqrt(2 * np.pi))
+    assert np.isclose(rule.integrate(lambda x: x**3), 0.0, atol=1e-10)
+
+
+def test_gauss_hermitenorm_matches_gaussian_expectation():
+    # Unlike _HermiteFamily, mean/std here are exactly the mean and standard
+    # deviation of a Gaussian density -- no sqrt(2) correction needed.
+    n = 6
+    x, w = roots_hermitenorm(n)
+    rule = QuadratureRule(x, w, name="gauss_hermitenorm_6", family=_HermiteNormFamily())
+
+    mean, std = 2.0, 3.0
+    norm = std * np.sqrt(2 * np.pi)  # normalizes the weight to a proper PDF
+
+    def expectation(f):
+        return rule.integrate(f, mean=mean, std=std) / norm
+
+    assert np.isclose(expectation(lambda x: np.ones_like(x)), 1.0)
+    assert np.isclose(expectation(lambda x: x), mean)
+    assert np.isclose(expectation(lambda x: x**2), mean**2 + std**2)
+
+
 # -- composite rules --
 
 
@@ -352,6 +397,18 @@ def test_compile_symbolic_rate():
 
     result = quad(2.0)
     assert np.isclose(float(result), 0.5)
+
+
+def test_compile_symbolic_mean_std():
+    x, w = roots_hermitenorm(5)
+    rule = QuadratureRule(x, w, name="gauss_hermitenorm_5", family=_HermiteNormFamily())
+
+    @arc.compile
+    def quad(mean, std):
+        return rule.dot(np.ones_like(rule.nodes), mean=mean, std=std)
+
+    result = quad(1.0, 2.0)
+    assert np.isclose(float(result), 2.0 * np.sqrt(2 * np.pi))
 
 
 def test_compile_vector_integrand():

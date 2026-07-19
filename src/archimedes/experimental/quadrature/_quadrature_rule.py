@@ -275,9 +275,9 @@ class _HermiteFamily(_QuadratureFamily):
 
     The associated orthogonal polynomials are the *physicists'* Hermite
     polynomials :math:`H_n(x)` (as opposed to the *probabilists'*
-    convention, which instead uses weight :math:`e^{-x^2/2}`). The zeroth
-    moment of the weight is :math:`\\int_{-\\infty}^\\infty e^{-x^2} \\, dx
-    = \\sqrt{\\pi}`.
+    convention used by :class:`_HermiteNormFamily`, which instead uses
+    weight :math:`e^{-x^2/2}`). The zeroth moment of the weight is
+    :math:`\\int_{-\\infty}^\\infty e^{-x^2} \\, dx = \\sqrt{\\pi}`.
     """
 
     @property
@@ -321,6 +321,80 @@ class _HermiteFamily(_QuadratureFamily):
             Scale of the target weight. Default 1. Equal to
             :math:`\\sqrt{2}` times the standard deviation of the
             corresponding Gaussian density.
+
+        Returns
+        -------
+        scale, shift : float
+            Affine parameters as derived above.
+
+        Raises
+        ------
+        ValueError
+            If `std` is not positive.
+        """
+        if mean is None and std is None:
+            return 1.0, 0.0
+        if mean is None:
+            mean = 0.0
+        if std is None:
+            std = 1.0
+        if isinstance(std, float) and std <= 0:
+            raise ValueError(f"Gauss-Hermite std must be positive, got {std}")
+        return std, mean
+
+
+class _HermiteNormFamily(_QuadratureFamily):
+    """Gauss-Hermite (probabilists') weight: :math:`w(x) = e^{-x^2/2}` on
+    :math:`(-\\infty, \\infty)`.
+
+    The associated orthogonal polynomials are the *probabilists'* Hermite
+    polynomials :math:`\\mathit{He}_n(x)` (as opposed to the *physicists'*
+    convention used by :class:`_HermiteFamily`, with weight
+    :math:`e^{-x^2}`). Up to normalization, this weight is exactly the
+    density of a standard normal distribution:
+    :math:`e^{-x^2/2} = \\sqrt{2\\pi} \\, \\phi(x)`, where :math:`\\phi` is
+    the standard normal PDF. The zeroth moment of the weight is
+    :math:`\\int_{-\\infty}^\\infty e^{-x^2/2} \\, dx = \\sqrt{2\\pi}`.
+    """
+
+    @property
+    def reference_domain(self) -> tuple[float, float]:
+        return (-np.inf, np.inf)
+
+    def weight(self, x: np.ndarray) -> np.ndarray:
+        """Reference weight function :math:`w(x) = e^{-x^2/2}`, evaluated
+        at `x`."""
+        return np.exp(-(x**2) / 2)
+
+    def affine_params(self, mean=None, std=None) -> tuple[float, float]:
+        """Map the reference weight onto a Gaussian weight with the given
+        mean and standard deviation:
+        :math:`w(x) = \\exp(-(x - \\mathrm{mean})^2 /
+        (2 \\, \\mathrm{std}^2))`.
+
+        Substituting :math:`x = \\mathrm{mean} + \\mathrm{std} \\cdot t`
+        gives
+
+        .. math::
+            \\int_{-\\infty}^\\infty f(x) \\,
+                e^{-(x-\\mathrm{mean})^2/(2 \\, \\mathrm{std}^2)} \\, dx
+            = \\mathrm{std} \\int_{-\\infty}^\\infty
+                f(\\mathrm{mean} + \\mathrm{std} \\cdot t) \\, e^{-t^2/2}
+                \\, dt,
+
+        so :math:`\\mathrm{scale} = \\mathrm{std}` and
+        :math:`\\mathrm{shift} = \\mathrm{mean}`. Unlike
+        `_HermiteFamily.affine_params`, `std` here is exactly the standard
+        deviation of the corresponding Gaussian density -- the reference
+        weight already uses the probabilists' normalization, so no
+        :math:`\\sqrt{2}` correction is needed.
+
+        Parameters
+        ----------
+        mean : float, optional
+            Mean of the target Gaussian weight. Default 0.
+        std : float, optional
+            Standard deviation of the target Gaussian weight. Default 1.
 
         Returns
         -------
@@ -724,7 +798,6 @@ def composite(base: QuadratureRule, breakpoints: np.ndarray) -> QuadratureRule:
         nodes.append(base.scaled_points(t0, t1))
         weights.append(base.scaled_weights(t0, t1))
 
-    n_elements = len(breakpoints) - 1
     return QuadratureRule(
         np.concatenate(nodes),
         np.concatenate(weights),
