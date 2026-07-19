@@ -1,0 +1,17 @@
+cmake/stm32cubemx/
+cmake/gcc-arm-none-eabi.cmake
+cmake/starm-clang.cmake
+
+Core/Inc/stm32h7xx_hal_conf.h
+Core/Inc/stm32h7xx_it.h
+
+Core/Src/stm32h7xx_hal_msp.c
+Core/Src/stm32h7xx_it.c
+Core/Src/syscalls.c
+Core/Src/sysmem.c
+Core/Src/system_stm32h7xx.c
+
+Drivers/
+
+startup_stm32h753xx.s
+STM32H753XX_FLASH.ld
