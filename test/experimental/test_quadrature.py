@@ -13,6 +13,7 @@ from archimedes.experimental.quadrature._quadrature_rule import (
     _JacobiFamily,
     _LaguerreFamily,
     _LegendreFamily,
+    clenshaw_curtis,
     composite,
     gauss_legendre,
     gauss_lobatto,
@@ -230,6 +231,81 @@ def test_gauss_lobatto_edge_cases():
     assert len(rule) == 2
     np.testing.assert_array_equal(rule.nodes, [-1.0, 1.0])
     np.testing.assert_array_equal(rule.weights, [1.0, 1.0])
+
+
+def _classical_clenshaw_curtis_weights(d):
+    """Direct O(d^2) evaluation of Waldvogel's Equs. (2.4)-(2.5), ascending
+    node order, as an independent check on the FFT-based implementation."""
+    k = np.arange(d + 1)
+    theta = np.pi * k / d
+    jmax = d // 2
+    w = np.zeros(d + 1)
+    for kk in range(d + 1):
+        s = sum(
+            (1.0 if j == d / 2 else 2.0) / (4 * j**2 - 1) * np.cos(2 * j * theta[kk])
+            for j in range(1, jmax + 1)
+        )
+        c = 1.0 if kk % d == 0 else 2.0
+        w[kk] = c / d * (1 - s)
+    return w[::-1]
+
+
+@pytest.mark.parametrize("n", [3, 4, 5, 6, 7, 11, 16])
+def test_clenshaw_curtis_matches_classical_formula(n):
+    rule = clenshaw_curtis(n)
+    expected = _classical_clenshaw_curtis_weights(n - 1)
+    np.testing.assert_allclose(rule.weights, expected, atol=1e-10)
+
+
+def test_clenshaw_curtis_matches_simpsons_rule():
+    # 3-node Clenshaw-Curtis coincides with Simpson's rule
+    rule = clenshaw_curtis(3)
+    np.testing.assert_allclose(rule.nodes, [-1.0, 0.0, 1.0], atol=1e-10)
+    np.testing.assert_allclose(rule.weights, [1 / 3, 4 / 3, 1 / 3])
+
+
+def test_clenshaw_curtis_two_nodes():
+    rule = clenshaw_curtis(2)
+    np.testing.assert_array_equal(rule.nodes, [-1.0, 1.0])
+    np.testing.assert_array_equal(rule.weights, [1.0, 1.0])
+
+
+def test_clenshaw_curtis_invalid_n():
+    with pytest.raises(ValueError):
+        clenshaw_curtis(1)
+
+
+@pytest.mark.parametrize("n", [2, 3, 4, 5, 8, 9])
+def test_clenshaw_curtis_properties(n):
+    rule = clenshaw_curtis(n)
+    assert len(rule) == n
+    assert np.isclose(rule.nodes[0], -1.0)
+    assert np.isclose(rule.nodes[-1], 1.0)
+    assert np.all(np.diff(rule.nodes) > 0)
+    assert np.all(rule.weights > 0)
+    assert np.isclose(np.sum(rule.weights), 2.0)
+
+    # Exact for polynomials up to degree n - 1
+    for k in range(n):
+        expected = 0.0 if k % 2 == 1 else 2 / (k + 1)
+        assert np.isclose(rule.integrate(lambda x, k=k: x**k), expected, atol=1e-10)
+
+
+def test_clenshaw_curtis_shares_legendre_family():
+    rule = clenshaw_curtis(5)
+    assert isinstance(rule.family, _LegendreFamily)
+
+    a, b = -2.0, 5.0
+    integral = rule.integrate(lambda x: x**2, a, b)
+    expected = (b**3 - a**3) / 3
+    assert np.isclose(integral, expected)
+
+
+def test_clenshaw_curtis_composite():
+    # Same (uniform-weight) family as Gauss-Legendre, so it tiles the same way
+    rule = composite(clenshaw_curtis(5), [-1.0, 0.0, 1.0])
+    assert len(rule) == 10
+    assert np.isclose(rule.integrate(lambda x: x**2), 2 / 3)
 
 
 def test_gauss_jacobi_exact_moment():
