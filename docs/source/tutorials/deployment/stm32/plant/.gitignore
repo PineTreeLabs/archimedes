@@ -1,0 +1,34 @@
+# Archimedes generated files
+archimedes/
+
+# CubeMX generated files
+Drivers/
+cmake/stm32cubemx/
+cmake/gcc-arm-none-eabi.cmake
+cmake/starm-clang.cmake
+
+# STM32F4(39) specific files
+Core/Inc/stm32f4xx_hal_conf.h
+Core/Inc/stm32f4xx_it.h
+
+Core/Src/stm32f4xx_hal_msp.c
+Core/Src/stm32f4xx_it.c
+Core/Src/syscalls.c
+Core/Src/sysmem.c
+Core/Src/system_stm32f4xx.c
+
+startup_stm32f439xx.s
+STM32F439XX_FLASH.ld
+
+# STM32H7(53) specific files
+Core/Inc/stm32h7xx_hal_conf.h
+Core/Inc/stm32h7xx_it.h
+
+Core/Src/stm32h7xx_hal_msp.c
+Core/Src/stm32h7xx_it.c
+Core/Src/syscalls.c
+Core/Src/sysmem.c
+Core/Src/system_stm32h7xx.c
+
+startup_stm32h753xx.s
+STM32H753XX_FLASH.ld

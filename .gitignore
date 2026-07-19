@@ -1,7 +1,16 @@
+extensions/
+
+# Ephemeral files for testing
+requirements.txt
+
 # Third-party libraries and explicitly local files
 third_party/
 local/
+CLAUDE.md
 
+# VS Code
+.devcontainer/
+.vscode/
 **/.DS_Store
 
 # Byte-compiled / optimized / DLL files
