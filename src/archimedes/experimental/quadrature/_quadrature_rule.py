@@ -1,8 +1,10 @@
 from __future__ import annotations
+
 import abc
 import dataclasses
-import numpy as np
 from typing import Callable
+
+import numpy as np
 from scipy.special import roots_jacobi, roots_legendre
 
 
@@ -72,12 +74,15 @@ class _LegendreFamily(_QuadratureFamily):
 @dataclasses.dataclass(frozen=True)
 class _JacobiFamily(_LegendreFamily):
     """Gauss-Jacobi weights (1-x)^alpha * (1+x)^beta on [-1, 1]."""
+
     alpha: float
     beta: float
 
     def __post_init__(self):
         if self.alpha <= -1 or self.beta <= -1:
-            raise ValueError(f"invalid alpha={self.alpha} or beta={self.beta}, must be > -1")
+            raise ValueError(
+                f"invalid alpha={self.alpha} or beta={self.beta}, must be > -1"
+            )
 
     def weight(self, x: np.ndarray) -> np.ndarray:
         """Weight function for the quadrature rule, evaluated at `x`."""
@@ -145,8 +150,9 @@ class QuadratureRule:
     target domain/measure is an affine transform of the reference nodes,
     whose parameters are specific to `family` -- see `scaled_points`.
     """
-    nodes: np.ndarray          # shape (n,), on `family.reference_domain`
-    weights: np.ndarray        # shape (n,)
+
+    nodes: np.ndarray  # shape (n,), on `family.reference_domain`
+    weights: np.ndarray  # shape (n,)
     name: str  # name for the rule
     family: _QuadratureFamily
     degree: int | None = None  # exact for polynomials up to this degree
