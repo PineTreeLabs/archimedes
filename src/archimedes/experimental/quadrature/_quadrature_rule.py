@@ -6,8 +6,13 @@ from typing import Callable
 from scipy.special import roots_jacobi, roots_legendre
 
 
-class _WeightType(metaclass=abc.ABCMeta):
-    """A type of quadrature rule, coupling a weight function and reference domain"""
+class _QuadratureFamily(metaclass=abc.ABCMeta):
+    """The measure of an orthogonal polynomial quadrature rule.
+
+    Combines a weight function and reference domain (support) -- together,
+    the data `w(x) dx` on `reference_domain` that defines a classical
+    family of orthogonal polynomials and its Gauss quadrature rules.
+    """
 
     @property
     @abc.abstractmethod
@@ -21,13 +26,21 @@ class _WeightType(metaclass=abc.ABCMeta):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def validate_domain(self, domain: tuple[float, float]) -> None:
-        """Validate that the given domain is compatible with this quadrature type."""
+    def affine_params(self, *args, **kwargs) -> tuple[float, float]:
+        """Return `(scale, shift)` mapping reference nodes onto the
+        requested instance of this family: `x = scale * t + shift` for
+        reference node `t`. Weights pick up the same `scale` as a
+        Jacobian factor.
+
+        Called with no arguments, must return the identity `(1.0, 0.0)`
+        -- i.e. the reference domain/measure itself. Also validates that
+        `args`/`kwargs` are compatible with this family. Their meaning is
+        family-specific; see the subclass docstring.
+        """
         raise NotImplementedError
 
 
-
-class _LegendreWeight(_WeightType):
+class _LegendreFamily(_QuadratureFamily):
     """Gauss-Legendre weights: 1 on [-1, 1]."""
 
     @property
@@ -38,17 +51,26 @@ class _LegendreWeight(_WeightType):
         """Weight function for the quadrature rule, evaluated at `x`."""
         return np.ones_like(x)
 
-    def validate_domain(self, domain: tuple[float, float]) -> None:
-        """Validate that the given domain is compatible with this quadrature type."""
-        a, b = domain
-        if not np.isfinite(a) or not np.isfinite(b):
+    def affine_params(self, a=None, b=None) -> tuple[float, float]:
+        """`(a, b)`: bounds of the target interval, default the reference
+        domain."""
+        if a is None and b is None:
+            return 1.0, 0.0
+        if a is None or b is None:
+            raise ValueError("specify both `a` and `b`, or neither")
+        if (isinstance(a, float) and not np.isfinite(a)) or (
+            isinstance(b, float) and not np.isfinite(b)
+        ):
             raise ValueError(
-                f"Gauss-Legendre quadrature requires finite domain, got {domain}"
+                f"{type(self).__name__} requires a finite domain, got ({a}, {b})"
             )
+        lo, hi = self.reference_domain
+        scale = (b - a) / (hi - lo)
+        return scale, a - scale * lo
 
 
 @dataclasses.dataclass(frozen=True)
-class _JacobiWeight(_WeightType):
+class _JacobiFamily(_LegendreFamily):
     """Gauss-Jacobi weights (1-x)^alpha * (1+x)^beta on [-1, 1]."""
     alpha: float
     beta: float
@@ -57,24 +79,14 @@ class _JacobiWeight(_WeightType):
         if self.alpha <= -1 or self.beta <= -1:
             raise ValueError(f"invalid alpha={self.alpha} or beta={self.beta}, must be > -1")
 
-    @property
-    def reference_domain(self) -> tuple[float, float]:
-        return (-1.0, 1.0)
-
     def weight(self, x: np.ndarray) -> np.ndarray:
         """Weight function for the quadrature rule, evaluated at `x`."""
         return (1 - x) ** self.alpha * (1 + x) ** self.beta
 
-    def validate_domain(self, domain: tuple[float, float]) -> None:
-        """Validate that the given domain is compatible with this quadrature type."""
-        a, b = domain
-        if not np.isfinite(a) or not np.isfinite(b):
-            raise ValueError(
-                f"Gauss-Jacobi quadrature requires finite domain, got {domain}"
-            )
 
-class _LaguerreWeight(_WeightType):
+class _LaguerreFamily(_QuadratureFamily):
     """Gauss-Laguerre weights: exp(-x) on [0, inf)."""
+
     @property
     def reference_domain(self) -> tuple[float, float]:
         return (0.0, np.inf)
@@ -83,44 +95,45 @@ class _LaguerreWeight(_WeightType):
         """Weight function for the quadrature rule, evaluated at `x`."""
         return np.exp(-x)
 
-    def validate_domain(self, domain: tuple[float, float]) -> None:
-        """Validate that the given domain is compatible with this quadrature type."""
-        a, b = domain
-        if a != 0 or b != np.inf:
-            raise ValueError(
-                f"Gauss-Laguerre quadrature requires domain [0, inf), got {domain}"
-            )
+    def affine_params(self, rate=None, start=None) -> tuple[float, float]:
+        """`rate`: rate of the target exponential weight
+        `exp(-rate*(x-start))`, default 1. `start`: left endpoint of the
+        target domain `[start, inf)`, default 0.
+        """
+        if rate is None and start is None:
+            return 1.0, 0.0
+        if rate is None:
+            rate = 1.0
+        if start is None:
+            start = 0.0
+        if isinstance(rate, float) and rate <= 0:
+            raise ValueError(f"Gauss-Laguerre rate must be positive, got {rate}")
+        return 1.0 / rate, start
 
 
-class _HermiteWeight(_WeightType):
+class _HermiteFamily(_QuadratureFamily):
     """Gauss-Hermite weights: exp(-x^2) on (-inf, inf)."""
+
     @property
     def reference_domain(self) -> tuple[float, float]:
         return (-np.inf, np.inf)
 
     def weight(self, x: np.ndarray) -> np.ndarray:
         """Weight function for the quadrature rule, evaluated at `x`."""
-        return np.exp(-x**2)
+        return np.exp(-(x**2))
 
-    def validate_domain(self, domain: tuple[float, float]) -> None:
-        """Validate that the given domain is compatible with this quadrature type."""
-        a, b = domain
-        if a != -np.inf or b != np.inf:
-            raise ValueError(
-                f"Gauss-Hermite quadrature requires domain (-inf, inf), got {domain}"
-            )
-
-def _resolve_quadrature_type(rule: str, **kwargs) -> _WeightType:
-    """Resolve a quadrature rule type from a string and optional parameters."""
-    QuadratureType = {
-        "gauss_legendre": _LegendreWeight,
-        "gauss_jacobi": _JacobiWeight,
-        "gauss_laguerre": _LaguerreWeight,
-        "gauss_hermite": _HermiteWeight,
-    }
-    if rule not in QuadratureType:
-        raise ValueError(f"Unknown quadrature rule '{rule}', must be one of {list(QuadratureType.keys())}")
-    return QuadratureType[rule](**kwargs)
+    def affine_params(self, mean=None, std=None) -> tuple[float, float]:
+        """`mean`, `std`: location and scale of the target Gaussian
+        weight, default 0 and 1."""
+        if mean is None and std is None:
+            return 1.0, 0.0
+        if mean is None:
+            mean = 0.0
+        if std is None:
+            std = 1.0
+        if isinstance(std, float) and std <= 0:
+            raise ValueError(f"Gauss-Hermite std must be positive, got {std}")
+        return std, mean
 
 
 # Note: dataclass, not struct, because all the data is static
@@ -128,13 +141,14 @@ def _resolve_quadrature_type(rule: str, **kwargs) -> _WeightType:
 class QuadratureRule:
     """Fixed-node quadrature rule on a reference domain.
 
-    Nodes and weights are always static (NumPy) arrays. The integration
-    domain may be symbolic, in which case only the affine scaling is traced.
+    Nodes and weights are always static (NumPy) arrays. Mapping onto a
+    target domain/measure is an affine transform of the reference nodes,
+    whose parameters are specific to `family` -- see `scaled_points`.
     """
-    nodes: np.ndarray          # shape (n,), on `domain`
+    nodes: np.ndarray          # shape (n,), on `family.reference_domain`
     weights: np.ndarray        # shape (n,)
     name: str  # name for the rule
-    weight_type: _WeightType
+    family: _QuadratureFamily
     degree: int | None = None  # exact for polynomials up to this degree
 
     def __post_init__(self):
@@ -152,63 +166,55 @@ class QuadratureRule:
 
     # -- domain mapping --
 
-    def _affine(self, a, b):
-        """Scale/shift coefficients mapping `domain` -> (a, b)."""
-        lo, hi = self.domain
-        scale = (b - a) / (hi - lo)
-        return scale, a - scale * lo
+    def scaled_points(self, *params, **kwparams):
+        """Nodes mapped by `family`'s affine parameters, or the reference
+        nodes if no parameters are given.
 
-    def scaled_points(self, a=None, b=None):
-        """Nodes mapped onto (a, b), or the reference nodes if omitted.
+        The meaning of `params`/`kwparams` is specific to `family`:
+        - Legendre/Jacobi: `(a, b)` bounds of the target interval.
+        - Laguerre: `rate` (and optional `start`) of the target
+          exponential weight.
+        - Hermite: `mean`, `std` of the target Gaussian weight.
 
-        Symbolic if `a` or `b` are symbolic; the underlying nodes are static.
+        See the family's `affine_params` docstring for details. Symbolic
+        if any parameter is symbolic; the underlying nodes are static.
         """
-        if a is None and b is None:
-            return self.nodes
-        if a is None or b is None:
-            raise ValueError("specify both `a` and `b`, or neither")
-        scale, shift = self._affine(a, b)
+        scale, shift = self.family.affine_params(*params, **kwparams)
         return scale * self.nodes + shift
 
-    def scaled_weights(self, a=None, b=None):
-        """Weights including the Jacobian factor for (a, b)."""
-        if a is None and b is None:
-            return self.weights
-        if a is None or b is None:
-            raise ValueError("specify both `a` and `b`, or neither")
-        scale, _ = self._affine(a, b)
+    def scaled_weights(self, *params, **kwparams):
+        """Weights including the Jacobian factor for the target
+        domain/measure. See `scaled_points` for the meaning of
+        `params`/`kwparams`.
+        """
+        scale, _ = self.family.affine_params(*params, **kwparams)
         return scale * self.weights
-
-    def _resolve_domain(self, domain: tuple[float, float] | None) -> tuple[float, float]:
-        """Resolve the integration domain, defaulting to the reference domain."""
-        if domain is None:
-            return self.rule_type.reference_domain
-        self.rule_type.validate_domain(domain)
-        return domain
 
     # -- integration --
 
     def integrate(
         self,
         f: Callable[[np.ndarray], np.ndarray],
-        domain: tuple[float, float] | None = None,
-        axis=-1
+        *params,
+        axis=-1,
+        **kwparams,
     ) -> np.ndarray:
-        """Approximate the weighted integral of `f` over `domain`.
+        """Approximate the weighted integral of `f`.
 
         `f` is called once on the full node array and must be vectorized,
-        returning values with the nodes along `axis`. If the domain is
-        symbolic, `f` must be symbolically traceable.
+        returning values with the nodes along `axis`. If any of
+        `params`/`kwparams` is symbolic, `f` must be symbolically
+        traceable. See `scaled_points` for their meaning.
         """
-        a, b = self._resolve_domain(domain)
-        fp = f(self.scaled_points(a, b))
-        return self.dot(fp, domain, axis=axis)
+        fp = f(self.scaled_points(*params, **kwparams))
+        return self.dot(fp, *params, axis=axis, **kwparams)
 
     def dot(
         self,
         values: np.ndarray,
-        domain: tuple[float, float] | None = None,
-        axis: int =-1
+        *params,
+        axis: int = -1,
+        **kwparams,
     ) -> np.ndarray:
         """Quadrature applied to values already sampled at the nodes.
 
@@ -218,8 +224,9 @@ class QuadratureRule:
             Sampled values, with the quadrature nodes along `axis`.
             Shape (n,) for scalar integrands or (m, n) for vector-valued
             integrands under the default `axis=-1`.
-        domain : tuple[float, float]
-            Integration domain (a, b) to scale the quadrature weights.
+        *params, **kwparams
+            Target domain/measure parameters, forwarded to
+            `family.affine_params`; see `scaled_points` for their meaning.
         axis : int, optional
             Axis holding the nodes. Default -1 (nodes last), matching the
             natural output of a vectorized `f`. Use `axis=0` for
@@ -232,8 +239,7 @@ class QuadratureRule:
             nodes integrated out along `axis`. Shape (m,) for vector-valued
             integrands, or () for scalar integrands.
         """
-        a, b = self._resolve_domain(domain)
-        w = self.scaled_weights(a, b)
+        w = self.scaled_weights(*params, **kwparams)
 
         if values.ndim > 2:
             raise ValueError(f"expected a 0-D, 1-D, or 2-D array, got {values.ndim}-D")
@@ -250,10 +256,10 @@ class QuadratureRule:
 
 def gauss_legendre(n: int) -> QuadratureRule:
     x, w = roots_legendre(n)
-    weight_type = _LegendreWeight()
+    family = _LegendreFamily()
     degree = 2 * n - 1
     name = f"gauss_legendre_{n}"
-    return QuadratureRule(x, w, degree=degree, weight_type=weight_type, name=name)
+    return QuadratureRule(x, w, degree=degree, family=family, name=name)
 
 
 def gauss_radau(n: int, endpoint: str = "left") -> QuadratureRule:
@@ -262,7 +268,7 @@ def gauss_radau(n: int, endpoint: str = "left") -> QuadratureRule:
     `endpoint="left"`  includes -1  (LGR, pseudospectral convention)
     `endpoint="right"` includes +1  (Radau IIA, IRK/DAE convention)
     """
-    weight_type = _LegendreWeight()
+    family = _LegendreFamily()
     name = f"gauss_radau_{n}_{endpoint}"
     degree = 2 * n - 2
     if n < 1:
@@ -278,11 +284,11 @@ def gauss_radau(n: int, endpoint: str = "left") -> QuadratureRule:
         x, w = -x[::-1], w[::-1]
     elif endpoint != "left":
         raise ValueError(f"endpoint must be 'left' or 'right', got {endpoint!r}")
-    return QuadratureRule(x, w, degree=degree, weight_type=weight_type, name=name)
+    return QuadratureRule(x, w, degree=degree, family=family, name=name)
 
 
 def gauss_lobatto(n: int) -> QuadratureRule:
-    weight_type = _LegendreWeight()
+    family = _LegendreFamily()
     name = f"gauss_lobatto_{n}"
     degree = 2 * n - 3
     if n < 2:
@@ -295,4 +301,4 @@ def gauss_lobatto(n: int) -> QuadratureRule:
         x = np.concatenate([[-1.0], x, [1.0]])
         end_w = 2.0 / (n * (n - 1))
         w = np.concatenate([[end_w], w, [end_w]])
-    return QuadratureRule(x, w, degree=degree, weight_type=weight_type, name=name)
+    return QuadratureRule(x, w, degree=degree, family=family, name=name)
