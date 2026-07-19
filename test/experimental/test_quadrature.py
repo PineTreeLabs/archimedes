@@ -12,6 +12,7 @@ from archimedes.experimental.quadrature._quadrature_rule import (
     _JacobiFamily,
     _LaguerreFamily,
     _LegendreFamily,
+    composite,
     gauss_legendre,
     gauss_lobatto,
     gauss_radau,
@@ -83,6 +84,7 @@ def test_dot_errors():
 
 def test_legendre_family():
     family = _LegendreFamily()
+    assert family.uniform_weight is True
     assert family.reference_domain == (-1.0, 1.0)
     np.testing.assert_array_equal(family.weight(np.array([-0.5, 0.5])), [1.0, 1.0])
 
@@ -104,6 +106,7 @@ def test_jacobi_family_invalid_parameters(alpha, beta):
 
 def test_jacobi_family_weight_and_shared_affine_params():
     family = _JacobiFamily(alpha=1.0, beta=2.0)
+    assert family.uniform_weight is False
     assert family.reference_domain == (-1.0, 1.0)
 
     x = np.array([0.0, 0.5])
@@ -116,6 +119,7 @@ def test_jacobi_family_weight_and_shared_affine_params():
 
 def test_laguerre_family():
     family = _LaguerreFamily()
+    assert family.uniform_weight is False
     assert family.reference_domain == (0.0, np.inf)
     np.testing.assert_allclose(family.weight(np.array([0.0, 1.0])), [1.0, np.exp(-1.0)])
 
@@ -131,6 +135,7 @@ def test_laguerre_family():
 
 def test_hermite_family():
     family = _HermiteFamily()
+    assert family.uniform_weight is False
     assert family.reference_domain == (-np.inf, np.inf)
     np.testing.assert_allclose(family.weight(np.array([0.0, 1.0])), [1.0, np.exp(-1.0)])
 
@@ -149,7 +154,6 @@ def test_hermite_family():
 
 def test_gauss_legendre():
     rule = gauss_legendre(5)
-    assert rule.degree == 9
     assert len(rule) == 5
     assert np.isclose(np.sum(rule.weights), 2.0)
 
@@ -262,6 +266,66 @@ def test_gauss_hermite_mean_std_scaling():
     mean, std = 1.0, 2.0
     integral = rule.integrate(lambda x: np.ones_like(x), mean=mean, std=std)
     assert np.isclose(integral, std * np.sqrt(np.pi))
+
+
+# -- composite rules --
+
+
+def test_composite_matches_exact_integral():
+    rule = composite(gauss_legendre(3), [-1.0, 0.0, 1.0])
+    assert len(rule) == 6
+    assert np.isclose(np.sum(rule.weights), 2.0)
+
+    # Exact for a quadratic (well within each panel's degree-5 exactness)
+    assert np.isclose(rule.integrate(lambda x: x**2), 2 / 3)
+
+
+def test_composite_nonuniform_breakpoints():
+    rule = composite(gauss_legendre(4), [-1.0, -0.2, 0.5, 1.0])
+    assert len(rule) == 12
+    assert np.isclose(rule.integrate(lambda x: x**2), 2 / 3)
+
+
+def test_composite_scaled_domain():
+    # A composite rule is still an ordinary rule on the reference domain, so
+    # it maps onto an arbitrary target interval like any other Legendre rule.
+    rule = composite(gauss_legendre(3), [-1.0, 0.0, 1.0])
+    a, b = -2.0, 5.0
+    integral = rule.integrate(lambda x: x**2, a, b)
+    expected = (b**3 - a**3) / 3
+    assert np.isclose(integral, expected)
+
+
+def test_composite_requires_uniform_weight():
+    jacobi_rule = QuadratureRule(
+        *roots_jacobi(5, 1.0, 2.0),
+        name="gauss_jacobi_5",
+        family=_JacobiFamily(alpha=1.0, beta=2.0),
+    )
+    with pytest.raises(ValueError):
+        composite(jacobi_rule, [-1.0, 0.0, 1.0])
+
+    laguerre_rule = QuadratureRule(
+        *roots_laguerre(5), name="gauss_laguerre_5", family=_LaguerreFamily()
+    )
+    with pytest.raises(ValueError):
+        composite(laguerre_rule, [0.0, 1.0, 2.0])
+
+
+def test_composite_breakpoints_validation():
+    rule = gauss_legendre(3)
+
+    with pytest.raises(ValueError):
+        composite(rule, [-1.0])  # too few entries
+
+    with pytest.raises(ValueError):
+        composite(rule, [-1.0, 0.5, 0.0, 1.0])  # not strictly increasing
+
+    with pytest.raises(ValueError):
+        composite(rule, [-0.5, 0.0, 1.0])  # doesn't span the reference domain
+
+    with pytest.raises(ValueError):
+        composite(rule, [-1.0, 0.0, 0.5])  # doesn't span the reference domain
 
 
 # -- arc.compile integration: symbolic domain/measure parameters --

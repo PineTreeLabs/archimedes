@@ -46,6 +46,19 @@ class _QuadratureFamily(metaclass=abc.ABCMeta):
     Laguerre/Hermite.
     """
 
+    uniform_weight: bool = False
+    """True if `weight(x) == 1` for every `x` in `reference_domain`.
+
+    A rule can only be tiled into a composite rule (see `composite`) if its
+    family's reference weight is uniform: `affine_params` rescales the
+    *whole* reference domain, so compositing applies it element-by-element, and
+    that's only correct if the weight has no shape of its own to distort --
+    i.e. it's constant. Families with a non-uniform reference weight (e.g.
+    Jacobi, whose weight is singular at the reference endpoints) would pick
+    up a spurious copy of that shape at every interior element boundary if
+    tiled the same way.
+    """
+
     @property
     @abc.abstractmethod
     def reference_domain(self) -> tuple[float, float]:
@@ -83,6 +96,8 @@ class _LegendreFamily(_QuadratureFamily):
     :math:`P_n(x)`, and the resulting quadrature rule is exact for
     polynomials up to degree :math:`2n - 1`.
     """
+
+    uniform_weight = True
 
     @property
     def reference_domain(self) -> tuple[float, float]:
@@ -170,6 +185,13 @@ class _JacobiFamily(_LegendreFamily):
 
     alpha: float
     beta: float
+
+    # Not a dataclass field: unannotated, so `dataclasses` leaves it as a
+    # plain class attribute overriding `_LegendreFamily.uniform_weight`.
+    # The Jacobi weight is singular at the reference endpoints, so it
+    # cannot be tiled into a composite rule -- see `_QuadratureFamily.
+    # uniform_weight`.
+    uniform_weight = False
 
     def __post_init__(self):
         if self.alpha <= -1 or self.beta <= -1:
@@ -333,8 +355,7 @@ class QuadratureRule:
 
     where :math:`w` and :math:`I` are the weight function and reference
     domain of `family`, and `nodes`/`weights` are the :math:`x_i`/:math:`w_i`
-    above. If `degree` is given, the approximation is exact for every
-    polynomial `f` of degree :math:`\\leq` `degree`.
+    above.
 
     Nodes and weights are always static (NumPy) arrays. Mapping onto a
     target domain/measure is an affine transform of the reference nodes,
@@ -351,8 +372,6 @@ class QuadratureRule:
         Name identifying the rule.
     family : _QuadratureFamily
         Weight function and reference domain the rule is defined on.
-    degree : int, optional
-        Degree of polynomial exactness, if known.
 
     Raises
     ------
@@ -381,8 +400,7 @@ class QuadratureRule:
     def __repr__(self) -> str:
         return (
             f"{type(self).__name__}(name={self.name!r}, "
-            f"family={type(self.family).__name__}, "
-            f"degree={self.degree}, n={len(self)})"
+            f"family={type(self.family).__name__}, n={len(self)})"
         )
 
     # -- domain mapping --
@@ -624,7 +642,6 @@ def gauss_lobatto(n: int) -> QuadratureRule:
         If `n < 2`.
     """
     family = _LegendreFamily()
-    degree = 2 * n - 3
     if n < 2:
         raise ValueError("Gauss-Lobatto requires n >= 2")
     if n == 2:
@@ -636,3 +653,81 @@ def gauss_lobatto(n: int) -> QuadratureRule:
         end_w = 2.0 / (n * (n - 1))
         w = np.concatenate([[end_w], w, [end_w]])
     return QuadratureRule(x, w, family=family, name="gauss_lobatto")
+
+
+def composite(base: QuadratureRule, breakpoints: np.ndarray) -> QuadratureRule:
+    """Tile `base` across elements of its reference domain.
+
+    Partitions `base.family.reference_domain` at `breakpoints` and applies
+    `base`, affinely rescaled, to each element, concatenating the resulting
+    nodes and weights. The result is itself a `QuadratureRule` on the same
+    reference domain -- its nodes are just clustered at the element
+    boundaries rather than spread uniformly -- so it can be mapped onto a
+    target domain/measure via `scaled_points`/`scaled_weights`/`integrate`
+    exactly like any other rule of `base.family`. This works because
+    `family.affine_params` maps affinely, and affine maps commute with
+    subdivision: rescaling the whole composite pattern onto `[a, b]` is
+    the same as building the elements directly on the rescaled sub-intervals
+    of `[a, b]`.
+
+    Only defined for families whose reference weight is uniform (see
+    `_QuadratureFamily.uniform_weight`) -- otherwise each interior element
+    boundary would pick up a spurious copy of the weight's shape, which is
+    only meaningful at the true endpoints of the reference domain.
+
+    Parameters
+    ----------
+    base : QuadratureRule
+        Rule to tile across elements. `base.family.uniform_weight` must be
+        `True`.
+    breakpoints : array_like
+        Element boundaries, shape `(k + 1,)` for `k` elements. Must be
+        strictly increasing and span `base.family.reference_domain`
+        exactly (first/last entries equal to its endpoints).
+
+    Returns
+    -------
+    rule : QuadratureRule
+        Composite rule with `k * len(base)` nodes on the same reference
+        domain as `base`.
+
+    Raises
+    ------
+    ValueError
+        If `base.family.uniform_weight` is `False`, if `breakpoints` has
+        fewer than 2 entries or is not strictly increasing, or if it does
+        not span `base.family.reference_domain` exactly.
+    """
+    if not base.family.uniform_weight:
+        raise ValueError(
+            f"composite quadrature requires a family with a uniform "
+            f"reference weight, got {type(base.family).__name__}"
+        )
+    breakpoints = np.asarray(breakpoints, dtype=float)
+    if breakpoints.ndim != 1 or len(breakpoints) < 2:
+        raise ValueError(
+            f"breakpoints must be 1-D with at least 2 entries, got shape "
+            f"{breakpoints.shape}"
+        )
+    if np.any(np.diff(breakpoints) <= 0):
+        raise ValueError("breakpoints must be strictly increasing")
+    lo, hi = base.family.reference_domain
+    if breakpoints[0] != lo or breakpoints[-1] != hi:
+        raise ValueError(
+            f"breakpoints must span the reference domain {(lo, hi)}, got "
+            f"({breakpoints[0]}, {breakpoints[-1]})"
+        )
+
+    nodes = []
+    weights = []
+    for t0, t1 in zip(breakpoints[:-1], breakpoints[1:]):
+        nodes.append(base.scaled_points(t0, t1))
+        weights.append(base.scaled_weights(t0, t1))
+
+    n_elements = len(breakpoints) - 1
+    return QuadratureRule(
+        np.concatenate(nodes),
+        np.concatenate(weights),
+        family=base.family,
+        name=base.name,
+    )
