@@ -3,11 +3,11 @@
 Gauss quadrature approximates a weighted integral
 
 .. math::
-    \\int_I f(x) \\, w(x) \\, dx \\approx \\sum_{i=1}^n w_i f(x_i)
+    \\int_\\mathcal{D} f(x) \\, w(x) \\, dx \\approx \\sum_{i=1}^n w_i f(x_i)
 
 exactly for every polynomial `f` of degree :math:`\\leq 2n - 1`, where the
 nodes :math:`x_i` are the roots of the degree-`n` polynomial orthogonal with
-respect to the weight `w` on the reference domain `I`. Each classical
+respect to the weight `w` on the reference domain `D`. Each classical
 a "weight/domain pair" (Legendre, Jacobi, Laguerre, Hermite) is represented by
 a "family"; :class:`QuadratureRule` pairs a family with a
 fixed set of nodes and weights on its reference domain.
@@ -36,14 +36,14 @@ class _QuadratureFamily(metaclass=abc.ABCMeta):
     polynomial family and its Gauss quadrature rule.
 
     A weight function :math:`w(x) \\geq 0` together with its support (the
-    reference domain :math:`I`) defines an orthogonality measure
+    reference domain :math:`\\mathcal{D}`) defines an orthogonality measure
     :math:`d\\mu(x) = w(x) \\, dx`. The polynomials orthogonal with respect
     to this measure determine the nodes of the associated Gauss quadrature
     rule: for the degree-`n` orthogonal polynomial, the `n` roots
     :math:`x_i` and quadrature weights :math:`w_i` satisfy
 
     .. math::
-        \\int_I f(x) \\, w(x) \\, dx = \\sum_{i=1}^n w_i f(x_i)
+        \\int_\\mathcal{D} f(x) \\, w(x) \\, dx = \\sum_{i=1}^n w_i f(x_i)
 
     exactly for every polynomial `f` of degree :math:`\\leq 2n - 1`.
 
@@ -70,7 +70,7 @@ class _QuadratureFamily(metaclass=abc.ABCMeta):
     @property
     @abc.abstractmethod
     def reference_domain(self) -> tuple[float, float]:
-        """Support :math:`I = (\\mathrm{lo}, \\mathrm{hi})` of the reference
+        """Support :math:`\\mathcal{D} = (\\mathrm{lo}, \\mathrm{hi})` of the reference
         weight function."""
         raise NotImplementedError
 
@@ -433,9 +433,9 @@ class QuadratureRule:
     Approximates the weighted integral
 
     .. math::
-        \\int_I f(x) \\, w(x) \\, dx \\approx \\sum_{i=1}^n w_i f(x_i)
+        \\int_\\mathcal{D} f(x) \\, w(x) \\, dx \\approx \\sum_{i=1}^n w_i f(x_i)
 
-    where :math:`w` and :math:`I` are the weight function and reference
+    where :math:`w` and :math:`\\mathcal{D}` are the weight function and reference
     domain of `family`, and `nodes`/`weights` are the :math:`x_i`/:math:`w_i`
     above.
 
