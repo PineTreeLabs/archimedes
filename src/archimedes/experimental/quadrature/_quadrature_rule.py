@@ -564,9 +564,9 @@ class QuadratureRule:
             integrands, or () for scalar integrands.
         """
         fp = f(self.scaled_points(*params, **kwparams))
-        return self.dot(fp, *params, axis=axis, **kwparams)
+        return self.sum(fp, *params, axis=axis, **kwparams)
 
-    def dot(
+    def sum(
         self,
         values: np.ndarray,
         *params,

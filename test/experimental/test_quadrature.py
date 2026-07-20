@@ -55,30 +55,30 @@ def test_scaled_points_weights_interval():
 def test_dot_matches_integrate():
     rule = gauss_legendre(4)
     values = np.cos(rule.nodes)
-    assert np.isclose(rule.dot(values), rule.integrate(np.cos))
+    assert np.isclose(rule.sum(values), rule.integrate(np.cos))
 
 
 def test_dot_axis():
     rule = gauss_legendre(4)
     values = np.cos(rule.nodes)
-    scalar = rule.dot(values)
+    scalar = rule.sum(values)
 
     # 2D values, nodes along the last axis (default)
     stacked = np.stack([values, 2 * values])
-    result_last = rule.dot(stacked, axis=-1)
+    result_last = rule.sum(stacked, axis=-1)
     np.testing.assert_allclose(result_last, [scalar, 2 * scalar])
 
     # nodes along the first axis
-    result_first = rule.dot(stacked.T, axis=0)
+    result_first = rule.sum(stacked.T, axis=0)
     np.testing.assert_allclose(result_first, [scalar, 2 * scalar])
 
 
 def test_dot_errors():
     rule = gauss_legendre(4)
     with pytest.raises(ValueError):
-        rule.dot(np.zeros((2, 2, 2)))
+        rule.sum(np.zeros((2, 2, 2)))
     with pytest.raises(ValueError):
-        rule.dot(np.zeros(len(rule) + 1))
+        rule.sum(np.zeros(len(rule) + 1))
 
 
 # -- _QuadratureFamily implementations --
@@ -469,7 +469,7 @@ def test_compile_symbolic_rate():
 
     @arc.compile
     def quad(rate):
-        return rule.dot(np.ones_like(rule.nodes), rate=rate)
+        return rule.sum(np.ones_like(rule.nodes), rate=rate)
 
     result = quad(2.0)
     assert np.isclose(float(result), 0.5)
@@ -481,7 +481,7 @@ def test_compile_symbolic_mean_std():
 
     @arc.compile
     def quad(mean, std):
-        return rule.dot(np.ones_like(rule.nodes), mean=mean, std=std)
+        return rule.sum(np.ones_like(rule.nodes), mean=mean, std=std)
 
     result = quad(1.0, 2.0)
     assert np.isclose(float(result), 2.0 * np.sqrt(2 * np.pi))
