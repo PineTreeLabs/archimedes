@@ -1,3 +1,5 @@
+"""Measures for the physicists' and probabilists' Hermite polynomial families."""
+
 from __future__ import annotations
 
 import dataclasses
@@ -10,7 +12,7 @@ __all__ = ["HermiteMeasure", "HermiteNormMeasure"]
 
 class HermiteMeasure(Measure):
     """Measure for the physicists' Hermite polynomial family.
-    
+
     Weight :math:`w(x) = e^{-x^2}` on :math:`(-\\infty, \\infty)`.
 
     The associated orthogonal polynomials are the *physicists'* Hermite
@@ -21,7 +23,8 @@ class HermiteMeasure(Measure):
     """
 
     @property
-    def reference_domain(self) -> tuple[float, float]:
+    def interval(self) -> tuple[float, float]:
+        """Reference domain :math:`(-\\infty, \\infty)`."""
         return (-np.inf, np.inf)
 
     def weight(self, x: np.ndarray) -> np.ndarray:
@@ -85,7 +88,7 @@ class HermiteMeasure(Measure):
 
 class HermiteNormMeasure(Measure):
     """Measure for the probabilists' Hermite polynomial family.
-    
+
     Weight :math:`w(x) = e^{-x^2/2}` on :math:`(-\\infty, \\infty)`.
 
     The associated orthogonal polynomials are the *probabilists'* Hermite
@@ -99,7 +102,8 @@ class HermiteNormMeasure(Measure):
     """
 
     @property
-    def reference_domain(self) -> tuple[float, float]:
+    def interval(self) -> tuple[float, float]:
+        """Reference domain :math:`(-\\infty, \\infty)`."""
         return (-np.inf, np.inf)
 
     def weight(self, x: np.ndarray) -> np.ndarray:
@@ -125,7 +129,7 @@ class HermiteNormMeasure(Measure):
 
         so :math:`\\mathrm{scale} = \\mathrm{std}` and
         :math:`\\mathrm{shift} = \\mathrm{mean}`. Unlike
-        `HermiteNormMeasure.affine_params`, `std` here is exactly the standard
+        `HermiteMeasure.affine_params`, `std` here is exactly the standard
         deviation of the corresponding Gaussian density -- the reference
         weight already uses the probabilists' normalization, so no
         :math:`\\sqrt{2}` correction is needed.

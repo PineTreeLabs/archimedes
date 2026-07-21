@@ -1,17 +1,20 @@
+"""Measure for the Jacobi polynomial family."""
+
 from __future__ import annotations
 
 import dataclasses
 
 import numpy as np
 from ._measure import Measure
+from ._legendre import LegendreMeasure
 
 __all__ = ["JacobiMeasure"]
 
 
 @dataclasses.dataclass(frozen=True)
-class JacobiMeasure(Measure):
+class JacobiMeasure(LegendreMeasure):
     """Measure for the Jacobi polynomial family.
-    
+
     Weight :math:`w(x) = (1-x)^\\alpha (1+x)^\\beta` on
     :math:`[-1, 1]`, with :math:`\\alpha, \\beta > -1`.
 

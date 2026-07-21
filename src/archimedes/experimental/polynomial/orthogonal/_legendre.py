@@ -1,3 +1,5 @@
+"""Measure for the Legendre polynomial family."""
+
 from __future__ import annotations
 
 import numpy as np
@@ -5,16 +7,18 @@ from ._measure import Measure
 
 __all__ = ["LegendreMeasure"]
 
+
 class LegendreMeasure(Measure):
     """Measure for the Legendre polynomial family.
-    
+
     Weight :math:`w(x) = 1` on :math:`[-1, 1]`.
     """
 
     uniform_weight = True
 
     @property
-    def reference_domain(self) -> tuple[float, float]:
+    def interval(self) -> tuple[float, float]:
+        """Reference domain :math:`[-1, 1]`."""
         return (-1.0, 1.0)
 
     def weight(self, x: np.ndarray) -> np.ndarray:
@@ -60,6 +64,6 @@ class LegendreMeasure(Measure):
             raise ValueError(
                 f"{type(self).__name__} requires a finite domain, got ({a}, {b})"
             )
-        lo, hi = self.reference_domain
+        lo, hi = self.interval
         scale = (b - a) / (hi - lo)
         return scale, a - scale * lo

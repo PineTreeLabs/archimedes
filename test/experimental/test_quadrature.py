@@ -6,19 +6,22 @@ from scipy.special import beta as beta_fn
 from scipy.special import roots_hermite, roots_hermitenorm, roots_jacobi, roots_laguerre
 
 import archimedes as arc
-from archimedes.experimental.quadrature import QuadratureRule
-from archimedes.experimental.quadrature._quadrature_rule import (
-    _HermiteFamily,
-    _HermiteNormFamily,
-    _JacobiFamily,
-    _LaguerreFamily,
-    _LegendreFamily,
+from archimedes.experimental.quadrature import (
+    QuadratureRule,
     clenshaw_curtis,
     composite,
     gauss_legendre,
     gauss_lobatto,
     gauss_radau,
 )
+from archimedes.experimental.polynomial.orthogonal import (
+    LegendreMeasure,
+    HermiteMeasure,
+    HermiteNormMeasure,
+    JacobiMeasure,
+    LaguerreMeasure,
+)
+
 
 # -- QuadratureRule machinery --
 
@@ -32,7 +35,7 @@ def test_len_and_shape_validation():
             nodes=np.array([1.0, 2.0]),
             weights=np.array([1.0]),
             name="bad",
-            family=_LegendreFamily(),
+            measure=LegendreMeasure(),
         )
 
 
@@ -79,92 +82,6 @@ def test_dot_errors():
         rule.sum(np.zeros((2, 2, 2)))
     with pytest.raises(ValueError):
         rule.sum(np.zeros(len(rule) + 1))
-
-
-# -- _QuadratureFamily implementations --
-
-
-def test_legendre_family():
-    family = _LegendreFamily()
-    assert family.uniform_weight is True
-    assert family.reference_domain == (-1.0, 1.0)
-    np.testing.assert_array_equal(family.weight(np.array([-0.5, 0.5])), [1.0, 1.0])
-
-    assert family.affine_params() == (1.0, 0.0)
-
-    with pytest.raises(ValueError):
-        family.affine_params(a=0.0)
-    with pytest.raises(ValueError):
-        family.affine_params(b=1.0)
-    with pytest.raises(ValueError):
-        family.affine_params(a=-np.inf, b=1.0)
-
-
-@pytest.mark.parametrize("alpha,beta", [(-1.0, 0.0), (0.0, -1.0)])
-def test_jacobi_family_invalid_parameters(alpha, beta):
-    with pytest.raises(ValueError):
-        _JacobiFamily(alpha=alpha, beta=beta)
-
-
-def test_jacobi_family_weight_and_shared_affine_params():
-    family = _JacobiFamily(alpha=1.0, beta=2.0)
-    assert family.uniform_weight is False
-    assert family.reference_domain == (-1.0, 1.0)
-
-    x = np.array([0.0, 0.5])
-    expected = (1 - x) ** 1.0 * (1 + x) ** 2.0
-    np.testing.assert_allclose(family.weight(x), expected)
-
-    # Shares the interval mapping with _LegendreFamily
-    assert family.affine_params(0.0, 2.0) == _LegendreFamily().affine_params(0.0, 2.0)
-
-
-def test_laguerre_family():
-    family = _LaguerreFamily()
-    assert family.uniform_weight is False
-    assert family.reference_domain == (0.0, np.inf)
-    np.testing.assert_allclose(family.weight(np.array([0.0, 1.0])), [1.0, np.exp(-1.0)])
-
-    assert family.affine_params() == (1.0, 0.0)
-
-    scale, shift = family.affine_params(rate=2.0, start=1.0)
-    assert np.isclose(scale, 0.5)
-    assert np.isclose(shift, 1.0)
-
-    with pytest.raises(ValueError):
-        family.affine_params(rate=-1.0)
-
-
-def test_hermite_family():
-    family = _HermiteFamily()
-    assert family.uniform_weight is False
-    assert family.reference_domain == (-np.inf, np.inf)
-    np.testing.assert_allclose(family.weight(np.array([0.0, 1.0])), [1.0, np.exp(-1.0)])
-
-    assert family.affine_params() == (1.0, 0.0)
-
-    scale, shift = family.affine_params(mean=1.0, std=2.0)
-    assert np.isclose(scale, 2.0)
-    assert np.isclose(shift, 1.0)
-
-    with pytest.raises(ValueError):
-        family.affine_params(std=-1.0)
-
-
-def test_hermite_norm_family():
-    family = _HermiteNormFamily()
-    assert family.uniform_weight is False
-    assert family.reference_domain == (-np.inf, np.inf)
-    np.testing.assert_allclose(family.weight(np.array([0.0, 1.0])), [1.0, np.exp(-0.5)])
-
-    assert family.affine_params() == (1.0, 0.0)
-
-    scale, shift = family.affine_params(mean=1.0, std=2.0)
-    assert np.isclose(scale, 2.0)
-    assert np.isclose(shift, 1.0)
-
-    with pytest.raises(ValueError):
-        family.affine_params(std=-1.0)
 
 
 # -- Known rules: node generation and exact integration --
@@ -291,9 +208,9 @@ def test_clenshaw_curtis_properties(n):
         assert np.isclose(rule.integrate(lambda x, k=k: x**k), expected, atol=1e-10)
 
 
-def test_clenshaw_curtis_shares_legendre_family():
+def test_clenshaw_curtis_shares_legendre_measure():
     rule = clenshaw_curtis(5)
-    assert isinstance(rule.family, _LegendreFamily)
+    assert isinstance(rule.measure, LegendreMeasure)
 
     a, b = -2.0, 5.0
     integral = rule.integrate(lambda x: x**2, a, b)
@@ -302,7 +219,7 @@ def test_clenshaw_curtis_shares_legendre_family():
 
 
 def test_clenshaw_curtis_composite():
-    # Same (uniform-weight) family as Gauss-Legendre, so it tiles the same way
+    # Same (uniform-weight) measure as Gauss-Legendre, so it tiles the same way
     rule = composite(clenshaw_curtis(5), [-1.0, 0.0, 1.0])
     assert len(rule) == 10
     assert np.isclose(rule.integrate(lambda x: x**2), 2 / 3)
@@ -312,7 +229,7 @@ def test_gauss_jacobi_exact_moment():
     n, alpha, beta = 5, 1.0, 2.0
     x, w = roots_jacobi(n, alpha, beta)
     rule = QuadratureRule(
-        x, w, name="gauss_jacobi_5", family=_JacobiFamily(alpha=alpha, beta=beta)
+        x, w, name="gauss_jacobi_5", measure=JacobiMeasure(alpha=alpha, beta=beta)
     )
 
     # Zeroth moment of the Jacobi weight has a closed form in the Beta function
@@ -323,7 +240,7 @@ def test_gauss_jacobi_exact_moment():
 def test_gauss_laguerre_exact_moments():
     n = 5
     x, w = roots_laguerre(n)
-    rule = QuadratureRule(x, w, name="gauss_laguerre_5", family=_LaguerreFamily())
+    rule = QuadratureRule(x, w, name="gauss_laguerre_5", measure=LaguerreMeasure())
 
     # Exact for polynomials up to degree 2n - 1
     for k in range(2 * n):
@@ -334,7 +251,7 @@ def test_gauss_laguerre_exact_moments():
 def test_gauss_laguerre_rate_scaling():
     n = 5
     x, w = roots_laguerre(n)
-    rule = QuadratureRule(x, w, name="gauss_laguerre_5", family=_LaguerreFamily())
+    rule = QuadratureRule(x, w, name="gauss_laguerre_5", measure=LaguerreMeasure())
 
     rate = 2.0
     integral = rule.integrate(lambda x: np.ones_like(x), rate=rate)
@@ -344,7 +261,7 @@ def test_gauss_laguerre_rate_scaling():
 def test_gauss_hermite_exact_moments():
     n = 5
     x, w = roots_hermite(n)
-    rule = QuadratureRule(x, w, name="gauss_hermite_5", family=_HermiteFamily())
+    rule = QuadratureRule(x, w, name="gauss_hermite_5", measure=HermiteMeasure())
 
     assert np.isclose(rule.integrate(lambda x: np.ones_like(x)), np.sqrt(np.pi))
     assert np.isclose(rule.integrate(lambda x: x**2), np.sqrt(np.pi) / 2)
@@ -354,7 +271,7 @@ def test_gauss_hermite_exact_moments():
 def test_gauss_hermite_mean_std_scaling():
     n = 5
     x, w = roots_hermite(n)
-    rule = QuadratureRule(x, w, name="gauss_hermite_5", family=_HermiteFamily())
+    rule = QuadratureRule(x, w, name="gauss_hermite_5", measure=HermiteMeasure())
 
     mean, std = 1.0, 2.0
     integral = rule.integrate(lambda x: np.ones_like(x), mean=mean, std=std)
@@ -364,7 +281,7 @@ def test_gauss_hermite_mean_std_scaling():
 def test_gauss_hermitenorm_exact_moments():
     n = 5
     x, w = roots_hermitenorm(n)
-    rule = QuadratureRule(x, w, name="gauss_hermitenorm_5", family=_HermiteNormFamily())
+    rule = QuadratureRule(x, w, name="gauss_hermitenorm_5", measure=HermiteNormMeasure())
 
     assert np.isclose(rule.integrate(lambda x: np.ones_like(x)), np.sqrt(2 * np.pi))
     assert np.isclose(rule.integrate(lambda x: x**2), np.sqrt(2 * np.pi))
@@ -372,11 +289,11 @@ def test_gauss_hermitenorm_exact_moments():
 
 
 def test_gauss_hermitenorm_matches_gaussian_expectation():
-    # Unlike _HermiteFamily, mean/std here are exactly the mean and standard
+    # Unlike HermiteMeasure, mean/std here are exactly the mean and standard
     # deviation of a Gaussian density -- no sqrt(2) correction needed.
     n = 6
     x, w = roots_hermitenorm(n)
-    rule = QuadratureRule(x, w, name="gauss_hermitenorm_6", family=_HermiteNormFamily())
+    rule = QuadratureRule(x, w, name="gauss_hermitenorm_6", measure=HermiteNormMeasure())
 
     mean, std = 2.0, 3.0
     norm = std * np.sqrt(2 * np.pi)  # normalizes the weight to a proper PDF
@@ -421,13 +338,13 @@ def test_composite_requires_uniform_weight():
     jacobi_rule = QuadratureRule(
         *roots_jacobi(5, 1.0, 2.0),
         name="gauss_jacobi_5",
-        family=_JacobiFamily(alpha=1.0, beta=2.0),
+        measure=JacobiMeasure(alpha=1.0, beta=2.0),
     )
     with pytest.raises(ValueError):
         composite(jacobi_rule, [-1.0, 0.0, 1.0])
 
     laguerre_rule = QuadratureRule(
-        *roots_laguerre(5), name="gauss_laguerre_5", family=_LaguerreFamily()
+        *roots_laguerre(5), name="gauss_laguerre_5", measure=LaguerreMeasure()
     )
     with pytest.raises(ValueError):
         composite(laguerre_rule, [0.0, 1.0, 2.0])
@@ -465,7 +382,7 @@ def test_compile_symbolic_interval():
 
 def test_compile_symbolic_rate():
     x, w = roots_laguerre(5)
-    rule = QuadratureRule(x, w, name="gauss_laguerre_5", family=_LaguerreFamily())
+    rule = QuadratureRule(x, w, name="gauss_laguerre_5", measure=LaguerreMeasure())
 
     @arc.compile
     def quad(rate):
@@ -477,7 +394,7 @@ def test_compile_symbolic_rate():
 
 def test_compile_symbolic_mean_std():
     x, w = roots_hermitenorm(5)
-    rule = QuadratureRule(x, w, name="gauss_hermitenorm_5", family=_HermiteNormFamily())
+    rule = QuadratureRule(x, w, name="gauss_hermitenorm_5", measure=HermiteNormMeasure())
 
     @arc.compile
     def quad(mean, std):

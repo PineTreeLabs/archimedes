@@ -15,7 +15,6 @@ fixed set of nodes and weights on its reference domain.
 
 from __future__ import annotations
 
-import abc
 import dataclasses
 from typing import Callable
 
@@ -244,7 +243,7 @@ def composite(base: QuadratureRule, breakpoints: np.ndarray) -> QuadratureRule:
     of `[a, b]`.
 
     Only defined for families whose reference weight is uniform (see
-    `_QuadratureFamily.uniform_weight`) -- otherwise each interior element
+    `Measure.uniform_weight`) -- otherwise each interior element
     boundary would pick up a spurious copy of the weight's shape, which is
     only meaningful at the true endpoints of the reference domain.
 

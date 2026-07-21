@@ -7,10 +7,6 @@ same Legendre measure, so they can be tiled into composite rules with
 """
 from __future__ import annotations
 
-import abc
-import dataclasses
-from typing import Callable
-
 import numpy as np
 from scipy.special import roots_jacobi, roots_legendre
 

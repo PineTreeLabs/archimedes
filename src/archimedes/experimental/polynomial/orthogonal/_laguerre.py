@@ -1,3 +1,5 @@
+"""Measure for the Laguerre polynomial family."""
+
 from __future__ import annotations
 
 import dataclasses
@@ -10,7 +12,7 @@ __all__ = ["LaguerreMeasure"]
 
 class LaguerreMeasure(Measure):
     """Measure for the Laguerre polynomial family.
-    
+
     Weight :math:`w(x) = e^{-x}` on :math:`[0, \\infty)`.
 
     The associated orthogonal polynomials are the (physicists') Laguerre
@@ -20,7 +22,8 @@ class LaguerreMeasure(Measure):
     """
 
     @property
-    def reference_domain(self) -> tuple[float, float]:
+    def interval(self) -> tuple[float, float]:
+        """Reference domain :math:`[0, \\infty)`."""
         return (0.0, np.inf)
 
     def weight(self, x: np.ndarray) -> np.ndarray:

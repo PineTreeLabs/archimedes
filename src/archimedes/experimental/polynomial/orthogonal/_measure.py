@@ -1,3 +1,11 @@
+"""Abstract base class for orthogonal polynomial family measures.
+
+Defines the :class:`Measure` interface implemented by each classical family
+(Legendre, Jacobi, Laguerre, Hermite): a weight function, its reference
+domain, and the affine map relating the reference measure to other instances
+of the same family.
+"""
+
 from __future__ import annotations
 
 import abc
@@ -31,7 +39,7 @@ class Measure(metaclass=abc.ABCMeta):
     """
 
     uniform_weight: bool = False
-    """True if `weight(x) == 1` for every `x` in `reference_domain`"""
+    """True if `weight(x) == 1` for every `x` in `interval`"""
 
     @property
     @abc.abstractmethod
