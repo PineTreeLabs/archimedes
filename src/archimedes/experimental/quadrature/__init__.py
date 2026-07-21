@@ -2,11 +2,13 @@
 
 from ._quadrature_rule import (
     QuadratureRule,
+    composite,
+)
+from ._gauss_legendre import (
     gauss_legendre,
     gauss_radau,
     gauss_lobatto,
     clenshaw_curtis,
-    composite,
 )
 
 __all__ = [
