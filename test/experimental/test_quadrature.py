@@ -6,6 +6,13 @@ from scipy.special import beta as beta_fn
 from scipy.special import roots_hermite, roots_hermitenorm, roots_jacobi, roots_laguerre
 
 import archimedes as arc
+from archimedes.experimental.polynomial.orthogonal import (
+    HermiteMeasure,
+    HermiteNormMeasure,
+    JacobiMeasure,
+    LaguerreMeasure,
+    LegendreMeasure,
+)
 from archimedes.experimental.quadrature import (
     QuadratureRule,
     clenshaw_curtis,
@@ -13,15 +20,8 @@ from archimedes.experimental.quadrature import (
     gauss_legendre,
     gauss_lobatto,
     gauss_radau,
+    integral,
 )
-from archimedes.experimental.polynomial.orthogonal import (
-    LegendreMeasure,
-    HermiteMeasure,
-    HermiteNormMeasure,
-    JacobiMeasure,
-    LaguerreMeasure,
-)
-
 
 # -- QuadratureRule machinery --
 
@@ -59,6 +59,27 @@ def test_dot_matches_integrate():
     rule = gauss_legendre(4)
     values = np.cos(rule.nodes)
     assert np.isclose(rule.sum(values), rule.integrate(np.cos))
+
+
+def test_integrate_args_forwarding():
+    def f(x, k):
+        return x**k
+
+    rule = gauss_legendre(5)
+    assert np.isclose(rule.integrate(f, args=(2,)), 2 / 3)
+    # Default (no args) still calls f with just the nodes
+    assert np.isclose(rule.integrate(lambda x: x**2), 2 / 3)
+
+
+def test_integrate_args_with_scaled_domain():
+    def f(x, k):
+        return x**k
+
+    rule = gauss_legendre(5)
+    a, b = -2.0, 5.0
+    result = rule.integrate(f, a, b, args=(2,))
+    expected = (b**3 - a**3) / 3
+    assert np.isclose(result, expected)
 
 
 def test_dot_axis():
@@ -281,7 +302,9 @@ def test_gauss_hermite_mean_std_scaling():
 def test_gauss_hermitenorm_exact_moments():
     n = 5
     x, w = roots_hermitenorm(n)
-    rule = QuadratureRule(x, w, name="gauss_hermitenorm_5", measure=HermiteNormMeasure())
+    rule = QuadratureRule(
+        x, w, name="gauss_hermitenorm_5", measure=HermiteNormMeasure()
+    )
 
     assert np.isclose(rule.integrate(lambda x: np.ones_like(x)), np.sqrt(2 * np.pi))
     assert np.isclose(rule.integrate(lambda x: x**2), np.sqrt(2 * np.pi))
@@ -293,7 +316,9 @@ def test_gauss_hermitenorm_matches_gaussian_expectation():
     # deviation of a Gaussian density -- no sqrt(2) correction needed.
     n = 6
     x, w = roots_hermitenorm(n)
-    rule = QuadratureRule(x, w, name="gauss_hermitenorm_6", measure=HermiteNormMeasure())
+    rule = QuadratureRule(
+        x, w, name="gauss_hermitenorm_6", measure=HermiteNormMeasure()
+    )
 
     mean, std = 2.0, 3.0
     norm = std * np.sqrt(2 * np.pi)  # normalizes the weight to a proper PDF
@@ -394,7 +419,9 @@ def test_compile_symbolic_rate():
 
 def test_compile_symbolic_mean_std():
     x, w = roots_hermitenorm(5)
-    rule = QuadratureRule(x, w, name="gauss_hermitenorm_5", measure=HermiteNormMeasure())
+    rule = QuadratureRule(
+        x, w, name="gauss_hermitenorm_5", measure=HermiteNormMeasure()
+    )
 
     @arc.compile
     def quad(mean, std):
@@ -416,3 +443,57 @@ def test_compile_vector_integrand():
 
     result = np.asarray(quad(-1.0, 1.0))
     np.testing.assert_allclose(result, [0.0, 2 / 3], atol=1e-10)
+
+
+# -- integral --
+
+
+def test_integral_default_rule():
+    a, b = -3.0, 3.0
+    expected = np.exp(b) - np.exp(a)
+    assert np.isclose(integral(np.exp, a, b), expected)
+
+
+@pytest.mark.parametrize(
+    "rule", ["legendre", "radau_left", "radau_right", "lobatto", "clenshaw_curtis"]
+)
+def test_integral_rule_dispatch(rule):
+    a, b = 0.0, np.pi
+    result = integral(np.sin, a, b, n=10, rule=rule)
+    assert np.isclose(result, 2.0, atol=1e-8)
+
+
+def test_integral_unknown_rule():
+    with pytest.raises(ValueError):
+        integral(np.sin, 0.0, 1.0, rule="simpson")
+
+
+@pytest.mark.parametrize("a,b", [(-np.inf, 1.0), (0.0, np.inf), (-np.inf, np.inf)])
+def test_integral_infinite_bounds(a, b):
+    with pytest.raises(ValueError):
+        integral(lambda x: np.exp(-(x**2)), a, b)
+
+
+def test_integral_args_forwarding():
+    def f(x, k):
+        return x**k
+
+    result = integral(f, 0.0, 1.0, args=(3,))
+    assert np.isclose(result, 0.25)
+
+
+def test_integral_vector_integrand():
+    def f(x):
+        return np.stack([x, x**2])
+
+    result = integral(f, -1.0, 1.0, n=5, axis=-1)
+    np.testing.assert_allclose(result, [0.0, 2 / 3], atol=1e-10)
+
+
+def test_integral_compile_symbolic_interval():
+    @arc.compile
+    def quad(a, b):
+        return integral(lambda x: x**2, a, b, n=5)
+
+    result = quad(0.0, 2.0)
+    assert np.isclose(float(result), 8 / 3)

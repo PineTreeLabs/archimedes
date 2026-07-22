@@ -10,6 +10,7 @@ from ._gauss_legendre import (
     gauss_lobatto,
     clenshaw_curtis,
 )
+from ._integral import integral
 
 __all__ = [
     "QuadratureRule",
@@ -18,4 +19,5 @@ __all__ = [
     "gauss_lobatto",
     "clenshaw_curtis",
     "composite",
+    "integral",
 ]

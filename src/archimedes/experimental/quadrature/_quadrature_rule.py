@@ -16,7 +16,7 @@ fixed set of nodes and weights on its reference domain.
 from __future__ import annotations
 
 import dataclasses
-from typing import Callable
+from typing import Any, Callable, Sequence
 
 import numpy as np
 from scipy.special import roots_jacobi, roots_legendre
@@ -134,9 +134,10 @@ class QuadratureRule:
 
     def integrate(
         self,
-        f: Callable[[np.ndarray], np.ndarray],
+        f: Callable[..., np.ndarray],
         *params,
-        axis=-1,
+        axis: int = -1,
+        args: Sequence[Any] | None = None,
         **kwparams,
     ) -> np.ndarray:
         """Approximate the weighted integral of `f`.
@@ -151,15 +152,17 @@ class QuadratureRule:
         Parameters
         ----------
         f : callable
-            Integrand, called once on the full node array. Must be
-            vectorized, returning values with the nodes along `axis`. If
-            any of `params`/`kwparams` is symbolic, `f` must be
-            symbolically traceable.
+            Integrand, called once as ``f(x, *args)`` on the full node
+            array. Must be vectorized, returning values with the nodes
+            along `axis`. If any of `params`/`kwparams` is symbolic, `f`
+            must be symbolically traceable.
         *params, **kwparams
             Target domain/measure parameters; see `scaled_points` for
             their meaning.
         axis : int, optional
             Axis holding the nodes in the output of `f`. Default -1.
+        args : tuple, optional
+            Extra arguments passed to `f` after the node array.
 
         Returns
         -------
@@ -167,7 +170,9 @@ class QuadratureRule:
             Approximated integral. Shape (m,) for vector-valued
             integrands, or () for scalar integrands.
         """
-        fp = f(self.scaled_points(*params, **kwparams))
+        if args is None:
+            args = ()
+        fp = f(self.scaled_points(*params, **kwparams), *args)
         return self.sum(fp, *params, axis=axis, **kwparams)
 
     def sum(

@@ -5,6 +5,7 @@ Clenshaw-Curtis quadrature (Chebyshev-Lobatto nodes). All rules share the
 same Legendre measure, so they can be tiled into composite rules with
 :func:`composite`.
 """
+
 from __future__ import annotations
 
 import numpy as np
@@ -209,4 +210,3 @@ def clenshaw_curtis(n: int) -> QuadratureRule:
 
     # Descending (x[0] = 1) to ascending, matching the other rules' node order
     return QuadratureRule(x[::-1], w[::-1], measure=measure, name="clenshaw_curtis")
-

@@ -15,7 +15,6 @@ from archimedes.experimental.polynomial.orthogonal import (
 )
 
 
-
 # -- _QuadratureFamily implementations --
 
 
@@ -58,7 +57,9 @@ def test_laguerre_measure():
     measure = LaguerreMeasure()
     assert measure.uniform_weight is False
     assert measure.support == (0.0, np.inf)
-    np.testing.assert_allclose(measure.weight(np.array([0.0, 1.0])), [1.0, np.exp(-1.0)])
+    np.testing.assert_allclose(
+        measure.weight(np.array([0.0, 1.0])), [1.0, np.exp(-1.0)]
+    )
 
     assert measure.affine_params() == (1.0, 0.0)
 
@@ -74,7 +75,9 @@ def test_hermite_measure():
     measure = HermiteMeasure()
     assert measure.uniform_weight is False
     assert measure.support == (-np.inf, np.inf)
-    np.testing.assert_allclose(measure.weight(np.array([0.0, 1.0])), [1.0, np.exp(-1.0)])
+    np.testing.assert_allclose(
+        measure.weight(np.array([0.0, 1.0])), [1.0, np.exp(-1.0)]
+    )
 
     assert measure.affine_params() == (1.0, 0.0)
 
@@ -90,7 +93,9 @@ def test_hermite_norm_measure():
     measure = HermiteNormMeasure()
     assert measure.uniform_weight is False
     assert measure.support == (-np.inf, np.inf)
-    np.testing.assert_allclose(measure.weight(np.array([0.0, 1.0])), [1.0, np.exp(-0.5)])
+    np.testing.assert_allclose(
+        measure.weight(np.array([0.0, 1.0])), [1.0, np.exp(-0.5)]
+    )
 
     assert measure.affine_params() == (1.0, 0.0)
 
