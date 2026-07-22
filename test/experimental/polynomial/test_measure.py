@@ -22,7 +22,7 @@ from archimedes.experimental.polynomial.orthogonal import (
 def test_legendre_measure():
     measure = LegendreMeasure()
     assert measure.uniform_weight is True
-    assert measure.interval == (-1.0, 1.0)
+    assert measure.support == (-1.0, 1.0)
     np.testing.assert_array_equal(measure.weight(np.array([-0.5, 0.5])), [1.0, 1.0])
 
     assert measure.affine_params() == (1.0, 0.0)
@@ -44,7 +44,7 @@ def test_jacobi_measure_invalid_parameters(alpha, beta):
 def test_jacobi_measure_weight_and_shared_affine_params():
     measure = JacobiMeasure(alpha=1.0, beta=2.0)
     assert measure.uniform_weight is False
-    assert measure.interval == (-1.0, 1.0)
+    assert measure.support == (-1.0, 1.0)
 
     x = np.array([0.0, 0.5])
     expected = (1 - x) ** 1.0 * (1 + x) ** 2.0
@@ -57,7 +57,7 @@ def test_jacobi_measure_weight_and_shared_affine_params():
 def test_laguerre_measure():
     measure = LaguerreMeasure()
     assert measure.uniform_weight is False
-    assert measure.interval == (0.0, np.inf)
+    assert measure.support == (0.0, np.inf)
     np.testing.assert_allclose(measure.weight(np.array([0.0, 1.0])), [1.0, np.exp(-1.0)])
 
     assert measure.affine_params() == (1.0, 0.0)
@@ -73,7 +73,7 @@ def test_laguerre_measure():
 def test_hermite_measure():
     measure = HermiteMeasure()
     assert measure.uniform_weight is False
-    assert measure.interval == (-np.inf, np.inf)
+    assert measure.support == (-np.inf, np.inf)
     np.testing.assert_allclose(measure.weight(np.array([0.0, 1.0])), [1.0, np.exp(-1.0)])
 
     assert measure.affine_params() == (1.0, 0.0)
@@ -89,7 +89,7 @@ def test_hermite_measure():
 def test_hermite_norm_measure():
     measure = HermiteNormMeasure()
     assert measure.uniform_weight is False
-    assert measure.interval == (-np.inf, np.inf)
+    assert measure.support == (-np.inf, np.inf)
     np.testing.assert_allclose(measure.weight(np.array([0.0, 1.0])), [1.0, np.exp(-0.5)])
 
     assert measure.affine_params() == (1.0, 0.0)

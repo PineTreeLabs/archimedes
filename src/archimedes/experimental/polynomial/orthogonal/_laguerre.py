@@ -22,12 +22,12 @@ class LaguerreMeasure(Measure):
     """
 
     @property
-    def interval(self) -> tuple[float, float]:
-        """Reference domain :math:`[0, \\infty)`."""
+    def support(self) -> tuple[float, float]:
+        """Support :math:`[0, \\infty)`."""
         return (0.0, np.inf)
 
     def weight(self, x: np.ndarray) -> np.ndarray:
-        """Reference weight function :math:`w(x) = e^{-x}`, evaluated at
+        """Wweight function :math:`w(x) = e^{-x}`, evaluated at
         `x`."""
         return np.exp(-x)
 

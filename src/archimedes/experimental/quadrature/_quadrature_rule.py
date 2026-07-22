@@ -51,7 +51,7 @@ class QuadratureRule:
     ----------
     nodes : array_like
         Quadrature nodes :math:`x_i`, shape `(n,)`, on
-        `measure.interval`.
+        `measure.support`.
     weights : array_like
         Quadrature weights :math:`w_i`, shape `(n,)`.
     name : str
@@ -65,7 +65,7 @@ class QuadratureRule:
         If `nodes` and `weights` do not have the same shape.
     """
 
-    nodes: np.ndarray  # shape (n,), on `measure.interval`
+    nodes: np.ndarray  # shape (n,), on `measure.support`
     weights: np.ndarray  # shape (n,)
     name: str  # name for the rule
     measure: Measure
@@ -230,7 +230,7 @@ class QuadratureRule:
 def composite(base: QuadratureRule, breakpoints: np.ndarray) -> QuadratureRule:
     """Tile `base` across elements of its reference domain.
 
-    Partitions `base.measure.interval` at `breakpoints` and applies
+    Partitions `base.measure.support` at `breakpoints` and applies
     `base`, affinely rescaled, to each element, concatenating the resulting
     nodes and weights. The result is itself a `QuadratureRule` on the same
     reference domain -- its nodes are just clustered at the element
@@ -254,7 +254,7 @@ def composite(base: QuadratureRule, breakpoints: np.ndarray) -> QuadratureRule:
         `True`.
     breakpoints : array_like
         Element boundaries, shape `(k + 1,)` for `k` elements. Must be
-        strictly increasing and span `base.measure.interval`
+        strictly increasing and span `base.measure.support`
         exactly (first/last entries equal to its endpoints).
 
     Returns
@@ -268,7 +268,7 @@ def composite(base: QuadratureRule, breakpoints: np.ndarray) -> QuadratureRule:
     ValueError
         If `base.measure.uniform_weight` is `False`, if `breakpoints` has
         fewer than 2 entries or is not strictly increasing, or if it does
-        not span `base.measure.interval` exactly.
+        not span `base.measure.support` exactly.
     """
     if not base.measure.uniform_weight:
         raise ValueError(
@@ -283,7 +283,7 @@ def composite(base: QuadratureRule, breakpoints: np.ndarray) -> QuadratureRule:
         )
     if np.any(np.diff(breakpoints) <= 0):
         raise ValueError("breakpoints must be strictly increasing")
-    lo, hi = base.measure.interval
+    lo, hi = base.measure.support
     if breakpoints[0] != lo or breakpoints[-1] != hi:
         raise ValueError(
             f"breakpoints must span the reference domain {(lo, hi)}, got "

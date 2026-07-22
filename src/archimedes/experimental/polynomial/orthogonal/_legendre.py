@@ -17,8 +17,8 @@ class LegendreMeasure(Measure):
     uniform_weight = True
 
     @property
-    def interval(self) -> tuple[float, float]:
-        """Reference domain :math:`[-1, 1]`."""
+    def support(self) -> tuple[float, float]:
+        """Support :math:`[-1, 1]`."""
         return (-1.0, 1.0)
 
     def weight(self, x: np.ndarray) -> np.ndarray:
@@ -64,6 +64,6 @@ class LegendreMeasure(Measure):
             raise ValueError(
                 f"{type(self).__name__} requires a finite domain, got ({a}, {b})"
             )
-        lo, hi = self.interval
+        lo, hi = self.support
         scale = (b - a) / (hi - lo)
         return scale, a - scale * lo

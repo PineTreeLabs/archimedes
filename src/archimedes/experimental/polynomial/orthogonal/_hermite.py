@@ -23,8 +23,8 @@ class HermiteMeasure(Measure):
     """
 
     @property
-    def interval(self) -> tuple[float, float]:
-        """Reference domain :math:`(-\\infty, \\infty)`."""
+    def support(self) -> tuple[float, float]:
+        """Support :math:`(-\\infty, \\infty)`."""
         return (-np.inf, np.inf)
 
     def weight(self, x: np.ndarray) -> np.ndarray:
@@ -102,13 +102,12 @@ class HermiteNormMeasure(Measure):
     """
 
     @property
-    def interval(self) -> tuple[float, float]:
-        """Reference domain :math:`(-\\infty, \\infty)`."""
+    def support(self) -> tuple[float, float]:
+        """Support :math:`(-\\infty, \\infty)`."""
         return (-np.inf, np.inf)
 
     def weight(self, x: np.ndarray) -> np.ndarray:
-        """Reference weight function :math:`w(x) = e^{-x^2/2}`, evaluated
-        at `x`."""
+        """Weight function :math:`w(x) = e^{-x^2/2}`, evaluated at `x`."""
         return np.exp(-(x**2) / 2)
 
     def affine_params(self, mean=None, std=None) -> tuple[float, float]:

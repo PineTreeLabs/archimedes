@@ -39,11 +39,11 @@ class Measure(metaclass=abc.ABCMeta):
     """
 
     uniform_weight: bool = False
-    """True if `weight(x) == 1` for every `x` in `interval`"""
+    """True if `weight(x) == 1` for every `x` in `support`"""
 
     @property
     @abc.abstractmethod
-    def interval(self) -> tuple[float, float]:
+    def support(self) -> tuple[float, float]:
         """Support :math:`\\mathcal{D} = [a, b]` of the measure."""
         raise NotImplementedError
 
