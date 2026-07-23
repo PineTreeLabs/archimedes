@@ -31,7 +31,7 @@ class JacobiMeasure(LegendreMeasure):
             = 2^{\\alpha + \\beta + 1} \\, B(\\alpha + 1, \\beta + 1)
 
     Since the reference domain :math:`[-1, 1]` is the same as
-    the Legendre family, `affine_params` is the same.
+    the Legendre family, ``affine_params`` is the same.
 
     Parameters
     ----------
@@ -42,17 +42,16 @@ class JacobiMeasure(LegendreMeasure):
     Raises
     ------
     ValueError
-        If `alpha` or `beta` is :math:`\\leq -1`.
+        If ``alpha`` or ``beta`` is :math:`\\leq -1`.
     """
 
     alpha: float
     beta: float
 
     # Not a dataclass field: unannotated, so `dataclasses` leaves it as a
-    # plain class attribute overriding `_LegendreFamily.uniform_weight`.
+    # plain class attribute overriding `LegendreMeasure.uniform_weight`.
     # The Jacobi weight is singular at the reference endpoints, so it
-    # cannot be tiled into a composite rule -- see `_QuadratureFamily.
-    # uniform_weight`.
+    # cannot be tiled into a composite rule -- see `Measure.uniform_weight`.
     uniform_weight = False
 
     def __post_init__(self):
@@ -63,5 +62,5 @@ class JacobiMeasure(LegendreMeasure):
 
     def weight(self, x: np.ndarray) -> np.ndarray:
         """Reference weight function :math:`w(x) = (1-x)^\\alpha
-        (1+x)^\\beta`, evaluated at `x`."""
+        (1+x)^\\beta`, evaluated at ``x``."""
         return (1 - x) ** self.alpha * (1 + x) ** self.beta

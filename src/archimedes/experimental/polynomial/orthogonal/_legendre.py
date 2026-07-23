@@ -22,7 +22,7 @@ class LegendreMeasure(Measure):
         return (-1.0, 1.0)
 
     def weight(self, x: np.ndarray) -> np.ndarray:
-        """Reference weight function :math:`w(x) = 1`, evaluated at `x`."""
+        """Reference weight function :math:`w(x) = 1`, evaluated at ``x``."""
         return np.ones_like(x)
 
     def affine_params(self, a=None, b=None) -> tuple[float, float]:
@@ -42,7 +42,7 @@ class LegendreMeasure(Measure):
         ----------
         a, b : float, optional
             Bounds of the target interval. Must both be given, or neither
-            (falls back to the reference domain, `(1.0, 0.0)`).
+            (falls back to the reference domain, ``(1.0, 0.0)``).
 
         Returns
         -------
@@ -52,7 +52,7 @@ class LegendreMeasure(Measure):
         Raises
         ------
         ValueError
-            If only one of `a`, `b` is given, or if `a`/`b` are not finite.
+            If only one of ``a``, ``b`` is given, or if ``a``/``b`` are not finite.
         """
         if a is None and b is None:
             return 1.0, 0.0

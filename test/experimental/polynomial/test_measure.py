@@ -15,7 +15,7 @@ from archimedes.experimental.polynomial.orthogonal import (
 )
 
 
-# -- _QuadratureFamily implementations --
+# -- Measure implementations --
 
 
 def test_legendre_measure():

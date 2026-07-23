@@ -28,7 +28,7 @@ class LaguerreMeasure(Measure):
 
     def weight(self, x: np.ndarray) -> np.ndarray:
         """Wweight function :math:`w(x) = e^{-x}`, evaluated at
-        `x`."""
+        ``x``."""
         return np.exp(-x)
 
     def affine_params(self, rate=None, start=None) -> tuple[float, float]:
@@ -63,7 +63,7 @@ class LaguerreMeasure(Measure):
         Raises
         ------
         ValueError
-            If `rate` is not positive.
+            If ``rate`` is not positive.
         """
         if rate is None and start is None:
             return 1.0, 0.0

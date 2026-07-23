@@ -17,6 +17,8 @@ from archimedes.experimental.quadrature import (
     QuadratureRule,
     clenshaw_curtis,
     composite,
+    gauss_hermite,
+    gauss_laguerre,
     gauss_legendre,
     gauss_lobatto,
     gauss_radau,
@@ -244,6 +246,39 @@ def test_clenshaw_curtis_composite():
     rule = composite(clenshaw_curtis(5), [-1.0, 0.0, 1.0])
     assert len(rule) == 10
     assert np.isclose(rule.integrate(lambda x: x**2), 2 / 3)
+
+
+def test_gauss_hermite():
+    n = 5
+    rule = gauss_hermite(n)
+    assert len(rule) == n
+    assert isinstance(rule.measure, HermiteMeasure)
+
+    # Exact for polynomials up to degree 2n - 1 = 9
+    assert np.isclose(rule.integrate(lambda x: np.ones_like(x)), np.sqrt(np.pi))
+    assert np.isclose(rule.integrate(lambda x: x**2), np.sqrt(np.pi) / 2)
+    assert np.isclose(rule.integrate(lambda x: x**3), 0.0, atol=1e-10)
+
+
+def test_gauss_hermite_norm():
+    n = 5
+    rule = gauss_hermite(n, norm=True)
+    assert len(rule) == n
+    assert isinstance(rule.measure, HermiteNormMeasure)
+
+    assert np.isclose(rule.integrate(lambda x: np.ones_like(x)), np.sqrt(2 * np.pi))
+    assert np.isclose(rule.integrate(lambda x: x**2), np.sqrt(2 * np.pi))
+
+
+def test_gauss_laguerre():
+    n = 5
+    rule = gauss_laguerre(n)
+    assert len(rule) == n
+    assert isinstance(rule.measure, LaguerreMeasure)
+
+    # Exact for polynomials up to degree 2n - 1
+    for k in range(2 * n):
+        assert np.isclose(rule.integrate(lambda x, k=k: x**k), math.factorial(k))
 
 
 def test_gauss_jacobi_exact_moment():

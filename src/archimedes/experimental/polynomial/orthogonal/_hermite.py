@@ -29,7 +29,7 @@ class HermiteMeasure(Measure):
 
     def weight(self, x: np.ndarray) -> np.ndarray:
         """Reference weight function :math:`w(x) = e^{-x^2}`, evaluated at
-        `x`."""
+        ``x``."""
         return np.exp(-(x**2))
 
     def affine_params(self, mean=None, std=None) -> tuple[float, float]:
@@ -52,7 +52,7 @@ class HermiteMeasure(Measure):
 
         Note that because the reference weight uses the physicists'
         normalization :math:`e^{-t^2}` rather than the probabilists'
-        :math:`e^{-t^2/2}`, `std` is *not* the standard deviation of a
+        :math:`e^{-t^2/2}`, ``std`` is *not* the standard deviation of a
         Gaussian density with this shape -- that would be :math:`\\sigma =
         \\mathrm{std} / \\sqrt{2}`.
 
@@ -73,7 +73,7 @@ class HermiteMeasure(Measure):
         Raises
         ------
         ValueError
-            If `std` is not positive.
+            If ``std`` is not positive.
         """
         if mean is None and std is None:
             return 1.0, 0.0
@@ -107,7 +107,7 @@ class HermiteNormMeasure(Measure):
         return (-np.inf, np.inf)
 
     def weight(self, x: np.ndarray) -> np.ndarray:
-        """Weight function :math:`w(x) = e^{-x^2/2}`, evaluated at `x`."""
+        """Weight function :math:`w(x) = e^{-x^2/2}`, evaluated at ``x``."""
         return np.exp(-(x**2) / 2)
 
     def affine_params(self, mean=None, std=None) -> tuple[float, float]:
@@ -128,7 +128,7 @@ class HermiteNormMeasure(Measure):
 
         so :math:`\\mathrm{scale} = \\mathrm{std}` and
         :math:`\\mathrm{shift} = \\mathrm{mean}`. Unlike
-        `HermiteMeasure.affine_params`, `std` here is exactly the standard
+        ``HermiteMeasure.affine_params``, ``std`` here is exactly the standard
         deviation of the corresponding Gaussian density -- the reference
         weight already uses the probabilists' normalization, so no
         :math:`\\sqrt{2}` correction is needed.
@@ -148,7 +148,7 @@ class HermiteNormMeasure(Measure):
         Raises
         ------
         ValueError
-            If `std` is not positive.
+            If ``std`` is not positive.
         """
         if mean is None and std is None:
             return 1.0, 0.0

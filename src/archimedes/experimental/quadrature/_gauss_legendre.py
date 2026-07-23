@@ -16,9 +16,9 @@ from ._quadrature_rule import QuadratureRule
 
 
 def gauss_legendre(n: int) -> QuadratureRule:
-    """Gauss-Legendre quadrature rule with `n` nodes.
+    """Gauss-Legendre quadrature rule with ``n`` nodes.
 
-    Nodes are the roots of the degree-`n` Legendre polynomial
+    Nodes are the roots of the degree-``n`` Legendre polynomial
     :math:`P_n(x)`, none of which coincide with the endpoints
     :math:`\\pm 1`. The rule is exact for polynomials up to degree
     :math:`2n - 1`.
@@ -31,7 +31,7 @@ def gauss_legendre(n: int) -> QuadratureRule:
     Returns
     -------
     rule : QuadratureRule
-        Gauss-Legendre rule with `n` nodes on :math:`[-1, 1]`, exact to
+        Gauss-Legendre rule with ``n`` nodes on :math:`[-1, 1]`, exact to
         degree :math:`2n - 1`.
     """
     x, w = roots_legendre(n)
@@ -56,21 +56,21 @@ def gauss_radau(n: int, endpoint: str = "left") -> QuadratureRule:
     endpoint : {"left", "right"}, optional
         Which endpoint of :math:`[-1, 1]` to fix as a node:
 
-        - `"left"` includes :math:`-1` (LGR, the pseudospectral
+        - ``"left"`` includes :math:`-1` (LGR, the pseudospectral
           convention).
-        - `"right"` includes :math:`+1` (Radau IIA, the IRK/DAE
+        - ``"right"`` includes :math:`+1` (Radau IIA, the IRK/DAE
           convention).
 
     Returns
     -------
     rule : QuadratureRule
-        Gauss-Radau rule with `n` nodes on :math:`[-1, 1]`, exact to
+        Gauss-Radau rule with ``n`` nodes on :math:`[-1, 1]`, exact to
         degree :math:`2n - 2`.
 
     Raises
     ------
     ValueError
-        If `n < 1`, or if `endpoint` is not `"left"` or `"right"`.
+        If ``n < 1``, or if ``endpoint`` is not ``"left"`` or ``"right"``.
     """
     measure = LegendreMeasure()
     if n < 1:
@@ -107,13 +107,13 @@ def gauss_lobatto(n: int) -> QuadratureRule:
     Returns
     -------
     rule : QuadratureRule
-        Gauss-Lobatto rule with `n` nodes on :math:`[-1, 1]`, exact to
+        Gauss-Lobatto rule with ``n`` nodes on :math:`[-1, 1]`, exact to
         degree :math:`2n - 3`.
 
     Raises
     ------
     ValueError
-        If `n < 2`.
+        If ``n < 2``.
     """
     measure = LegendreMeasure()
     if n < 2:
@@ -130,7 +130,7 @@ def gauss_lobatto(n: int) -> QuadratureRule:
 
 
 def clenshaw_curtis(n: int) -> QuadratureRule:
-    """Clenshaw-Curtis quadrature rule with `n` nodes.
+    """Clenshaw-Curtis quadrature rule with ``n`` nodes.
 
     Nodes are the extrema of the degree-:math:`(n-1)` Chebyshev polynomial
     :math:`T_{n-1}(x)` (the Chebyshev-Lobatto points), including both
@@ -143,11 +143,11 @@ def clenshaw_curtis(n: int) -> QuadratureRule:
     polynomial exactness -- the rule is only guaranteed exact for
     polynomials up to degree :math:`n - 1`, half that of Gauss-Legendre
     for the same node count. The weight function is still uniform,
-    so this rule shares the Legendre measure with `gauss_legendre`,
-    `gauss_radau`, and `gauss_lobatto`, and can be tiled with `composite`.
+    so this rule shares the Legendre measure with ``gauss_legendre``,
+    ``gauss_radau``, and ``gauss_lobatto``, and can be tiled with ``composite``.
     The tradeoff for the lower degree of exactness is that
-    Chebyshev-Lobatto nodes are nested across doublings of `n` and cheap,
-    numerically stable to compute for very large `n`.
+    Chebyshev-Lobatto nodes are nested across doublings of ``n`` and cheap,
+    numerically stable to compute for very large ``n``.
 
     Weights are computed via a :math:`O(n \\log n)` algorithm from
     Waldvogel [1]_, which expresses them as the inverse DFT of an
@@ -161,13 +161,13 @@ def clenshaw_curtis(n: int) -> QuadratureRule:
     Returns
     -------
     rule : QuadratureRule
-        Clenshaw-Curtis rule with `n` nodes on :math:`[-1, 1]`, exact to
+        Clenshaw-Curtis rule with ``n`` nodes on :math:`[-1, 1]`, exact to
         degree :math:`n - 1`.
 
     Raises
     ------
     ValueError
-        If `n < 2`.
+        If ``n < 2``.
 
     References
     ----------

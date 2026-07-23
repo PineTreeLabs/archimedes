@@ -108,7 +108,7 @@ def integral(
     --------
     QuadratureRule.integrate : Underlying integration method.
     gauss_legendre, gauss_radau, gauss_lobatto, clenshaw_curtis :
-        Rule constructors dispatched by `rule`.
+        Rule constructors dispatched by ``rule``.
     scipy.integrate.quad : Adaptive quadrature, including infinite and
         semi-infinite intervals.
     """
