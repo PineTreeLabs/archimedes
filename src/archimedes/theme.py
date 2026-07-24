@@ -5,9 +5,13 @@ copper_orange = "#D35400"
 rich_brown = "#5D4037"
 ember_red = "#C0392B"
 pale_gold = "#F1C40F"
+dark_goldenrod = "#AF8918"
 light_gray = "#F5F5F5"
-slate_blue = "#34495E"
-steel_blue = "#5C9DC0"
+slate_blue = "#3B4F8A"
+steel_blue = "#518EC1"
+forest_green = "#309157"
+dusty_rose = "#B45093"
+indigo_violet = "#7C5AE2"
 
 color_schemes = {
     "light": {
@@ -16,7 +20,10 @@ color_schemes = {
         "grid": "#DDDDDD",
         "primary": copper_orange,
         "secondary": slate_blue,
-        "tertiary": pale_gold,
+        "tertiary": dark_goldenrod,
+        "quaternary": forest_green,
+        "quinary": dusty_rose,
+        "senary": indigo_violet,
         "highlight": ember_red,
     },
     "dark": {
@@ -26,6 +33,9 @@ color_schemes = {
         "primary": copper_orange,
         "secondary": steel_blue,
         "tertiary": pale_gold,
+        "quaternary": forest_green,
+        "quinary": dusty_rose,
+        "senary": indigo_violet,
         "highlight": ember_red,
     },
 }
@@ -113,5 +123,8 @@ def set_theme(theme: str):
             colors["primary"],
             colors["secondary"],
             colors["tertiary"],
+            colors["quaternary"],
+            colors["quinary"],
+            colors["senary"],
         ]
     )

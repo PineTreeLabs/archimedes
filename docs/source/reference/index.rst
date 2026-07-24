@@ -15,9 +15,12 @@ Modules
 .. autosummary::
     :toctree: ../generated/api
     :template: module.rst
+    :recursive:
 
+    measure
     observers
     optimize
+    quadrature
     simulate
     spatial
     sysid

@@ -2,7 +2,7 @@
 
 This page outlines the development priorities and future direction of Archimedes. As an open-source project, we welcome community input and contributions across any of these areas. In particular, feel free to create or contribute to a thread with the "RFC" (request for comments) tag on the [GitHub Discussions](https://github.com/PineTreeLabs/archimedes/discussions) page with your thoughts on the roadmap.
 
-This document was last updated **29 Sep 2025** for **v0.2.0**.
+This document was last updated **24 Jul 2026** for **v0.4**.
 It will be updated regularly, but with ongoing development it's possible that work has proceeded beyond the status given here.
 
 ## Vision & Design Philosophy
@@ -35,14 +35,16 @@ That said, it is still an early-stage project and some things are still likely t
 
 We're committed to smooth upgrade paths and clear deprecation notices. The `experimental` module provides a sandbox for new features without destabilizing the core API.
 
-- **Physics Library**: Expanding rapidly but still in the `experimental` module
+- **Physics Library**: Expanding but still in the `experimental` module
 - **Code Generation**: Functional proof-of-concept with ongoing API refinements
 - **Hybrid Systems**: Core concepts implemented, advanced features in development
 
 For instance, some features currently living in `experimental` include:
 
-- Support for 3D spatial rotations via quaternions, DCM, and Euler angles
-- 6 degree-of-freedom flight dynamics with modules for atmosphere, gravity, and sensors
+- ~~Support for 3D spatial rotations via quaternions, DCM, and Euler angles~~ (Released in the [`spatial`](#archimedes.spatial) module)
+- ~~6 degree-of-freedom rigid body dynamics~~ (Released in the [`spatial`](#archimedes.spatial) module)
+- Flight dynamics modules for atmosphere, gravity, and sensors
+- The beginnings of orbital mechanics functionality, currently limited to orbital elements representation and conversion
 - A trajectory optimization code using pseudo-spectral collocation with adaptive mesh refinement
 - Basic neural network functionality including feedforward nets and an ADAM optimizer
 
@@ -102,12 +104,11 @@ A comprehensive library of reusable, well-tested physics models accelerates deve
 
 **Current Capabilities:**
 
-At the moment there are a few modules with the `experimental` tag, including 6-DOF rigid body dynamics, gravity and atmospheric effects, spatial rotations, and orbital elements.
+At the moment there are a few modules with the `experimental` tag, including gravity and atmospheric effects, sensor models, and orbital elements.
 We plan to expand on these features and migrate them to the main codebase when they're ready, but in the meantime you can "invent it here" with fully customized code.
 
-
 **Near-term:**
-- **Spatial Rotations**: Quaternions, DCM, Euler angles
+- ~~**Spatial Rotations**: Quaternions, DCM, Euler angles~~ (now in [`spatial`](#archimedes.spatial))
 - **Reference Frames**: Kinematic trees to manage complex and time-varying transformations
 - **Linear Systems**: LTI utilities, transfer functions, conversions
 - **Environment Models**: Atmosphere, gravity, wind (Dryden/von Karman)

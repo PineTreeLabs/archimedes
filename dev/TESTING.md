@@ -26,7 +26,7 @@ uv run pytest test --cov=archimedes --cov-report=html
 In theory submodules are fully covered by a subdirectory in test/, so you should also see 100% coverage with
 
 ```bash
-uv run pytest test/<submodule> --cov=archimedes.<submodule> --cov-report=term-missing
+uv run pytest test/<submodule> --cov=src/archimedes/<submodule> --cov-report=term-missing
 ```
 
 Essentially this requires that code be specifically covered by unit-type tests, instead of happening to be called by integration tests or examples.
