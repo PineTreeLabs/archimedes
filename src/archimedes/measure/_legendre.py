@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import numpy as np
 
-from ._measure import Measure
+from archimedes import tree
+
+from ._base import Measure
 
 __all__ = ["LegendreMeasure"]
 
@@ -16,6 +18,26 @@ class LegendreMeasure(Measure):
     """
 
     uniform_weight = True
+
+    @tree.struct
+    class Parameters(Measure.Parameters):
+        """Bounds of the target interval; see ``affine_params``."""
+
+        a: float | None = None
+        b: float | None = None
+
+        def __post_init__(self):
+            if self.a is None and self.b is None:
+                return
+            if self.a is None or self.b is None:
+                raise ValueError("specify both `a` and `b`, or neither")
+            if (isinstance(self.a, float) and not np.isfinite(self.a)) or (
+                isinstance(self.b, float) and not np.isfinite(self.b)
+            ):
+                raise ValueError(
+                    f"{type(self).__qualname__} requires a finite domain, "
+                    f"got ({self.a}, {self.b})"
+                )
 
     @property
     def support(self) -> tuple[float, float]:
@@ -60,16 +82,12 @@ class LegendreMeasure(Measure):
         ValueError
             If only one of ``a``, ``b`` is given, or if ``a``/``b`` are not finite.
         """
-        if a is None and b is None:
+        params = self.Parameters(a, b)
+        if params.a is None and params.b is None:
             return 1.0, 0.0
-        if a is None or b is None:
-            raise ValueError("specify both `a` and `b`, or neither")
-        if (isinstance(a, float) and not np.isfinite(a)) or (
-            isinstance(b, float) and not np.isfinite(b)
-        ):
-            raise ValueError(
-                f"{type(self).__name__} requires a finite domain, got ({a}, {b})"
-            )
+        assert (
+            params.a is not None and params.b is not None
+        )  # enforced by __post_init__
         lo, hi = self.support
-        scale = (b - a) / (hi - lo)
-        return scale, a - scale * lo
+        scale = (params.b - params.a) / (hi - lo)
+        return scale, params.a - scale * lo

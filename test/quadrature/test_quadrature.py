@@ -6,7 +6,7 @@ from scipy.special import beta as beta_fn
 from scipy.special import roots_hermite, roots_hermitenorm, roots_jacobi, roots_laguerre
 
 import archimedes as arc
-from archimedes.polynomial.orthogonal import (
+from archimedes.measure import (
     HermiteMeasure,
     HermiteNormMeasure,
     JacobiMeasure,

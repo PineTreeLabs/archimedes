@@ -20,7 +20,7 @@ from typing import Any, Callable, Sequence
 
 import numpy as np
 
-from archimedes.polynomial.orthogonal import Measure
+from archimedes.measure import Measure
 
 __all__ = [
     "QuadratureRule",

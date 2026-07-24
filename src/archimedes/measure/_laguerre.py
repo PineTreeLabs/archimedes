@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import numpy as np
 
-from ._measure import Measure
+from archimedes import tree
+
+from ._base import Measure
 
 __all__ = ["LaguerreMeasure"]
 
@@ -19,6 +21,19 @@ class LaguerreMeasure(Measure):
     Gamma function: :math:`\\int_0^\\infty x^k e^{-x} \\, dx = k! =
     \\Gamma(k+1)`.
     """
+
+    @tree.struct
+    class Parameters(Measure.Parameters):
+        """Rate/location of the target exponential weight; see ``affine_params``."""
+
+        rate: float = 1.0
+        start: float = 0.0
+
+        def __post_init__(self):
+            if isinstance(self.rate, float) and self.rate <= 0:
+                raise ValueError(
+                    f"Gauss-Laguerre rate must be positive, got {self.rate}"
+                )
 
     @property
     def support(self) -> tuple[float, float]:
@@ -69,12 +84,10 @@ class LaguerreMeasure(Measure):
         ValueError
             If ``rate`` is not positive.
         """
-        if rate is None and start is None:
-            return 1.0, 0.0
-        if rate is None:
-            rate = 1.0
-        if start is None:
-            start = 0.0
-        if isinstance(rate, float) and rate <= 0:
-            raise ValueError(f"Gauss-Laguerre rate must be positive, got {rate}")
-        return 1.0 / rate, start
+        kwargs = {}
+        if rate is not None:
+            kwargs["rate"] = rate
+        if start is not None:
+            kwargs["start"] = start
+        params = self.Parameters(**kwargs)
+        return 1.0 / params.rate, params.start

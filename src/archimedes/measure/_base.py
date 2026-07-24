@@ -1,9 +1,12 @@
-"""Abstract base class for orthogonal polynomial family measures.
+"""Abstract base class for classical weight/domain measures.
 
 Defines the :class:`Measure` interface implemented by each classical family
 (Legendre, Jacobi, Laguerre, Hermite): a weight function, its reference
 domain, and the affine map relating the reference measure to other instances
-of the same family.
+of the same family. These are the weights of the classical orthogonal
+polynomial families and, via the Wiener-Askey correspondence, the
+(unnormalized) densities of the associated classical probability
+distributions.
 """
 
 from __future__ import annotations
@@ -39,7 +42,25 @@ class Measure(metaclass=abc.ABCMeta):
     """
 
     uniform_weight: bool = False
-    """True if ``weight(x) == 1`` for every ``x`` in ``support``"""
+    """True if the weight is constant (``weight(x) == weight(y)``) for every
+    ``x``, ``y`` in ``support`` -- e.g. true for Legendre, false for Jacobi
+    (singular at the endpoints) or Hermite/Laguerre (unbounded support).
+    Used by consumers that need to know whether the weight's *shape* is
+    trivial, e.g. ``archimedes.quadrature.composite``, which can only tile a
+    rule across sub-elements when there's no interior discontinuity in the
+    weight to worry about."""
+
+    class Parameters:
+        """Base for a family's affine-reparametrization parameters.
+
+        Each concrete :class:`Measure` defines its own ``@tree.struct``
+        subclass of ``Parameters`` with the fields ``affine_params`` accepts
+        (e.g. ``a``/``b`` for :class:`~archimedes.measure.LegendreMeasure`,
+        ``mean``/``std`` for :class:`~archimedes.measure.HermiteMeasure`).
+        This base is never instantiated directly -- it exists so code that
+        doesn't know which family it's working with can still refer to "the
+        parameters of some measure" as a single type.
+        """
 
     @property
     @abc.abstractmethod
@@ -62,8 +83,8 @@ class Measure(metaclass=abc.ABCMeta):
         domain -- the shape of the weight itself (e.g. Jacobi's ``alpha``,
         ``beta``) is fixed per instance -- the zeroth moment of the mapped
         weight is always ``scale * reference_mass``, with no dependence on
-        ``shift``. This is what lets ``QuadratureRule``'s ``density``
-        option normalize weights without re-deriving a moment per call.
+        ``shift``. This is the normalizing constant that turns the (raw)
+        weight into a probability density, ``weight(x) / reference_mass``.
         """
         raise NotImplementedError
 
@@ -79,7 +100,9 @@ class Measure(metaclass=abc.ABCMeta):
 
         Called with no arguments, must return the identity ``(1.0, 0.0)``,
         i.e. the reference domain/measure itself. Also validates that
-        ``args``/``kwargs`` are compatible with this family. Their meaning is
-        family-specific; see the subclass docstring.
+        ``args``/``kwargs`` are compatible with this family -- concretely,
+        by constructing and validating a ``self.Parameters(*args, **kwargs)``
+        instance internally. Their meaning is family-specific; see the
+        subclass docstring.
         """
         raise NotImplementedError

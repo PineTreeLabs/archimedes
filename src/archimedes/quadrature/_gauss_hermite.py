@@ -6,7 +6,7 @@ from typing import Literal
 
 from scipy.special import roots_hermite, roots_hermitenorm
 
-from archimedes.polynomial.orthogonal import (
+from archimedes.measure import (
     HermiteMeasure,
     HermiteNormMeasure,
     Measure,

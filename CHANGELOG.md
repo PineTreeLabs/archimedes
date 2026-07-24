@@ -7,7 +7,7 @@ In particular, the API is still evolving and may change between minor versions, 
 
 ## [Unreleased]
 - Add support for Gaussian quadrature in `archimedes.quadrature`
-- Added orthogonal polynomial `Measure` classes in `archimedes.polynomial.orthogonal` (currently only used for quadrature weights)
+- Added `Measure` classes in `archimedes.measure` (currently only used for quadrature weights)
 
 ## [0.4.6] - 2026-07-18
 - Bump tornado, mistune, click, setuptools, soupsieve, tornado to resolve vulnerabilities (not expected to be relevant to Archimedes specifically)

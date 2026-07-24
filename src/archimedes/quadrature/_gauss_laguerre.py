@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from scipy.special import roots_laguerre
 
-from archimedes.polynomial.orthogonal import LaguerreMeasure
+from archimedes.measure import LaguerreMeasure
 
 from ._quadrature_rule import QuadratureRule
 

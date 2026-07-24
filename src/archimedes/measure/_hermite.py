@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import numpy as np
 
-from ._measure import Measure
+from archimedes import tree
+
+from ._base import Measure
 
 __all__ = ["HermiteMeasure", "HermiteNormMeasure"]
 
@@ -20,6 +22,17 @@ class HermiteMeasure(Measure):
     weight :math:`e^{-x^2/2}`). The zeroth moment of the weight is
     :math:`\\int_{-\\infty}^\\infty e^{-x^2} \\, dx = \\sqrt{\\pi}`.
     """
+
+    @tree.struct
+    class Parameters(Measure.Parameters):
+        """Mean/scale of the target Gaussian-shaped weight; see ``affine_params``."""
+
+        mean: float = 0.0
+        std: float = 1.0
+
+        def __post_init__(self):
+            if isinstance(self.std, float) and self.std <= 0:
+                raise ValueError(f"Gauss-Hermite std must be positive, got {self.std}")
 
     @property
     def support(self) -> tuple[float, float]:
@@ -79,15 +92,13 @@ class HermiteMeasure(Measure):
         ValueError
             If ``std`` is not positive.
         """
-        if mean is None and std is None:
-            return 1.0, 0.0
-        if mean is None:
-            mean = 0.0
-        if std is None:
-            std = 1.0
-        if isinstance(std, float) and std <= 0:
-            raise ValueError(f"Gauss-Hermite std must be positive, got {std}")
-        return std, mean
+        kwargs = {}
+        if mean is not None:
+            kwargs["mean"] = mean
+        if std is not None:
+            kwargs["std"] = std
+        params = self.Parameters(**kwargs)
+        return params.std, params.mean
 
 
 class HermiteNormMeasure(Measure):
@@ -104,6 +115,18 @@ class HermiteNormMeasure(Measure):
     the standard normal PDF. The zeroth moment of the weight is
     :math:`\\int_{-\\infty}^\\infty e^{-x^2/2} \\, dx = \\sqrt{2\\pi}`.
     """
+
+    @tree.struct
+    class Parameters(Measure.Parameters):
+        """Mean/standard deviation of the target Gaussian weight; see
+        ``affine_params``."""
+
+        mean: float = 0.0
+        std: float = 1.0
+
+        def __post_init__(self):
+            if isinstance(self.std, float) and self.std <= 0:
+                raise ValueError(f"Gauss-Hermite std must be positive, got {self.std}")
 
     @property
     def support(self) -> tuple[float, float]:
@@ -160,12 +183,10 @@ class HermiteNormMeasure(Measure):
         ValueError
             If ``std`` is not positive.
         """
-        if mean is None and std is None:
-            return 1.0, 0.0
-        if mean is None:
-            mean = 0.0
-        if std is None:
-            std = 1.0
-        if isinstance(std, float) and std <= 0:
-            raise ValueError(f"Gauss-Hermite std must be positive, got {std}")
-        return std, mean
+        kwargs = {}
+        if mean is not None:
+            kwargs["mean"] = mean
+        if std is not None:
+            kwargs["std"] = std
+        params = self.Parameters(**kwargs)
+        return params.std, params.mean

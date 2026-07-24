@@ -175,7 +175,7 @@ The nodes are the roots of classical orthogonal polynomials associated with the 
 Since the nodes and weights on the reference domain can be statically computed, under the hood we use SciPy's [`roots_legendre/jacobi/laguerre/hermite`](https://docs.scipy.org/doc/scipy/reference/special.html#orthogonal-polynomials) functions to do the actual math.
 
 There are two internal abstractions that keep track of the weight function, reference domain, and reference nodes/weights.
-The first is [`Measure`](#archimedes.polynomial.orthogonal.Measure), which combines a weight function with a reference interval to define families of orthogonal polynomials.
+The first is [`Measure`](#archimedes.measure.Measure), which combines a weight function with a reference interval to define families of orthogonal polynomials.
 The second is [`QuadratureRule`](#archimedes.quadrature.QuadratureRule), which stores the nodes, weights, and associated `Measure`, and which is responsible for domain transformations and performing the weighted sum.
 
 If you're not constructing exotic custom quadrature rules, you shouldn't need to interact with either of these classes directly.

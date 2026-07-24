@@ -17,9 +17,9 @@ Modules
     :template: module.rst
     :recursive:
 
+    measure
     observers
     optimize
-    polynomial
     quadrature
     simulate
     spatial

@@ -11,7 +11,7 @@ from __future__ import annotations
 import numpy as np
 from scipy.special import roots_jacobi, roots_legendre
 
-from archimedes.polynomial.orthogonal import LegendreMeasure
+from archimedes.measure import LegendreMeasure
 
 from ._quadrature_rule import QuadratureRule
 
