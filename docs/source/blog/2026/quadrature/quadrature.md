@@ -18,14 +18,11 @@ Jared Callaham • 24 Jul 2026
 
 ---
 
-**NOTE: This is a draft, unpublished post. The content may change before publication**
-
-The latest release includes a new [`quadrature`](#archimedes.quadrature) module including support for Gaussian quadrature implementations that are compatible with Archimedes' symbolic tracing, autodiff, and code generation.
+The latest source includes a new [`quadrature`](#archimedes.quadrature) module including support for Gaussian quadrature implementations that are compatible with Archimedes' symbolic tracing, autodiff, and code generation.
 
 Of course, you could always have just called SciPy yourself to compute the weights and nodes and then done `np.dot(f(x), w)` in an Archimedes-traced function.
 The reason there's a quadrature module at all is to begin to introduce some new abstractions that will eventually become the foundation for function approximation functionality loosely inspired by [ApproxFun.jl](https://juliaapproximation.github.io/ApproxFun.jl/stable/) and [FEniCS/Firedrake's UFL](https://docs.fenicsproject.org/ufl/main/manual/introduction.html).
-While I think the high-level quadrature functions I'll introduce below should be more or less in their final form, it's possible some of the structure of the quadrature module will change once the function approximation infrastructure starts to fill in.
-But as always, updates and breaking changes will be documented and will respect versioning in releases.
+While I think the high-level quadrature functions I'll introduce below should be more or less in their final form, it's possible some of the structure of the quadrature module will change once the function approximation infrastructure starts to fill in, which is why this feature isn't included in a versioned release quite yet.
 
 With that in mind, I wanted to give a quick tour of the new quadrature capabilities and sketch out where the function approximation work is heading.
 
