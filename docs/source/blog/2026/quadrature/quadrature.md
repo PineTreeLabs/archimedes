@@ -78,11 +78,6 @@ print(f"Exact integral:          {J_ex:.6f}")
 print(f"Gauss-Legendre integral: {J_leg:.6f}")
 ```
 
-```
-Exact integral:          20.035750
-Gauss-Legendre integral: 20.035578
-```
-
 Unlike [`scipy.integrate.quad`](https://docs.scipy.org/doc/scipy/reference/generated/scipy.integrate.quad.html), this does not support adaptive integration with an error tolerance, nor does it support infinite or semi-infinite intervals.
 However, it does support symbolic evaluation (including limits) and vector-valued integrands:
 
@@ -102,11 +97,6 @@ print(f"Analytical dJ/da: {-np.exp(a):.6f}, dJ/db: {np.exp(b):.6f}")
 print(f"Computed dJ/da:   {dJ_da:.6f}, dJ/db: {dJ_db:.6f}")
 ```
 
-```
-Analytical dJ/da: -0.049787, dJ/db: 20.085537
-Computed dJ/da:   -0.049547, dJ/db: 20.085125
-```
-
 ```{code-cell} python
 # Vector-valued integrands
 def f(x):
@@ -117,11 +107,6 @@ J_vec = arc.quadrature.integral(f, a, b, n=3)
 
 print(f"Analytical integral: [1, 1]")
 print(f"Computed integral:   {J_vec}")
-```
-
-```
-Analytical integral: [1, 1]
-Computed integral:   [1.00000812 1.00000812]
 ```
 
 Composing these lets you easily compute derivatives "under the integral sign" using the Leibnitz rule:
@@ -147,10 +132,6 @@ dg = arc.vmap(dg_dx)(x)
 dg_ex = -np.cosh(np.cos(x)**2) * np.sin(x) - np.cosh(np.sin(x)**2) * np.cos(x)
 
 print(f"Error: {np.linalg.norm(dg - dg_ex)}")
-```
-
-```
-Error: 3.2529317765771063e-06
 ```
 
 ```python
@@ -317,11 +298,6 @@ print(f"Exact integral:          {J_ex:.6f}")
 print(f"Clenshaw-Curtis integral:  {J_cc:.6f}")
 ```
 
-```
-Exact integral:          20.035750
-Clenshaw-Curtis integral:  20.035750
-```
-
 One distinct feature of the Archimedes quadrature interface is that you can optionally pass a `density=True` keyword arg to directly interpret the weight functions as probability densities.
 That is, the quadrature result approximates an expectation under the corresponding probability density:
 
@@ -343,11 +319,6 @@ J = quad_rule.integrate(f, mean=mu, std=sigma, density=True)
 
 print(f"Exact value: {mu**2 + sigma**2:.6f}")
 print(f"Quadrature value: {J:.6f}")
-```
-
-```
-Exact value: 6.250000
-Quadrature value: 6.250000
 ```
 
 This avoids needing to remember to manually divide out the sum of the weights to normalize an expectation integral.
