@@ -120,3 +120,33 @@ class Measure(metaclass=abc.ABCMeta):
         Their meaning is family-specific; see the subclass docstring.
         """
         raise NotImplementedError
+
+    @abc.abstractmethod
+    def recurrence_coeffs(self, n: int) -> tuple[np.ndarray, np.ndarray]:
+        """Monic three-term recurrence coefficients, each shape ``(n,)``.
+
+        The monic polynomials orthogonal with respect to this (reference)
+        measure satisfy
+
+        .. math::
+            \\pi_{k+1}(x) = (x - \\alpha_k) \\, \\pi_k(x) - \\beta_k \\,
+                \\pi_{k-1}(x), \\qquad k = 0, \\ldots, n-1,
+
+        with :math:`\\pi_{-1} = 0`, :math:`\\pi_0 = 1`. ``beta[0]`` plays no
+        role in the recursion itself (since :math:`\\pi_{-1} = 0`) and is
+        instead defined as ``reference_mass`` -- the normalization Gauss
+        quadrature (e.g. the Golub-Welsch algorithm) needs to recover
+        quadrature weights from these coefficients.
+
+        Only reference-instance coefficients are provided; a mapped
+        instance's coefficients follow from ``affine_params`` (``alpha' =
+        scale * alpha + shift``, ``beta' = scale**2 * beta`` with
+        ``beta'[0] = mass(...)``), which callers can apply themselves.
+
+        Parameters
+        ----------
+        n : int
+            Number of coefficients to compute, i.e. degrees ``0, ..., n-1``.
+            Must be ``>= 1``; not validated here.
+        """
+        raise NotImplementedError

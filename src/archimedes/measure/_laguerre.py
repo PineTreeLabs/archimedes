@@ -91,3 +91,15 @@ class LaguerreMeasure(Measure):
             kwargs["start"] = start
         params = self.Parameters(**kwargs)
         return 1.0 / params.rate, params.start
+
+    def recurrence_coeffs(self, n: int) -> tuple[np.ndarray, np.ndarray]:
+        """Monic Laguerre recurrence coefficients.
+
+        :math:`\\alpha_k = 2k + 1`; :math:`\\beta_0 = 1` (=
+        ``reference_mass``), :math:`\\beta_k = k^2` for :math:`k \\geq 1`.
+        """
+        k = np.arange(n, dtype=float)
+        alpha = 2 * k + 1
+        beta = k**2
+        beta[0] = self.reference_mass
+        return alpha, beta

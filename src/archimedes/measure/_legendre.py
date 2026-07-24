@@ -93,3 +93,17 @@ class LegendreMeasure(Measure):
         a_, b_ = cast(float, params.a), cast(float, params.b)
         scale = (b_ - a_) / (hi - lo)
         return scale, a_ - scale * lo
+
+    def recurrence_coeffs(self, n: int) -> tuple[np.ndarray, np.ndarray]:
+        """Monic Legendre recurrence coefficients.
+
+        :math:`\\alpha_k = 0`; :math:`\\beta_0 = 2` (= ``reference_mass``),
+        :math:`\\beta_k = k^2 / (4k^2 - 1)` for :math:`k \\geq 1`.
+        """
+        alpha = np.zeros(n)
+        beta = np.empty(n)
+        beta[0] = self.reference_mass
+        if n > 1:
+            k = np.arange(1, n, dtype=float)
+            beta[1:] = k**2 / (4 * k**2 - 1)
+        return alpha, beta

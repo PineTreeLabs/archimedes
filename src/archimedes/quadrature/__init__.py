@@ -8,6 +8,7 @@ from ._gauss_legendre import (
     gauss_lobatto,
     gauss_radau,
 )
+from ._golub_welsch import from_measure, golub_welsch
 from ._integral import integral
 from ._quadrature_rule import (
     QuadratureRule,
@@ -22,6 +23,8 @@ __all__ = [
     "clenshaw_curtis",
     "gauss_hermite",
     "gauss_laguerre",
+    "golub_welsch",
+    "from_measure",
     "composite",
     "integral",
 ]

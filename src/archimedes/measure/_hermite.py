@@ -100,6 +100,17 @@ class HermiteMeasure(Measure):
         params = self.Parameters(**kwargs)
         return params.std, params.mean
 
+    def recurrence_coeffs(self, n: int) -> tuple[np.ndarray, np.ndarray]:
+        """Monic physicists' Hermite recurrence coefficients.
+
+        :math:`\\alpha_k = 0`; :math:`\\beta_0 = \\sqrt{\\pi}` (=
+        ``reference_mass``), :math:`\\beta_k = k / 2` for :math:`k \\geq 1`.
+        """
+        alpha = np.zeros(n)
+        beta = np.arange(n, dtype=float) / 2
+        beta[0] = self.reference_mass
+        return alpha, beta
+
 
 class HermiteNormMeasure(Measure):
     """Measure for the probabilists' Hermite polynomial family.
@@ -190,3 +201,14 @@ class HermiteNormMeasure(Measure):
             kwargs["std"] = std
         params = self.Parameters(**kwargs)
         return params.std, params.mean
+
+    def recurrence_coeffs(self, n: int) -> tuple[np.ndarray, np.ndarray]:
+        """Monic probabilists' Hermite recurrence coefficients.
+
+        :math:`\\alpha_k = 0`; :math:`\\beta_0 = \\sqrt{2\\pi}` (=
+        ``reference_mass``), :math:`\\beta_k = k` for :math:`k \\geq 1`.
+        """
+        alpha = np.zeros(n)
+        beta = np.arange(n, dtype=float)
+        beta[0] = self.reference_mass
+        return alpha, beta
