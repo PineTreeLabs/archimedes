@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import numpy as np
+
 from ._measure import Measure
 
 __all__ = ["LegendreMeasure"]

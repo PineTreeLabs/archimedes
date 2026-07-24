@@ -2,9 +2,8 @@
 
 from __future__ import annotations
 
-import dataclasses
-
 import numpy as np
+
 from ._measure import Measure
 
 __all__ = ["HermiteMeasure", "HermiteNormMeasure"]
@@ -30,12 +29,12 @@ class HermiteMeasure(Measure):
     def weight(self, x: np.ndarray) -> np.ndarray:
         """Reference weight function :math:`w(x) = e^{-x^2}`, evaluated at
         ``x``."""
-        return np.exp(-(x**2))
+        return np.exp(-(x**2))  # type: ignore[no-any-return]
 
     @property
     def reference_mass(self) -> float:
         """:math:`\\int_{-\\infty}^\\infty e^{-t^2} \\, dt = \\sqrt{\\pi}`."""
-        return np.sqrt(np.pi)
+        return float(np.sqrt(np.pi))
 
     def affine_params(self, mean=None, std=None) -> tuple[float, float]:
         """Map the reference weight onto a location-scaled Gaussian-shaped
@@ -113,13 +112,13 @@ class HermiteNormMeasure(Measure):
 
     def weight(self, x: np.ndarray) -> np.ndarray:
         """Weight function :math:`w(x) = e^{-x^2/2}`, evaluated at ``x``."""
-        return np.exp(-(x**2) / 2)
+        return np.exp(-(x**2) / 2)  # type: ignore[no-any-return]
 
     @property
     def reference_mass(self) -> float:
         """:math:`\\int_{-\\infty}^\\infty e^{-t^2/2} \\, dt =
         \\sqrt{2\\pi}`."""
-        return np.sqrt(2 * np.pi)
+        return float(np.sqrt(2 * np.pi))
 
     def affine_params(self, mean=None, std=None) -> tuple[float, float]:
         """Map the reference weight onto a Gaussian weight with the given

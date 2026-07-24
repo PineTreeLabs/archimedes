@@ -2,9 +2,8 @@
 
 from __future__ import annotations
 
-import dataclasses
-
 import numpy as np
+
 from ._measure import Measure
 
 __all__ = ["LaguerreMeasure"]
@@ -27,9 +26,9 @@ class LaguerreMeasure(Measure):
         return (0.0, np.inf)
 
     def weight(self, x: np.ndarray) -> np.ndarray:
-        """Wweight function :math:`w(x) = e^{-x}`, evaluated at
+        """Weight function :math:`w(x) = e^{-x}`, evaluated at
         ``x``."""
-        return np.exp(-x)
+        return np.exp(-x)  # type: ignore[no-any-return]
 
     @property
     def reference_mass(self) -> float:

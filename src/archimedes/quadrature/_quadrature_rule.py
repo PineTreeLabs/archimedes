@@ -19,9 +19,8 @@ import dataclasses
 from typing import Any, Callable, Sequence
 
 import numpy as np
-from scipy.special import roots_jacobi, roots_legendre
 
-from archimedes.experimental.polynomial.orthogonal import Measure
+from archimedes.polynomial.orthogonal import Measure
 
 __all__ = [
     "QuadratureRule",
@@ -251,8 +250,8 @@ class QuadratureRule:
             )
 
         if values.ndim == 1 or axis == 0:
-            return np.dot(w, values)
-        return np.dot(values, w)
+            return np.dot(w, values)  # type: ignore[no-any-return]
+        return np.dot(values, w)  # type: ignore[no-any-return]
 
 
 def composite(base: QuadratureRule, breakpoints: np.ndarray) -> QuadratureRule:

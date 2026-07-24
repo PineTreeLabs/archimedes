@@ -1,7 +1,7 @@
 import warnings
 import sys
 
-from . import aero, coco, observers, signal, quadrature, polynomial
+from . import aero, coco, observers, signal
 from .lqr import lqr_design
 from .balanced_truncation import balanced_truncation
 
@@ -33,6 +33,4 @@ __all__ = [
     "spatial",
     "lqr_design",
     "balanced_truncation",
-    "quadrature",
-    "polynomial",
 ]

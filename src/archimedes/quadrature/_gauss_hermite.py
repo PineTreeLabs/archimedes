@@ -6,11 +6,12 @@ from typing import Literal
 
 from scipy.special import roots_hermite, roots_hermitenorm
 
-from archimedes.experimental.polynomial.orthogonal import (
+from archimedes.polynomial.orthogonal import (
     HermiteMeasure,
     HermiteNormMeasure,
     Measure,
 )
+
 from ._quadrature_rule import QuadratureRule
 
 __all__ = ["gauss_hermite"]

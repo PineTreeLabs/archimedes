@@ -6,7 +6,7 @@ import dataclasses
 
 import numpy as np
 from scipy.special import beta as beta_fn
-from ._measure import Measure
+
 from ._legendre import LegendreMeasure
 
 __all__ = ["JacobiMeasure"]
@@ -69,6 +69,6 @@ class JacobiMeasure(LegendreMeasure):
     @property
     def reference_mass(self) -> float:
         """:math:`2^{\\alpha + \\beta + 1} \\, B(\\alpha + 1, \\beta + 1)`."""
-        return 2 ** (self.alpha + self.beta + 1) * beta_fn(
-            self.alpha + 1, self.beta + 1
+        return float(
+            2 ** (self.alpha + self.beta + 1) * beta_fn(self.alpha + 1, self.beta + 1)
         )

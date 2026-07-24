@@ -1,19 +1,14 @@
-import math
-
 import numpy as np
 import pytest
 from scipy.special import beta as beta_fn
-from scipy.special import roots_hermite, roots_hermitenorm, roots_jacobi, roots_laguerre
 
-import archimedes as arc
-from archimedes.experimental.polynomial.orthogonal import (
-    LegendreMeasure,
+from archimedes.polynomial.orthogonal import (
     HermiteMeasure,
     HermiteNormMeasure,
     JacobiMeasure,
     LaguerreMeasure,
+    LegendreMeasure,
 )
-
 
 # -- Measure implementations --
 
@@ -72,6 +67,11 @@ def test_laguerre_measure():
     assert np.isclose(scale, 0.5)
     assert np.isclose(shift, 1.0)
 
+    # rate defaults to 1.0 when only start is given
+    scale, shift = measure.affine_params(start=1.0)
+    assert np.isclose(scale, 1.0)
+    assert np.isclose(shift, 1.0)
+
     with pytest.raises(ValueError):
         measure.affine_params(rate=-1.0)
 
@@ -91,6 +91,11 @@ def test_hermite_measure():
     assert np.isclose(scale, 2.0)
     assert np.isclose(shift, 1.0)
 
+    # std defaults to 1.0 when only mean is given
+    scale, shift = measure.affine_params(mean=1.0)
+    assert np.isclose(scale, 1.0)
+    assert np.isclose(shift, 1.0)
+
     with pytest.raises(ValueError):
         measure.affine_params(std=-1.0)
 
@@ -108,6 +113,11 @@ def test_hermite_norm_measure():
 
     scale, shift = measure.affine_params(mean=1.0, std=2.0)
     assert np.isclose(scale, 2.0)
+    assert np.isclose(shift, 1.0)
+
+    # std defaults to 1.0 when only mean is given
+    scale, shift = measure.affine_params(mean=1.0)
+    assert np.isclose(scale, 1.0)
     assert np.isclose(shift, 1.0)
 
     with pytest.raises(ValueError):

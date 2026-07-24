@@ -6,14 +6,14 @@ from scipy.special import beta as beta_fn
 from scipy.special import roots_hermite, roots_hermitenorm, roots_jacobi, roots_laguerre
 
 import archimedes as arc
-from archimedes.experimental.polynomial.orthogonal import (
+from archimedes.polynomial.orthogonal import (
     HermiteMeasure,
     HermiteNormMeasure,
     JacobiMeasure,
     LaguerreMeasure,
     LegendreMeasure,
 )
-from archimedes.experimental.quadrature import (
+from archimedes.quadrature import (
     QuadratureRule,
     clenshaw_curtis,
     composite,

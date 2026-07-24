@@ -18,6 +18,8 @@ Modules
 
     observers
     optimize
+    polynomial
+    quadrature
     simulate
     spatial
     sysid

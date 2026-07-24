@@ -100,8 +100,8 @@ def integral(
     overflow/cancellation problems Gauss quadrature exists to avoid, so
     this is not done automatically. If your integrand already has the
     appropriate decay, construct a ``QuadratureRule`` directly with an
-    :py:class:`~archimedes.experimental.polynomial.orthogonal.LaguerreMeasure`
-    or :py:class:`~archimedes.experimental.polynomial.orthogonal.HermiteMeasure`
+    :py:class:`~archimedes.polynomial.orthogonal.LaguerreMeasure`
+    or :py:class:`~archimedes.polynomial.orthogonal.HermiteMeasure`
     instead of using this function.
 
     See Also
