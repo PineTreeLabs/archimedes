@@ -15,6 +15,7 @@ Modules
 .. autosummary::
     :toctree: ../generated/api
     :template: module.rst
+    :recursive:
 
     observers
     optimize

@@ -106,6 +106,6 @@ New version tag for release to PyPI (previous "Archimedes" project tagged with v
 ## [0.4.6] - 2026-07-18
 - Bump tornado, mistune, click, setuptools, soupsieve, tornado to resolve vulnerabilities (not expected to be relevant to Archimedes specifically)
 
-## [0.5.0] - 2026-07-24
+## Unreleased
 - Add support for Gaussian quadrature in `archimedes.quadrature`
 - Added orthogonal polynomial `Measure` classes in `archimedes.polynomial.orthogonal` (currently only used for quadrature weights)

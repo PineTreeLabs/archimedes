@@ -41,6 +41,7 @@ An end-to-end example of simple sensor fusion with Archimedes
 Parameter estimation for a Li-ion battery cell
 :::
 
+<!-- 
 :::{grid-item-card} Gaussian Quadrature
 :link: 2026/quadrature/quadrature
 :link-type: doc
@@ -48,6 +49,6 @@ Parameter estimation for a Li-ion battery cell
 24 Jul 2026 · Announcements
 
 A new quadrature module and an update on the function approximation roadmap
-:::
+::: -->
 
 ::::

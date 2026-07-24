@@ -23,7 +23,9 @@ Jared Callaham • 24 Jul 2026
 
 ---
 
-Release v0.5.0 is out today, and with it a new [`quadrature`](#archimedes.quadrature) module including support for Gaussian quadrature implementations that are compatible with Archimedes' symbolic tracing, autodiff, and code generation.
+**NOTE: This is a draft, unpublished post. The content may change before publication**
+
+The latest release includes a new [`quadrature`](#archimedes.quadrature) module including support for Gaussian quadrature implementations that are compatible with Archimedes' symbolic tracing, autodiff, and code generation.
 
 Of course, you could always have just called SciPy yourself to compute the weights and nodes and then done `np.dot(f(x), w)` in an Archimedes-traced function.
 The reason there's a quadrature module at all is to begin to introduce some new abstractions that will eventually become the foundation for function approximation functionality loosely inspired by [ApproxFun.jl](https://juliaapproximation.github.io/ApproxFun.jl/stable/) and [FEniCS/Firedrake's UFL](https://docs.fenicsproject.org/ufl/main/manual/introduction.html).
@@ -50,12 +52,14 @@ $$
 
 which can be shifted to an arbitrary (finite) domain $[a, b]$ by rescaling the Gauss-Legendre nodes and weights by:
 
+$$
 \begin{aligned}
 x_i &\leftarrow \frac{b-a}{2} x_i + \frac{a+b}{2} \\
 w_i &\leftarrow \frac{b-a}{2} w_i
 \end{aligned}
+$$
 
-Definite integrals on finite domains can be calculated using Gauss-Legendre quadrature with the [`integral`](#archimedes.quadrature.integral) function
+Definite integrals on finite domains can be calculated using Gauss-Legendre quadrature with the [`integral`](#archimedes.quadrature.integral) function:
 
 ```{code-cell} python
 :tags: [hide-cell]
@@ -85,7 +89,6 @@ Gauss-Legendre integral: 20.035578
 ```
 
 Unlike [`scipy.integrate.quad`](https://docs.scipy.org/doc/scipy/reference/generated/scipy.integrate.quad.html), this does not support adaptive integration with an error tolerance, nor does it support infinite or semi-infinite intervals.
-
 However, it does support symbolic evaluation (including limits) and vector-valued integrands:
 
 ```{code-cell} python
@@ -149,7 +152,13 @@ dg = arc.vmap(dg_dx)(x)
 dg_ex = -np.cosh(np.cos(x)**2) * np.sin(x) - np.cosh(np.sin(x)**2) * np.cos(x)
 
 print(f"Error: {np.linalg.norm(dg - dg_ex)}")
+```
 
+```
+Error: 3.2529317765771063e-06
+```
+
+```python
 fig, ax = plt.subplots(1, 1, figsize=(7, 3))
 ax.plot(x, dg, label="Computed")
 ax.plot(x, dg_ex, '--', label="Exact")
@@ -160,26 +169,8 @@ ax.set_ylabel("$g(x)$")
 plt.show()
 ```
 
-```
-Error: 3.2529317765771063e-06
-```
-
 ```{code-cell} python
 :tags: [remove-cell]
-def f(x):
-    return np.cosh(x**2)
-
-def g(x):
-    a = np.sin(x)
-    b = np.cos(x)
-    return arc.quadrature.integral(f, a, b, n=5)
-
-dg_dx = arc.grad(g)
-
-x = np.linspace(0, 2 * np.pi, 100)
-dg = arc.vmap(dg_dx)(x)
-dg_ex = -np.cosh(np.cos(x)**2) * np.sin(x) - np.cosh(np.sin(x)**2) * np.cos(x)
-
 for theme in ("light", "dark"):
     arc.set_theme(theme)
     fig, ax = plt.subplots(1, 1, figsize=(7, 3))
@@ -223,7 +214,15 @@ In fact, #1 is just a very thin wrapper around #2 for anyone (for example, me) w
 These constructors use snake-case versions of the conventional names of the rules, e.g. Clenshaw-Curtis becomes `clenshaw_curtis`, and produce a `QuadratureRule` instance.
 Available options are:
 
-<!-- TODO: Fill in a table with classical name, Python name, weight function, and reference interval -->
+| Classical name | Python function | Weight function $w(x)$ | Reference interval | Notes |
+|---|---|---|---|---|
+| Gauss-Legendre | `gauss_legendre(n)` | $1$ | $[-1, 1]$ | Neither endpoint included |
+| Gauss-Radau | `gauss_radau(n, endpoint="left"\|"right")` | $1$ | $[-1, 1]$ | Fixes one endpoint |
+| Gauss-Lobatto | `gauss_lobatto(n)` | $1$ | $[-1, 1]$ | Fixes both endpoints |
+| Clenshaw-Curtis | `clenshaw_curtis(n)` | $1$ | $[-1, 1]$ | Chebyshev-Lobatto nodes |
+| Gauss-Hermite (physicists') | `gauss_hermite(n, kind="phys")` | $e^{-x^2}$ | $(-\infty, \infty)$ |   |
+| Gauss-Hermite (probabilists') | `gauss_hermite(n, kind="prob")` |$e^{-x^2/2}$ | $(-\infty, \infty)$ |   |
+| Gauss-Laguerre | `gauss_laguerre(n)` | $e^{-x}$ | $[0, \infty)$ |   |
 
 Once you have the `QuadratureRule` object, you can inspect the nodes and weights if you like, or just use its quadrature methods:
 
