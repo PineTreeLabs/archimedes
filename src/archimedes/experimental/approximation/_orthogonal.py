@@ -1,0 +1,108 @@
+"""Orthonormal polynomial basis for any classical-orthogonal-polynomial Measure."""
+
+from __future__ import annotations
+
+import dataclasses
+
+import numpy as np
+
+from archimedes.measure import Measure
+
+from ._basis import Basis
+
+__all__ = ["OrthogonalPolynomialBasis"]
+
+
+@dataclasses.dataclass(frozen=True)
+class OrthogonalPolynomialBasis(Basis):
+    """Orthonormal polynomials :math:`\\{p_0, p_1, \\ldots, p_{n-1}\\}` for
+    ``measure``, built entirely from ``measure.recurrence_coeffs``.
+
+    The monic polynomials orthogonal w.r.t. any :class:`~archimedes.measure.Measure`
+    satisfy the three-term recurrence
+
+    .. math::
+        \\pi_{k+1}(x) = (x - \\alpha_k) \\, \\pi_k(x) - \\beta_k \\, \\pi_{k-1}(x)
+
+    Differentiating this recurrence ``deriv`` times (the :math:`\\alpha_k`,
+    :math:`\\beta_k` are constants in :math:`x`) gives a recurrence for
+    :math:`\\pi_k^{(m)}` for every :math:`m \\leq` ``deriv`` simultaneously:
+
+    .. math::
+        \\pi_{k+1}^{(m)}(x) = m \\, \\pi_k^{(m-1)}(x) + (x - \\alpha_k) \\,
+            \\pi_k^{(m)}(x) - \\beta_k \\, \\pi_{k-1}^{(m)}(x)
+
+    and the squared norm :math:`\\int \\pi_k^2 \\, w \\, dx = \\beta_0 \\beta_1
+    \\cdots \\beta_k` (with :math:`\\beta_0` = the total mass) is a cumulative
+    product of the same coefficients. All of this holds for *any* classical
+    orthogonal polynomial family.
+
+    Basis functions are the resulting *orthonormal* polynomials
+    :math:`p_k = \\pi_k / \\sqrt{\\beta_0 \\cdots \\beta_k}`. This is one of
+    only two normalizations derivable from ``(alpha, beta)`` alone (the
+    other being the monic polynomials themselves); "classical" normalizations
+    like ``scipy.special.eval_legendre``'s (:math:`P_n(1) = 1`) are
+    family-specific conventions with no generic definition. Orthonormal is
+    preferred over monic here because monic polynomials shrink rapidly with
+    degree (on ``[-1, 1]``, degree-30 monic Legendre is O(1e-8)), which is a
+    real conditioning problem at higher degree; orthonormal polynomials stay
+    O(1) by construction.
+
+    Target-domain evaluation maps ``measure.recurrence_coeffs``' *reference*
+    coefficients via the same ``(scale, shift) = measure.affine_params(...)``
+    used by ``archimedes.quadrature``: :math:`\\alpha' = \\mathrm{scale}
+    \\cdot \\alpha + \\mathrm{shift}`, :math:`\\beta' = \\mathrm{scale}^2 \\cdot
+    \\beta` except :math:`\\beta_0' = \\mathrm{measure.mass}(\\ldots)`
+    (the total mass on the target domain/measure) -- so the resulting basis
+    is orthonormal on the *target* domain, not just the reference one.
+
+    Parameters
+    ----------
+    measure : Measure
+        Defines the orthogonality weight and reference domain.
+    n_basis : int
+        Number of basis functions (polynomial degrees ``0`` through
+        ``n_basis - 1``).
+    """
+
+    measure: Measure
+    n_basis: int
+
+    def __post_init__(self):
+        if self.n_basis < 1:
+            raise ValueError(f"n_basis must be >= 1, got {self.n_basis}")
+
+    def evaluate(self, x, deriv: int = 0, **domain_kwargs):
+        if deriv < 0:
+            raise ValueError(f"deriv must be >= 0, got {deriv}")
+
+        alpha, beta = self.measure.recurrence_coeffs(self.n_basis)
+        scale, shift = self.measure.affine_params(**domain_kwargs)
+        alpha = scale * alpha + shift
+        beta = scale**2 * beta
+        beta[0] = self.measure.mass(**domain_kwargs)
+        norm = np.sqrt(np.cumprod(beta))
+
+        # pi[m][k] = the m-th derivative of the k-th monic polynomial, for
+        # every m <= deriv simultaneously (computing derivatives is nearly
+        # free once the recurrence is being evaluated regardless).
+        pi = [[None] * self.n_basis for _ in range(deriv + 1)]
+        pi[0][0] = np.ones_like(x)
+        for m in range(1, deriv + 1):
+            pi[m][0] = np.zeros_like(x)
+
+        if self.n_basis > 1:
+            pi[0][1] = x - alpha[0]
+            if deriv >= 1:
+                pi[1][1] = np.ones_like(x)
+            for m in range(2, deriv + 1):
+                pi[m][1] = np.zeros_like(x)
+
+        for k in range(1, self.n_basis - 1):
+            for m in range(deriv + 1):
+                value = (x - alpha[k]) * pi[m][k] - beta[k] * pi[m][k - 1]
+                if m > 0:
+                    value = value + m * pi[m - 1][k]
+                pi[m][k + 1] = value
+
+        return np.stack(pi[deriv], axis=-1) / norm

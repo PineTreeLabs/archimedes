@@ -1,7 +1,7 @@
 import warnings
 import sys
 
-from . import aero, coco, observers, signal
+from . import aero, approximation, coco, observers, signal
 from .lqr import lqr_design
 from .balanced_truncation import balanced_truncation
 
@@ -28,6 +28,7 @@ def __getattr__(name):
 __all__ = [
     "coco",
     "aero",
+    "approximation",
     "observers",
     "signal",
     "spatial",
