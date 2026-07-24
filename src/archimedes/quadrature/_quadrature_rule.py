@@ -130,7 +130,7 @@ class QuadratureRule:
         ----------
         density : bool, optional
             If ``True``, additionally divide by the target measure's total
-            mass ``scale * measure.reference_mass``, so the returned
+            mass (``measure.mass(*params, **kwparams)``), so the returned
             weights sum to 1 -- i.e. they act as quadrature weights for the
             *normalized* density rather than the raw weight function.
             Default ``False``.
@@ -138,7 +138,7 @@ class QuadratureRule:
         scale, _ = self.measure.affine_params(*params, **kwparams)
         w = scale * self.weights
         if density:
-            w = w / (scale * self.measure.reference_mass)
+            w = w / self.measure.mass(*params, **kwparams)
         return w
 
     # -- integration --

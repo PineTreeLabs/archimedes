@@ -165,6 +165,27 @@ def test_hermite_parameters_defaults_and_validation(measure_cls):
         measure_cls.Parameters(std=-1.0)
 
 
+def test_measure_mass_reference_domain():
+    # mass() with no args is just reference_mass (scale == 1)
+    assert LegendreMeasure().mass() == LegendreMeasure().reference_mass
+    assert HermiteMeasure().mass() == HermiteMeasure().reference_mass
+    assert LaguerreMeasure().mass() == LaguerreMeasure().reference_mass
+
+
+def test_measure_mass_mapped_domain():
+    # Legendre: mapping [-1, 1] (mass 2) onto [0, 4] (width 4) scales mass by 2
+    assert LegendreMeasure().mass(0.0, 4.0) == 4.0
+
+    # Hermite (prob.): mass scales by std, matching the affine Jacobian
+    measure = HermiteNormMeasure()
+    assert np.isclose(measure.mass(mean=1.0, std=2.0), 2.0 * measure.reference_mass)
+
+    # mass() is exactly what scaled_weights(density=True) divides by
+    measure = LaguerreMeasure()
+    scale, _ = measure.affine_params(rate=2.0)
+    assert np.isclose(measure.mass(rate=2.0), scale * measure.reference_mass)
+
+
 def test_hermite_and_hermitenorm_parameters_are_distinct_types():
     # Same field shape, but kept as separate types since the measures are
     # separate (mirrors HermiteMeasure vs. HermiteNormMeasure not sharing an

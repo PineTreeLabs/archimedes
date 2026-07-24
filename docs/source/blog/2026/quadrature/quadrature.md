@@ -406,7 +406,7 @@ def a(u, v, x):
 
 You could do something similar for all of the other algorithm classes above, bringing the code much closer to how you'd write the math.
 
-As I said, it needs some design work, but today's release of a `QuadratureRule` based on an orthogonal polynomial's `Measure` abstraction is the first step towards this kind of unified function approximation infrastructure.
+As I said, it needs some design work, but today's release of a `QuadratureRule` based on the `Measure` abstraction is the first step towards this kind of unified function approximation infrastructure.
 
 ## For More
 

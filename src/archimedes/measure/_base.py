@@ -85,8 +85,24 @@ class Measure(metaclass=abc.ABCMeta):
         weight is always ``scale * reference_mass``, with no dependence on
         ``shift``. This is the normalizing constant that turns the (raw)
         weight into a probability density, ``weight(x) / reference_mass``.
+        See also ``mass``, which generalizes this to a mapped instance.
         """
         raise NotImplementedError
+
+    def mass(self, *args, **kwargs) -> float:
+        """Total mass of the measure mapped by ``affine_params(*args,
+        **kwargs)``.
+
+        Equal to ``scale * reference_mass``, where ``scale`` is the affine
+        scale factor -- i.e. the Jacobian picked up by rescaling the
+        reference domain. Dividing a mapped weight by this quantity turns it
+        into a probability density on the mapped domain; this is the
+        formula behind ``QuadratureRule``'s ``density`` option. Concrete
+        subclasses don't need to override this -- it's fully determined by
+        ``affine_params`` and ``reference_mass``.
+        """
+        scale, _ = self.affine_params(*args, **kwargs)
+        return scale * self.reference_mass
 
     @abc.abstractmethod
     def affine_params(self, *args, **kwargs) -> tuple[float, float]:
