@@ -72,6 +72,14 @@ class OrthogonalPolynomialBasis(Basis):
         if self.n_basis < 1:
             raise ValueError(f"n_basis must be >= 1, got {self.n_basis}")
 
+    @property
+    def Parameters(self) -> type:  # noqa: N802
+        """Delegates to ``type(self.measure).Parameters`` -- whatever domain
+        parameters ``measure.affine_params`` expects (``a``/``b`` for
+        Legendre/Jacobi, ``mean``/``std`` for Hermite, ``rate``/``start``
+        for Laguerre)."""
+        return type(self.measure).Parameters
+
     def evaluate(self, x, deriv: int = 0, **domain_kwargs):
         if deriv < 0:
             raise ValueError(f"deriv must be >= 0, got {deriv}")

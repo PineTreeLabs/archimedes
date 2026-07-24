@@ -29,6 +29,12 @@ class Basis(metaclass=abc.ABCMeta):
     pairs a ``FunctionSpace`` with coefficients.
     """
 
+    @property
+    @abc.abstractmethod
+    def Parameters(self) -> type:  # noqa: N802
+        """The domain parameters this basis expects."""
+        raise NotImplementedError
+
     @abc.abstractmethod
     def evaluate(self, x: np.ndarray, deriv: int = 0, **domain_kwargs) -> np.ndarray:
         """Evaluate all ``n_basis`` basis functions at ``x``.
