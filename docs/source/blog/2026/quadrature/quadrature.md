@@ -7,11 +7,6 @@ kernelspec:
   display_name: Python 3
   language: python
   name: archimedes
-execute:
-  skip: true
-
-mystnb:
-  execution_mode: "off"  
 ---
 
 
@@ -131,7 +126,7 @@ Computed integral:   [1.00000812 1.00000812]
 
 Composing these lets you easily compute derivatives "under the integral sign" using the Leibnitz rule:
 
-```python
+```{code-cell}[python]
 # https://en.wikipedia.org/wiki/Leibniz_integral_rule#Example_2:_Variable_limits
 
 def f(x):
@@ -179,7 +174,7 @@ for theme in ("light", "dark"):
     ax.legend()
     ax.grid()
     ax.set_xlabel("$x$")
-    ax.set_ylabel("$g(x)$")
+    ax.set_ylabel("$g'(x)$")
     plt.savefig(f"_static/leibniz_{theme}.png")
 ```
 
