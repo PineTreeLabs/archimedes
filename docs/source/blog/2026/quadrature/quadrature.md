@@ -55,8 +55,10 @@ Definite integrals on finite domains can be calculated using Gauss-Legendre quad
 
 ```{code-cell} python
 :tags: [hide-cell]
-import numpy as np
+# ruff: noqa: N816
+
 import matplotlib.pyplot as plt
+import numpy as np
 
 import archimedes as arc
 ```
@@ -64,6 +66,7 @@ import archimedes as arc
 ```{code-cell} python
 def f(x):
     return np.exp(x)
+
 
 a, b = -3, 3  # Integration limits
 J_ex = np.exp(b) - np.exp(a)  # Exact integral: e^b - e^a
@@ -83,9 +86,11 @@ However, it does support symbolic evaluation (including limits) and vector-value
 def f(x):
     return np.exp(x)
 
+
 @arc.compile
 def integrate_f(a, b):
     return arc.quadrature.integral(f, a, b, n=5)
+
 
 dJ_da, dJ_db = arc.grad(integrate_f, argnums=(0, 1))(a, b)
 
@@ -99,10 +104,11 @@ print(f"Computed dJ/da:   {dJ_da:.6f}, dJ/db: {dJ_db:.6f}")
 def f(x):
     return np.array([np.cos(x), np.sin(x)])
 
+
 a, b = 0, np.pi / 2  # Integration limits
 J_vec = arc.quadrature.integral(f, a, b, n=3)
 
-print(f"Analytical integral: [1, 1]")
+print("Analytical integral: [1, 1]")
 print(f"Computed integral:   {J_vec}")
 ```
 
@@ -111,8 +117,10 @@ Composing these lets you easily compute derivatives "under the integral sign" us
 ```{code-cell}[python]
 # https://en.wikipedia.org/wiki/Leibniz_integral_rule#Example_2:_Variable_limits
 
+
 def f(x):
     return np.cosh(x**2)
+
 
 def g(x):
     # Variable limits of integration
@@ -126,7 +134,7 @@ dg_dx = arc.grad(g)
 
 x = np.linspace(0, 2 * np.pi, 100)
 dg = arc.vmap(dg_dx)(x)
-dg_ex = -np.cosh(np.cos(x)**2) * np.sin(x) - np.cosh(np.sin(x)**2) * np.cos(x)
+dg_ex = -np.cosh(np.cos(x) ** 2) * np.sin(x) - np.cosh(np.sin(x) ** 2) * np.cos(x)
 
 print(f"Error: {np.linalg.norm(dg - dg_ex)}")
 ```
@@ -148,7 +156,7 @@ for theme in ("light", "dark"):
     arc.set_theme(theme)
     fig, ax = plt.subplots(1, 1, figsize=(7, 3))
     ax.plot(x, dg, label="Computed")
-    ax.plot(x, dg_ex, '--', label="Exact")
+    ax.plot(x, dg_ex, "--", label="Exact")
     ax.legend()
     ax.grid()
     ax.set_xlabel("$x$")
@@ -256,11 +264,11 @@ zero = np.zeros_like(leg.nodes)
 for theme in ("light", "dark"):
     arc.set_theme(theme)
     fig, ax = plt.subplots(1, 1, figsize=(6, 4))
-    ax.plot(leg.nodes, zero, 'o', label="Gauss-Legendre")
-    ax.plot(rad_left.nodes, zero + 1, 'o', label="Gauss-Radau (left)")
-    ax.plot(rad_right.nodes, zero + 2, 'o', label="Gauss-Radau (right)")
-    ax.plot(lob.nodes, zero + 3, 'o', label="Gauss-Lobatto")
-    ax.plot(cc.nodes, zero + 4, 'o', label="Clenshaw-Curtis")
+    ax.plot(leg.nodes, zero, "o", label="Gauss-Legendre")
+    ax.plot(rad_left.nodes, zero + 1, "o", label="Gauss-Radau (left)")
+    ax.plot(rad_right.nodes, zero + 2, "o", label="Gauss-Radau (right)")
+    ax.plot(lob.nodes, zero + 3, "o", label="Gauss-Lobatto")
+    ax.plot(cc.nodes, zero + 4, "o", label="Clenshaw-Curtis")
     ax.set_xlabel("Node $x_i$")
     ax.set_title(f"Quadrature nodes for n={n}")
     ax.legend()
@@ -281,8 +289,10 @@ for theme in ("light", "dark"):
 ```{code-cell} python
 # Same example as above, but using Clenshaw-Curtis quadrature
 
+
 def f(x):
     return np.exp(x)
+
 
 a, b = -3, 3  # Integration limits
 J_ex = np.exp(b) - np.exp(a)  # Exact integral: e^b - e^a
@@ -306,7 +316,7 @@ For example, we can compute the expectation of $x^2$ over a normal distribution 
 
 ```{code-cell} python
 def f(x):
-    return x ** 2
+    return x**2
 
 mu = 2.0
 sigma = 1.5
