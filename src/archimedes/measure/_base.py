@@ -96,9 +96,8 @@ class Measure(metaclass=abc.ABCMeta):
         Equal to ``scale * reference_mass``, where ``scale`` is the affine
         scale factor -- i.e. the Jacobian picked up by rescaling the
         reference domain. Dividing a mapped weight by this quantity turns it
-        into a probability density on the mapped domain; this is the
-        formula behind ``QuadratureRule``'s ``density`` option. Concrete
-        subclasses don't need to override this -- it's fully determined by
+        into a probability density on the mapped domain. Concrete
+        subclasses don't need to override this; it's fully determined by
         ``affine_params`` and ``reference_mass``.
         """
         scale, _ = self.affine_params(*args, **kwargs)
@@ -116,9 +115,8 @@ class Measure(metaclass=abc.ABCMeta):
 
         Called with no arguments, must return the identity ``(1.0, 0.0)``,
         i.e. the reference domain/measure itself. Also validates that
-        ``args``/``kwargs`` are compatible with this family -- concretely,
-        by constructing and validating a ``self.Parameters(*args, **kwargs)``
-        instance internally. Their meaning is family-specific; see the
-        subclass docstring.
+        ``args``/``kwargs`` are compatible with this family by constructing
+        and validating a ``self.Parameters(*args, **kwargs)`` instance internally.
+        Their meaning is family-specific; see the subclass docstring.
         """
         raise NotImplementedError
