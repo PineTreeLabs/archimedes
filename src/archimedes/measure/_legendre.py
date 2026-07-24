@@ -85,9 +85,8 @@ class LegendreMeasure(Measure):
         params = self.Parameters(a, b)
         if params.a is None and params.b is None:
             return 1.0, 0.0
-        assert (
-            params.a is not None and params.b is not None
-        )  # enforced by __post_init__
+        if not (params.a is not None and params.b is not None):
+            raise ValueError("Both a and b must be specified")
         lo, hi = self.support
         scale = (params.b - params.a) / (hi - lo)
         return scale, params.a - scale * lo
