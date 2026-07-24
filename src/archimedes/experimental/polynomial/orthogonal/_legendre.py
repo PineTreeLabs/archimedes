@@ -25,6 +25,11 @@ class LegendreMeasure(Measure):
         """Reference weight function :math:`w(x) = 1`, evaluated at ``x``."""
         return np.ones_like(x)
 
+    @property
+    def reference_mass(self) -> float:
+        """:math:`\\int_{-1}^1 1 \\, dt = 2`."""
+        return 2.0
+
     def affine_params(self, a=None, b=None) -> tuple[float, float]:
         """Map the reference interval :math:`[-1, 1]` onto :math:`[a, b]`.
 

@@ -52,6 +52,21 @@ class Measure(metaclass=abc.ABCMeta):
         """Weight function :math:`w(x)`, evaluated at ``x``."""
         raise NotImplementedError
 
+    @property
+    @abc.abstractmethod
+    def reference_mass(self) -> float:
+        """Zeroth moment :math:`\\int_\\mathcal{D} w(t) \\, dt` of the
+        *reference* weight (i.e. before any ``affine_params`` shift/scale).
+
+        Since ``affine_params`` only ever rescales/shifts the reference
+        domain -- the shape of the weight itself (e.g. Jacobi's ``alpha``,
+        ``beta``) is fixed per instance -- the zeroth moment of the mapped
+        weight is always ``scale * reference_mass``, with no dependence on
+        ``shift``. This is what lets ``QuadratureRule``'s ``density``
+        option normalize weights without re-deriving a moment per call.
+        """
+        raise NotImplementedError
+
     @abc.abstractmethod
     def affine_params(self, *args, **kwargs) -> tuple[float, float]:
         """Return ``(scale, shift)`` mapping reference nodes onto the

@@ -116,7 +116,7 @@ class QuadratureRule:
         scale, shift = self.measure.affine_params(*params, **kwparams)
         return scale * self.nodes + shift
 
-    def scaled_weights(self, *params, **kwparams):
+    def scaled_weights(self, *params, density: bool = False, **kwparams):
         """Weights including the Jacobian factor for the target
         domain/measure.
 
@@ -126,9 +126,21 @@ class QuadratureRule:
         where :math:`\\mathrm{scale}` is the same affine scale used by
         ``scaled_points``. See ``scaled_points`` for the meaning of
         ``params``/``kwparams``.
+
+        Parameters
+        ----------
+        density : bool, optional
+            If ``True``, additionally divide by the target measure's total
+            mass ``scale * measure.reference_mass``, so the returned
+            weights sum to 1 -- i.e. they act as quadrature weights for the
+            *normalized* density rather than the raw weight function.
+            Default ``False``.
         """
         scale, _ = self.measure.affine_params(*params, **kwparams)
-        return scale * self.weights
+        w = scale * self.weights
+        if density:
+            w = w / (scale * self.measure.reference_mass)
+        return w
 
     # -- integration --
 
@@ -138,6 +150,7 @@ class QuadratureRule:
         *params,
         axis: int = -1,
         args: Sequence[Any] | None = None,
+        density: bool = False,
         **kwparams,
     ) -> np.ndarray:
         """Approximate the weighted integral of ``f``.
@@ -163,6 +176,12 @@ class QuadratureRule:
             Axis holding the nodes in the output of ``f``. Default -1.
         args : tuple, optional
             Extra arguments passed to ``f`` after the node array.
+        density : bool, optional
+            If ``True``, normalize by the target measure's total mass, so
+            the result approximates :math:`\\int f(x) \\, w(x) \\, dx /
+            \\int w(x) \\, dx` -- e.g. an expectation under the
+            corresponding probability density. See ``scaled_weights``.
+            Default ``False``.
 
         Returns
         -------
@@ -173,13 +192,14 @@ class QuadratureRule:
         if args is None:
             args = ()
         fp = f(self.scaled_points(*params, **kwparams), *args)
-        return self.sum(fp, *params, axis=axis, **kwparams)
+        return self.sum(fp, *params, axis=axis, density=density, **kwparams)
 
     def sum(
         self,
         values: np.ndarray,
         *params,
         axis: int = -1,
+        density: bool = False,
         **kwparams,
     ) -> np.ndarray:
         """Quadrature applied to values already sampled at the nodes.
@@ -202,6 +222,9 @@ class QuadratureRule:
             Axis holding the nodes. Default -1 (nodes last), matching the
             natural output of a vectorized ``f``. Use ``axis=0`` for
             nodes-first data.
+        density : bool, optional
+            Forwarded to ``scaled_weights``; see its docstring. Default
+            ``False``.
 
         Returns
         -------
@@ -217,7 +240,7 @@ class QuadratureRule:
             ``values.shape[axis]`` does not match the number of quadrature
             nodes.
         """
-        w = self.scaled_weights(*params, **kwparams)
+        w = self.scaled_weights(*params, density=density, **kwparams)
 
         if values.ndim > 2:
             raise ValueError(f"expected a 0-D, 1-D, or 2-D array, got {values.ndim}-D")

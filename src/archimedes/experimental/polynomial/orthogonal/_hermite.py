@@ -32,6 +32,11 @@ class HermiteMeasure(Measure):
         ``x``."""
         return np.exp(-(x**2))
 
+    @property
+    def reference_mass(self) -> float:
+        """:math:`\\int_{-\\infty}^\\infty e^{-t^2} \\, dt = \\sqrt{\\pi}`."""
+        return np.sqrt(np.pi)
+
     def affine_params(self, mean=None, std=None) -> tuple[float, float]:
         """Map the reference weight onto a location-scaled Gaussian-shaped
         weight :math:`w(x) = \\exp(-((x - \\mathrm{mean})/
@@ -109,6 +114,12 @@ class HermiteNormMeasure(Measure):
     def weight(self, x: np.ndarray) -> np.ndarray:
         """Weight function :math:`w(x) = e^{-x^2/2}`, evaluated at ``x``."""
         return np.exp(-(x**2) / 2)
+
+    @property
+    def reference_mass(self) -> float:
+        """:math:`\\int_{-\\infty}^\\infty e^{-t^2/2} \\, dt =
+        \\sqrt{2\\pi}`."""
+        return np.sqrt(2 * np.pi)
 
     def affine_params(self, mean=None, std=None) -> tuple[float, float]:
         """Map the reference weight onto a Gaussian weight with the given

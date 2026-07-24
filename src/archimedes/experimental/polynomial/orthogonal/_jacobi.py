@@ -5,6 +5,7 @@ from __future__ import annotations
 import dataclasses
 
 import numpy as np
+from scipy.special import beta as beta_fn
 from ._measure import Measure
 from ._legendre import LegendreMeasure
 
@@ -64,3 +65,10 @@ class JacobiMeasure(LegendreMeasure):
         """Reference weight function :math:`w(x) = (1-x)^\\alpha
         (1+x)^\\beta`, evaluated at ``x``."""
         return (1 - x) ** self.alpha * (1 + x) ** self.beta
+
+    @property
+    def reference_mass(self) -> float:
+        """:math:`2^{\\alpha + \\beta + 1} \\, B(\\alpha + 1, \\beta + 1)`."""
+        return 2 ** (self.alpha + self.beta + 1) * beta_fn(
+            self.alpha + 1, self.beta + 1
+        )

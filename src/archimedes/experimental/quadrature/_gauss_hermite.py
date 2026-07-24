@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Literal
+
 from scipy.special import roots_hermite, roots_hermitenorm
 
 from archimedes.experimental.polynomial.orthogonal import (
@@ -14,7 +16,7 @@ from ._quadrature_rule import QuadratureRule
 __all__ = ["gauss_hermite"]
 
 
-def gauss_hermite(n: int, norm: bool = False) -> QuadratureRule:
+def gauss_hermite(n: int, kind: Literal["phys", "prob"] = "phys") -> QuadratureRule:
     """Gauss-Hermite quadrature rule with ``n`` nodes.
 
     Nodes are the roots of the degree-``n`` Hermite polynomial. The rule is
@@ -25,24 +27,35 @@ def gauss_hermite(n: int, norm: bool = False) -> QuadratureRule:
     ----------
     n : int
         Number of quadrature nodes.
-    norm : bool, optional
-        If ``False`` (default), use the *physicists'* convention, with
-        reference weight :math:`e^{-x^2}` (:class:`HermiteMeasure`). If
-        ``True``, use the *probabilists'* convention, with reference weight
+    kind : {"phys", "prob"}, optional
+        Which classical Hermite convention to use. ``"phys"`` (default) is
+        the *physicists'* convention, with reference weight
+        :math:`e^{-x^2}` (:class:`HermiteMeasure`). ``"prob"`` is the
+        *probabilists'* convention, with reference weight
         :math:`e^{-x^2/2}` (:class:`HermiteNormMeasure`) -- up to
-        normalization, the standard normal density.
+        normalization, the standard normal density. Neither weight
+        integrates to 1 on its own; pass ``density=True`` to
+        ``QuadratureRule.integrate``/``sum``/``scaled_weights`` for weights
+        that do.
 
     Returns
     -------
     rule : QuadratureRule
         Gauss-Hermite rule with ``n`` nodes on :math:`(-\\infty, \\infty)`,
         exact to degree :math:`2n - 1`.
+
+    Raises
+    ------
+    ValueError
+        If ``kind`` is not ``"phys"`` or ``"prob"``.
     """
     measure: Measure
-    if norm:
+    if kind == "prob":
         x, w = roots_hermitenorm(n)
         measure = HermiteNormMeasure()
-    else:
+    elif kind == "phys":
         x, w = roots_hermite(n)
         measure = HermiteMeasure()
+    else:
+        raise ValueError(f"kind must be 'phys' or 'prob', got {kind!r}")
     return QuadratureRule(x, w, measure=measure, name="gauss_hermite")

@@ -31,6 +31,11 @@ class LaguerreMeasure(Measure):
         ``x``."""
         return np.exp(-x)
 
+    @property
+    def reference_mass(self) -> float:
+        """:math:`\\int_0^\\infty e^{-t} \\, dt = 1`."""
+        return 1.0
+
     def affine_params(self, rate=None, start=None) -> tuple[float, float]:
         """Map the reference weight onto a rate/shifted exponential weight
         :math:`w(x) = e^{-\\mathrm{rate}(x - \\mathrm{start})}` on

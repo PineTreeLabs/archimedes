@@ -260,14 +260,19 @@ def test_gauss_hermite():
     assert np.isclose(rule.integrate(lambda x: x**3), 0.0, atol=1e-10)
 
 
-def test_gauss_hermite_norm():
+def test_gauss_hermite_prob():
     n = 5
-    rule = gauss_hermite(n, norm=True)
+    rule = gauss_hermite(n, kind="prob")
     assert len(rule) == n
     assert isinstance(rule.measure, HermiteNormMeasure)
 
     assert np.isclose(rule.integrate(lambda x: np.ones_like(x)), np.sqrt(2 * np.pi))
     assert np.isclose(rule.integrate(lambda x: x**2), np.sqrt(2 * np.pi))
+
+
+def test_gauss_hermite_invalid_kind():
+    with pytest.raises(ValueError):
+        gauss_hermite(5, kind="norm")
 
 
 def test_gauss_laguerre():
@@ -364,6 +369,73 @@ def test_gauss_hermitenorm_matches_gaussian_expectation():
     assert np.isclose(expectation(lambda x: np.ones_like(x)), 1.0)
     assert np.isclose(expectation(lambda x: x), mean)
     assert np.isclose(expectation(lambda x: x**2), mean**2 + std**2)
+
+
+# -- density=True normalization --
+
+
+def test_scaled_weights_density_sums_to_one():
+    rule = gauss_legendre(5)
+    a, b = -2.0, 5.0
+    w = rule.scaled_weights(a, b, density=True)
+    assert np.isclose(np.sum(w), 1.0)
+    np.testing.assert_allclose(w, rule.scaled_weights(a, b) / (b - a))
+
+
+def test_scaled_weights_density_default_false():
+    rule = gauss_legendre(5)
+    np.testing.assert_array_equal(
+        rule.scaled_weights(-2.0, 5.0), rule.scaled_weights(-2.0, 5.0, density=False)
+    )
+
+
+def test_integrate_density_matches_gaussian_expectation():
+    n = 6
+    rule = gauss_hermite(n, kind="prob")
+    mean, std = 2.0, 3.0
+
+    assert np.isclose(
+        rule.integrate(lambda x: np.ones_like(x), mean=mean, std=std, density=True),
+        1.0,
+    )
+    assert np.isclose(
+        rule.integrate(lambda x: x, mean=mean, std=std, density=True), mean
+    )
+    assert np.isclose(
+        rule.integrate(lambda x: x**2, mean=mean, std=std, density=True),
+        mean**2 + std**2,
+    )
+
+
+def test_sum_density_forwarded():
+    n = 6
+    rule = gauss_hermite(n, kind="prob")
+    mean, std = 2.0, 3.0
+    values = np.ones_like(rule.nodes)
+    assert np.isclose(rule.sum(values, mean=mean, std=std, density=True), 1.0)
+
+
+@pytest.mark.parametrize(
+    "rule_factory,params",
+    [
+        (lambda: gauss_legendre(5), {"a": -2.0, "b": 5.0}),
+        (
+            lambda: QuadratureRule(
+                *roots_jacobi(5, 1.0, 2.0),
+                name="gauss_jacobi_5",
+                measure=JacobiMeasure(alpha=1.0, beta=2.0),
+            ),
+            {},
+        ),
+        (lambda: gauss_laguerre(5), {"rate": 2.0, "start": 1.0}),
+        (lambda: gauss_hermite(5, kind="phys"), {"mean": 1.0, "std": 2.0}),
+        (lambda: gauss_hermite(5, kind="prob"), {"mean": 1.0, "std": 2.0}),
+    ],
+)
+def test_density_weights_sum_to_one_all_families(rule_factory, params):
+    rule = rule_factory()
+    w = rule.scaled_weights(**params, density=True)
+    assert np.isclose(np.sum(w), 1.0)
 
 
 # -- composite rules --

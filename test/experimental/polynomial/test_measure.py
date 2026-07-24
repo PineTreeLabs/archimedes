@@ -23,6 +23,7 @@ def test_legendre_measure():
     assert measure.uniform_weight is True
     assert measure.support == (-1.0, 1.0)
     np.testing.assert_array_equal(measure.weight(np.array([-0.5, 0.5])), [1.0, 1.0])
+    assert measure.reference_mass == 2.0
 
     assert measure.affine_params() == (1.0, 0.0)
 
@@ -49,6 +50,9 @@ def test_jacobi_measure_weight_and_shared_affine_params():
     expected = (1 - x) ** 1.0 * (1 + x) ** 2.0
     np.testing.assert_allclose(measure.weight(x), expected)
 
+    expected_mass = 2 ** (1.0 + 2.0 + 1) * beta_fn(1.0 + 1, 2.0 + 1)
+    assert np.isclose(measure.reference_mass, expected_mass)
+
     # Shares the interval mapping with LegendreMeasure
     assert measure.affine_params(0.0, 2.0) == LegendreMeasure().affine_params(0.0, 2.0)
 
@@ -60,6 +64,7 @@ def test_laguerre_measure():
     np.testing.assert_allclose(
         measure.weight(np.array([0.0, 1.0])), [1.0, np.exp(-1.0)]
     )
+    assert measure.reference_mass == 1.0
 
     assert measure.affine_params() == (1.0, 0.0)
 
@@ -78,6 +83,7 @@ def test_hermite_measure():
     np.testing.assert_allclose(
         measure.weight(np.array([0.0, 1.0])), [1.0, np.exp(-1.0)]
     )
+    assert np.isclose(measure.reference_mass, np.sqrt(np.pi))
 
     assert measure.affine_params() == (1.0, 0.0)
 
@@ -96,6 +102,7 @@ def test_hermite_norm_measure():
     np.testing.assert_allclose(
         measure.weight(np.array([0.0, 1.0])), [1.0, np.exp(-0.5)]
     )
+    assert np.isclose(measure.reference_mass, np.sqrt(2 * np.pi))
 
     assert measure.affine_params() == (1.0, 0.0)
 
