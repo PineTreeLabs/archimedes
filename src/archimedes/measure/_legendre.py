@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import cast
+
 import numpy as np
 
 from archimedes import tree
@@ -85,6 +87,9 @@ class LegendreMeasure(Measure):
         params = self.Parameters(a, b)
         if params.a is None and params.b is None:
             return 1.0, 0.0
+        # `__post_init__` enforces that a/b are both None or both set; the
+        # branch above rules out "both None", so both are floats here.
         lo, hi = self.support
-        scale = (params.b - params.a) / (hi - lo)
-        return scale, params.a - scale * lo
+        a_, b_ = cast(float, params.a), cast(float, params.b)
+        scale = (b_ - a_) / (hi - lo)
+        return scale, a_ - scale * lo

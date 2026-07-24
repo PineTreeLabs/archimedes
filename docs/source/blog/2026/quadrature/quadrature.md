@@ -129,6 +129,7 @@ def g(x):
     # Compute integral using Gauss-Legendre quadrature
     return arc.quadrature.integral(f, a, b, n=5)
 
+
 # Compute g'(x) using automatic differentiation
 dg_dx = arc.grad(g)
 
@@ -317,6 +318,7 @@ For example, we can compute the expectation of $x^2$ over a normal distribution 
 ```{code-cell} python
 def f(x):
     return x**2
+
 
 mu = 2.0
 sigma = 1.5
