@@ -174,9 +174,7 @@ class FunctionSpace:
         if integrand.ndim > 1:
             # `ndim` is a static (trace-time) property, so this branches on
             # shape rather than on a value and is safe under `@arc.compile`.
-            # `axis=1` rather than the idiomatic `axis=-1`: the symbolic
-            # `np.sum` does not normalize a negative axis.
-            integrand = np.sum(integrand, axis=1)
+            integrand = np.sum(integrand, axis=-1)
         return np.dot(w, integrand)
 
     def mass_matrix(self) -> np.ndarray:
@@ -235,15 +233,9 @@ class FunctionSpace:
         fx = f(x)
 
         # `ndim` is a static (trace-time) property, so this branches on shape
-        # rather than on a value and is safe under `@arc.compile`.
-        if fx.ndim == 1:
-            return Function(np.linalg.solve(M, phi.T @ (w * fx)), self)
-
-        # Vector-valued: one coefficient column per component. Solved column
-        # by column because the symbolic `np.linalg.solve` accepts only a
-        # vector right-hand side; `m` is static, so the loop unrolls at trace
-        # time. NumPy alone would take the whole (n_basis, m) right-hand side
-        # in a single call.
-        rhs = phi.T @ (w[:, None] * fx)  # (n_basis, m)
-        columns = [np.linalg.solve(M, rhs[:, k]) for k in range(fx.shape[1])]
-        return Function(np.stack(columns, axis=-1), self)
+        # rather than on a value and is safe under `@arc.compile`. In the
+        # vector-valued case the right-hand side is the (n_basis, m) matrix of
+        # stacked component loads, which `solve` handles with a single
+        # factorization of the shared mass matrix.
+        rhs = phi.T @ (w * fx if fx.ndim == 1 else w[:, None] * fx)
+        return Function(np.linalg.solve(M, rhs), self)

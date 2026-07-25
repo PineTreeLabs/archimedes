@@ -93,19 +93,25 @@ def _shape_inference_matmul(shape1: ShapeLike, shape2: ShapeLike) -> ShapeLike:
 
 
 def _shape_inference_solve(shape1: ShapeLike, shape2: ShapeLike) -> ShapeLike:
+    # As in NumPy, the right-hand side may be a single vector (n,) or a matrix
+    # (n, m) of m stacked right-hand sides; the result has the same shape.
+    # CasADi solves a matrix right-hand side with a single factorization, so
+    # this is faster than looping over columns, not just more convenient.
+    if len(shape1) != 2 or shape1[0] != shape1[1]:
+        raise ShapeDtypeError(f"shape {shape1} is not a square matrix")
+
+    if len(shape2) not in {1, 2}:
+        raise ShapeDtypeError(f"shape {shape2} is not a vector or matrix")
+
     # The leading axis of x1 must be the same as the leading axis of x2
-    # For now, x2 must also be a vector
     if shape1[0] != shape2[0]:
         raise ShapeDtypeError(
-            f"shapes {shape1} and {shape2} not aligned: {shape1[-1]} (dim 0) != "
-            f"{shape2[0]} (dim 1)"
+            f"shapes {shape1} and {shape2} not aligned: {shape1[0]} (dim 0) != "
+            f"{shape2[0]} (dim 0)"
         )
 
-    if len(shape2) != 1:
-        raise ShapeDtypeError(f"shape {shape2} is not a vector")
-
-    # The result is the trailing axis of x1
-    return (shape1[-1],)
+    # The result is the trailing axis of x1 plus any trailing axis of x2
+    return (shape1[-1],) + tuple(shape2[1:])
 
 
 def _shape_inference_gradient(expr: ShapeLike, arg: ShapeLike) -> ShapeLike:

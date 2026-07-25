@@ -1200,11 +1200,26 @@ class TestSymbolicArrayFunctions:
         assert result.shape == ()
         assert cs.is_equal(result._sym, cs.norm_fro(x._sym), 5)
 
-        result = np.linalg.norm(x, ord=1)
-        assert cs.is_equal(result._sym, cs.norm_1(x._sym), 4)
+        # NumPy's matrix norms are induced operator norms, NOT the entrywise
+        # norms CasADi provides under the same names -- mapping ord=1 onto
+        # cs.norm_1 (sum of all |entries|) and ord=inf onto cs.norm_inf
+        # (largest |entry|) silently returned wrong numbers.
+        A = np.array([[1.0, -2.0, 3.0], [4.0, 5.0, -6.0]])
 
-        result = np.linalg.norm(x, ord=np.inf)
-        assert cs.is_equal(result._sym, cs.norm_inf(x._sym), 5)
+        @compile
+        def matrix_norm_1(a):
+            return np.linalg.norm(a, ord=1)
+
+        @compile
+        def matrix_norm_inf(a):
+            return np.linalg.norm(a, ord=np.inf)
+
+        assert np.isclose(matrix_norm_1(A), np.linalg.norm(A, ord=1))  # max col sum
+        assert np.isclose(matrix_norm_inf(A), np.linalg.norm(A, ord=np.inf))  # row sum
+
+        # The spectral norm needs an SVD, which has no symbolic implementation
+        with pytest.raises(NotImplementedError, match=r".*spectral norm.*"):
+            np.linalg.norm(x, ord=2)
 
     def test_solve(self):
         A = sym("A", shape=(2, 2), dtype=np.float64)
@@ -1216,11 +1231,135 @@ class TestSymbolicArrayFunctions:
         assert x.dtype == np.float64
         assert cs.is_equal(x._sym, cs.solve(A._sym, b._sym), 5)
 
+        # As in NumPy, the right-hand side may be a matrix of stacked
+        # right-hand sides; CasADi solves them with a single factorization.
+        B = sym("B", shape=(2, 3), dtype=np.float64)
+        X = np.linalg.solve(A, B)
+        assert isinstance(X, SymbolicArray)
+        assert X.shape == (2, 3)
+        assert X.dtype == np.float64
+        assert cs.is_equal(X._sym, cs.solve(A._sym, B._sym), 5)
+
+        Anum = np.array([[2.0, 1.0], [1.0, 3.0]])
+        Bnum = np.array([[1.0, 2.0, 5.0], [3.0, 4.0, 6.0]])
+
+        @compile
+        def solve_mat(a, b):
+            return np.linalg.solve(a, b)
+
+        np.testing.assert_allclose(
+            solve_mat(Anum, Bnum), np.linalg.solve(Anum, Bnum), atol=1e-12
+        )
+
         # Error handling
         with pytest.raises(ShapeDtypeError, match=r".*not aligned.*"):
             b = sym("b", shape=(3,))
             np.linalg.solve(A, b)
 
-        with pytest.raises(ShapeDtypeError, match=r".*not a vector.*"):
-            b = sym("b", shape=(2, 3))
-            np.linalg.solve(A, b)
+        with pytest.raises(ShapeDtypeError, match=r".*not a square matrix.*"):
+            np.linalg.solve(sym("A", shape=(2, 3)), sym("b", shape=(3,)))
+
+        with pytest.raises(ShapeDtypeError, match=r".*not a vector or matrix.*"):
+            np.linalg.solve(A, sym("s", shape=()))
+
+
+class TestAxisHandling:
+    """Axis arguments should behave as they do in NumPy.
+
+    ``SymbolicArray`` supports at most 2 dimensions, so the whole space of
+    valid axes is ``{0, 1, -1, -2}``. These check symbolic results against
+    NumPy on the same inputs rather than against a hand-built CasADi
+    expression, since the bugs being guarded here were wrong *values* and
+    wrong *shapes*, not wrong graph structure.
+    """
+
+    X2 = np.array([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])
+    X1 = np.array([1.0, 2.0, 3.0, 4.0])
+
+    def _compare(self, func, *args):
+        """Evaluate `func` numerically and symbolically; require both to
+        agree on value and on shape."""
+        expected = func(*args)
+        actual = compile(func)(*args)
+        assert np.shape(actual) == np.shape(expected), (
+            f"shape {np.shape(actual)} != NumPy's {np.shape(expected)}"
+        )
+        np.testing.assert_allclose(np.asarray(actual), expected, atol=1e-12)
+
+    @pytest.mark.parametrize("axis", [None, 0, 1, -1, -2])
+    @pytest.mark.parametrize("keepdims", [False, True])
+    def test_sum_2d(self, axis, keepdims):
+        self._compare(lambda x: np.sum(x, axis=axis, keepdims=keepdims), self.X2)
+
+    @pytest.mark.parametrize("axis", [None, 0, -1])
+    @pytest.mark.parametrize("keepdims", [False, True])
+    def test_sum_1d(self, axis, keepdims):
+        self._compare(lambda x: np.sum(x, axis=axis, keepdims=keepdims), self.X1)
+
+    def test_sum_accepts_numpy_integer_axis(self):
+        # `normalize_axis_index` uses operator.index rather than
+        # isinstance(axis, int), which rejects np.int64.
+        self._compare(lambda x: np.sum(x, axis=np.int64(-1)), self.X2)
+
+    @pytest.mark.parametrize("axis", [2, -3])
+    def test_sum_axis_out_of_bounds(self, axis):
+        x = _sym("x", shape=(2, 3))
+        with pytest.raises(npex.AxisError):
+            np.sum(x, axis=axis)
+
+    def test_normalize_axis_rejects_non_integer(self):
+        x = _sym("x", shape=(2, 3))
+        with pytest.raises(TypeError, match="integer argument expected"):
+            np.sum(x, axis="0")
+
+    @pytest.mark.parametrize("shift", [1, 2, -1, 7])
+    @pytest.mark.parametrize("axis", [None, 0, 1, -1, -2])
+    def test_roll_2d(self, shift, axis):
+        # axis=None must flatten, roll, and restore the original shape --
+        # it previously returned the flattened result.
+        self._compare(lambda x: np.roll(x, shift, axis=axis), self.X2)
+
+    @pytest.mark.parametrize("axis", [None, 0, -1])
+    def test_roll_1d(self, axis):
+        self._compare(lambda x: np.roll(x, 2, axis=axis), self.X1)
+
+    @pytest.mark.parametrize("axis", [None, 0, -1])
+    def test_append_1d(self, axis):
+        # axis=0 previously returned shape (n, 1) instead of (n,).
+        self._compare(lambda a, b: np.append(a, b, axis=axis), self.X1, self.X1)
+
+    @pytest.mark.parametrize("axis", [None, 0, 1, -1, -2])
+    def test_append_2d(self, axis):
+        self._compare(lambda a, b: np.append(a, b, axis=axis), self.X2, self.X2)
+
+    @pytest.mark.parametrize(
+        "shape,axis",
+        [((1, 3), 0), ((3, 1), -1), ((1, 1), (0, 1)), ((1, 3), None)],
+    )
+    def test_squeeze_axis(self, shape, axis):
+        self._compare(lambda x: np.squeeze(x, axis=axis), np.ones(shape))
+
+    def test_squeeze_axis_size_not_one(self):
+        x = _sym("x", shape=(2, 3))
+        with pytest.raises(ValueError, match="size not equal to one"):
+            np.squeeze(x, axis=0)
+
+    @pytest.mark.parametrize("func", [np.cumsum, np.cumprod])
+    @pytest.mark.parametrize("axis", [None, 0, 1, -1, -2])
+    def test_cumulative_2d(self, func, axis):
+        self._compare(lambda x: func(x, axis=axis), self.X2)
+
+    @pytest.mark.parametrize("func", [np.cumsum, np.cumprod])
+    @pytest.mark.parametrize("axis", [None, 0, -1])
+    def test_cumulative_1d(self, func, axis):
+        self._compare(lambda x: func(x, axis=axis), self.X1)
+
+    @pytest.mark.parametrize("func", [np.cumsum, np.cumprod])
+    def test_cumulative_rejects_dtype(self, func):
+        x = _sym("x", shape=(3,))
+        with pytest.raises(NotImplementedError, match="dtype argument"):
+            func(x, dtype=np.float32)
+
+    @pytest.mark.parametrize("shape", [(3,), (2, 3)])
+    def test_ndim(self, shape):
+        assert np.ndim(_sym("x", shape=shape)) == len(shape)

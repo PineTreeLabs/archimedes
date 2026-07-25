@@ -8,6 +8,15 @@ In particular, the API is still evolving and may change between minor versions, 
 ## [Unreleased]
 - Add support for Gaussian quadrature in `archimedes.quadrature`
 - Added `Measure` classes in `archimedes.measure` (currently only used for quadrature weights)
+- Added `archimedes.experimental.approximation`: `Basis`/`FunctionSpace`/`Function` for linear basis expansions, with orthogonal polynomial, Lagrange, and piecewise (C⁻¹/C⁰) bases
+- **Fix incorrect matrix norms**: `np.linalg.norm(A, ord=...)` for 2-D `A` returned CasADi's *entrywise* norms instead of NumPy's *induced operator* norms, silently giving wrong values for `ord=1` and `ord=inf` (`ord=None`/`'fro'` were correct). `ord=1` and `ord=inf` now match NumPy; `ord=2` (spectral norm) raises `NotImplementedError` pending a symbolic SVD, where it previously returned the Frobenius norm
+- **Fix `np.roll(a, shift)` silently changing shape**: with `axis=None` and 2-D `a`, the result was returned flattened instead of restored to `a.shape`
+- **Fix `np.append(a, b, axis=0)` silently changing shape**: for 1-D inputs the result had shape `(n, 1)` instead of `(n,)`
+- Fix `np.sum` with a negative `axis`, which raised `UnboundLocalError` instead of reducing (and gave `UnboundLocalError` rather than `AxisError` when out of bounds)
+- Support `keepdims` in `np.sum`; previously any value, including the default `keepdims=False`, raised `TypeError`
+- Support a matrix right-hand side in `np.linalg.solve`, as NumPy does; solving `m` right-hand sides now uses a single factorization instead of `m`
+- Support `np.ndim`, `np.cumsum`, and `np.cumprod` for symbolic arrays, and the `axis` argument of `np.squeeze`
+- Accept NumPy integer scalars (e.g. `np.int64`) as `axis` arguments wherever a Python `int` was previously required
 
 ## [0.4.6] - 2026-07-18
 - Bump tornado, mistune, click, setuptools, soupsieve, tornado to resolve vulnerabilities (not expected to be relevant to Archimedes specifically)
