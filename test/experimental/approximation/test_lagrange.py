@@ -4,7 +4,7 @@ import pytest
 import archimedes as arc
 from archimedes._core._array_impl import SymbolicArray
 from archimedes.experimental.approximation import LagrangeBasis
-from archimedes.measure import LegendreMeasure
+from archimedes.measure import UnitInterval
 from archimedes.quadrature import gauss_lobatto
 
 
@@ -58,7 +58,7 @@ def test_interpolates_polynomial_within_degree_exactly(nodes):
 def test_domain_mapping_preserves_cardinal_property(nodes):
     a, b = 2.0, 7.0
     basis = LagrangeBasis(reference_nodes=nodes)
-    scale, shift = LegendreMeasure().affine_params(a, b)
+    scale, shift = UnitInterval().affine_params(a, b)
     mapped_nodes = scale * nodes + shift
 
     phi = basis.evaluate(mapped_nodes, a=a, b=b)
@@ -68,7 +68,7 @@ def test_domain_mapping_preserves_cardinal_property(nodes):
 def test_domain_mapping_interpolates_exactly(nodes):
     a, b = 2.0, 7.0
     basis = LagrangeBasis(reference_nodes=nodes)
-    scale, shift = LegendreMeasure().affine_params(a, b)
+    scale, shift = UnitInterval().affine_params(a, b)
     mapped_nodes = scale * nodes + shift
 
     def f(x):

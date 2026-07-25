@@ -6,7 +6,7 @@ import dataclasses
 
 import numpy as np
 
-from archimedes.measure import LegendreMeasure
+from archimedes.measure import UnitInterval
 
 from ._basis import Basis
 
@@ -36,15 +36,15 @@ class LagrangeBasis(Basis):
 
     with the usual special-case handling at :math:`x = x_k` (where
     :math:`\\ell_i(x_k) = \\delta_{ik}` directly, avoiding 0/0). Unlike
-    :class:`OrthogonalPolynomialBasis`, this family has no natural weight
-    function or orthogonality measure -- ``reference_nodes`` are just data.
-    ``LegendreMeasure`` is used *only* for its ``[-1, 1]`` affine domain
-    map (the same one ``archimedes.quadrature.gauss_legendre`` uses), not
-    for anything specific to Legendre polynomials: the barycentric weights
-    computed from ``reference_nodes`` are actually invariant under this
-    map (a uniform rescaling of every node cancels in the ratio above), so
-    they're computed once, from the reference nodes, and reused unchanged
-    for every target domain.
+    :class:`OrthogonalPolynomialBasis`, this family has no weight function
+    or orthogonality measure at all -- ``reference_nodes`` are just data,
+    and the only thing needed from the domain is the affine
+    :class:`~archimedes.measure.UnitInterval` map onto :math:`[a, b]`.
+
+    The barycentric weights are invariant under that map (a uniform
+    rescaling of every node cancels in the ratio above), so they're
+    computed once from the reference nodes and reused unchanged for every
+    target domain.
 
     Only ``deriv=0`` is implemented so far; the barycentric derivative
     formula (and its own 0/0 handling at the nodes) is left for later.
@@ -81,7 +81,7 @@ class LagrangeBasis(Basis):
 
     @property
     def Parameters(self) -> type:  # noqa: N802
-        return LegendreMeasure.Parameters
+        return UnitInterval.Parameters
 
     def evaluate(self, x, deriv: int = 0, a=None, b=None):
         if deriv != 0:
@@ -89,7 +89,7 @@ class LagrangeBasis(Basis):
                 f"LagrangeBasis only supports deriv=0 currently, got {deriv}"
             )
 
-        scale, shift = LegendreMeasure().affine_params(a, b)
+        scale, shift = UnitInterval().affine_params(a, b)
         xp = scale * self.reference_nodes + shift  # (n_basis,)
         w = self._weights  # scale-invariant; see class docstring
 

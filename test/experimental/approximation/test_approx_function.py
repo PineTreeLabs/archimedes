@@ -7,7 +7,7 @@ from archimedes.experimental.approximation import (
     FunctionSpace,
     OrthogonalPolynomialBasis,
 )
-from archimedes.measure import LegendreMeasure
+from archimedes.measure import LegendreMeasure, UnitInterval
 from archimedes.quadrature import gauss_legendre
 
 
@@ -20,7 +20,7 @@ def quad_rule():
 def space(quad_rule):
     return FunctionSpace(
         OrthogonalPolynomialBasis(LegendreMeasure(), n_basis=5),
-        domain=LegendreMeasure.Parameters(a=-1.0, b=1.0),
+        domain=UnitInterval.Parameters(a=-1.0, b=1.0),
         quad_rule=quad_rule,
     )
 
@@ -45,7 +45,7 @@ def test_add_same_space(quadratic):
 def test_add_mismatched_space_raises(quadratic, quad_rule):
     other_space = FunctionSpace(
         OrthogonalPolynomialBasis(LegendreMeasure(), n_basis=5),
-        domain=LegendreMeasure.Parameters(a=0.0, b=2.0),
+        domain=UnitInterval.Parameters(a=0.0, b=2.0),
         quad_rule=quad_rule,
     )
     other = other_space.project(lambda x: x**2)
@@ -131,7 +131,7 @@ def test_norm_matches_sqrt_self_dot(quadratic):
 def test_dot_mismatched_space_raises(quadratic, quad_rule):
     other_space = FunctionSpace(
         OrthogonalPolynomialBasis(LegendreMeasure(), n_basis=5),
-        domain=LegendreMeasure.Parameters(a=0.0, b=2.0),
+        domain=UnitInterval.Parameters(a=0.0, b=2.0),
         quad_rule=quad_rule,
     )
     other = other_space.project(lambda x: x**2)

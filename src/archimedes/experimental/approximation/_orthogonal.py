@@ -74,11 +74,12 @@ class OrthogonalPolynomialBasis(Basis):
 
     @property
     def Parameters(self) -> type:  # noqa: N802
-        """Delegates to ``type(self.measure).Parameters`` -- whatever domain
-        parameters ``measure.affine_params`` expects (``a``/``b`` for
-        Legendre/Jacobi, ``mean``/``std`` for Hermite, ``rate``/``start``
-        for Laguerre)."""
-        return type(self.measure).Parameters
+        """Delegates to the measure's ``ReferenceDomain`` -- ``a``/``b`` for
+        a :class:`~archimedes.measure.UnitInterval` (Legendre/Jacobi),
+        ``mean``/``std`` for :class:`~archimedes.measure.RealLine`
+        (Hermite), ``rate``/``start`` for
+        :class:`~archimedes.measure.HalfLine` (Laguerre)."""
+        return type(self.measure.domain).Parameters
 
     def evaluate(self, x, deriv: int = 0, **domain_kwargs):
         if deriv < 0:

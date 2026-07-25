@@ -4,11 +4,14 @@ from scipy.special import beta as beta_fn
 
 from archimedes import tree
 from archimedes.measure import (
+    HalfLine,
     HermiteMeasure,
     HermiteNormMeasure,
     JacobiMeasure,
     LaguerreMeasure,
     LegendreMeasure,
+    RealLine,
+    UnitInterval,
 )
 
 # -- Measure implementations --
@@ -101,11 +104,11 @@ def test_hermite_measure():
         measure.affine_params(std=-1.0)
 
 
-# -- Measure.Parameters structs --
+# -- ReferenceDomain.Parameters structs --
 
 
 def test_legendre_parameters_flatten_and_replace():
-    params = LegendreMeasure.Parameters(a=0.0, b=2.0)
+    params = UnitInterval.Parameters(a=0.0, b=2.0)
     assert params.a == 0.0
     assert params.b == 2.0
     assert tree.is_struct(params)
@@ -119,50 +122,56 @@ def test_legendre_parameters_flatten_and_replace():
 
 
 def test_legendre_parameters_defaults_and_validation():
-    identity = LegendreMeasure.Parameters()
+    identity = UnitInterval.Parameters()
     assert identity.a is None
     assert identity.b is None
 
     with pytest.raises(ValueError):
-        LegendreMeasure.Parameters(a=0.0)
+        UnitInterval.Parameters(a=0.0)
     with pytest.raises(ValueError):
-        LegendreMeasure.Parameters(b=1.0)
+        UnitInterval.Parameters(b=1.0)
     with pytest.raises(ValueError):
-        LegendreMeasure.Parameters(a=-np.inf, b=1.0)
+        UnitInterval.Parameters(a=-np.inf, b=1.0)
 
 
-def test_jacobi_parameters_shares_legendre_parameters_type():
-    # Jacobi doesn't override affine_params, so it shares Legendre's Parameters
-    assert JacobiMeasure.Parameters is LegendreMeasure.Parameters
+def test_families_sharing_a_domain_share_its_parameters_type():
+    # Legendre and Jacobi differ only in weight, not domain, so both are
+    # UnitInterval -- as are both Hermite conventions on RealLine. The
+    # parameters belong to the domain, so sharing one means sharing them.
+    assert type(JacobiMeasure(alpha=1.0, beta=2.0).domain) is UnitInterval
+    assert type(LegendreMeasure().domain) is UnitInterval
+    assert type(HermiteMeasure().domain) is RealLine
+    assert type(HermiteNormMeasure().domain) is RealLine
+    assert type(LaguerreMeasure().domain) is HalfLine
 
 
 def test_laguerre_parameters_defaults_and_validation():
-    identity = LaguerreMeasure.Parameters()
+    identity = HalfLine.Parameters()
     assert identity.rate == 1.0
     assert identity.start == 0.0
 
-    params = LaguerreMeasure.Parameters(rate=2.0, start=1.0)
+    params = HalfLine.Parameters(rate=2.0, start=1.0)
     assert tree.is_struct(params)
     flat, _ = tree.flatten(params)
     assert flat == [2.0, 1.0]
 
     with pytest.raises(ValueError):
-        LaguerreMeasure.Parameters(rate=-1.0)
+        HalfLine.Parameters(rate=-1.0)
 
 
-@pytest.mark.parametrize("measure_cls", [HermiteMeasure, HermiteNormMeasure])
-def test_hermite_parameters_defaults_and_validation(measure_cls):
-    identity = measure_cls.Parameters()
+@pytest.mark.parametrize("domain_cls", [RealLine])
+def test_hermite_parameters_defaults_and_validation(domain_cls):
+    identity = domain_cls.Parameters()
     assert identity.mean == 0.0
     assert identity.std == 1.0
 
-    params = measure_cls.Parameters(mean=1.0, std=2.0)
+    params = domain_cls.Parameters(mean=1.0, std=2.0)
     assert tree.is_struct(params)
     flat, _ = tree.flatten(params)
     assert flat == [1.0, 2.0]
 
     with pytest.raises(ValueError):
-        measure_cls.Parameters(std=-1.0)
+        domain_cls.Parameters(std=-1.0)
 
 
 def test_measure_mass_reference_domain():
@@ -186,11 +195,13 @@ def test_measure_mass_mapped_domain():
     assert np.isclose(measure.mass(rate=2.0), scale * measure.reference_mass)
 
 
-def test_hermite_and_hermitenorm_parameters_are_distinct_types():
-    # Same field shape, but kept as separate types since the measures are
-    # separate (mirrors HermiteMeasure vs. HermiteNormMeasure not sharing an
-    # `affine_params` implementation).
-    assert HermiteMeasure.Parameters is not HermiteNormMeasure.Parameters
+def test_hermite_and_hermitenorm_share_a_domain_parameters_type():
+    # These were separate types before the domain refactor. They're now one:
+    # both measures live on the same location-scaled RealLine and had
+    # byte-identical affine_params. Only the *weight* differs (and hence the
+    # interpretation of `std` relative to it -- see the measure docstrings),
+    # which is a Measure concern, not a domain one.
+    assert HermiteMeasure().domain.Parameters is HermiteNormMeasure().domain.Parameters
 
 
 # -- recurrence_coeffs --

@@ -1,3 +1,4 @@
+# ruff: noqa: N806  (M, K are the conventional names for these matrices)
 import numpy as np
 import pytest
 
@@ -6,7 +7,7 @@ from archimedes.experimental.approximation import (
     FunctionSpace,
     OrthogonalPolynomialBasis,
 )
-from archimedes.measure import HermiteMeasure, LegendreMeasure
+from archimedes.measure import LegendreMeasure, RealLine, UnitInterval
 from archimedes.quadrature import gauss_legendre
 
 
@@ -21,7 +22,7 @@ def quad_rule():
 def space(quad_rule):
     return FunctionSpace(
         OrthogonalPolynomialBasis(LegendreMeasure(), n_basis=5),
-        domain=LegendreMeasure.Parameters(a=-1.0, b=1.0),
+        domain=UnitInterval.Parameters(a=-1.0, b=1.0),
         quad_rule=quad_rule,
     )
 
@@ -35,9 +36,9 @@ def test_domain_must_match_basis_parameters_type(quad_rule):
     with pytest.raises(TypeError):
         FunctionSpace(basis, domain=(-1.0, 1.0), quad_rule=quad_rule)
     with pytest.raises(TypeError):
-        # Right *shape* of struct, wrong family -- Hermite's Parameters
-        # takes mean/std, not a/b, so this isn't a LegendreMeasure.Parameters.
-        FunctionSpace(basis, domain=HermiteMeasure.Parameters(), quad_rule=quad_rule)
+        # Wrong domain type -- RealLine's Parameters takes mean/std, not
+        # a/b, so it isn't a UnitInterval.Parameters.
+        FunctionSpace(basis, domain=RealLine.Parameters(), quad_rule=quad_rule)
 
 
 def test_evaluate_matches_direct_basis_contraction(space):
@@ -66,7 +67,7 @@ def test_mass_matrix_is_identity_on_non_reference_domain(quad_rule):
     # unlike a fixed classical normalization, it isn't Jacobian-scaled.
     wide_space = FunctionSpace(
         OrthogonalPolynomialBasis(LegendreMeasure(), n_basis=4),
-        domain=LegendreMeasure.Parameters(a=0.0, b=4.0),
+        domain=UnitInterval.Parameters(a=0.0, b=4.0),
         quad_rule=quad_rule,
     )
     M = wide_space.mass_matrix()
@@ -115,7 +116,7 @@ def test_project_rejects_quad_rule_with_too_few_points(space):
 def test_project_on_non_reference_domain(quad_rule):
     space = FunctionSpace(
         OrthogonalPolynomialBasis(LegendreMeasure(), n_basis=5),
-        domain=LegendreMeasure.Parameters(a=0.0, b=4.0),
+        domain=UnitInterval.Parameters(a=0.0, b=4.0),
         quad_rule=quad_rule,
     )
 
@@ -132,7 +133,7 @@ def test_project_of_function_outside_basis_degree_is_approximate(quad_rule):
     # should be a genuine (inexact) least-squares fit, not a crash.
     space = FunctionSpace(
         OrthogonalPolynomialBasis(LegendreMeasure(), n_basis=2),
-        domain=LegendreMeasure.Parameters(a=-1.0, b=1.0),
+        domain=UnitInterval.Parameters(a=-1.0, b=1.0),
         quad_rule=quad_rule,
     )
     fn = space.project(lambda x: x**2)

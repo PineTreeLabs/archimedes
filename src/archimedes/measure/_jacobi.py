@@ -7,13 +7,14 @@ import dataclasses
 import numpy as np
 from scipy.special import beta as beta_fn
 
-from ._legendre import LegendreMeasure
+from ._base import Measure
+from ._domain import UnitInterval
 
 __all__ = ["JacobiMeasure"]
 
 
 @dataclasses.dataclass(frozen=True)
-class JacobiMeasure(LegendreMeasure):
+class JacobiMeasure(Measure):
     """Measure for the Jacobi polynomial family.
 
     Weight :math:`w(x) = (1-x)^\\alpha (1+x)^\\beta` on
@@ -31,8 +32,9 @@ class JacobiMeasure(LegendreMeasure):
         \\int_{-1}^1 (1-x)^\\alpha (1+x)^\\beta \\, dx
             = 2^{\\alpha + \\beta + 1} \\, B(\\alpha + 1, \\beta + 1)
 
-    Since the reference domain :math:`[-1, 1]` is the same as
-    the Legendre family, ``affine_params`` is the same.
+    Shares the :class:`UnitInterval` reference domain (and hence
+    ``affine_params``) with :class:`LegendreMeasure`; the two differ only
+    in their weight.
 
     Parameters
     ----------
@@ -48,6 +50,8 @@ class JacobiMeasure(LegendreMeasure):
 
     alpha: float
     beta: float
+
+    domain = UnitInterval()
 
     # Not a dataclass field: unannotated, so `dataclasses` leaves it as a
     # plain class attribute overriding `LegendreMeasure.uniform_weight`.

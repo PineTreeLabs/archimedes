@@ -1,3 +1,4 @@
+# ruff: noqa: N806  (M, K are the conventional names for these matrices)
 import numpy as np
 import pytest
 from scipy.special import eval_legendre

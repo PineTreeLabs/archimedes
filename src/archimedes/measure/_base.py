@@ -15,6 +15,8 @@ import abc
 
 import numpy as np
 
+from ._domain import ReferenceDomain
+
 __all__ = ["Measure"]
 
 
@@ -35,10 +37,15 @@ class Measure(metaclass=abc.ABCMeta):
     exactly for every polynomial ``f`` of degree :math:`\\leq 2n - 1`.
 
     Subclasses implement one classical family each (Legendre, Jacobi,
-    Laguerre, Hermite). ``affine_params`` additionally describes how the
-    reference measure relates to other instances of the same family, e.g.
-    rescaling the interval for Legendre/Jacobi, or the rate/location for
-    Laguerre/Hermite.
+    Laguerre, Hermite), pairing a weight with the ``domain`` it lives on.
+    The domain -- the reference support and the affine map onto other
+    instances of it -- is factored out into
+    :class:`~archimedes.measure.ReferenceDomain`, since several families
+    share one (Legendre and Jacobi are both :class:`UnitInterval`; both
+    Hermite conventions are :class:`RealLine`) and since consumers with no
+    weight function at all, such as a nodal
+    :class:`~archimedes.experimental.approximation.Basis`, need the domain
+    without the measure.
     """
 
     uniform_weight: bool = False
@@ -50,23 +57,29 @@ class Measure(metaclass=abc.ABCMeta):
     rule across sub-elements when there's no interior discontinuity in the
     weight to worry about."""
 
-    class Parameters:
-        """Base for a family's affine-reparametrization parameters.
-
-        Each concrete :class:`Measure` defines its own ``@tree.struct``
-        subclass of ``Parameters`` with the fields ``affine_params`` accepts
-        (e.g. ``a``/``b`` for :class:`~archimedes.measure.LegendreMeasure`,
-        ``mean``/``std`` for :class:`~archimedes.measure.HermiteMeasure`).
-        This base is never instantiated directly -- it exists so code that
-        doesn't know which family it's working with can still refer to "the
-        parameters of some measure" as a single type.
-        """
+    domain: ReferenceDomain
+    """The reference domain this measure's weight is supported on. Set as a
+    class attribute by each concrete subclass; carries the ``support``,
+    ``affine_params`` and ``Parameters`` that ``Measure`` delegates to."""
 
     @property
-    @abc.abstractmethod
     def support(self) -> tuple[float, float]:
-        """Support :math:`\\mathcal{D} = [a, b]` of the measure."""
-        raise NotImplementedError
+        """Support :math:`\\mathcal{D} = [a, b]`; forwarded from ``domain``."""
+        return self.domain.support
+
+    def affine_params(self, *args, **kwargs) -> tuple[float, float]:
+        """Return ``(scale, shift)`` mapping the reference measure onto the
+        requested instance of this family; forwarded to
+        ``domain.affine_params``.
+
+        Quadrature weights pick up the same ``scale`` as a Jacobian factor,
+        since :math:`dx = \\mathrm{scale} \\cdot dt`. The meaning of the
+        arguments is domain-specific -- ``a``/``b`` for
+        :class:`UnitInterval`, ``mean``/``std`` for :class:`RealLine`,
+        ``rate``/``start`` for :class:`HalfLine` -- see the corresponding
+        ``ReferenceDomain`` subclass.
+        """
+        return self.domain.affine_params(*args, **kwargs)
 
     @abc.abstractmethod
     def weight(self, x: np.ndarray) -> np.ndarray:
@@ -102,24 +115,6 @@ class Measure(metaclass=abc.ABCMeta):
         """
         scale, _ = self.affine_params(*args, **kwargs)
         return scale * self.reference_mass
-
-    @abc.abstractmethod
-    def affine_params(self, *args, **kwargs) -> tuple[float, float]:
-        """Return ``(scale, shift)`` mapping reference nodes onto the
-        requested instance of this family.
-
-        For reference node ``t``, the corresponding node in the target
-        domain/measure is :math:`x = \\mathrm{scale} \\cdot t +
-        \\mathrm{shift}`. Quadrature weights pick up the same ``scale`` as a
-        Jacobian factor, since :math:`dx = \\mathrm{scale} \\cdot dt`.
-
-        Called with no arguments, must return the identity ``(1.0, 0.0)``,
-        i.e. the reference domain/measure itself. Also validates that
-        ``args``/``kwargs`` are compatible with this family by constructing
-        and validating a ``self.Parameters(*args, **kwargs)`` instance internally.
-        Their meaning is family-specific; see the subclass docstring.
-        """
-        raise NotImplementedError
 
     @abc.abstractmethod
     def recurrence_coeffs(self, n: int) -> tuple[np.ndarray, np.ndarray]:
