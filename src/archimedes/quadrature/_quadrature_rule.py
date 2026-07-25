@@ -82,6 +82,28 @@ class QuadratureRule:
     def __len__(self) -> int:
         return len(self.nodes)
 
+    def __eq__(self, other: object) -> bool:
+        """Compare by value, elementwise on ``nodes``/``weights``.
+
+        Defined explicitly because the ``@dataclass``-generated ``__eq__``
+        would compare the array fields with ``==``, yielding an array and
+        raising "truth value of an array is ambiguous" for any rule with
+        more than one node. (``@dataclass`` leaves an explicitly-defined
+        ``__eq__`` alone.)
+        """
+        if not isinstance(other, QuadratureRule):
+            return NotImplemented
+        return (
+            self.name == other.name
+            and self.measure == other.measure
+            and np.array_equal(self.nodes, other.nodes)
+            and np.array_equal(self.weights, other.weights)
+        )
+
+    def __hash__(self) -> int:
+        # Cheap, consistent with __eq__: equal rules agree on all of these.
+        return hash((type(self), self.name, self.measure, len(self)))
+
     def __repr__(self) -> str:
         return (
             f"{type(self).__name__}(name={self.name!r}, "

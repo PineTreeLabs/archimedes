@@ -24,17 +24,22 @@ class Function:
     ``Function`` on the same ``space``. A general product of two
     ``Function``s is not yet supported, since the product of two finite basis
     expansions isn't generally representable in the same finite space.
+
+    ``Function`` is a struct with two fields: ``coefficients`` (the expansion
+    coefficients) and ``space`` (the :class:`FunctionSpace` that defines the
+    basis and domain). Since ``FunctionSpace`` is also a struct, the entire
+    Function can be symbolically traced, flattened, used in optimization problems, etc.
     """
 
     coefficients: np.ndarray
-    space: FunctionSpace = tree.field(static=True)
+    space: FunctionSpace
 
     def __call__(self, x, deriv: int = 0):
         """Evaluate this function (or its ``deriv``-th derivative) at ``x``."""
         return self.space.evaluate(self.coefficients, x, deriv=deriv)
 
     def __add__(self, other: Function) -> Function:
-        if self.space != other.space:
+        if not self.space.is_compatible_with(other.space):
             raise ValueError("Can only add Functions defined on the same FunctionSpace")
         return Function(self.coefficients + other.coefficients, self.space)
 
@@ -50,7 +55,7 @@ class Function:
         for any pair of same-space ``Function``s -- the result is a
         scalar, not another element of the space.
         """
-        if self.space != other.space:
+        if not self.space.is_compatible_with(other.space):
             raise ValueError(
                 "Can only take the inner product of Functions on the same FunctionSpace"
             )

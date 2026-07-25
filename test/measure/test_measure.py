@@ -296,3 +296,32 @@ def test_hermite_norm_measure():
 
     with pytest.raises(ValueError):
         measure.affine_params(std=-1.0)
+
+
+# -- equality / hashing --
+
+
+def test_measure_equality_is_by_type():
+    # Parameterless measures are fully determined by their class, so two
+    # separately-constructed instances must compare (and hash) equal --
+    # otherwise a FunctionSpace built from one wouldn't match the other.
+    assert LegendreMeasure() == LegendreMeasure()
+    assert LegendreMeasure() != HermiteMeasure()
+    assert hash(LegendreMeasure()) == hash(LegendreMeasure())
+    assert len({LegendreMeasure(), LegendreMeasure(), HermiteMeasure()}) == 2
+
+    # HermiteMeasure vs. HermiteNormMeasure share a domain but are distinct
+    # measures (different weights), so they must not compare equal.
+    assert HermiteMeasure() != HermiteNormMeasure()
+
+
+def test_measure_equality_against_non_measure_is_not_implemented():
+    assert LegendreMeasure().__eq__(object()) is NotImplemented
+    assert LegendreMeasure() != object()
+
+
+def test_parametrized_measure_equality_includes_parameters():
+    # Jacobi is a dataclass, so it keeps the field-wise __eq__ rather than the
+    # type-only one inherited from Measure.
+    assert JacobiMeasure(alpha=1.0, beta=2.0) == JacobiMeasure(alpha=1.0, beta=2.0)
+    assert JacobiMeasure(alpha=1.0, beta=2.0) != JacobiMeasure(alpha=1.0, beta=3.0)

@@ -604,3 +604,25 @@ def test_integral_compile_symbolic_interval():
 
     result = quad(0.0, 2.0)
     assert np.isclose(float(result), 8 / 3)
+
+
+# -- equality / hashing --
+
+
+def test_quadrature_rule_equality_is_elementwise():
+    # The dataclass-generated __eq__ would compare the node/weight arrays with
+    # `==` and raise "truth value of an array is ambiguous", so QuadratureRule
+    # defines its own.
+    assert gauss_legendre(5) == gauss_legendre(5)
+    assert gauss_legendre(5) != gauss_legendre(6)
+    assert gauss_legendre(5) != gauss_lobatto(5)
+
+
+def test_quadrature_rule_is_hashable():
+    assert hash(gauss_legendre(5)) == hash(gauss_legendre(5))
+    assert len({gauss_legendre(5), gauss_legendre(5), gauss_legendre(6)}) == 2
+
+
+def test_quadrature_rule_equality_against_other_types_is_not_implemented():
+    assert gauss_legendre(5).__eq__(object()) is NotImplemented
+    assert gauss_legendre(5) != object()

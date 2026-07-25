@@ -13,6 +13,7 @@ from ._function import Function
 from ._function_space import FunctionSpace
 from ._lagrange import LagrangeBasis
 from ._orthogonal import OrthogonalPolynomialBasis
+from ._piecewise import PiecewiseBasis
 
 __all__ = [
     "Basis",
@@ -20,4 +21,5 @@ __all__ = [
     "FunctionSpace",
     "LagrangeBasis",
     "OrthogonalPolynomialBasis",
+    "PiecewiseBasis",
 ]

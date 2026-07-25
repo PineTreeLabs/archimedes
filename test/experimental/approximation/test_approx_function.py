@@ -42,15 +42,33 @@ def test_add_same_space(quadratic):
     np.testing.assert_allclose(doubled(x), 2 * x**2, atol=1e-10)
 
 
-def test_add_mismatched_space_raises(quadratic, quad_rule):
+def test_add_structurally_mismatched_space_raises(quadratic, quad_rule):
+    # Different n_basis -> different basis -> genuinely incompatible.
+    other_space = FunctionSpace(
+        OrthogonalPolynomialBasis(LegendreMeasure(), n_basis=4),
+        domain=UnitInterval.Parameters(a=-1.0, b=1.0),
+        quad_rule=quad_rule,
+    )
+    other = other_space.project(lambda x: x**2)
+    with pytest.raises(ValueError):
+        quadratic + other
+
+
+def test_add_numerically_mismatched_domain_is_not_caught(quadratic, quad_rule):
+    # Documented limitation: `is_compatible_with` compares the domain only
+    # structurally, since values are undecidable once traced. Two spaces
+    # differing *only* in domain values are therefore accepted -- the caller
+    # is responsible for ensuring they agree numerically.
     other_space = FunctionSpace(
         OrthogonalPolynomialBasis(LegendreMeasure(), n_basis=5),
         domain=UnitInterval.Parameters(a=0.0, b=2.0),
         quad_rule=quad_rule,
     )
     other = other_space.project(lambda x: x**2)
-    with pytest.raises(ValueError):
-        quadratic + other
+    result = quadratic + other  # does not raise
+    np.testing.assert_allclose(
+        result.coefficients, quadratic.coefficients + other.coefficients
+    )
 
 
 def test_scalar_multiplication(quadratic):
@@ -61,13 +79,47 @@ def test_scalar_multiplication(quadratic):
 
 
 def test_is_struct_pytree(quadratic):
+    # coefficients + the domain's (a, b): `basis`/`quad_rule` are static, but
+    # the domain parameters are leaves so they can be traced/optimized.
     leaves, treedef = arc.tree.flatten(quadratic)
-    assert len(leaves) == 1  # only `coefficients` is a leaf; `space` is static
+    assert len(leaves) == 3
     np.testing.assert_array_equal(leaves[0], quadratic.coefficients)
+    assert leaves[1:] == [-1.0, 1.0]
 
-    rebuilt = arc.tree.unflatten(treedef, [quadratic.coefficients * 2])
+    rebuilt = arc.tree.unflatten(treedef, [quadratic.coefficients * 2, -1.0, 1.0])
     np.testing.assert_allclose(rebuilt.coefficients, quadratic.coefficients * 2)
-    assert rebuilt.space == quadratic.space
+    assert rebuilt.space.is_compatible_with(quadratic.space)
+
+
+def test_domain_parameters_are_traceable(space, quadratic):
+    # The point of making FunctionSpace a struct: the domain endpoints are
+    # pytree leaves, so they can be traced and differentiated through.
+    x0 = 0.4
+
+    @arc.compile
+    def evaluate(c, a, b):
+        moving = FunctionSpace(
+            space.basis,
+            domain=UnitInterval.Parameters(a=a, b=b),
+            quad_rule=space.quad_rule,
+        )
+        return Function(c, moving)(np.array([x0]))[0]
+
+    # Matches the equivalent static-domain evaluation
+    val = evaluate(quadratic.coefficients, -1.0, 1.0)
+    np.testing.assert_allclose(float(val), float(quadratic(np.array([x0]))[0]))
+
+    # d/da and d/db agree with finite differences of the same function
+    h = 1e-6
+    for argnum, (da, db) in enumerate([(h, 0.0), (0.0, h)], start=1):
+        analytic = float(
+            arc.grad(evaluate, argnums=argnum)(quadratic.coefficients, -1.0, 1.0)
+        )
+        fd = (
+            float(evaluate(quadratic.coefficients, -1.0 + da, 1.0 + db))
+            - float(evaluate(quadratic.coefficients, -1.0 - da, 1.0 - db))
+        ) / (2 * h)
+        np.testing.assert_allclose(analytic, fd, atol=1e-6)
 
 
 # -- symbolic tracing / autodiff --
@@ -128,10 +180,10 @@ def test_norm_matches_sqrt_self_dot(quadratic):
     np.testing.assert_allclose(quadratic.norm() ** 2, quadratic.dot(quadratic))
 
 
-def test_dot_mismatched_space_raises(quadratic, quad_rule):
+def test_dot_structurally_mismatched_space_raises(quadratic, quad_rule):
     other_space = FunctionSpace(
-        OrthogonalPolynomialBasis(LegendreMeasure(), n_basis=5),
-        domain=UnitInterval.Parameters(a=0.0, b=2.0),
+        OrthogonalPolynomialBasis(LegendreMeasure(), n_basis=4),
+        domain=UnitInterval.Parameters(a=-1.0, b=1.0),
         quad_rule=quad_rule,
     )
     other = other_space.project(lambda x: x**2)

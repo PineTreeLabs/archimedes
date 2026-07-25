@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, Any, Callable
 
 import numpy as np
 
+from archimedes import tree
 from archimedes.quadrature import QuadratureRule
 
 from ._basis import Basis
@@ -17,7 +18,7 @@ if TYPE_CHECKING:
 __all__ = ["FunctionSpace"]
 
 
-@dataclasses.dataclass(frozen=True)
+@tree.struct
 class FunctionSpace:
     """The linear span of a :class:`Basis` on a fixed target domain.
 
@@ -29,16 +30,22 @@ class FunctionSpace:
     See :class:`Function` for a specific element of the space (a
     coefficient vector).
 
+    This is a ``@struct`` rather than a plain dataclass so that ``domain``
+    is a pytree leaf: the domain parameters can be symbolically traced,
+    and so optimized over (moving the endpoints of an element, say) jointly
+    with a ``Function``'s coefficients. ``basis`` and ``quad_rule`` are
+    static -- they carry structure, not numbers.
+
     Parameters
     ----------
     basis : Basis
-        Basis family and size.
+        Basis family and size. Static.
     domain : basis.Parameters
-        Target-domain parameters, validated and typed per ``basis`` --
-        an instance of ``basis.Parameters`` (e.g.
-        ``LegendreMeasure.Parameters(a=..., b=...)`` for a Legendre-derived
-        basis, ``HermiteMeasure.Parameters(mean=..., std=...)`` for a
-        Hermite-derived one).
+        Target-domain parameters, validated and typed per ``basis`` -- an
+        instance of ``basis.Parameters`` (e.g.
+        ``UnitInterval.Parameters(a=..., b=...)`` for a basis on an
+        interval, ``RealLine.Parameters(mean=..., std=...)`` for a
+        Hermite-derived one). A pytree leaf, so it may be traced.
     quad_rule : QuadratureRule
         The space's natural quadrature rule, used unconditionally by
         ``mass_matrix``/``stiffness_matrix`` (their integrands' required
@@ -46,11 +53,12 @@ class FunctionSpace:
         let it drift from this default) and as the default for ``project``
         (which accepts an explicit override, since the right accuracy
         for a given target function isn't knowable from the space alone).
+        Static.
     """
 
-    basis: Basis
+    basis: Basis = tree.field(static=True)
     domain: Any
-    quad_rule: QuadratureRule
+    quad_rule: QuadratureRule = tree.field(static=True)
 
     def __post_init__(self):
         if not isinstance(self.domain, self.basis.Parameters):
@@ -64,8 +72,32 @@ class FunctionSpace:
         """Number of basis functions; forwarded from ``basis``."""
         return self.basis.n_basis
 
+    def is_compatible_with(self, other: FunctionSpace) -> bool:
+        """Whether ``other`` denotes the same space, as far as is decidable.
+
+        Compares ``basis`` and ``quad_rule`` by value, and ``domain`` only
+        *structurally* (via its treedef) -- deliberately not by value.
+
+        Domain values can't be compared once traced: two symbolic
+        parametrizations raise ``TypeError`` under ``bool()`` unless they
+        happen to be the same objects, and independently-traced ``Function``
+        arguments get distinct symbols even when their source domains were
+        numerically identical. So value comparison would be both
+        undecidable and prone to false rejection.
+
+        This means a caller can add two ``Function``s whose domains differ
+        *numerically* -- e.g. ``(a=0, b=1)`` and ``(a=0, b=2)`` -- without
+        an error. **Callers are responsible for ensuring the domains agree
+        numerically**; only the structure is enforced here.
+        """
+        return (
+            self.basis == other.basis
+            and self.quad_rule == other.quad_rule
+            and tree.structure(self.domain) == tree.structure(other.domain)
+        )
+
     def _domain_kwargs(self) -> dict:
-        return dataclasses.asdict(self.domain)
+        return {f.name: getattr(self.domain, f.name) for f in tree.fields(self.domain)}
 
     def _basis_eval(self, x, deriv: int = 0):
         return self.basis.evaluate(x, deriv=deriv, **self._domain_kwargs())

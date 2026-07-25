@@ -89,8 +89,17 @@ class OrthogonalPolynomialBasis(Basis):
         scale, shift = self.measure.affine_params(**domain_kwargs)
         alpha = scale * alpha + shift
         beta = scale**2 * beta
-        beta[0] = self.measure.mass(**domain_kwargs)
-        norm = np.sqrt(np.cumprod(beta))
+
+        # norm[k] = sqrt(beta_0 * beta_1 * ... * beta_k), with beta_0 taken as
+        # the target measure's total mass. Accumulated with an explicit Python
+        # loop (n_basis is static) rather than `np.cumprod`, and without
+        # writing into `beta`, because both the cumulative product and the
+        # item assignment have no symbolic implementation -- `scale` and
+        # `mass` are traced whenever the domain parameters are.
+        norms = [self.measure.mass(**domain_kwargs)]
+        for k in range(1, self.n_basis):
+            norms.append(norms[-1] * beta[k])
+        norm = np.stack([np.sqrt(value) for value in norms], axis=-1)
 
         # pi[m][k] = the m-th derivative of the k-th monic polynomial, for
         # every m <= deriv simultaneously (computing derivatives is nearly

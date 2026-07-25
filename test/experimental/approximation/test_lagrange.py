@@ -83,7 +83,70 @@ def test_domain_mapping_interpolates_exactly(nodes):
 def test_unsupported_derivative_order(nodes):
     basis = LagrangeBasis(reference_nodes=nodes)
     with pytest.raises(NotImplementedError):
-        basis.evaluate(np.array([0.0]), deriv=1)
+        basis.evaluate(np.array([0.0]), deriv=2)
+
+
+# -- derivatives --
+
+
+def test_derivative_matches_finite_difference(nodes):
+    basis = LagrangeBasis(reference_nodes=nodes)
+    # Deliberately off-node points; the at-node branch is covered separately.
+    x = np.linspace(-0.93, 0.91, 17)
+    h = 1e-6
+    dphi = basis.evaluate(x, deriv=1)
+    dphi_fd = (basis.evaluate(x + h) - basis.evaluate(x - h)) / (2 * h)
+    np.testing.assert_allclose(dphi, dphi_fd, atol=1e-5)
+
+
+def test_derivative_at_nodes_matches_finite_difference(nodes):
+    # At a node the general barycentric formula is 0/0, so this exercises the
+    # differentiation-matrix branch instead.
+    basis = LagrangeBasis(reference_nodes=nodes)
+    h = 1e-6
+    dphi = basis.evaluate(nodes, deriv=1)
+    dphi_fd = (basis.evaluate(nodes + h) - basis.evaluate(nodes - h)) / (2 * h)
+    np.testing.assert_allclose(dphi, dphi_fd, atol=1e-5)
+
+
+def test_derivative_reproduces_polynomial_derivative(nodes):
+    basis = LagrangeBasis(reference_nodes=nodes)
+
+    def f(x):
+        return 3 * x**5 - 2 * x**3 + x - 1
+
+    def df(x):
+        return 15 * x**4 - 6 * x**2 + 1
+
+    x = np.linspace(-1, 1, 21)
+    np.testing.assert_allclose(basis.evaluate(x, deriv=1) @ f(nodes), df(x), atol=1e-8)
+
+
+def test_derivatives_sum_to_zero(nodes):
+    # d/dx of the partition of unity.
+    basis = LagrangeBasis(reference_nodes=nodes)
+    x = np.linspace(-1, 1, 21)
+    np.testing.assert_allclose(basis.evaluate(x, deriv=1).sum(axis=1), 0.0, atol=1e-9)
+
+
+def test_derivative_on_mapped_domain(nodes):
+    a, b = 2.0, 7.0
+    basis = LagrangeBasis(reference_nodes=nodes)
+    scale, shift = UnitInterval().affine_params(a, b)
+    mapped = scale * nodes + shift
+
+    def f(x):
+        return 3 * x**2 - 2 * x + 1
+
+    def df(x):
+        return 6 * x - 2
+
+    # Includes the mapped nodes, to cover the chain-rule factor on the
+    # differentiation-matrix branch as well as the generic one.
+    x = np.concatenate([np.linspace(a, b, 15), mapped])
+    np.testing.assert_allclose(
+        basis.evaluate(x, deriv=1, a=a, b=b) @ f(mapped), df(x), atol=1e-8
+    )
 
 
 # -- static (NumPy) vs. dynamic (symbolic, via arc.compile) equivalence --

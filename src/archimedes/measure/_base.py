@@ -62,6 +62,24 @@ class Measure(metaclass=abc.ABCMeta):
     class attribute by each concrete subclass; carries the ``support``,
     ``affine_params`` and ``Parameters`` that ``Measure`` delegates to."""
 
+    def __eq__(self, other: object) -> bool:
+        """Measures compare by *type*, since a measure with no parameters
+        (Legendre, Laguerre, both Hermites) is fully determined by its class
+        -- two separately-constructed ``LegendreMeasure()`` instances denote
+        the same measure and must compare equal.
+
+        Parametrized families override this: :class:`JacobiMeasure` is a
+        ``@dataclass``, whose generated ``__eq__`` compares ``alpha``/``beta``
+        as well (``@dataclass`` leaves an explicitly-defined ``__eq__`` alone,
+        but Jacobi doesn't define one, so it gets the field-wise version).
+        """
+        if not isinstance(other, Measure):
+            return NotImplemented
+        return type(self) is type(other)
+
+    def __hash__(self) -> int:
+        return hash(type(self))
+
     @property
     def support(self) -> tuple[float, float]:
         """Support :math:`\\mathcal{D} = [a, b]`; forwarded from ``domain``."""

@@ -35,6 +35,26 @@ class Basis(metaclass=abc.ABCMeta):
         """The domain parameters this basis expects."""
         raise NotImplementedError
 
+    def boundary_dofs(self) -> tuple[int | None, int | None]:
+        """Indices of the degrees of freedom that *are* the values at the
+        left and right ends of the domain, or ``None`` where there is no
+        such DOF.
+
+        Only meaningful for nodal families: a Lagrange basis whose nodes
+        include both endpoints has :math:`\\ell_i(x_{\\mathrm{left}}) =
+        \\delta_{i,\\mathrm{left}}`, so coefficient ``left`` is exactly the
+        endpoint value. A modal family (e.g.
+        :class:`OrthogonalPolynomialBasis`) has no such DOF -- its endpoint
+        value is a combination of every coefficient -- and neither does a
+        nodal basis whose nodes are all interior (Gauss-Legendre points).
+
+        Used by :class:`PiecewiseBasis` to impose :math:`C^0` continuity by
+        identifying adjacent elements' endpoint DOFs. The default returns
+        ``(None, None)``, i.e. "continuity >= 0 not supported"; families
+        that can support it override this.
+        """
+        return (None, None)
+
     @abc.abstractmethod
     def evaluate(self, x: np.ndarray, deriv: int = 0, **domain_kwargs) -> np.ndarray:
         """Evaluate all ``n_basis`` basis functions at ``x``.
