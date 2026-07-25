@@ -119,6 +119,22 @@ class FunctionSpace:
     def evaluate(self, coefficients: np.ndarray, x, deriv: int = 0):
         """Evaluate :math:`\\sum_i c_i \\, \\phi_i(x)` (or its ``deriv``-th
         derivative) at ``x``, for coefficients ``c = coefficients``.
+
+        Parameters
+        ----------
+        coefficients : ndarray
+            Shape ``(n_basis,)`` for a scalar-valued function, or
+            ``(n_basis, m)`` for an ``m``-component vector-valued one (see
+            :class:`Function`).
+        x : array_like
+            Evaluation points, shape ``(npts,)``.
+        deriv : int, optional
+            Derivative order. Default 0.
+
+        Returns
+        -------
+        ndarray
+            Shape ``(npts,)`` or ``(npts, m)``, matching ``coefficients``.
         """
         phi = self._basis_eval(x, deriv=deriv)  # (npts, n_basis)
         return phi @ coefficients
@@ -142,10 +158,26 @@ class FunctionSpace:
         is exact whenever ``quad_rule`` is accurate enough for that
         product -- equivalently ``c1 @ mass_matrix() @ c2``, but computed
         directly without forming the full ``(n_basis, n_basis)`` matrix.
+
+        For vector-valued coefficients (shape ``(n_basis, m)``) the
+        integrand is contracted over components, :math:`\\langle f, g
+        \\rangle = \\int f \\cdot g \\, w \\, dx`, so the result is a
+        scalar in that case too and :meth:`Function.norm` is the
+        :math:`L^2` norm of the whole vector-valued function rather than
+        an array of per-component norms. Both coefficient arrays must have
+        the same shape; for a per-component inner product, slice the
+        coefficients and call this once per component.
         """
         x, w = self._quad_points_weights(quad_rule)
         phi = self._basis_eval(x)  # (npts, n_basis)
-        return np.dot(w, (phi @ c1) * (phi @ c2))
+        integrand = (phi @ c1) * (phi @ c2)  # (npts,) or (npts, m)
+        if integrand.ndim > 1:
+            # `ndim` is a static (trace-time) property, so this branches on
+            # shape rather than on a value and is safe under `@arc.compile`.
+            # `axis=1` rather than the idiomatic `axis=-1`: the symbolic
+            # `np.sum` does not normalize a negative axis.
+            integrand = np.sum(integrand, axis=1)
+        return np.dot(w, integrand)
 
     def mass_matrix(self) -> np.ndarray:
         """Mass matrix :math:`M_{ij} = \\int \\phi_i \\, \\phi_j \\, w \\, dx`,
@@ -174,24 +206,44 @@ class FunctionSpace:
         exactness for the basis alone; pass an explicit ``quad_rule`` to
         use something other than the space's natural default.
 
+        ``f`` may be vector-valued: if ``f(x)`` has shape ``(npts, m)``,
+        each component is projected onto the same space and the result has
+        coefficients of shape ``(n_basis, m)``. The mass matrix is shared
+        across components, so this costs one basis evaluation rather than
+        ``m`` of them.
+
         Parameters
         ----------
         f : callable
             Target function, called once as ``f(x)`` on the full node
-            array from the quadrature rule.
+            array from the quadrature rule. Must return an array of shape
+            ``(npts,)`` (scalar-valued) or ``(npts, m)`` (vector-valued).
         quad_rule : QuadratureRule, optional
             Quadrature rule to use instead of ``self.quad_rule``.
 
         Returns
         -------
         Function
-            The projected function, in this space.
+            The projected function, in this space, with coefficients of
+            shape ``(n_basis,)`` or ``(n_basis, m)`` to match ``f``.
         """
         from ._function import Function  # avoid a circular import
 
         x, w = self._quad_points_weights(quad_rule)
         phi = self._basis_eval(x)  # (npts, n_basis)
         M = phi.T @ (w[:, None] * phi)
-        rhs = phi.T @ (w * f(x))
-        coefficients = np.linalg.solve(M, rhs)
-        return Function(coefficients, self)
+        fx = f(x)
+
+        # `ndim` is a static (trace-time) property, so this branches on shape
+        # rather than on a value and is safe under `@arc.compile`.
+        if fx.ndim == 1:
+            return Function(np.linalg.solve(M, phi.T @ (w * fx)), self)
+
+        # Vector-valued: one coefficient column per component. Solved column
+        # by column because the symbolic `np.linalg.solve` accepts only a
+        # vector right-hand side; `m` is static, so the loop unrolls at trace
+        # time. NumPy alone would take the whole (n_basis, m) right-hand side
+        # in a single call.
+        rhs = phi.T @ (w[:, None] * fx)  # (n_basis, m)
+        columns = [np.linalg.solve(M, rhs[:, k]) for k in range(fx.shape[1])]
+        return Function(np.stack(columns, axis=-1), self)

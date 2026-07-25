@@ -29,13 +29,25 @@ class Function:
     coefficients) and ``space`` (the :class:`FunctionSpace` that defines the
     basis and domain). Since ``FunctionSpace`` is also a struct, the entire
     Function can be symbolically traced, flattened, used in optimization problems, etc.
+
+    **Vector-valued functions.** ``coefficients`` may have shape
+    ``(n_basis,)`` for a scalar-valued function or ``(n_basis, m)`` for one
+    mapping a scalar to an ``m``-vector -- a trajectory ``[x(t), v(t)]``,
+    say. Vector-valuedness lives entirely in the coefficients: a ``Basis``
+    evaluates to ``(npts, n_basis)`` regardless, so the ``space`` is
+    unchanged and the vector space :math:`V^m` is implied by the trailing
+    axis. Evaluating gives ``(npts,)`` or ``(npts, m)`` correspondingly.
     """
 
     coefficients: np.ndarray
     space: FunctionSpace
 
     def __call__(self, x, deriv: int = 0):
-        """Evaluate this function (or its ``deriv``-th derivative) at ``x``."""
+        """Evaluate this function (or its ``deriv``-th derivative) at ``x``.
+
+        Returns shape ``(npts,)`` or ``(npts, m)``, matching
+        ``coefficients``.
+        """
         return self.space.evaluate(self.coefficients, x, deriv=deriv)
 
     def __add__(self, other: Function) -> Function:
@@ -54,6 +66,9 @@ class Function:
         ``FunctionSpace.inner_product``. Unlike ``__mul__``, this is safe
         for any pair of same-space ``Function``s -- the result is a
         scalar, not another element of the space.
+
+        For vector-valued coefficients the integrand is contracted over
+        components, so the result is a scalar.
         """
         if not self.space.is_compatible_with(other.space):
             raise ValueError(

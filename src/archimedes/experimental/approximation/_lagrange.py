@@ -134,7 +134,7 @@ class LagrangeBasis(Basis):
         safe_diff = np.where(xdiff == 0, 1.0, xdiff)
         temp = w[None, :] / safe_diff
 
-        is_node = (xdiff == 0).astype(float) # (npts, n_basis), 0/1-valued
+        is_node = (xdiff == 0).astype(float)  # (npts, n_basis), 0/1-valued
         any_node = np.sum(is_node, axis=1)  # (npts,); 1 if x_i is a node
         den = np.sum(temp, axis=1)
         phi_generic = temp / den[:, None]
