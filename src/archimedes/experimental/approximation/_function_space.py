@@ -91,6 +91,30 @@ class FunctionSpace:
         phi = self._basis_eval(x, deriv=deriv)  # (npts, n_basis)
         return phi @ coefficients
 
+    def inner_product(
+        self,
+        c1: np.ndarray,
+        c2: np.ndarray,
+        quad_rule: QuadratureRule | None = None,
+    ):
+        """Inner product :math:`\\langle f, g \\rangle = \\int f(x) \\, g(x)
+        \\, w(x) \\, dx` for ``f``, ``g`` in this space with coefficients
+        ``c1``, ``c2``, approximated via ``quad_rule`` (default
+        ``self.quad_rule``).
+
+        Unlike a product of two ``Function``s (deliberately unsupported --
+        see :class:`Function`), an inner product returns a scalar rather
+        than another element of the space, so there's no aliasing/closure
+        question to resolve: it's computed by evaluating both functions at
+        the quadrature nodes and integrating the pointwise product, which
+        is exact whenever ``quad_rule`` is accurate enough for that
+        product -- equivalently ``c1 @ mass_matrix() @ c2``, but computed
+        directly without forming the full ``(n_basis, n_basis)`` matrix.
+        """
+        x, w = self._quad_points_weights(quad_rule)
+        phi = self._basis_eval(x)  # (npts, n_basis)
+        return np.dot(w, (phi @ c1) * (phi @ c2))
+
     def mass_matrix(self) -> np.ndarray:
         """Mass matrix :math:`M_{ij} = \\int \\phi_i \\, \\phi_j \\, w \\, dx`,
         approximated via ``self.quad_rule``.

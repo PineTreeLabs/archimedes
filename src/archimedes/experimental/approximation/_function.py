@@ -5,6 +5,7 @@ from __future__ import annotations
 import numpy as np
 
 from archimedes import tree
+from archimedes.quadrature import QuadratureRule
 
 from ._function_space import FunctionSpace
 
@@ -41,3 +42,22 @@ class Function:
         return Function(scalar * self.coefficients, self.space)
 
     __rmul__ = __mul__
+
+    def dot(self, other: Function, quad_rule: QuadratureRule | None = None):
+        """Inner product :math:`\\langle f, g \\rangle` with another
+        ``Function`` on the same ``space``; see
+        ``FunctionSpace.inner_product``. Unlike ``__mul__``, this is safe
+        for any pair of same-space ``Function``s -- the result is a
+        scalar, not another element of the space.
+        """
+        if self.space != other.space:
+            raise ValueError(
+                "Can only take the inner product of Functions on the same FunctionSpace"
+            )
+        return self.space.inner_product(
+            self.coefficients, other.coefficients, quad_rule
+        )
+
+    def norm(self, quad_rule: QuadratureRule | None = None):
+        """:math:`\\lVert f \\rVert = \\sqrt{\\langle f, f \\rangle}`."""
+        return np.sqrt(self.dot(self, quad_rule))

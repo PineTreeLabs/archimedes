@@ -140,3 +140,35 @@ def test_project_of_function_outside_basis_degree_is_approximate(quad_rule):
     residual = fn(x) - x**2
     assert np.max(np.abs(residual)) > 1e-3  # not exact
     assert np.max(np.abs(residual)) < 1.0  # but still a reasonable fit
+
+
+# -- inner_product --
+
+
+def test_inner_product_matches_mass_matrix_quadratic_form(space):
+    c1 = np.array([1.0, -2.0, 0.5, 0.0, 3.0])
+    c2 = np.array([0.2, 1.0, -1.0, 4.0, 0.1])
+    M = space.mass_matrix()
+    np.testing.assert_allclose(space.inner_product(c1, c2), c1 @ M @ c2, atol=1e-10)
+
+
+def test_inner_product_of_orthonormal_basis_vectors_is_kronecker_delta(space):
+    for i in range(space.n_basis):
+        for j in range(space.n_basis):
+            ci = np.eye(space.n_basis)[i]
+            cj = np.eye(space.n_basis)[j]
+            expected = 1.0 if i == j else 0.0
+            np.testing.assert_allclose(
+                space.inner_product(ci, cj), expected, atol=1e-10
+            )
+
+
+def test_inner_product_accepts_quad_rule_override(space):
+    c1 = np.array([1.0, -2.0, 0.5, 0.0, 3.0])
+    c2 = np.array([0.2, 1.0, -1.0, 4.0, 0.1])
+    coarse = gauss_legendre(6)
+    np.testing.assert_allclose(
+        space.inner_product(c1, c2, quad_rule=coarse),
+        space.inner_product(c1, c2),
+        atol=1e-10,
+    )

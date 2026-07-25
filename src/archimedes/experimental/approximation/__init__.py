@@ -11,11 +11,13 @@
 from ._basis import Basis
 from ._function import Function
 from ._function_space import FunctionSpace
+from ._lagrange import LagrangeBasis
 from ._orthogonal import OrthogonalPolynomialBasis
 
 __all__ = [
     "Basis",
     "Function",
     "FunctionSpace",
+    "LagrangeBasis",
     "OrthogonalPolynomialBasis",
 ]
