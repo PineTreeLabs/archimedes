@@ -180,8 +180,13 @@ class FunctionSpace:
         ndarray
             Shape ``(npts,)`` or ``(npts, m)``, matching ``coefficients``.
         """
-        phi = self._basis_eval(x, deriv=deriv)  # (npts, n_basis)
-        return phi @ coefficients
+        # `evaluate_expansion` rather than `_basis_eval(...) @ coefficients`:
+        # a locally-supported basis can fuse the two and avoid materializing
+        # the full (npts, n_basis) matrix. The default implementation is
+        # exactly that matrix product.
+        return self.basis.evaluate_expansion(
+            coefficients, x, deriv=deriv, **self._domain_kwargs()
+        )
 
     def inner_product(
         self,

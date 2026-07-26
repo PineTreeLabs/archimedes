@@ -73,6 +73,34 @@ class Basis(metaclass=abc.ABCMeta):
         """
         raise NotImplementedError
 
+    def evaluate_expansion(
+        self, coefficients: np.ndarray, x: np.ndarray, deriv: int = 0, **domain_kwargs
+    ) -> np.ndarray:
+        """Evaluate :math:`\\sum_i c_i \\, \\phi_i(x)` directly.
+
+        Mathematically equivalent to ``evaluate(x, deriv) @ coefficients``,
+        which is the default implementation, but allows families with local
+        support (e.g. piecewise polynomials) to fuse the two steps.
+
+        Parameters
+        ----------
+        coefficients : ndarray
+            Shape ``(n_basis,)`` or ``(n_basis, m)`` for a vector-valued
+            expansion.
+        x : array_like
+            Evaluation points, shape ``(npts,)``.
+        deriv : int, optional
+            Derivative order. Default 0.
+        **domain_kwargs
+            Target-domain parameters, as for :meth:`evaluate`.
+
+        Returns
+        -------
+        ndarray
+            Shape ``(npts,)`` or ``(npts, m)``, matching ``coefficients``.
+        """
+        return self.evaluate(x, deriv=deriv, **domain_kwargs) @ coefficients
+
     def boundary_dofs(self) -> tuple[int | None, int | None]:
         """Indices of the degrees of freedom that *are* the values at the
         left and right ends of the domain, or ``None`` where there is no

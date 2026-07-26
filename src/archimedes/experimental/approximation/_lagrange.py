@@ -50,6 +50,16 @@ class LagrangeBasis(Basis):
     with the usual special-case handling at :math:`x = x_k` (where
     :math:`\\ell_i(x_k) = \\delta_{ik}` directly, avoiding 0/0).
 
+    .. warning::
+        That special case is selected by a runtime comparison, so it is a
+        branch point for automatic differentiation. Differentiating with
+        respect to a *domain parameter* (``a``/``b``, which move the nodes)
+        at a point that coincides *exactly* with a node returns the
+        derivative of the constant :math:`\\delta_{ik}` branch, i.e. zero,
+        rather than the true value -- the underlying function is smooth
+        there, but this formula is not. Off-node points, and derivatives
+        with respect to ``x``, are unaffected.
+
     Derivatives of every order are supported. Rather than differentiating
     the barycentric quotient (which reintroduces a 0/0 case at each node
     for each order), note that :math:`\\ell_j^{(k)}` is itself a polynomial
@@ -166,7 +176,14 @@ class LagrangeBasis(Basis):
         is_node = (xdiff == 0).astype(float)  # (npts, n_basis), 0/1-valued
         any_node = np.sum(is_node, axis=1)  # (npts,); 1 if x_i is a node
         den = np.sum(temp, axis=1)
-        phi = np.where(any_node[:, None] > 0, is_node, temp / den[:, None])
+        # `den` can be *exactly* zero at a node: substituting 1.0 into
+        # `safe_diff` perturbs that term, and the perturbed terms can cancel
+        # (they do at the right endpoint of a 3-node Lobatto element). The
+        # generic branch is discarded there, but `np.where` evaluates both,
+        # so guard this division as well rather than emit an inf that is
+        # only conditionally unused.
+        safe_den = np.where(any_node > 0, 1.0, den)
+        phi = np.where(any_node[:, None] > 0, is_node, temp / safe_den[:, None])
 
         if deriv == 0:
             return phi

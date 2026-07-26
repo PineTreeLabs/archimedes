@@ -333,3 +333,128 @@ class TestQuadratureCompatibility:
         # n_basis; the default must never trip that guard.
         basis = PiecewiseBasis(local, self.BP, continuity=continuity)
         assert len(basis.default_quadrature()) >= basis.n_basis
+
+
+# -- fused evaluation (locate-and-gather) --
+
+
+class TestEvaluateExpansion:
+    """``evaluate_expansion`` locates each point's element and gathers only
+    that element's coefficients, so its cost is independent of the number of
+    elements. It must agree exactly with the dense
+    ``evaluate(...) @ coefficients`` path it replaces."""
+
+    A, B = 0.0, 3.0
+
+    def _points(self, breakpoints):
+        # Interior points, exact breakpoints, exact endpoints, and points
+        # outside the domain on both sides.
+        scale, shift = UnitInterval().affine_params(self.A, self.B)
+        return np.concatenate(
+            [np.linspace(-1.3, 1.3, 23) * scale + shift, breakpoints * scale + shift]
+        )
+
+    @pytest.mark.parametrize("continuity", [-1, 0])
+    @pytest.mark.parametrize("n_elements", [1, 2, 5])
+    @pytest.mark.parametrize("deriv", [0, 1, 2])
+    @pytest.mark.parametrize("n_components", [None, 3])
+    def test_matches_dense_path(
+        self, local, continuity, n_elements, deriv, n_components
+    ):
+        bp = np.linspace(-1.0, 1.0, n_elements + 1)
+        basis = PiecewiseBasis(local, bp, continuity=continuity)
+        shape = (
+            (basis.n_basis,)
+            if n_components is None
+            else (
+                basis.n_basis,
+                n_components,
+            )
+        )
+        coefficients = np.random.default_rng(0).normal(size=shape)
+        x = self._points(bp)
+
+        dense = basis.evaluate(x, deriv=deriv, a=self.A, b=self.B) @ coefficients
+        fused = basis.evaluate_expansion(
+            coefficients, x, deriv=deriv, a=self.A, b=self.B
+        )
+        np.testing.assert_allclose(fused, dense, atol=1e-9)
+
+    def test_zero_outside_domain(self, local, breakpoints):
+        # `evaluate` masks every element, so a point outside contributes
+        # nothing; `low`/`searchsorted` clamp instead, which would
+        # extrapolate. The two must agree.
+        basis = PiecewiseBasis(local, breakpoints, continuity=0)
+        coefficients = np.ones(basis.n_basis)
+        outside = np.array([self.A - 1.0, self.B + 1.0])
+        got = basis.evaluate_expansion(coefficients, outside, a=self.A, b=self.B)
+        np.testing.assert_array_equal(got, 0.0)
+
+    @pytest.mark.parametrize("deriv", [0, 1, 2])
+    def test_symbolic_matches_numeric(self, local, breakpoints, deriv):
+        basis = PiecewiseBasis(local, breakpoints, continuity=0)
+        coefficients = np.random.default_rng(1).normal(size=basis.n_basis)
+        x = self._points(breakpoints)
+        expected = basis.evaluate_expansion(
+            coefficients, x, deriv=deriv, a=self.A, b=self.B
+        )
+
+        @arc.compile
+        def traced(xx, cc):
+            assert isinstance(xx, SymbolicArray)
+            return basis.evaluate_expansion(cc, xx, deriv=deriv, a=self.A, b=self.B)
+
+        np.testing.assert_allclose(
+            np.asarray(traced(x, coefficients)).ravel(), expected, atol=1e-10
+        )
+
+    def test_symbolic_coefficients_with_numeric_points(self, local, breakpoints):
+        # The gather must also work the other way round: numeric element
+        # indices into a symbolic coefficient vector.
+        basis = PiecewiseBasis(local, breakpoints, continuity=0)
+        coefficients = np.random.default_rng(2).normal(size=basis.n_basis)
+        x = np.array([0.4, 1.5, 2.7])
+        expected = basis.evaluate_expansion(coefficients, x, a=self.A, b=self.B)
+
+        @arc.compile
+        def traced(cc):
+            assert isinstance(cc, SymbolicArray)
+            return basis.evaluate_expansion(cc, x, a=self.A, b=self.B)
+
+        np.testing.assert_allclose(
+            np.asarray(traced(coefficients)).ravel(), expected, atol=1e-10
+        )
+
+    def test_cost_is_independent_of_element_count(self, local):
+        # The whole point: graph size must not grow with n_elements.
+        sizes = []
+        for n_elements in (4, 16, 64):
+            basis = PiecewiseBasis(
+                local, np.linspace(-1.0, 1.0, n_elements + 1), continuity=0
+            )
+            coefficients = np.zeros(basis.n_basis)
+            x = np.array([1.7])
+
+            def fused(xx, cc, basis=basis):
+                return basis.evaluate_expansion(cc, xx, a=self.A, b=self.B)
+
+            compiled = arc.compile(fused, static_argnames=("basis",))
+            sizes.append(compiled._specialize(x, coefficients)[0].func.n_nodes())
+
+        assert len(set(sizes)) == 1, f"graph size varied with n_elements: {sizes}"
+
+    def test_function_call_uses_fused_path(self, local, breakpoints):
+        # FunctionSpace.evaluate routes through evaluate_expansion, so a
+        # Function's __call__ gets this for free.
+        basis = PiecewiseBasis(local, breakpoints, continuity=0)
+        space = FunctionSpace(basis, domain=UnitInterval.Parameters(a=self.A, b=self.B))
+
+        def f(x):
+            return 3 * x**2 - 2 * x + 1
+
+        fn = space.project(f)
+        x = np.linspace(self.A, self.B, 31)
+        np.testing.assert_allclose(fn(x), f(x), atol=1e-9)
+        np.testing.assert_allclose(
+            fn(x), basis.evaluate(x, a=self.A, b=self.B) @ fn.coefficients, atol=1e-9
+        )

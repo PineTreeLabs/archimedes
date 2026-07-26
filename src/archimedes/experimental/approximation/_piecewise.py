@@ -4,13 +4,52 @@ from __future__ import annotations
 
 import dataclasses
 
+import casadi as cs
 import numpy as np
 
+from archimedes._core._array_impl import SymbolicArray, _unwrap_sym_array
 from archimedes.measure import UnitInterval
 
 from ._basis import Basis
 
 __all__ = ["PiecewiseBasis"]
+
+
+def _as_mx(value):
+    """Unwrap to a CasADi MX. ``cs.low`` and symbolic-index gathers are
+    MX-only, and a constant must be promoted from DM before it can be
+    indexed by a symbolic expression."""
+    if isinstance(value, SymbolicArray):
+        return _unwrap_sym_array(value)
+    return cs.MX(cs.DM(np.asarray(value, dtype=float)))
+
+
+def _locate(knots, x, symbolic: bool):
+    """Index of the element owning each point of ``x``.
+
+    Half-open ``[lo, hi)``, with both ends clamped into range, matching
+    :meth:`PiecewiseBasis.evaluate`'s masking convention. ``cs.low`` is
+    CasADi's ``std::lower_bound`` and already has exactly these semantics;
+    ``searchsorted(..., "right") - 1`` is its NumPy equivalent.
+    """
+    n_elements = len(knots) - 1
+    if symbolic:
+        return SymbolicArray(
+            cs.low(_as_mx(knots), _as_mx(x)), shape=np.shape(x), dtype=int
+        )
+    index = np.searchsorted(np.asarray(knots), np.asarray(x), side="right") - 1
+    return np.clip(index, 0, n_elements - 1)
+
+
+def _gather(values, index, symbolic: bool, npts: int):
+    """``values[index]`` (rows, if ``values`` is 2-D) for a possibly
+    symbolic integer ``index``."""
+    if not symbolic:
+        return values[index]
+    shape = (npts,) if np.ndim(values) == 1 else (npts, np.shape(values)[1])
+    gathered = _as_mx(values)[_as_mx(index), :]
+    return SymbolicArray(gathered, shape=shape, dtype=float)
+
 
 DISCONTINUOUS = -1
 """``continuity`` value for independent per-element DOFs (a "DG" basis)."""
@@ -222,3 +261,63 @@ class PiecewiseBasis(Basis):
 
         broken = np.concatenate(blocks, axis=-1)  # (npts, n_broken)
         return broken @ self._assembly
+
+    def evaluate_expansion(self, coefficients, x, deriv: int = 0, a=None, b=None):
+        """Locate each point's element and gather only that element's
+        coefficients, instead of building the full ``(npts, n_basis)``
+        matrix.
+
+        :meth:`evaluate` must fill every column, so it evaluates the element
+        basis once per element and masks, hence the cost grows with
+        ``n_elements``. Here each point is instead mapped into the reference
+        coordinate of *its own* element, so the element basis is evaluated
+        exactly once regardless of how many elements there are, and only
+        ``element_basis.n_basis`` coefficients are read per point.
+
+        Mapping into the element's reference coordinate (rather than
+        evaluating the element basis on ``[lo, hi]``) is what keeps this to
+        a single call: ``lo``/``hi`` differ per point, and the element bases
+        take scalar domain parameters.
+        """
+        symbolic = isinstance(x, SymbolicArray) or isinstance(
+            coefficients, SymbolicArray
+        )
+        scale, shift = UnitInterval().affine_params(a, b)
+        knots = scale * self.breakpoints + shift
+        npts = np.shape(x)[0]
+
+        element = _locate(knots, x, symbolic)
+        lo = _gather(knots, element, symbolic, npts)
+        hi = _gather(knots, element + 1, symbolic, npts)
+
+        # Reference coordinate within the owning element, t in [-1, 1]
+        width = hi - lo
+        t = 2.0 * (x - lo) / width - 1.0
+        phi = self.element_basis.evaluate(t, deriv=deriv)  # (npts, n_loc)
+
+        # Expanding to per-element coefficients once makes each element's
+        # block contiguous, so the gather is a fixed offset from `element`.
+        # This is independent of `npts`, so it does not affect the per-point
+        # cost that motivates this path.
+        broken = self._assembly @ coefficients  # (n_broken,) or (n_broken, m)
+        vector_valued = np.ndim(coefficients) > 1
+
+        n_loc = self.element_basis.n_basis
+        total = None
+        for k in range(n_loc):
+            c_k = _gather(broken, element * n_loc + k, symbolic, npts)
+            phi_k = phi[:, k]
+            term = phi_k[:, None] * c_k if vector_valued else phi_k * c_k
+            total = term if total is None else total + term
+
+        # Chain rule for the map into the reference coordinate, one factor
+        # of dt/dx = 2/width per derivative order.
+        jacobian = (2.0 / width) ** deriv
+
+        # `evaluate` masks every element, so a point outside the domain
+        # contributes nothing; `low`/`searchsorted` instead clamp to the end
+        # element, which would extrapolate. Mask to keep the two paths equal.
+        inside = (x >= knots[0]) & (x <= knots[-1])
+        if vector_valued:
+            return np.where(inside[:, None], jacobian[:, None] * total, 0.0)
+        return np.where(inside, jacobian * total, 0.0)
