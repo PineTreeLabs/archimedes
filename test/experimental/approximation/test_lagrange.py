@@ -3,7 +3,7 @@ import pytest
 
 import archimedes as arc
 from archimedes._core._array_impl import SymbolicArray
-from archimedes.experimental.approximation import LagrangeBasis
+from archimedes.experimental.approximation import LagrangeBasis, PiecewiseBasis
 from archimedes.measure import UnitInterval
 from archimedes.quadrature import gauss_lobatto
 
@@ -80,10 +80,10 @@ def test_domain_mapping_interpolates_exactly(nodes):
     np.testing.assert_allclose(interp, f(x), atol=1e-6)
 
 
-def test_unsupported_derivative_order(nodes):
+def test_negative_derivative_order_rejected(nodes):
     basis = LagrangeBasis(reference_nodes=nodes)
-    with pytest.raises(NotImplementedError):
-        basis.evaluate(np.array([0.0]), deriv=2)
+    with pytest.raises(ValueError, match="deriv must be >= 0"):
+        basis.evaluate(np.array([0.0]), deriv=-1)
 
 
 # -- derivatives --
@@ -166,3 +166,97 @@ def test_static_and_dynamic_evaluation_agree_including_at_nodes(nodes):
 
     dynamic_phi = np.array([np.asarray(traced(xi)).ravel() for xi in x])
     np.testing.assert_allclose(static_phi, dynamic_phi, atol=1e-10)
+
+
+# -- higher derivatives --
+
+
+class TestHigherDerivatives:
+    """``Phi^(k) = Phi @ D**k`` is exact, not approximate: each cardinal
+    polynomial's k-th derivative has degree <= n-1 and so lies in the span
+    of the basis itself. These check against exact polynomial derivatives
+    rather than finite differences, which are far too noisy above k=1."""
+
+    N = 7
+
+    @pytest.fixture
+    def basis(self):
+        return LagrangeBasis(reference_nodes=gauss_lobatto(self.N).nodes)
+
+    @pytest.fixture
+    def poly(self):
+        # Degree n-1: exactly representable, and its k-th derivative is a
+        # nonzero polynomial for every k <= n-1.
+        rng = np.random.default_rng(0)
+        return np.polynomial.Polynomial(rng.normal(size=self.N))
+
+    @pytest.mark.parametrize("deriv", [0, 1, 2, 3, 4])
+    def test_exact_on_reference_domain(self, basis, poly, deriv):
+        x = np.linspace(-0.95, 0.95, 17)
+        values = poly(basis.reference_nodes)
+        got = basis.evaluate(x, deriv=deriv) @ values
+        np.testing.assert_allclose(got, poly.deriv(deriv)(x), atol=1e-10)
+
+    @pytest.mark.parametrize("deriv", [1, 2, 3])
+    def test_exact_on_mapped_domain(self, basis, poly, deriv):
+        # The chain-rule factor is 1/scale per derivative order.
+        a, b = 0.0, 3.0
+        scale, shift = UnitInterval().affine_params(a, b)
+        x = scale * np.linspace(-0.95, 0.95, 17) + shift
+        values = poly(scale * basis.reference_nodes + shift)
+        got = basis.evaluate(x, deriv=deriv, a=a, b=b) @ values
+        np.testing.assert_allclose(got, poly.deriv(deriv)(x), atol=1e-9)
+
+    @pytest.mark.parametrize("deriv", [1, 2, 3])
+    def test_exact_at_nodes(self, basis, poly, deriv):
+        # At a node phi is a unit vector, so phi @ D**k is a row of D**k --
+        # the 0/0 case is subsumed rather than special-cased.
+        x = basis.reference_nodes
+        got = basis.evaluate(x, deriv=deriv) @ poly(basis.reference_nodes)
+        np.testing.assert_allclose(got, poly.deriv(deriv)(x), atol=1e-10)
+
+    def test_first_derivative_matches_barycentric_formula(self, basis):
+        # Cross-check against the analytic barycentric derivative, which the
+        # matrix-power identity replaced.
+        x = np.linspace(-0.9, 0.9, 11)
+        w = basis._weights
+        xp = basis.reference_nodes
+        xdiff = x[:, None] - xp[None, :]
+        temp = w[None, :] / xdiff
+        den = np.sum(temp, axis=1)
+        phi = temp / den[:, None]
+        t_sum = np.sum(temp / xdiff, axis=1)
+        expected = phi * (t_sum[:, None] / den[:, None] - 1.0 / xdiff)
+        np.testing.assert_allclose(basis.evaluate(x, deriv=1), expected, atol=1e-11)
+
+    def test_vanishes_beyond_polynomial_degree(self, basis):
+        # Degree is n-1, so the n-th derivative and beyond are identically 0.
+        x = np.linspace(-0.9, 0.9, 5)
+        for deriv in (self.N, self.N + 3):
+            got = basis.evaluate(x, deriv=deriv)
+            assert got.shape == (len(x), self.N)
+            np.testing.assert_array_equal(got, 0.0)
+
+    @pytest.mark.parametrize("deriv", [1, 2, 3])
+    def test_symbolic_matches_numeric(self, basis, deriv):
+        x = np.concatenate([np.array([-0.62, 0.31]), basis.reference_nodes])
+        expected = basis.evaluate(x, deriv=deriv)
+
+        @arc.compile
+        def traced(xi):
+            assert isinstance(xi, SymbolicArray)
+            return basis.evaluate(np.atleast_1d(xi), deriv=deriv)
+
+        actual = np.array([np.asarray(traced(xi)).ravel() for xi in x])
+        np.testing.assert_allclose(actual, expected, atol=1e-10)
+
+    @pytest.mark.parametrize("deriv", [2, 3])
+    def test_piecewise_inherits_higher_derivatives(self, basis, deriv):
+        # The whole point of fixing this: stiffness-like operators on a
+        # piecewise space need element derivatives above first order.
+        bp = np.linspace(-1.0, 1.0, 3)
+        pw = PiecewiseBasis(basis, bp, continuity=0)
+        x = np.array([-0.7, -0.2, 0.35, 0.8])
+        got = pw.evaluate(x, deriv=deriv)
+        assert got.shape == (len(x), pw.n_basis)
+        assert np.isfinite(got).all()

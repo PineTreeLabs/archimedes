@@ -50,6 +50,23 @@ class LagrangeBasis(Basis):
     with the usual special-case handling at :math:`x = x_k` (where
     :math:`\\ell_i(x_k) = \\delta_{ik}` directly, avoiding 0/0).
 
+    Derivatives of every order are supported. Rather than differentiating
+    the barycentric quotient (which reintroduces a 0/0 case at each node
+    for each order), note that :math:`\\ell_j^{(k)}` is itself a polynomial
+    of degree :math:`\\leq n - 1` and so is *exactly* represented in this
+    same basis:
+
+    .. math::
+        \\ell_j^{(k)}(x) = \\sum_i \\ell_j^{(k)}(x_i) \\, \\ell_i(x)
+                        = \\sum_i D^k_{ij} \\, \\ell_i(x),
+
+    where :math:`D_{ij} = \\ell_j'(x_i)` is the classical differentiation
+    matrix. In matrix form :math:`\\Phi^{(k)} = \\Phi \\, D^k`, so every
+    derivative order reduces to the ``deriv=0`` evaluation above followed
+    by a matrix product. At a node :math:`\\Phi` is a unit vector, so this
+    returns the corresponding row of :math:`D^k` exactly -- the special
+    case is subsumed rather than handled separately.
+
     Parameters
     ----------
     reference_nodes : array_like
@@ -135,10 +152,8 @@ class LagrangeBasis(Basis):
         )
 
     def evaluate(self, x, deriv: int = 0, a=None, b=None):
-        if deriv not in (0, 1):
-            raise NotImplementedError(
-                f"LagrangeBasis only supports deriv in (0, 1), got {deriv}"
-            )
+        if deriv < 0:
+            raise ValueError(f"deriv must be >= 0, got {deriv}")
 
         scale, shift = UnitInterval().affine_params(a, b)
         xp = scale * self.reference_nodes + shift  # (n_basis,)
@@ -151,23 +166,22 @@ class LagrangeBasis(Basis):
         is_node = (xdiff == 0).astype(float)  # (npts, n_basis), 0/1-valued
         any_node = np.sum(is_node, axis=1)  # (npts,); 1 if x_i is a node
         den = np.sum(temp, axis=1)
-        phi_generic = temp / den[:, None]
+        phi = np.where(any_node[:, None] > 0, is_node, temp / den[:, None])
 
         if deriv == 0:
-            return np.where(any_node[:, None] > 0, is_node, phi_generic)
+            return phi
 
-        # Differentiating the barycentric quotient ell_j = u_j / S, with
-        # u_j = w_j / (x - x_j) and S = sum_k u_k, gives
-        #     ell_j' = ell_j * (T / S - 1 / (x - x_j)),   T = sum_k u_k/(x - x_k)
-        # which is again 0/0 at a node, where the classical differentiation
-        # matrix supplies the value instead. `is_node @ D` selects the row of D
-        # belonging to whichever node the point coincides with (and is all
-        # zeros elsewhere), so the same masked-select pattern works.
-        t_sum = np.sum(temp / safe_diff, axis=1)
-        dphi_generic = phi_generic * (t_sum[:, None] / den[:, None] - 1.0 / safe_diff)
+        # Each cardinal polynomial has degree n_basis - 1, so its
+        # n_basis-th derivative vanishes identically. Returning exact zeros
+        # is both correct and better conditioned than the numerical D**k,
+        # which is only nilpotent up to roundoff.
+        if deriv >= self.n_basis:
+            return np.zeros_like(phi)
 
-        # D is built from the reference nodes, so it carries a 1/scale
-        # chain-rule factor when mapped onto [a, b].
-        dphi_at_nodes = (is_node @ self._diff_matrix) / scale
-
-        return np.where(any_node[:, None] > 0, dphi_at_nodes, dphi_generic)
+        # Phi^(k) = Phi @ D**k -- see the class docstring. D is built from the
+        # reference nodes, so it carries a 1/scale chain-rule factor per
+        # derivative when mapped onto [a, b]. The division is applied to the
+        # result rather than to D so that a symbolic `scale` never has to
+        # propagate through `matrix_power`.
+        d_power = np.linalg.matrix_power(self._diff_matrix, deriv)
+        return (phi @ d_power) / scale**deriv
