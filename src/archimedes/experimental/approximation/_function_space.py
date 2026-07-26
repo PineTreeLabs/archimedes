@@ -18,6 +18,17 @@ if TYPE_CHECKING:
 __all__ = ["FunctionSpace"]
 
 
+def _is_superset(have: np.ndarray, required: np.ndarray, tol: float = 1e-12) -> bool:
+    """Whether every point of ``required`` appears in ``have``.
+
+    A superset, not equality: refining an element is harmless, since each
+    sub-element still lies inside one element of the basis. Conversely a
+    finer rule that is *not* aligned is still wrong, so comparing node
+    counts would prove nothing.
+    """
+    return bool(np.all([np.any(np.abs(have - point) <= tol) for point in required]))
+
+
 @tree.struct
 class FunctionSpace:
     """The linear span of a :class:`Basis` on a fixed target domain.
@@ -46,7 +57,7 @@ class FunctionSpace:
         ``UnitInterval.Parameters(a=..., b=...)`` for a basis on an
         interval, ``RealLine.Parameters(mean=..., std=...)`` for a
         Hermite-derived one). A pytree leaf, so it may be traced.
-    quad_rule : QuadratureRule
+    quad_rule : QuadratureRule, optional
         The space's natural quadrature rule, used unconditionally by
         ``mass_matrix``/``stiffness_matrix`` (their integrands' required
         accuracy is fully determined by ``basis``, so there's no reason to
@@ -54,17 +65,50 @@ class FunctionSpace:
         (which accepts an explicit override, since the right accuracy
         for a given target function isn't knowable from the space alone).
         Static.
+
+        Defaults to ``basis.default_quadrature()``, which is exact for
+        those integrands by construction. An explicit rule is checked for
+        compatibility with the basis and rejected if it cannot integrate it
+        exactly -- see ``Basis.required_breakpoints``.
     """
 
     basis: Basis = tree.field(static=True)
     domain: Any
-    quad_rule: QuadratureRule = tree.field(static=True)
+    quad_rule: QuadratureRule | None = tree.field(static=True, default=None)
 
     def __post_init__(self):
         if not isinstance(self.domain, self.basis.Parameters):
             raise TypeError(
                 f"domain must be a {self.basis.Parameters.__qualname__} "
                 f"instance for this basis, got {type(self.domain).__name__}"
+            )
+
+        if self.quad_rule is None:
+            object.__setattr__(self, "quad_rule", self.basis.default_quadrature())
+        else:
+            self._validate_quad_rule(self.quad_rule)
+
+    def _validate_quad_rule(self, rule: QuadratureRule) -> None:
+        """Reject a rule that cannot integrate this basis exactly.
+
+        The only structural requirement is alignment: where the basis is
+        not smooth, the rule's subintervals must not straddle the kinks.
+        Degree is *not* checked; an under-resolved rule is inaccurate but
+        not categorically wrong, and ``project`` legitimately varies it.
+        """
+        required = self.basis.required_breakpoints
+        if required is None:
+            return
+
+        have = rule.breakpoints
+        if have is None or not _is_superset(have, required):
+            raise ValueError(
+                f"{type(self.basis).__name__} is only piecewise smooth, with "
+                f"breakpoints {np.asarray(required)}, so quadrature elements "
+                f"must not straddle them; got a rule with breakpoints "
+                f"{have}. Use `composite(rule, breakpoints)` over a superset "
+                f"of the basis breakpoints, or omit `quad_rule` to use "
+                f"`basis.default_quadrature()`."
             )
 
     @property

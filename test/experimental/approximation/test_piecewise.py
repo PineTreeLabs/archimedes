@@ -251,3 +251,85 @@ def test_static_and_dynamic_evaluation_agree(local, breakpoints, continuity):
 
     dynamic_phi = np.array([np.asarray(traced(xi)).ravel() for xi in x])
     np.testing.assert_allclose(static_phi, dynamic_phi, atol=1e-10)
+
+
+# -- quadrature compatibility --
+
+
+class TestQuadratureCompatibility:
+    """A piecewise basis can only be integrated exactly by a rule whose
+    elements do not straddle its kinks. The basis supplies such a rule, and
+    an explicit one is checked rather than silently accepted."""
+
+    BP = np.array([-1.0, -0.3, 0.4, 1.0])  # deliberately uneven
+    DOMAIN = UnitInterval.Parameters(a=0.0, b=3.0)
+
+    @pytest.fixture
+    def basis(self, local):
+        return PiecewiseBasis(local, self.BP, continuity=0)
+
+    def test_required_breakpoints(self, basis, local):
+        np.testing.assert_array_equal(basis.required_breakpoints, self.BP)
+        # A globally smooth family imposes no constraint
+        assert local.required_breakpoints is None
+
+    def test_default_quadrature_is_composite_over_own_breakpoints(self, basis):
+        rule = basis.default_quadrature()
+        np.testing.assert_array_equal(rule.breakpoints, self.BP)
+        assert len(rule) == basis.n_elements * len(basis.element_basis.reference_nodes)
+
+    def test_default_quadrature_integrates_mass_matrix_exactly(self, basis):
+        default = FunctionSpace(basis, domain=self.DOMAIN)
+        # A much higher-order aligned rule must give the same mass matrix.
+        exact = FunctionSpace(
+            basis, domain=self.DOMAIN, quad_rule=composite(gauss_legendre(8), self.BP)
+        )
+        np.testing.assert_allclose(
+            default.mass_matrix(), exact.mass_matrix(), atol=1e-12
+        )
+
+    def test_space_without_quad_rule_projects_correctly(self, basis):
+        space = FunctionSpace(basis, domain=self.DOMAIN)
+
+        def f(x):
+            return 3 * x**2 - 2 * x + 1
+
+        x = np.linspace(0.0, 3.0, 41)
+        np.testing.assert_allclose(space.project(f)(x), f(x), atol=1e-9)
+
+    def test_aligned_rule_accepted(self, basis):
+        rule = composite(gauss_legendre(4), self.BP)
+        assert FunctionSpace(basis, domain=self.DOMAIN, quad_rule=rule) is not None
+
+    def test_refinement_accepted(self, basis):
+        # A superset is fine: each sub-element still lies inside one element
+        # of the basis, so the integrand is a polynomial there.
+        midpoints = (self.BP[:-1] + self.BP[1:]) / 2
+        refined = np.unique(np.concatenate([self.BP, midpoints]))
+        rule = composite(gauss_legendre(4), refined)
+        assert FunctionSpace(basis, domain=self.DOMAIN, quad_rule=rule) is not None
+
+    def test_misaligned_composite_rejected(self, basis):
+        # Same number of elements, different partition -- silently produced a
+        # ~2.5% error in the mass matrix before this was checked.
+        rule = composite(gauss_legendre(4), np.linspace(-1.0, 1.0, 4))
+        with pytest.raises(ValueError, match="must not straddle"):
+            FunctionSpace(basis, domain=self.DOMAIN, quad_rule=rule)
+
+    def test_plain_rule_rejected_however_fine(self, basis):
+        # Node count is beside the point: a 24-point global rule is still
+        # wrong, while an aligned 12-point one is exact.
+        with pytest.raises(ValueError, match="must not straddle"):
+            FunctionSpace(basis, domain=self.DOMAIN, quad_rule=gauss_legendre(24))
+
+    def test_smooth_basis_accepts_any_rule(self, local):
+        # required_breakpoints is None, so there is nothing to enforce.
+        space = FunctionSpace(local, domain=self.DOMAIN, quad_rule=gauss_legendre(7))
+        assert len(space.quad_rule) == 7
+
+    @pytest.mark.parametrize("continuity", [-1, 0])
+    def test_default_quadrature_satisfies_n_basis_guard(self, local, continuity):
+        # The mass matrix is singular if the rule has fewer points than
+        # n_basis; the default must never trip that guard.
+        basis = PiecewiseBasis(local, self.BP, continuity=continuity)
+        assert len(basis.default_quadrature()) >= basis.n_basis

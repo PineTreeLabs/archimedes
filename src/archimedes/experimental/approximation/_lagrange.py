@@ -103,6 +103,20 @@ class LagrangeBasis(Basis):
     def Parameters(self) -> type:  # noqa: N802
         return UnitInterval.Parameters
 
+    def default_quadrature(self):
+        """Gauss-Legendre rule of ``n_basis`` points.
+
+        This family carries no weight function of its own (see the class
+        docstring), so the relevant inner product is the unweighted one on
+        :math:`[-1, 1]`, i.e. Legendre. Each cardinal polynomial has degree
+        ``n_basis - 1``, so their products have degree
+        ``2 * (n_basis - 1)``, which ``n_basis`` Gauss points integrate
+        exactly.
+        """
+        from archimedes.quadrature import gauss_legendre
+
+        return gauss_legendre(self.n_basis)
+
     def boundary_dofs(self) -> tuple[int | None, int | None]:
         """Indices of the nodes at :math:`t = \\pm 1`, or ``None`` if the
         corresponding endpoint isn't a node.

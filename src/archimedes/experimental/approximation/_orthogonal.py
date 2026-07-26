@@ -81,6 +81,17 @@ class OrthogonalPolynomialBasis(Basis):
         :class:`~archimedes.measure.HalfLine` (Laguerre)."""
         return type(self.measure.domain).Parameters
 
+    def default_quadrature(self):
+        """Gauss rule of ``n_basis`` points for this basis's own measure.
+
+        A rule of :math:`n` Gauss points is exact to degree :math:`2n - 1`,
+        which covers the degree-:math:`2(n_\\mathrm{basis} - 1)` mass-matrix
+        integrand (and the lower-degree stiffness one).
+        """
+        from archimedes.quadrature import from_measure
+
+        return from_measure(self.measure, self.n_basis)
+
     def evaluate(self, x, deriv: int = 0, **domain_kwargs):
         if deriv < 0:
             raise ValueError(f"deriv must be >= 0, got {deriv}")

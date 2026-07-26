@@ -28,6 +28,15 @@ __all__ = [
 ]
 
 
+def _breakpoints_equal(a: np.ndarray | None, b: np.ndarray | None) -> bool:
+    """Compare optional breakpoint arrays, treating ``None`` as distinct
+    from any array (a composite rule is not the same rule as a plain one,
+    even if the nodes happened to coincide)."""
+    if a is None or b is None:
+        return a is None and b is None
+    return np.array_equal(a, b)
+
+
 # Note: dataclass, not struct, because all the data is static
 @dataclasses.dataclass(frozen=True)
 class QuadratureRule:
@@ -57,6 +66,10 @@ class QuadratureRule:
         Name identifying the rule.
     measure : Measure
         Weight function and reference domain the rule is defined on.
+    breakpoints : array_like, optional
+        For a composite rule (see :func:`composite`), the element boundaries
+        it was tiled across, on ``measure.support``; ``None`` for a plain
+        rule.
 
     Raises
     ------
@@ -68,11 +81,16 @@ class QuadratureRule:
     weights: np.ndarray  # shape (n,)
     name: str  # name for the rule
     measure: Measure
+    breakpoints: np.ndarray | None = None  # element boundaries, if composite
 
     def __post_init__(self):
         # Static data, safe to unconditionally convert to NumPy arrays
         object.__setattr__(self, "nodes", np.asarray(self.nodes, dtype=float))
         object.__setattr__(self, "weights", np.asarray(self.weights, dtype=float))
+        if self.breakpoints is not None:
+            object.__setattr__(
+                self, "breakpoints", np.asarray(self.breakpoints, dtype=float)
+            )
         if self.nodes.shape != self.weights.shape:
             raise ValueError(
                 f"nodes {self.nodes.shape} and weights {self.weights.shape} "
@@ -98,6 +116,7 @@ class QuadratureRule:
             and self.measure == other.measure
             and np.array_equal(self.nodes, other.nodes)
             and np.array_equal(self.weights, other.weights)
+            and _breakpoints_equal(self.breakpoints, other.breakpoints)
         )
 
     def __hash__(self) -> int:
@@ -350,4 +369,5 @@ def composite(base: QuadratureRule, breakpoints: np.ndarray) -> QuadratureRule:
         np.concatenate(weights),
         measure=base.measure,
         name=base.name,
+        breakpoints=breakpoints,
     )

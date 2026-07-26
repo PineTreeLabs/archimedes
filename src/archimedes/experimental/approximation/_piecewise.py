@@ -162,6 +162,23 @@ class PiecewiseBasis(Basis):
         the breakpoints themselves are structural, not parameters."""
         return UnitInterval.Parameters
 
+    @property
+    def required_breakpoints(self) -> np.ndarray:
+        """This basis is only piecewise smooth: it kinks (or, for
+        ``continuity=-1``, jumps) at every interior breakpoint."""
+        return self.breakpoints
+
+    def default_quadrature(self):
+        """The element basis's own rule, tiled across the same breakpoints.
+
+        Tiling the element rule is what makes the result exact: every
+        subinterval then lies inside a single element, where the integrand
+        is a polynomial of the degree the element rule was chosen for.
+        """
+        from archimedes.quadrature import composite
+
+        return composite(self.element_basis.default_quadrature(), self.breakpoints)
+
     def _build_assembly(self) -> np.ndarray:
         n_loc = self.element_basis.n_basis
         if self.continuity == DISCONTINUOUS:

@@ -626,3 +626,34 @@ def test_quadrature_rule_is_hashable():
 def test_quadrature_rule_equality_against_other_types_is_not_implemented():
     assert gauss_legendre(5).__eq__(object()) is NotImplemented
     assert gauss_legendre(5) != object()
+
+
+class TestCompositeBreakpoints:
+    """A composite rule records the breakpoints it was tiled across, so that
+    consumers can tell whether it aligns with a piecewise integrand."""
+
+    def test_plain_rule_has_no_breakpoints(self):
+        assert gauss_legendre(5).breakpoints is None
+
+    def test_composite_records_breakpoints(self):
+        bp = np.array([-1.0, -0.2, 1.0])
+        rule = composite(gauss_legendre(3), bp)
+        np.testing.assert_array_equal(rule.breakpoints, bp)
+
+    def test_equality_distinguishes_breakpoints(self):
+        bp = np.array([-1.0, 0.0, 1.0])
+        a = composite(gauss_legendre(3), bp)
+        b = composite(gauss_legendre(3), bp.copy())
+        c = composite(gauss_legendre(3), np.array([-1.0, 0.5, 1.0]))
+        assert a == b
+        assert a != c
+
+    def test_composite_not_equal_to_plain_rule(self):
+        # A single-element composite has the same nodes and weights as its
+        # base, but is still a different kind of object to a consumer that
+        # cares about alignment.
+        base = gauss_legendre(4)
+        tiled = composite(base, np.array([-1.0, 1.0]))
+        np.testing.assert_allclose(tiled.nodes, base.nodes, atol=1e-14)
+        assert tiled != base
+        assert base != tiled

@@ -8,8 +8,12 @@ bases, etc.).
 from __future__ import annotations
 
 import abc
+from typing import TYPE_CHECKING
 
 import numpy as np
+
+if TYPE_CHECKING:
+    from archimedes.quadrature import QuadratureRule
 
 __all__ = ["Basis"]
 
@@ -33,6 +37,40 @@ class Basis(metaclass=abc.ABCMeta):
     @abc.abstractmethod
     def Parameters(self) -> type:  # noqa: N802
         """The domain parameters this basis expects."""
+        raise NotImplementedError
+
+    @property
+    def required_breakpoints(self) -> np.ndarray | None:
+        """Points on the reference domain where this basis is not smooth, or
+        ``None`` if it is smooth throughout.
+
+        A quadrature rule integrates products of basis functions exactly
+        only if none of its subintervals straddles one of these kinks --
+        equivalently, if the rule's own breakpoints are a *superset* of
+        these. Equality is not required: refining an element is harmless,
+        and a finer rule that is not aligned is still wrong, so node count
+        is beside the point.
+
+        Returns ``None`` by default (a globally smooth family, e.g. a
+        polynomial basis); :class:`PiecewiseBasis` overrides it.
+        """
+        return None
+
+    @abc.abstractmethod
+    def default_quadrature(self) -> "QuadratureRule":
+        """A quadrature rule that integrates this basis's mass and stiffness
+        integrands exactly.
+
+        Fully determined by the basis: the degree requirement follows from
+        ``n_basis``, and any element structure from the basis's own
+        breakpoints. :class:`FunctionSpace` uses this when no explicit rule
+        is given.
+
+        This is *not* generally sufficient for :meth:`FunctionSpace.project`,
+        whose accuracy requirement depends on the target function rather
+        than on the space -- ``project`` takes an explicit override for
+        that case.
+        """
         raise NotImplementedError
 
     def boundary_dofs(self) -> tuple[int | None, int | None]:
