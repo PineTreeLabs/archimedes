@@ -92,6 +92,25 @@ class OrthogonalPolynomialBasis(Basis):
 
         return from_measure(self.measure, self.n_basis)
 
+    def _product_basis(self, other):
+        """Same measure, ``n_1 + n_2 - 1`` functions.
+
+        Both operands must be built on the same measure: the orthogonality
+        weight is what defines the family, so polynomials orthogonal under
+        different weights don't share a product space in this form.
+        """
+        if not isinstance(other, OrthogonalPolynomialBasis):
+            raise ValueError(
+                f"cannot form a product basis between "
+                f"{type(self).__name__} and {type(other).__name__}"
+            )
+        if self.measure != other.measure:
+            raise ValueError(
+                f"product requires the same measure, got "
+                f"{type(self.measure).__name__} and {type(other.measure).__name__}"
+            )
+        return OrthogonalPolynomialBasis(self.measure, self.n_basis + other.n_basis - 1)
+
     def evaluate(self, x, deriv: int = 0, **domain_kwargs):
         if deriv < 0:
             raise ValueError(f"deriv must be >= 0, got {deriv}")

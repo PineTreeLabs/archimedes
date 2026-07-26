@@ -12,6 +12,14 @@ from ._function_space import FunctionSpace
 __all__ = ["Function"]
 
 
+def _pointwise(u, v):
+    """Elementwise product of two evaluated functions, promoting a
+    scalar-valued one against a vector-valued one."""
+    if np.ndim(u) == np.ndim(v):
+        return u * v
+    return u[:, None] * v if np.ndim(u) == 1 else u * v[:, None]
+
+
 @tree.struct
 class Function:
     """A specific element of a :class:`FunctionSpace`:
@@ -51,14 +59,62 @@ class Function:
         return self.space.evaluate(self.coefficients, x, deriv=deriv)
 
     def __add__(self, other: Function) -> Function:
-        if not self.space.is_compatible_with(other.space):
+        if not self.space._is_compatible_with(other.space):
             raise ValueError("Can only add Functions defined on the same FunctionSpace")
         return Function(self.coefficients + other.coefficients, self.space)
 
-    def __mul__(self, scalar) -> Function:
-        return Function(scalar * self.coefficients, self.space)
+    def __mul__(self, other) -> Function:
+        """Scalar multiple, or the pointwise product of two ``Function``s.
+
+        A scalar multiple stays in the same space. A ``Function`` product
+        does not -- see :meth:`multiply`.
+        """
+        if isinstance(other, Function):
+            return self.multiply(other)
+        return Function(other * self.coefficients, self.space)
 
     __rmul__ = __mul__
+
+    def multiply(self, other: Function, space: FunctionSpace | None = None) -> Function:
+        """Pointwise product :math:`(fg)(x) = f(x) \\, g(x)`.
+
+        The product of two basis expansions does not lie in either operand's
+        space, so the result is returned in a *larger* one, which for
+        polynomial families has ``n_1 + n_2 - 1`` degrees of freedom and
+        represents the product **exactly** (to quadrature roundoff), not as an
+        approximation.
+
+        The degree therefore grows with each product. That is deliberate --
+        an exact operation should not silently lose information -- so
+        reducing back down requires an explicit :meth:`FunctionSpace.project`
+        rather than an automatic truncation. Repeated products without
+        projecting will grow the space quickly.
+
+        Parameters
+        ----------
+        other : Function
+            The other factor. Must be on a compatible space; see
+            :meth:`FunctionSpace._product_space`.
+        space : FunctionSpace, optional
+            Result space, overriding the automatic one. If it is too small
+            to represent the product, the result is the projection of the
+            product onto it -- a well-defined approximation, but no longer
+            exact.
+
+        Returns
+        -------
+        Function
+            The product, in the result space.
+        """
+        result_space = (
+            space if space is not None else self.space._product_space(other.space)
+        )
+        return result_space.project(
+            lambda x: _pointwise(self(x), other(x)),
+            # `project`'s guard against an under-resolved rule does not apply
+            # here: the product space's default rule is exact for this
+            # integrand by construction.
+        )
 
     def dot(self, other: Function, quad_rule: QuadratureRule | None = None):
         """Inner product :math:`\\langle f, g \\rangle` with another
@@ -70,7 +126,7 @@ class Function:
         For vector-valued coefficients the integrand is contracted over
         components, so the result is a scalar.
         """
-        if not self.space.is_compatible_with(other.space):
+        if not self.space._is_compatible_with(other.space):
             raise ValueError(
                 "Can only take the inner product of Functions on the same FunctionSpace"
             )

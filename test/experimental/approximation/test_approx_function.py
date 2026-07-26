@@ -55,7 +55,7 @@ def test_add_structurally_mismatched_space_raises(quadratic, quad_rule):
 
 
 def test_add_numerically_mismatched_domain_is_not_caught(quadratic, quad_rule):
-    # Documented limitation: `is_compatible_with` compares the domain only
+    # Documented limitation: `_is_compatible_with` compares the domain only
     # structurally, since values are undecidable once traced. Two spaces
     # differing *only* in domain values are therefore accepted -- the caller
     # is responsible for ensuring they agree numerically.
@@ -88,7 +88,7 @@ def test_is_struct_pytree(quadratic):
 
     rebuilt = arc.tree.unflatten(treedef, [quadratic.coefficients * 2, -1.0, 1.0])
     np.testing.assert_allclose(rebuilt.coefficients, quadratic.coefficients * 2)
-    assert rebuilt.space.is_compatible_with(quadratic.space)
+    assert rebuilt.space._is_compatible_with(quadratic.space)
 
 
 def test_domain_parameters_are_traceable(space, quadratic):

@@ -101,6 +101,34 @@ class Basis(metaclass=abc.ABCMeta):
         """
         return self.evaluate(x, deriv=deriv, **domain_kwargs) @ coefficients
 
+    def _product_basis(self, other: "Basis") -> "Basis":
+        """A basis large enough to represent products from this basis and
+        ``other`` *exactly*.
+
+        For polynomial families the requirement is purely a degree count:
+        a degree-:math:`(n_1 - 1)` polynomial times a degree-:math:`(n_2 -
+        1)` one has degree :math:`n_1 + n_2 - 2`, so the product space needs
+        :math:`n_1 + n_2 - 1` functions. That number is *static*, which is
+        what makes products expressible here at all -- the space cannot be
+        sized from the data the way an adaptive system would.
+
+        Raising ``NotImplementedError`` is the correct default: whether
+        products are closed in an enlarged version of the same family is a
+        per-family fact, not something that can be assumed.
+
+        Raises
+        ------
+        ValueError
+            If the two bases are not compatible (different measures,
+            different breakpoints, ...), so no common product space exists.
+        NotImplementedError
+            If this family has no product-space construction.
+        """
+        raise NotImplementedError(
+            f"{type(self).__name__} does not define a product basis; multiply "
+            f"the Functions into an explicitly chosen FunctionSpace instead"
+        )
+
     def boundary_dofs(self) -> tuple[int | None, int | None]:
         """Indices of the degrees of freedom that *are* the values at the
         left and right ends of the domain, or ``None`` where there is no

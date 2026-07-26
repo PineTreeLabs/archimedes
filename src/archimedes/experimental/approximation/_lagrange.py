@@ -144,6 +144,28 @@ class LagrangeBasis(Basis):
 
         return gauss_legendre(self.n_basis)
 
+    def _product_basis(self, other):
+        """``n_1 + n_2 - 1`` Gauss-Lobatto nodes.
+
+        Any distinct node set spans the same polynomial space, so the choice
+        only affects conditioning and which degrees of freedom are nodal.
+        Gauss-Lobatto is well-conditioned and includes both endpoints, which
+        keeps :meth:`boundary_dofs` populated so the result can still be
+        tiled with :math:`C^0` continuity.
+        """
+        from archimedes.quadrature import gauss_lobatto
+
+        if not isinstance(other, LagrangeBasis):
+            raise ValueError(
+                f"cannot form a product basis between "
+                f"{type(self).__name__} and {type(other).__name__}"
+            )
+        n = self.n_basis + other.n_basis - 1
+        # gauss_lobatto is undefined below 2 points; n == 1 means both
+        # operands are constants, and a single node spans the constants.
+        nodes = np.zeros(1) if n < 2 else gauss_lobatto(n).nodes
+        return LagrangeBasis(reference_nodes=nodes)
+
     def boundary_dofs(self) -> tuple[int | None, int | None]:
         """Indices of the nodes at :math:`t = \\pm 1`, or ``None`` if the
         corresponding endpoint isn't a node.

@@ -116,7 +116,7 @@ class FunctionSpace:
         """Number of basis functions; forwarded from ``basis``."""
         return self.basis.n_basis
 
-    def is_compatible_with(self, other: FunctionSpace) -> bool:
+    def _is_compatible_with(self, other: FunctionSpace) -> bool:
         """Whether ``other`` denotes the same space, as far as is decidable.
 
         Compares ``basis`` and ``quad_rule`` by value, and ``domain`` only
@@ -139,6 +139,26 @@ class FunctionSpace:
             and self.quad_rule == other.quad_rule
             and tree.structure(self.domain) == tree.structure(other.domain)
         )
+
+    def _product_space(self, other: FunctionSpace) -> FunctionSpace:
+        """The space that represents products of elements of ``self`` and
+        ``other`` exactly.
+
+        Uses ``basis._product_basis`` for the enlarged basis and this space's
+        ``domain``; the quadrature rule is the product basis's own default,
+        which is automatically exact for the product. With ``n_1 + n_2 - 1``
+        Gauss points that rule is exact through degree
+        ``2(n_1 + n_2) - 3``, and both the mass matrix and the load vector
+        of the projection have degree ``2(n_1 + n_2 - 2)``.
+
+        The domains are checked structurally only, for the same reason as
+        :meth:`_is_compatible_with`: they may be traced.
+        """
+        if tree.structure(self.domain) != tree.structure(other.domain):
+            raise ValueError(
+                "product requires Functions on structurally identical domains"
+            )
+        return FunctionSpace(self.basis._product_basis(other.basis), domain=self.domain)
 
     def _domain_kwargs(self) -> dict:
         return {f.name: getattr(self.domain, f.name) for f in tree.fields(self.domain)}

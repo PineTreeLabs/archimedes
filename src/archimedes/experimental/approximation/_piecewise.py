@@ -218,6 +218,34 @@ class PiecewiseBasis(Basis):
 
         return composite(self.element_basis.default_quadrature(), self.breakpoints)
 
+    def _product_basis(self, other):
+        """Same breakpoints, product element basis, weaker continuity.
+
+        The breakpoints must match exactly: a product across two different
+        partitions kinks at the union of both, which neither operand's
+        partition can represent.
+
+        Continuity is the *minimum* of the two. A product is only as smooth
+        as its least smooth factor -- continuous times discontinuous is
+        discontinuous -- so taking the maximum would claim a smoothness the
+        result does not have.
+        """
+        if not isinstance(other, PiecewiseBasis):
+            raise ValueError(
+                f"cannot form a product basis between "
+                f"{type(self).__name__} and {type(other).__name__}"
+            )
+        if not np.array_equal(self.breakpoints, other.breakpoints):
+            raise ValueError(
+                f"product requires identical breakpoints, got "
+                f"{self.breakpoints} and {other.breakpoints}"
+            )
+        return PiecewiseBasis(
+            self.element_basis._product_basis(other.element_basis),
+            self.breakpoints,
+            continuity=min(self.continuity, other.continuity),
+        )
+
     def _build_assembly(self) -> np.ndarray:
         n_loc = self.element_basis.n_basis
         if self.continuity == DISCONTINUOUS:
