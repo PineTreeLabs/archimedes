@@ -63,10 +63,16 @@ class OrthogonalPolynomialBasis(Basis):
     n_basis : int
         Number of basis functions (polynomial degrees ``0`` through
         ``n_basis - 1``).
+    density : bool, optional
+        If ``True``, normalize against the *probability* density
+        ``measure.weight / measure.mass(...)`` instead of the raw weight --
+        i.e. use ``beta_0' = 1`` in place of ``beta_0' = mass(...)`` in the
+        norm below. See :attr:`Basis.density`. Default ``False``.
     """
 
     measure: Measure
     n_basis: int
+    density: bool = False
 
     def __post_init__(self):
         if self.n_basis < 1:
@@ -109,7 +115,14 @@ class OrthogonalPolynomialBasis(Basis):
                 f"product requires the same measure, got "
                 f"{type(self.measure).__name__} and {type(other.measure).__name__}"
             )
-        return OrthogonalPolynomialBasis(self.measure, self.n_basis + other.n_basis - 1)
+        if self.density != other.density:
+            raise ValueError(
+                f"product requires the same normalization, got "
+                f"density={self.density} and density={other.density}"
+            )
+        return OrthogonalPolynomialBasis(
+            self.measure, self.n_basis + other.n_basis - 1, density=self.density
+        )
 
     def evaluate(self, x, deriv: int = 0, **domain_kwargs):
         if deriv < 0:
@@ -121,12 +134,14 @@ class OrthogonalPolynomialBasis(Basis):
         beta = scale**2 * beta
 
         # norm[k] = sqrt(beta_0 * beta_1 * ... * beta_k), with beta_0 taken as
-        # the target measure's total mass. Accumulated with an explicit Python
-        # loop (n_basis is static) rather than `np.cumprod`, and without
-        # writing into `beta`, because both the cumulative product and the
-        # item assignment have no symbolic implementation -- `scale` and
-        # `mass` are traced whenever the domain parameters are.
-        norms = [self.measure.mass(**domain_kwargs)]
+        # the target measure's total mass -- or 1, with `density=True`, so
+        # the basis is instead orthonormal w.r.t. the *probability* density
+        # `weight / mass` (see `Basis.density`). Accumulated with an explicit
+        # Python loop (n_basis is static) rather than `np.cumprod`, and
+        # without writing into `beta`, because both the cumulative product
+        # and the item assignment have no symbolic implementation -- `scale`
+        # and `mass` are traced whenever the domain parameters are.
+        norms = [1.0 if self.density else self.measure.mass(**domain_kwargs)]
         for k in range(1, self.n_basis):
             norms.append(norms[-1] * beta[k])
         norm = np.stack([np.sqrt(value) for value in norms], axis=-1)

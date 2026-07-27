@@ -176,6 +176,20 @@ def test_different_measures_rejected():
         legendre._product_basis(hermite)
 
 
+def test_different_density_rejected():
+    raw = OrthogonalPolynomialBasis(HermiteMeasure(), 3)
+    density = OrthogonalPolynomialBasis(HermiteMeasure(), 3, density=True)
+    with pytest.raises(ValueError, match="same normalization"):
+        raw._product_basis(density)
+
+
+def test_matching_density_forwarded_to_product():
+    left = OrthogonalPolynomialBasis(HermiteMeasure(), 3, density=True)
+    right = OrthogonalPolynomialBasis(HermiteMeasure(), 4, density=True)
+    product = left._product_basis(right)
+    assert product.density is True
+
+
 def test_different_basis_families_rejected():
     modal = OrthogonalPolynomialBasis(LegendreMeasure(), 3)
     nodal = _lobatto(3)

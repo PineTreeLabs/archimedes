@@ -178,7 +178,12 @@ class FunctionSpace:
                 f"{self.n_basis}; the mass matrix would be singular"
             )
         domain_kwargs = self._domain_kwargs()
-        return rule.scaled_points(**domain_kwargs), rule.scaled_weights(**domain_kwargs)
+        # `density=self.basis.density` keeps the quadrature weights consistent
+        # with the basis's own normalization (see `Basis.density`): a basis
+        # orthonormal w.r.t. a probability measure needs weights that
+        # integrate that same probability measure, not the raw weight.
+        weights = rule.scaled_weights(**domain_kwargs, density=self.basis.density)
+        return rule.scaled_points(**domain_kwargs), weights
 
     def evaluate(self, coefficients: np.ndarray, x, deriv: int = 0):
         """Evaluate :math:`\\sum_i c_i \\, \\phi_i(x)` (or its ``deriv``-th

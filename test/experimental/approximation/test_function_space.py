@@ -7,7 +7,12 @@ from archimedes.experimental.approximation import (
     FunctionSpace,
     OrthogonalPolynomialBasis,
 )
-from archimedes.measure import LegendreMeasure, RealLine, UnitInterval
+from archimedes.measure import (
+    HermiteNormMeasure,
+    LegendreMeasure,
+    RealLine,
+    UnitInterval,
+)
 from archimedes.quadrature import gauss_legendre
 
 
@@ -173,3 +178,41 @@ def test_inner_product_accepts_quad_rule_override(space):
         space.inner_product(c1, c2),
         atol=1e-10,
     )
+
+
+# -- density=True: a Hermite space projects directly to PCE moments --
+
+
+@pytest.fixture
+def hermite_space():
+    basis = OrthogonalPolynomialBasis(HermiteNormMeasure(), n_basis=4, density=True)
+    return FunctionSpace(basis, domain=basis.Parameters(mean=0.0, std=2.0))
+
+
+def test_density_mass_matrix_is_identity(hermite_space):
+    # Same identity result as the (density=False) Legendre case above, but
+    # now against the probability measure rather than the raw weight.
+    np.testing.assert_allclose(
+        hermite_space.mass_matrix(), np.eye(hermite_space.n_basis), atol=1e-8
+    )
+
+
+def test_density_project_gives_mean_and_variance_directly(hermite_space):
+    # For X ~ N(0, std^2): E[X^2] = std^2, Var(X^2) = 2 * std^4. With
+    # density=True, project's c_0 and sum(c[k>=1]^2) recover these directly
+    # -- no rescaling by the measure's mass, unlike a density=False basis.
+    std = hermite_space.domain.std
+    fn = hermite_space.project(lambda x: x**2)
+    np.testing.assert_allclose(fn.coefficients[0], std**2, atol=1e-6)
+    np.testing.assert_allclose(np.sum(fn.coefficients[1:] ** 2), 2 * std**4, atol=1e-6)
+
+
+def test_density_false_project_does_not_give_moments_directly(hermite_space):
+    # Contrast case: the default (density=False) convention is orthonormal
+    # against the *raw* weight, so c_0 is off from the true mean by a factor
+    # of sqrt(mass) -- confirming the two conventions really do differ.
+    raw_basis = OrthogonalPolynomialBasis(HermiteNormMeasure(), n_basis=4)
+    raw_space = FunctionSpace(raw_basis, domain=hermite_space.domain)
+    std = hermite_space.domain.std
+    fn = raw_space.project(lambda x: x**2)
+    assert abs(fn.coefficients[0] - std**2) > 1e-3

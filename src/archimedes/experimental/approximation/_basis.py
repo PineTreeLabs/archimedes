@@ -33,6 +33,28 @@ class Basis(metaclass=abc.ABCMeta):
     pairs a ``FunctionSpace`` with coefficients.
     """
 
+    density: bool = False
+    """Whether this basis is orthonormal with respect to a *probability*
+    measure (unit mass) rather than its associated
+    :class:`~archimedes.measure.Measure`'s raw weight.
+
+    Only meaningful for families built on a classical-orthogonal-polynomial
+    ``Measure`` (see :class:`OrthogonalPolynomialBasis`); other families
+    (nodal, piecewise) have no such notion and leave this ``False``.
+
+    :class:`FunctionSpace` forwards this to
+    ``QuadratureRule.scaled_weights``/``scaled_points``' ``density``
+    argument wherever it draws quadrature weights (``mass_matrix``,
+    ``stiffness_matrix``, ``inner_product``, ``project``), so that with
+    ``density=True`` the mass matrix is still the identity but the
+    quadrature is now over a probability measure -- e.g. the coefficients
+    from ``project`` become directly interpretable moments, as in a
+    polynomial chaos expansion: ``c_0`` is the mean and ``sum(c[1:]**2)``
+    is the variance of the projected function, with no extra rescaling.
+    Default ``False``, matching the classical spectral-method convention
+    (orthonormal against the raw weight).
+    """
+
     @property
     @abc.abstractmethod
     def Parameters(self) -> type:  # noqa: N802

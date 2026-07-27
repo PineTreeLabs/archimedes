@@ -6,7 +6,12 @@ from scipy.special import eval_legendre
 import archimedes as arc
 from archimedes._core._array_impl import SymbolicArray
 from archimedes.experimental.approximation import OrthogonalPolynomialBasis
-from archimedes.measure import HermiteMeasure, LaguerreMeasure, LegendreMeasure
+from archimedes.measure import (
+    HermiteMeasure,
+    HermiteNormMeasure,
+    LaguerreMeasure,
+    LegendreMeasure,
+)
 from archimedes.quadrature import gauss_hermite, gauss_laguerre, gauss_legendre
 
 
@@ -74,6 +79,42 @@ def test_orthonormal_on_mapped_domain():
     phi = basis.evaluate(x, a=a, b=b)
     M = phi.T @ (w[:, None] * phi)
     np.testing.assert_allclose(M, np.eye(6), atol=1e-10)
+
+
+# -- `density`: orthonormal against the probability measure, not the raw weight --
+
+
+def test_density_orthonormal_against_probability_measure():
+    # With density=True, integrating phi_i * phi_j against density-normalized
+    # (mass-1) quadrature weights should give the identity, same as the
+    # raw-weight case gives for density=False.
+    mean, std = 1.5, 2.0
+    basis = OrthogonalPolynomialBasis(HermiteNormMeasure(), n_basis=5, density=True)
+    rule = gauss_hermite(15, kind="prob")
+    x = rule.scaled_points(mean, std)
+    w = rule.scaled_weights(mean, std, density=True)
+    phi = basis.evaluate(x, mean=mean, std=std)
+    M = phi.T @ (w[:, None] * phi)
+    np.testing.assert_allclose(M, np.eye(5), atol=1e-8)
+
+
+def test_density_rescales_by_sqrt_mass_relative_to_raw():
+    # Only norm[0] (beta_0) differs between the two conventions -- 1 instead
+    # of measure.mass(...) -- so phi_density = phi_raw * sqrt(mass) exactly,
+    # for every degree.
+    mean, std = 0.0, 3.0
+    raw = OrthogonalPolynomialBasis(HermiteNormMeasure(), n_basis=4)
+    density = OrthogonalPolynomialBasis(HermiteNormMeasure(), n_basis=4, density=True)
+    x = np.linspace(-5, 5, 11)
+    phi_raw = raw.evaluate(x, mean=mean, std=std)
+    phi_density = density.evaluate(x, mean=mean, std=std)
+    mass = HermiteNormMeasure().mass(mean=mean, std=std)
+    np.testing.assert_allclose(phi_density, phi_raw * np.sqrt(mass), atol=1e-10)
+
+
+def test_density_defaults_to_false():
+    basis = OrthogonalPolynomialBasis(LegendreMeasure(), n_basis=3)
+    assert basis.density is False
 
 
 # -- genericity: same class, no family-specific code, for other measures --
