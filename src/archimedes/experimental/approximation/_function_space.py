@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Any, Callable
 import numpy as np
 
 from archimedes import tree
-from archimedes.quadrature import QuadratureRule
+from archimedes.quadrature import Quadrature, QuadratureRule
 
 from ._basis import Basis
 
@@ -74,7 +74,7 @@ class FunctionSpace:
 
     basis: Basis = tree.field(static=True)
     domain: Any
-    quad_rule: QuadratureRule | None = tree.field(static=True, default=None)
+    quad_rule: Quadrature | None = tree.field(static=True, default=None)
 
     def __post_init__(self):
         if not isinstance(self.domain, self.basis.Parameters):
@@ -88,28 +88,66 @@ class FunctionSpace:
         else:
             self._validate_quad_rule(self.quad_rule)
 
-    def _validate_quad_rule(self, rule: QuadratureRule) -> None:
-        """Reject a rule that cannot integrate this basis exactly.
+    def _validate_quad_rule(self, rule: Quadrature) -> None:
+        """Reject a rule that cannot integrate this basis correctly.
 
-        The only structural requirement is alignment: where the basis is
-        not smooth, the rule's subintervals must not straddle the kinks.
+        Three structural requirements:
+
+        - **Dimension.** A rule of the wrong ``ndim`` presents points of the
+          wrong shape.
+        - **Weight.** ``scaled_weights`` applies the *rule's* weight
+          implicitly, so a rule built on a different measure computes a
+          different inner product than the basis is orthogonal under.
+        - **Alignment.** Where the basis is not smooth, the rule's
+          subintervals must not straddle the kinks.
+
         Degree is *not* checked; an under-resolved rule is inaccurate but
         not categorically wrong, and ``project`` legitimately varies it.
         """
+        ndim = self.basis.ndim
+        if rule.ndim != ndim:
+            raise ValueError(
+                f"{type(self.basis).__name__} is {ndim}-dimensional but the "
+                f"quadrature rule is {rule.ndim}-dimensional"
+            )
+
+        # Both sides are per-dimension tuples of length `ndim`; a basis with
+        # no weight of its own (nodal, piecewise) reports None and imposes
+        # no constraint.
+        for d, (basis_measure, rule_measure) in enumerate(
+            zip(self.basis.measures, rule.measures)
+        ):
+            if basis_measure is not None and basis_measure != rule_measure:
+                where = "" if ndim == 1 else f" in dimension {d}"
+                raise ValueError(
+                    f"quadrature weight does not match the basis{where}: the "
+                    f"basis is orthogonal under "
+                    f"{type(basis_measure).__name__} but the rule integrates "
+                    f"against {type(rule_measure).__name__}, so the two "
+                    f"describe different inner products"
+                )
+
         required = self.basis.required_breakpoints
         if required is None:
             return
 
-        have = rule.breakpoints
-        if have is None or not _is_superset(have, required):
-            raise ValueError(
-                f"{type(self.basis).__name__} is only piecewise smooth, with "
-                f"breakpoints {np.asarray(required)}, so quadrature elements "
-                f"must not straddle them; got a rule with breakpoints "
-                f"{have}. Use `composite(rule, breakpoints)` over a superset "
-                f"of the basis breakpoints, or omit `quad_rule` to use "
-                f"`basis.default_quadrature()`."
-            )
+        # `required_breakpoints`/`breakpoints` are per-dimension tuples for a
+        # tensor basis/rule and bare values otherwise.
+        per_dim_required = required if ndim > 1 else (required,)
+        per_dim_have = rule.breakpoints if ndim > 1 else (rule.breakpoints,)
+        for d, (req, have) in enumerate(zip(per_dim_required, per_dim_have)):
+            if req is None:
+                continue
+            if have is None or not _is_superset(have, req):
+                where = "" if ndim == 1 else f" in dimension {d}"
+                raise ValueError(
+                    f"{type(self.basis).__name__} is only piecewise smooth"
+                    f"{where}, with breakpoints {np.asarray(req)}, so "
+                    f"quadrature elements must not straddle them; got a rule "
+                    f"with breakpoints {have}. Use `composite(rule, "
+                    f"breakpoints)` over a superset of the basis breakpoints, "
+                    f"or omit `quad_rule` to use `basis.default_quadrature()`."
+                )
 
     @property
     def n_basis(self) -> int:
@@ -166,7 +204,7 @@ class FunctionSpace:
     def _basis_eval(self, x, deriv: int = 0):
         return self.basis.evaluate(x, deriv=deriv, **self._domain_kwargs())
 
-    def _quad_points_weights(self, quad_rule: QuadratureRule | None = None):
+    def _quad_points_weights(self, quad_rule: Quadrature | None = None):
         rule = quad_rule if quad_rule is not None else self.quad_rule
         # phi is (npts, n_basis), so phi.T @ diag(w) @ phi has rank at most
         # min(npts, n_basis) -- below n_basis points the mass matrix is
@@ -217,7 +255,7 @@ class FunctionSpace:
         self,
         c1: np.ndarray,
         c2: np.ndarray,
-        quad_rule: QuadratureRule | None = None,
+        quad_rule: Quadrature | None = None,
     ):
         """Inner product :math:`\\langle f, g \\rangle = \\int f(x) \\, g(x)
         \\, w(x) \\, dx` for ``f``, ``g`` in this space with coefficients
@@ -260,14 +298,31 @@ class FunctionSpace:
         return phi.T @ (w[:, None] * phi)
 
     def stiffness_matrix(self) -> np.ndarray:
-        """Stiffness matrix :math:`K_{ij} = \\int \\phi_i' \\, \\phi_j' \\,
-        w \\, dx`, approximated via ``self.quad_rule``.
+        """Stiffness matrix :math:`K_{ij} = \\int \\nabla \\phi_i \\cdot
+        \\nabla \\phi_j \\, w \\, dx`, approximated via ``self.quad_rule``.
+
+        In one dimension this is the usual :math:`\\int \\phi_i' \\phi_j'`.
+        In more, "the derivative" is ambiguous, and the form that appears in
+        a Laplacian is the gradient one -- a sum over dimensions of the
+        per-direction stiffness, using the unit multi-indices as ``deriv``.
         """
         x, w = self._quad_points_weights()
-        dphi = self._basis_eval(x, deriv=1)
-        return dphi.T @ (w[:, None] * dphi)
+        ndim = self.basis.ndim
+        if ndim == 1:
+            derivs: list = [1]
+        else:
+            derivs = [
+                tuple(1 if d == k else 0 for d in range(ndim)) for k in range(ndim)
+            ]
 
-    def project(self, f: Callable, quad_rule: QuadratureRule | None = None) -> Function:
+        stiffness = None
+        for deriv in derivs:
+            dphi = self._basis_eval(x, deriv=deriv)
+            block = dphi.T @ (w[:, None] * dphi)
+            stiffness = block if stiffness is None else stiffness + block
+        return stiffness
+
+    def project(self, f: Callable, quad_rule: Quadrature | None = None) -> Function:
         """Galerkin projection of ``f`` onto this space.
 
         Solves ``M @ c = b`` for the coefficients ``c``, where ``M`` is the

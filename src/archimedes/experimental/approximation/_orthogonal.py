@@ -79,6 +79,11 @@ class OrthogonalPolynomialBasis(Basis):
             raise ValueError(f"n_basis must be >= 1, got {self.n_basis}")
 
     @property
+    def measures(self) -> tuple[Measure, ...]:
+        """This basis's orthogonality weight; see :attr:`Basis.measures`."""
+        return (self.measure,)
+
+    @property
     def Parameters(self) -> type:  # noqa: N802
         """Delegates to the measure's ``ReferenceDomain`` -- ``a``/``b`` for
         a :class:`~archimedes.measure.UnitInterval` (Legendre/Jacobi),

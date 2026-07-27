@@ -13,6 +13,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 
 if TYPE_CHECKING:
+    from archimedes.measure import Measure
     from archimedes.quadrature import QuadratureRule
 
 __all__ = ["Basis"]
@@ -31,6 +32,16 @@ class Basis(metaclass=abc.ABCMeta):
     ``Basis`` with a domain and quadrature-based operations (``project``,
     ``mass_matrix``, ``stiffness_matrix``), and :class:`Function`, which
     pairs a ``FunctionSpace`` with coefficients.
+    """
+
+    ndim: int = 1
+    """Number of independent variables the basis functions take.
+
+    Nearly every family here is univariate; :class:`TensorBasis` is the
+    exception, taking one variable per tensored factor. ``evaluate``'s ``x``
+    is ``(npts,)`` when this is 1 and ``(npts, ndim)`` otherwise, and
+    ``deriv`` is a plain order in the first case and a multi-index in the
+    second.
     """
 
     density: bool = False
@@ -60,6 +71,18 @@ class Basis(metaclass=abc.ABCMeta):
     def Parameters(self) -> type:  # noqa: N802
         """The domain parameters this basis expects."""
         raise NotImplementedError
+
+    @property
+    def measures(self) -> tuple[Measure | None, ...]:
+        """The orthogonality weight this basis is built against, per
+        dimension -- always a tuple of length ``ndim``, with ``None`` for a
+        family that has no weight of its own (nodal, piecewise).
+
+        Used by :class:`FunctionSpace` to reject a quadrature rule whose
+        weight does not match the basis's. ``None`` disables that
+        check for a dimension, since there is then nothing to disagree with.
+        """
+        return (None,) * self.ndim
 
     @property
     def required_breakpoints(self) -> np.ndarray | None:

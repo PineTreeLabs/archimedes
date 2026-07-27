@@ -107,6 +107,14 @@ def test_quadrature_rule_reports_ndim_one():
     assert _gl(5).ndim == 1
 
 
+def test_quadrature_rule_measures_is_a_length_one_tuple():
+    # Uniform with the tensor rule, so consumers can zip against a basis's
+    # per-dimension measures without dispatching on ndim.
+    rule = _gl(5)
+    assert rule.measures == (rule.measure,)
+    assert len(rule.measures) == rule.ndim
+
+
 # -- exactness --
 
 

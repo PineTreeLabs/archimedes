@@ -127,6 +127,17 @@ class PiecewiseBasis(Basis):
     continuity: int = C0
 
     def __post_init__(self):
+        # Tiling is along a single reference interval, so a multivariate
+        # element basis has no meaning here; a structured multi-dimensional
+        # mesh is a `TensorBasis` *of* `PiecewiseBasis` factors, not the
+        # other way around.
+        if self.element_basis.ndim != 1:
+            raise ValueError(
+                f"element_basis must be univariate, got "
+                f"{self.element_basis.ndim}-dimensional "
+                f"{type(self.element_basis).__name__}; for a structured mesh, "
+                f"tensor together one PiecewiseBasis per dimension"
+            )
         bp = np.asarray(self.breakpoints, dtype=float)
         if bp.ndim != 1 or len(bp) < 2:
             raise ValueError(
@@ -200,6 +211,12 @@ class PiecewiseBasis(Basis):
         """The outer affine map of the whole tiled pattern onto ``[a, b]``;
         the breakpoints themselves are structural, not parameters."""
         return UnitInterval.Parameters
+
+    @property
+    def measures(self):
+        """The element basis's weight: tiling rescales the reference weight
+        onto each element but does not change which family it is."""
+        return self.element_basis.measures
 
     @property
     def required_breakpoints(self) -> np.ndarray:

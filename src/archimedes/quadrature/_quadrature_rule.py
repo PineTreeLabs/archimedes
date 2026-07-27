@@ -50,6 +50,11 @@ class Quadrature(Protocol):
         (see ``Basis.required_breakpoints``) dispatch on ``ndim``.
         """
 
+    @property
+    def measures(self) -> tuple[Measure, ...]:
+        """The measure integrated against in each dimension, always a tuple
+        of length ``ndim``."""
+
     def __len__(self) -> int:
         """Total number of quadrature nodes."""
 
@@ -163,6 +168,11 @@ class QuadratureRule:
         :class:`TensorQuadratureRule`).
         """
         return 1
+
+    @property
+    def measures(self) -> tuple[Measure, ...]:
+        """This rule's single ``measure``, as a length-1 tuple."""
+        return (self.measure,)
 
     def __eq__(self, other: object) -> bool:
         """Compare by value, elementwise on ``nodes``/``weights``.
