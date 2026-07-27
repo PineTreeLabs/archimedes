@@ -16,16 +16,70 @@ fixed set of nodes and weights on its reference domain.
 from __future__ import annotations
 
 import dataclasses
-from typing import Any, Callable, Sequence
+from typing import Any, Callable, Protocol, Sequence
 
 import numpy as np
 
 from archimedes.measure import Measure
 
 __all__ = [
+    "Quadrature",
     "QuadratureRule",
     "composite",
 ]
+
+
+class Quadrature(Protocol):
+    """The interface every quadrature rule provides, whatever its dimension.
+
+    Deliberately minimal: this is only what's needed by
+    :class:`~archimedes.experimental.approximation.FunctionSpace` to define
+    an inner product.
+    """
+
+    @property
+    def ndim(self) -> int:
+        """Number of dimensions of the domain integrated over."""
+
+    @property
+    def breakpoints(self) -> Any:
+        """Element boundaries, for a rule assembled from sub-elements.
+
+        ``np.ndarray | None`` for a one-dimensional rule; a per-dimension
+        tuple of those for a multi-dimensional one. Consumers that care
+        (see ``Basis.required_breakpoints``) dispatch on ``ndim``.
+        """
+
+    def __len__(self) -> int:
+        """Total number of quadrature nodes."""
+
+    def scaled_points(self, *params: Any, **kwparams: Any) -> np.ndarray:
+        """Nodes mapped onto the target domain, shape ``(n,)`` for a
+        one-dimensional rule or ``(n, ndim)`` otherwise. The meaning of
+        ``params``/``kwparams`` is specific to the implementation."""
+
+    def scaled_weights(
+        self, *params: Any, density: bool = False, **kwparams: Any
+    ) -> np.ndarray:
+        """Weights including the Jacobian of the map onto the target domain,
+        shape ``(n,)``. Normalized to unit total mass if ``density``."""
+
+
+def _weighted_sum(
+    weights: np.ndarray, values: np.ndarray, axis: int, n: int
+) -> np.ndarray:
+    """Contract ``values`` against quadrature ``weights`` along ``axis``."""
+    if values.ndim > 2:
+        raise ValueError(f"expected a 0-D, 1-D, or 2-D array, got {values.ndim}-D")
+    if values.shape[axis] != n:
+        raise ValueError(
+            f"values.shape[{axis}] is {values.shape[axis]}, expected "
+            f"{n} to match the quadrature nodes"
+        )
+
+    if values.ndim == 1 or axis == 0:
+        return np.dot(weights, values)  # type: ignore[no-any-return]
+    return np.dot(values, weights)  # type: ignore[no-any-return]
 
 
 def _breakpoints_equal(a: np.ndarray | None, b: np.ndarray | None) -> bool:
@@ -99,6 +153,16 @@ class QuadratureRule:
 
     def __len__(self) -> int:
         return len(self.nodes)
+
+    @property
+    def ndim(self) -> int:
+        """Dimension of the domain integrated over: always 1.
+
+        Note this is the dimension of the *domain*, not of the ``nodes``
+        array (which is 1-D here and N-D for a
+        :class:`TensorQuadratureRule`).
+        """
+        return 1
 
     def __eq__(self, other: object) -> bool:
         """Compare by value, elementwise on ``nodes``/``weights``.
@@ -281,18 +345,7 @@ class QuadratureRule:
             nodes.
         """
         w = self.scaled_weights(*params, density=density, **kwparams)
-
-        if values.ndim > 2:
-            raise ValueError(f"expected a 0-D, 1-D, or 2-D array, got {values.ndim}-D")
-        if values.shape[axis] != len(self):
-            raise ValueError(
-                f"values.shape[{axis}] is {values.shape[axis]}, expected "
-                f"{len(self)} to match the quadrature nodes"
-            )
-
-        if values.ndim == 1 or axis == 0:
-            return np.dot(w, values)  # type: ignore[no-any-return]
-        return np.dot(values, w)  # type: ignore[no-any-return]
+        return _weighted_sum(w, values, axis, len(self))
 
 
 def composite(base: QuadratureRule, breakpoints: np.ndarray) -> QuadratureRule:

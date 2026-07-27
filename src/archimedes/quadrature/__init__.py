@@ -11,12 +11,16 @@ from ._gauss_legendre import (
 from ._golub_welsch import from_measure, golub_welsch
 from ._integral import integral
 from ._quadrature_rule import (
+    Quadrature,
     QuadratureRule,
     composite,
 )
+from ._tensor import TensorQuadratureRule, tensor
 
 __all__ = [
+    "Quadrature",
     "QuadratureRule",
+    "TensorQuadratureRule",
     "gauss_legendre",
     "gauss_radau",
     "gauss_lobatto",
@@ -26,5 +30,6 @@ __all__ = [
     "golub_welsch",
     "from_measure",
     "composite",
+    "tensor",
     "integral",
 ]
