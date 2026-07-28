@@ -198,6 +198,58 @@ class FunctionSpace:
             )
         return FunctionSpace(self.basis._product_basis(other.basis), domain=self.domain)
 
+    def _derivative_space(self, deriv=1) -> FunctionSpace:
+        """The smallest space that represents ``deriv``-th derivatives of
+        this space's elements exactly.
+
+        Uses the domain and derivative basis from this space's ``domain`` and
+        ``basis``, with the derivative basis's own default quadrature. Smaller
+        than this space for a polynomial family (differentiating lowers the degree);
+        see :meth:`Basis._derivative_basis` for why the minimal space rather
+        than this one.
+        """
+        return FunctionSpace(self.basis._derivative_basis(deriv), domain=self.domain)
+
+    def diff_matrix(self, deriv=1, space: FunctionSpace | None = None) -> np.ndarray:
+        """Matrix mapping this space's coefficients to those of the
+        ``deriv``-th derivative.
+
+        .. math::
+            D = M^{-1} \\, \\Phi_t^\\top W \\, \\Phi^{(k)},
+
+        the Galerkin projection of :math:`\\phi_i^{(k)}` onto the target
+        space, with :math:`M` and the quadrature taken from that target.
+        This is exact whenever the target space contains the derivative,
+        which it does by construction for both defaults below.
+
+        Parameters
+        ----------
+        deriv : int or tuple of int, optional
+            Derivative order; a multi-index for a
+            :class:`TensorBasis`, a plain order otherwise. Default 1.
+        space : FunctionSpace, optional
+            Target space, overriding the default. By default the target is
+            **this** space, giving the square ``(n_basis, n_basis)``
+            differentiation matrix -- the form collocation and operator
+            assembly want, since it keeps the coefficients' meaning (nodal
+            values, modal amplitudes) unchanged. Use :meth:`Function.derivative`
+            for the minimal target.
+
+            A target too small to hold the derivative gives its projection,
+            which is a well-defined approximation but no longer exact.
+
+        Returns
+        -------
+        ndarray
+            Shape ``(space.n_basis, self.n_basis)``.
+        """
+        target = self if space is None else space
+        x, w = target._quad_points_weights()
+        phi = target._basis_eval(x)  # (npts, n_target)
+        dphi = self._basis_eval(x, deriv=deriv)  # (npts, n_basis)
+        M = phi.T @ (w[:, None] * phi)
+        return np.linalg.solve(M, phi.T @ (w[:, None] * dphi))  # type: ignore[no-any-return]
+
     def _domain_kwargs(self) -> dict:
         return {f.name: getattr(self.domain, f.name) for f in tree.fields(self.domain)}
 

@@ -263,6 +263,35 @@ class PiecewiseBasis(Basis):
             continuity=min(self.continuity, other.continuity),
         )
 
+    def _derivative_basis(self, deriv=1):
+        """Same breakpoints, derivative element basis, **discontinuous**.
+
+        This is the one family where the derivative genuinely leaves the
+        original space rather than landing in a subspace of it: a
+        :math:`C^0` function has a derivative that jumps at every interior
+        breakpoint, so the result is a ``continuity=-1`` basis regardless of
+        what this one was. Within each element the derivative is still a
+        polynomial of degree ``n_loc - 1 - deriv``, so the element basis
+        shrinks in the usual way and the representation stays exact.
+
+        .. note::
+            The derivative is genuinely two-valued at an interior
+            breakpoint, so a quadrature rule with a node sitting exactly on
+            one (a *composite Lobatto* rule, say) samples whichever element
+            owns it under the half-open convention. The default rules put
+            their nodes strictly inside elements, so this only arises for an
+            explicitly supplied rule.
+        """
+        if deriv < 0:
+            raise ValueError(f"deriv must be >= 0, got {deriv}")
+        if deriv == 0:
+            return self
+        return PiecewiseBasis(
+            self.element_basis._derivative_basis(deriv),
+            self.breakpoints,
+            continuity=DISCONTINUOUS,
+        )
+
     def _build_assembly(self) -> np.ndarray:
         n_loc = self.element_basis.n_basis
         if self.continuity == DISCONTINUOUS:

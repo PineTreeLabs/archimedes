@@ -245,6 +245,23 @@ class TensorBasis(Basis):
             tuple(a._product_basis(b) for a, b in zip(self.bases, other.bases))
         )
 
+    def _derivative_basis(self, deriv=1):
+        """Tensor of the factors' derivative bases.
+
+        ``deriv`` is a multi-index, as everywhere else here, so each factor
+        is differentiated to its own order and shrinks independently --
+        there is no coupling across dimensions.
+        """
+        alpha = self._multi_index(deriv)
+        derived = []
+        for d, (basis, order) in enumerate(zip(self.bases, alpha)):
+            try:
+                derived.append(basis._derivative_basis(order))
+            except ValueError as exc:
+                # Name the dimension; the factor only knows its own size.
+                raise ValueError(f"in dimension {d}: {exc}") from exc
+        return TensorBasis(tuple(derived))
+
     def _multi_index(self, deriv) -> tuple[int, ...]:
         """Normalize ``deriv`` into a length-``ndim`` multi-index."""
         if isinstance(deriv, (int, np.integer)):

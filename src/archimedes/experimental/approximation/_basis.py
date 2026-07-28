@@ -174,6 +174,32 @@ class Basis(metaclass=abc.ABCMeta):
             f"the Functions into an explicitly chosen FunctionSpace instead"
         )
 
+    def _derivative_basis(self, deriv=1) -> "Basis":
+        """The smallest basis that represents this family's ``deriv``-th
+        derivatives *exactly*.
+
+        Note this is a strictly smaller space, not merely a different one:
+        :math:`P_{n-2} \\subset P_{n-1}`, so the derivative would also be
+        exactly representable in the *original* basis. Returning the minimal
+        space keeps the rule uniform so that every closed operation gives
+        the tightest exact space and keeps downstream products from carrying
+        extra unnecessary degrees of freedom. See also
+        :meth:`FunctionSpace.diff_matrix`, whose square (same-space) form is
+        the classical differentiation matrix.
+
+        Raises
+        ------
+        ValueError
+            If ``deriv`` is not a valid derivative order for this basis.
+        NotImplementedError
+            If this family has no derivative-space construction.
+        """
+        raise NotImplementedError(
+            f"{type(self).__name__} does not define a derivative basis; "
+            f"evaluate with `deriv=` instead, or differentiate into an "
+            f"explicitly chosen FunctionSpace"
+        )
+
     def boundary_dofs(self) -> tuple[int | None, int | None]:
         """Indices of the degrees of freedom that *are* the values at the
         left and right ends of the domain, or ``None`` where there is no

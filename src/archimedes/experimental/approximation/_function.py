@@ -116,6 +116,44 @@ class Function:
             # integrand by construction.
         )
 
+    def derivative(self, deriv=1, space: FunctionSpace | None = None) -> Function:
+        """The ``deriv``-th derivative :math:`f^{(k)}`, as a ``Function``.
+
+        Exact, not an approximation: the result is returned in the smallest
+        space that represents it, which for a polynomial family is *smaller*
+        than this one (differentiating lowers the degree). That mirrors
+        :meth:`multiply`, which returns the smallest space that is exact in
+        the other direction -- every closed operation here gives the
+        tightest exact space.
+
+        Since the target is smaller, ``f + f.derivative()`` will not
+        typecheck as-is; project one onto the other's space first, which is
+        exact in either direction. For the derivative sampled at points
+        rather than as a ``Function``, ``f(x, deriv=k)`` is more direct, and
+        for the matrix itself see :meth:`FunctionSpace.diff_matrix`.
+
+        Parameters
+        ----------
+        deriv : int or tuple of int, optional
+            Derivative order; a multi-index (one order per dimension) for a
+            function of several variables, a plain order otherwise -- the
+            same convention as :meth:`__call__`. Default 1.
+        space : FunctionSpace, optional
+            Result space, overriding the automatic one. A space too small to
+            hold the derivative gives its projection rather than an error,
+            as in :meth:`multiply`.
+
+        Returns
+        -------
+        Function
+            The derivative, in the result space, with coefficients of shape
+            ``(n_basis,)`` or ``(n_basis, m)`` matching this function.
+        """
+        target = space if space is not None else self.space._derivative_space(deriv)
+        return Function(
+            self.space.diff_matrix(deriv, space=target) @ self.coefficients, target
+        )
+
     def dot(self, other: Function, quad_rule: QuadratureRule | None = None):
         """Inner product :math:`\\langle f, g \\rangle` with another
         ``Function`` on the same ``space``; see

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import dataclasses
+from typing import Callable
 
 import numpy as np
 
@@ -21,6 +22,21 @@ def _barycentric_weights(nodes: np.ndarray) -> np.ndarray:
             if j != i:
                 w[i] *= nodes[i] - nodes[j]
     return 1.0 / w
+
+
+def _lobatto_nodes(n: int) -> np.ndarray:
+    """``n`` Gauss-Lobatto nodes, or the single node ``0`` when ``n < 2``.
+
+    Any distinct node set spans the same polynomial space, so the choice
+    only affects conditioning and which degrees of freedom are nodal.
+    Gauss-Lobatto is well-conditioned and includes both endpoints, which
+    keeps :meth:`LagrangeBasis.boundary_dofs` populated so the result can
+    still be tiled with :math:`C^0` continuity. ``gauss_lobatto`` is
+    undefined below 2 points, and a single node spans the constants.
+    """
+    from archimedes.quadrature import gauss_lobatto
+
+    return np.zeros(1) if n < 2 else gauss_lobatto(n).nodes
 
 
 def _differentiation_matrix(nodes: np.ndarray, weights: np.ndarray) -> np.ndarray:
@@ -85,9 +101,28 @@ class LagrangeBasis(Basis):
         coefficients (``coefficients[i]`` is the value at
         ``reference_nodes[i]``, once mapped to the target domain), but not
         the basis itself.
+    node_family : callable, optional
+        ``n -> nodes``, used to pick the node set whenever an operation
+        needs a *differently sized* basis of the same kind --
+        :meth:`_product_basis` and :meth:`_derivative_basis`. It is not
+        applied to ``reference_nodes``, which are taken as given.
+
+        Defaults to Gauss-Lobatto, which is the conventional nodal set
+        (Chebyshev points of the second kind and the spectral-element
+        method's standard GLL) and which keeps :meth:`boundary_dofs`
+        populated so the result can still be tiled with :math:`C^0` continuity.
+
+        Any ``n`` distinct nodes span the same :math:`P_{n-1}`, so the choice
+        affects only conditioning and which degrees of freedom are nodal.
+        Supply one to keep a method's node family intact where that matters, e.g.
+        ``lambda n: gauss_radau(n, endpoint="left").nodes`` for a
+        Radau-based pseudospectral scheme. Note that a family with no endpoint
+        node leaves ``boundary_dofs`` empty, so the derived basis cannot be tiled with
+        :math:`C^0` continuity.
     """
 
     reference_nodes: np.ndarray
+    node_family: Callable[[int], np.ndarray] | None = None
 
     def __post_init__(self):
         nodes = np.asarray(self.reference_nodes, dtype=float)
@@ -117,10 +152,34 @@ class LagrangeBasis(Basis):
         """
         if not isinstance(other, LagrangeBasis):
             return NotImplemented
-        return np.array_equal(self.reference_nodes, other.reference_nodes)
+        return (
+            np.array_equal(self.reference_nodes, other.reference_nodes)
+            # Two bases with identical nodes but different families agree on
+            # every value and disagree on every *derived* basis, so they are
+            # not interchangeable.
+            and self.node_family == other.node_family
+        )
 
     def __hash__(self) -> int:
-        return hash((type(self), self.reference_nodes.tobytes()))
+        return hash((type(self), self.reference_nodes.tobytes(), self.node_family))
+
+    def _nodes_for(self, n: int) -> np.ndarray:
+        """``n`` nodes from this basis's family, for a derived basis."""
+        if self.node_family is None:
+            return _lobatto_nodes(n)
+        nodes = np.asarray(self.node_family(n), dtype=float)
+        if nodes.shape != (n,):
+            raise ValueError(
+                f"node_family({n}) returned shape {nodes.shape}, expected ({n},)"
+            )
+        return nodes
+
+    def _derived(self, n: int) -> "LagrangeBasis":
+        """A basis of ``n`` nodes from this one's family, family preserved so
+        repeated operations don't drift back to the default."""
+        return LagrangeBasis(
+            reference_nodes=self._nodes_for(n), node_family=self.node_family
+        )
 
     @property
     def n_basis(self) -> int:
@@ -145,26 +204,46 @@ class LagrangeBasis(Basis):
         return gauss_legendre(self.n_basis)
 
     def _product_basis(self, other):
-        """``n_1 + n_2 - 1`` Gauss-Lobatto nodes.
-
-        Any distinct node set spans the same polynomial space, so the choice
-        only affects conditioning and which degrees of freedom are nodal.
-        Gauss-Lobatto is well-conditioned and includes both endpoints, which
-        keeps :meth:`boundary_dofs` populated so the result can still be
-        tiled with :math:`C^0` continuity.
-        """
-        from archimedes.quadrature import gauss_lobatto
-
+        """``n_1 + n_2 - 1`` nodes from this basis's ``node_family``."""
         if not isinstance(other, LagrangeBasis):
             raise ValueError(
                 f"cannot form a product basis between "
                 f"{type(self).__name__} and {type(other).__name__}"
             )
-        n = self.n_basis + other.n_basis - 1
-        # gauss_lobatto is undefined below 2 points; n == 1 means both
-        # operands are constants, and a single node spans the constants.
-        nodes = np.zeros(1) if n < 2 else gauss_lobatto(n).nodes
-        return LagrangeBasis(reference_nodes=nodes)
+        if self.node_family != other.node_family:
+            raise ValueError(
+                "product requires the same node_family, since the result's "
+                "node set would otherwise depend on the order of the operands"
+            )
+        return self._derived(self.n_basis + other.n_basis - 1)
+
+    def _derivative_basis(self, deriv=1):
+        """``n_basis - deriv`` nodes from this basis's ``node_family``.
+
+        The nodes necessarily *move*: a smaller nodal space is a different
+        set of points, so the result's coefficients are values at the new
+        nodes rather than at this basis's. Collocation methods that need the
+        derivative sampled at the *original* nodes want the square
+        :meth:`FunctionSpace.diff_matrix` instead, which for this family is
+        exactly the classical barycentric differentiation matrix.
+        """
+        if deriv < 0:
+            raise ValueError(f"deriv must be >= 0, got {deriv}")
+        # Not `self._derived(n_basis)`: regenerating from `node_family` would
+        # silently move nodes that were supplied explicitly. This matters for
+        # `TensorBasis`, which asks for order 0 on every undifferentiated
+        # factor.
+        if deriv == 0:
+            return self
+        if deriv >= self.n_basis:
+            raise ValueError(
+                f"deriv={deriv} is at or past the degree of a {self.n_basis}-"
+                f"node basis, whose elements are polynomials of degree "
+                f"{self.n_basis - 1}; the derivative is identically zero and "
+                f"has no space of its own. Use `f(x, deriv={deriv})` if the "
+                f"zero values are what you want."
+            )
+        return self._derived(self.n_basis - deriv)
 
     def boundary_dofs(self) -> tuple[int | None, int | None]:
         """Indices of the nodes at :math:`t = \\pm 1`, or ``None`` if the

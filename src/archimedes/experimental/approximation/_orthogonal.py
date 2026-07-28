@@ -129,6 +129,34 @@ class OrthogonalPolynomialBasis(Basis):
             self.measure, self.n_basis + other.n_basis - 1, density=self.density
         )
 
+    def _derivative_basis(self, deriv=1):
+        """Same measure and normalization, ``n_basis - deriv`` functions.
+
+        The measure is unchanged even for families whose classical
+        derivative identity shifts it (Jacobi's
+        :math:`\\frac{d}{dx} P_n^{(\\alpha,\\beta)} \\propto
+        P_{n-1}^{(\\alpha+1,\\beta+1)}`). That identity says the derivative
+        is a *single term* in the shifted family -- a sparsity statement --
+        but the span here is all of :math:`P_{n-1}` regardless of which
+        weight makes the basis orthogonal, so the derivative is exactly
+        representable in this same family as a dense combination.
+        """
+        if deriv < 0:
+            raise ValueError(f"deriv must be >= 0, got {deriv}")
+        if deriv == 0:
+            return self
+        if deriv >= self.n_basis:
+            raise ValueError(
+                f"deriv={deriv} is at or past the degree of a {self.n_basis}-"
+                f"function basis, whose elements are polynomials of degree "
+                f"{self.n_basis - 1}; the derivative is identically zero and "
+                f"has no space of its own. Use `f(x, deriv={deriv})` if the "
+                f"zero values are what you want."
+            )
+        return OrthogonalPolynomialBasis(
+            self.measure, self.n_basis - deriv, density=self.density
+        )
+
     def evaluate(self, x, deriv: int = 0, **domain_kwargs):
         if deriv < 0:
             raise ValueError(f"deriv must be >= 0, got {deriv}")
