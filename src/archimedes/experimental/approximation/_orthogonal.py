@@ -8,7 +8,7 @@ import numpy as np
 
 from archimedes.measure import Measure
 
-from ._basis import Basis
+from ._basis import RIGHT, Basis, _check_side
 
 __all__ = ["OrthogonalPolynomialBasis"]
 
@@ -157,7 +157,10 @@ class OrthogonalPolynomialBasis(Basis):
             self.measure, self.n_basis - deriv, density=self.density
         )
 
-    def evaluate(self, x, deriv: int = 0, **domain_kwargs):
+    def evaluate(self, x, deriv: int = 0, side: str = RIGHT, **domain_kwargs):
+        # `side` is validated but unused: these polynomials are smooth, so
+        # both one-sided limits agree everywhere. See `Basis.evaluate`.
+        _check_side(side)
         if deriv < 0:
             raise ValueError(f"deriv must be >= 0, got {deriv}")
 

@@ -10,7 +10,7 @@ import numpy as np
 from archimedes import tree
 from archimedes.measure import Measure, ReferenceDomain
 
-from ._basis import Basis
+from ._basis import RIGHT, Basis, _check_side
 
 __all__ = ["ProductParameters", "TensorBasis"]
 
@@ -324,6 +324,21 @@ class TensorBasis(Basis):
             raise ValueError(f"deriv orders must be >= 0, got {alpha}")
         return alpha
 
+    def _side_specs(self, side) -> tuple:
+        """Normalize ``side`` into one entry per dimension.
+
+        A bare string broadcasts to all dimensions.
+        """
+        if isinstance(side, str):
+            return (_check_side(side),) * self.ndim
+        specs = tuple(side)
+        if len(specs) != self.ndim:
+            raise ValueError(
+                f"side must have one entry per dimension, got {len(specs)} "
+                f"for a {self.ndim}-dimensional basis"
+            )
+        return tuple(_check_side(entry) for entry in specs)
+
     def _dim_specs(self, dims) -> tuple:
         if dims is None:
             return (None,) * self.ndim
@@ -334,7 +349,7 @@ class TensorBasis(Basis):
             )
         return dims
 
-    def evaluate(self, x, deriv=0, dims=None):
+    def evaluate(self, x, deriv=0, dims=None, side=RIGHT):
         """Evaluate all ``n_basis`` product functions at ``x``.
 
         Parameters
@@ -350,6 +365,9 @@ class TensorBasis(Basis):
             Per-dimension target-domain parameters; see :func:`_dim_kwargs`
             for the accepted forms. Omitted, every dimension uses its
             reference domain.
+        side : str or sequence of str, optional
+            One-sided limit per dimension, where a factor is two-valued. A
+            bare string broadcasts to every dimension. Default ``"right"``.
 
         Returns
         -------
@@ -359,6 +377,7 @@ class TensorBasis(Basis):
         """
         alpha = self._multi_index(deriv)
         specs = self._dim_specs(dims)
+        sides = self._side_specs(side)
 
         shape = np.shape(x)
         if len(shape) != 2 or shape[1] != self.ndim:
@@ -369,7 +388,12 @@ class TensorBasis(Basis):
 
         return _row_kron(
             [
-                basis.evaluate(x[:, d], deriv=alpha[d], **_dim_kwargs(basis, spec))
+                basis.evaluate(
+                    x[:, d],
+                    deriv=alpha[d],
+                    side=sides[d],
+                    **_dim_kwargs(basis, spec),
+                )
                 for d, (basis, spec) in enumerate(zip(self.bases, specs))
             ]
         )

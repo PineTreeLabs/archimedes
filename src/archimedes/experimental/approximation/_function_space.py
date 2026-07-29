@@ -10,7 +10,7 @@ import numpy as np
 from archimedes import tree
 from archimedes.quadrature import Quadrature, QuadratureRule
 
-from ._basis import Basis
+from ._basis import RIGHT, Basis
 
 if TYPE_CHECKING:
     from ._function import Function
@@ -289,7 +289,7 @@ class FunctionSpace:
         weights = rule.scaled_weights(**domain_kwargs, density=self.basis.density)
         return rule.scaled_points(**domain_kwargs), weights
 
-    def evaluate(self, coefficients: np.ndarray, x, deriv: int = 0, **kwargs):
+    def evaluate(self, coefficients: np.ndarray, x, deriv: int = 0, side: str = RIGHT):
         """Evaluate :math:`\\sum_i c_i \\, \\phi_i(x)` (or its ``deriv``-th
         derivative) at ``x``, for coefficients ``c = coefficients``.
 
@@ -303,10 +303,10 @@ class FunctionSpace:
             Evaluation points, shape ``(npts,)``.
         deriv : int, optional
             Derivative order. Default 0.
-        side: str, optional
-            Forwarded to the basis, for options only some families accept, e.g.
-            currently ``side`` (:class:`PiecewiseBasis`), selecting which
-            one-sided limit to take at a breakpoint with discontinuous elements.
+        side : str, optional
+            Which one-sided limit to take where the basis is two-valued; see
+            :meth:`Basis.evaluate`. Accepted for every basis and irrelevant
+            for the smooth ones. Default ``"right"``.
 
         Returns
         -------
@@ -318,7 +318,7 @@ class FunctionSpace:
         # the full (npts, n_basis) matrix. The default implementation is
         # exactly that matrix product.
         return self.basis.evaluate_expansion(
-            coefficients, x, deriv=deriv, **self._domain_kwargs(), **kwargs
+            coefficients, x, deriv=deriv, side=side, **self._domain_kwargs()
         )
 
     def inner_product(

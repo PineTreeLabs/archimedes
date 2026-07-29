@@ -7,6 +7,7 @@ import numpy as np
 from archimedes import tree
 from archimedes.quadrature import QuadratureRule
 
+from ._basis import RIGHT
 from ._function_space import FunctionSpace
 
 __all__ = ["Function"]
@@ -50,19 +51,22 @@ class Function:
     coefficients: np.ndarray
     space: FunctionSpace
 
-    def __call__(self, x, deriv: int = 0, **kwargs):
+    def __call__(self, x, deriv: int = 0, side: str = RIGHT):
         """Evaluate this function (or its ``deriv``-th derivative) at ``x``.
 
         Returns shape ``(npts,)`` or ``(npts, m)``, matching
         ``coefficients``.
 
-        For a piecewise space, ``side="left"``/``"right"`` selects which
-        one-sided limit to take at a point lying exactly on a breakpoint,
-        where the function (or its derivative) is two-valued -- the values a
-        discontinuous-Galerkin flux or a gradient-jump error indicator are
-        built from. See :class:`PiecewiseBasis`.
+        ``side="left"``/``"right"`` selects which one-sided limit to take at
+        a point where this function is two-valued -- on a breakpoint of a
+        piecewise space, giving the values a discontinuous-Galerkin flux or
+        a gradient-jump error indicator is built from. It is accepted for
+        every space and irrelevant where the basis is smooth, since the two
+        limits then coincide. A :class:`TensorBasis` takes one entry per
+        dimension, with a bare string broadcasting. See
+        :meth:`Basis.evaluate`.
         """
-        return self.space.evaluate(self.coefficients, x, deriv=deriv, **kwargs)
+        return self.space.evaluate(self.coefficients, x, deriv=deriv, side=side)
 
     def __add__(self, other: Function) -> Function:
         if not self.space._is_compatible_with(other.space):

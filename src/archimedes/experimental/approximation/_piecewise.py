@@ -10,7 +10,7 @@ import numpy as np
 from archimedes._core._array_impl import SymbolicArray, _unwrap_sym_array
 from archimedes.measure import UnitInterval
 
-from ._basis import Basis
+from ._basis import LEFT, RIGHT, Basis, _check_side
 
 __all__ = ["PiecewiseBasis"]
 
@@ -22,19 +22,6 @@ def _as_mx(value):
     if isinstance(value, SymbolicArray):
         return _unwrap_sym_array(value)
     return cs.MX(cs.DM(np.asarray(value, dtype=float)))
-
-
-RIGHT = "right"
-"""``side`` value selecting the limit from above at a breakpoint."""
-
-LEFT = "left"
-"""``side`` value selecting the limit from below at a breakpoint."""
-
-
-def _check_side(side: str) -> str:
-    if side not in (LEFT, RIGHT):
-        raise ValueError(f"side must be {LEFT!r} or {RIGHT!r}, got {side!r}")
-    return side
 
 
 def _locate(knots, x, symbolic: bool, side: str = RIGHT):

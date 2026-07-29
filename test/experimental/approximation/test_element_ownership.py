@@ -245,3 +245,92 @@ def test_side_at_the_outer_endpoints():
 def test_invalid_side_rejected(call):
     with pytest.raises(ValueError, match="side must be 'left' or 'right'"):
         call(_basis(-1))
+
+
+# -- `side` is accepted by every family --
+
+
+def _smooth_spaces():
+    from archimedes.experimental.approximation import OrthogonalPolynomialBasis
+    from archimedes.measure import LegendreMeasure
+
+    return {
+        "modal": FunctionSpace(OrthogonalPolynomialBasis(LegendreMeasure(), 4), DOMAIN),
+        "nodal": FunctionSpace(_element(4), DOMAIN),
+    }
+
+
+@pytest.mark.parametrize("name", sorted(_smooth_spaces()))
+def test_smooth_families_accept_side_and_both_limits_coincide(name):
+    # Not "allow and ignore": a one-sided limit is well posed for any
+    # function, and where the basis is smooth the two limits are equal, so
+    # returning the ordinary value *is* the right answer. That is what lets
+    # generic code pass `side` without branching on the basis type.
+    space = _smooth_spaces()[name]
+    u = space.project(lambda t: t**2)
+    x = np.array([0.25, KNOT, 0.75])
+    np.testing.assert_allclose(u(x, side="left"), u(x, side="right"), atol=1e-12)
+    np.testing.assert_allclose(u(x, side="left"), x**2, atol=1e-12)
+
+
+@pytest.mark.parametrize("name", sorted(_smooth_spaces()))
+def test_smooth_families_still_validate_side(name):
+    # A typo must fail the same way whichever basis it is handed to, rather
+    # than being quietly accepted where the argument has no effect.
+    space = _smooth_spaces()[name]
+    with pytest.raises(ValueError, match="side must be 'left' or 'right'"):
+        space.project(lambda t: t**2)(np.array([KNOT]), side="lft")
+
+
+def test_unknown_keyword_is_rejected_at_the_call_site():
+    # There is no **kwargs funnel to swallow a typo and surface it several
+    # layers down inside a measure's affine_params.
+    space = FunctionSpace(_basis(-1), DOMAIN)
+    u = space.project(lambda t: t**2)
+    with pytest.raises(TypeError, match="unexpected keyword argument"):
+        u(np.array([KNOT]), sid="left")
+
+
+# -- `side` is per-dimension for a tensor basis --
+
+
+def _corner_space():
+    basis = TensorBasis((_basis(-1), _basis(-1)))
+    return FunctionSpace(basis, ProductParameters(dims=(DOMAIN, DOMAIN)))
+
+
+@pytest.mark.parametrize(
+    "side,expected",
+    [
+        ("left", 10.0),
+        ("right", 40.0),
+        (("left", "right"), 20.0),
+        (("right", "left"), 20.0),
+    ],
+)
+def test_tensor_side_is_per_dimension(side, expected):
+    # At a corner where both coordinates land on breakpoints there are four
+    # one-sided limits, so a scalar cannot express all of them; a bare string
+    # broadcasts to every dimension.
+    space = _corner_space()
+    u = space.project(
+        lambda p: (
+            np.where(p[:, 0] < KNOT, 1.0, 2.0) * np.where(p[:, 1] < KNOT, 10.0, 20.0)
+        )
+    )
+    corner = np.array([[KNOT, KNOT]])
+    assert u(corner, side=side)[0] == pytest.approx(expected, rel=1e-9)
+
+
+def test_tensor_side_must_have_one_entry_per_dimension():
+    space = _corner_space()
+    u = space.project(lambda p: p[:, 0])
+    with pytest.raises(ValueError, match="one entry per dimension"):
+        u(np.array([[KNOT, KNOT]]), side=("left",))
+
+
+def test_tensor_side_entries_are_validated():
+    space = _corner_space()
+    u = space.project(lambda p: p[:, 0])
+    with pytest.raises(ValueError, match="side must be 'left' or 'right'"):
+        u(np.array([[KNOT, KNOT]]), side=("left", "up"))

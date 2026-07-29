@@ -18,6 +18,24 @@ if TYPE_CHECKING:
 
 __all__ = ["Basis"]
 
+RIGHT = "right"
+"""``side`` value selecting the limit from above at a point of discontinuity."""
+
+LEFT = "left"
+"""``side`` value selecting the limit from below at a point of discontinuity."""
+
+
+def _check_side(side: str) -> str:
+    """Validate a ``side`` value.
+
+    Checked by every family, including the smooth ones for which the two
+    sides coincide: a typo should fail the same way regardless of which
+    basis it is handed to.
+    """
+    if side not in (LEFT, RIGHT):
+        raise ValueError(f"side must be {LEFT!r} or {RIGHT!r}, got {side!r}")
+    return side
+
 
 class Basis(metaclass=abc.ABCMeta):
     """A finite family of basis functions :math:`\\{\\phi_i\\}_{i=1}^n`.
@@ -119,7 +137,12 @@ class Basis(metaclass=abc.ABCMeta):
         raise NotImplementedError
 
     def evaluate_expansion(
-        self, coefficients: np.ndarray, x: np.ndarray, deriv: int = 0, **domain_kwargs
+        self,
+        coefficients: np.ndarray,
+        x: np.ndarray,
+        deriv: int = 0,
+        side: str = RIGHT,
+        **domain_kwargs,
     ) -> np.ndarray:
         """Evaluate :math:`\\sum_i c_i \\, \\phi_i(x)` directly.
 
@@ -136,6 +159,9 @@ class Basis(metaclass=abc.ABCMeta):
             Evaluation points, shape ``(npts,)``.
         deriv : int, optional
             Derivative order. Default 0.
+        side : {"right", "left"}, optional
+            One-sided limit to take at a point of discontinuity, as for
+            :meth:`evaluate`.
         **domain_kwargs
             Target-domain parameters, as for :meth:`evaluate`.
 
@@ -144,7 +170,7 @@ class Basis(metaclass=abc.ABCMeta):
         ndarray
             Shape ``(npts,)`` or ``(npts, m)``, matching ``coefficients``.
         """
-        return self.evaluate(x, deriv=deriv, **domain_kwargs) @ coefficients
+        return self.evaluate(x, deriv=deriv, side=side, **domain_kwargs) @ coefficients
 
     def _evaluate_at_nodes(self, rule, deriv=0, **domain_kwargs) -> np.ndarray:
         """Design matrix at a quadrature rule's nodes.
@@ -247,7 +273,9 @@ class Basis(metaclass=abc.ABCMeta):
         return (None, None)
 
     @abc.abstractmethod
-    def evaluate(self, x: np.ndarray, deriv: int = 0, **domain_kwargs) -> np.ndarray:
+    def evaluate(
+        self, x: np.ndarray, deriv: int = 0, side: str = RIGHT, **domain_kwargs
+    ) -> np.ndarray:
         """Evaluate all ``n_basis`` basis functions at ``x``.
 
         Parameters
@@ -260,6 +288,9 @@ class Basis(metaclass=abc.ABCMeta):
             Order of derivative to evaluate. Default 0 (the basis functions
             themselves). Not every family supports every order -- see the
             subclass docstring for what's implemented.
+        side : {"right", "left"}, optional
+            Which one-sided limit to take where the basis is two-valued.
+            Default ``"right"``.  Irrelevant for smooth bases.
         **domain_kwargs
             Target-domain parameters. Families built on a classical
             orthogonal-polynomial :class:`~archimedes.measure.Measure`
