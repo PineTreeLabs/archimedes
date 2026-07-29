@@ -24,21 +24,56 @@ def _as_mx(value):
     return cs.MX(cs.DM(np.asarray(value, dtype=float)))
 
 
-def _locate(knots, x, symbolic: bool):
-    """Index of the element owning each point of ``x``.
+RIGHT = "right"
+"""``side`` value selecting the limit from above at a breakpoint."""
 
-    Half-open ``[lo, hi)``, with both ends clamped into range, matching
-    :meth:`PiecewiseBasis.evaluate`'s masking convention. ``cs.low`` is
-    CasADi's ``std::lower_bound`` and already has exactly these semantics;
-    ``searchsorted(..., "right") - 1`` is its NumPy equivalent.
+LEFT = "left"
+"""``side`` value selecting the limit from below at a breakpoint."""
+
+
+def _check_side(side: str) -> str:
+    if side not in (LEFT, RIGHT):
+        raise ValueError(f"side must be {LEFT!r} or {RIGHT!r}, got {side!r}")
+    return side
+
+
+def _locate(knots, x, symbolic: bool, side: str = RIGHT):
+    """Index of the element owning each point of ``x``, by coordinate.
+
+    With ``side="right"`` (the default) ownership is half-open ``[lo, hi)``,
+    so a point on a breakpoint belongs to the element above it -- the limit
+    from the right. ``side="left"`` gives ``(lo, hi]`` and the limit from
+    the left. Both clamp out-of-range points into the end elements.
+
+    ``cs.low`` is CasADi's ``std::lower_bound`` and has exactly the
+    right-sided semantics; ``searchsorted(..., "right") - 1`` is its NumPy
+    equivalent. The left-sided variant steps back one element at points that
+    land exactly on a knot, which costs one comparison against a value the
+    caller is gathering anyway.
+
+    This is the coordinate-only path, used for user-supplied points. Where
+    provenance exists -- quadrature nodes, which know the element they were
+    generated for -- :meth:`PiecewiseBasis._evaluate_at_nodes` uses it
+    instead and no convention is needed.
     """
+    _check_side(side)
     n_elements = len(knots) - 1
     if symbolic:
-        return SymbolicArray(
+        index = SymbolicArray(
             cs.low(_as_mx(knots), _as_mx(x)), shape=np.shape(x), dtype=int
         )
-    index = np.searchsorted(np.asarray(knots), np.asarray(x), side="right") - 1
-    return np.clip(index, 0, n_elements - 1)
+    else:
+        index = np.clip(
+            np.searchsorted(np.asarray(knots), np.asarray(x), side="right") - 1,
+            0,
+            n_elements - 1,
+        )
+    if side == RIGHT:
+        return index
+    # On a knot, back up one element; `np.where` keeps this branch-free so it
+    # traces, and the max() guards the first element's left end.
+    on_knot = _gather(knots, index, symbolic, np.shape(x)[0]) == x
+    return np.maximum(index - on_knot, 0)
 
 
 def _gather(values, index, symbolic: bool, npts: int):
@@ -95,16 +130,19 @@ class PiecewiseBasis(Basis):
     need *derivative* degrees of freedom to identify, requiring Hermite
     elements or similar (not yet implemented).
 
-    Note that under ``continuity=0`` the *derivative* is still
-    discontinuous at breakpoints, so ``evaluate(..., deriv=1)`` returns the
-    one-sided value belonging to whichever element owns the point (see
-    below).
+    **Element ownership at a breakpoint.** This basis can be two-valued at its
+    interior breakpoints (always for the derivatives of :math:`C^0` functions,
+    and also the value when ``continuity=-1``) so evaluating exactly *on* one
+    requires choosing a side. Evaluation** follows the ``side`` argument: ``"right"``
+    (the default) makes ownership half-open ``[lo, hi)``, giving the limit
+    from above, and ``"left"`` gives ``(lo, hi]`` and the limit from
+    below.
 
-    **Element ownership** is half-open, ``[lo, hi)``, with the last element
-    closed on the right. This matters: with closed intervals both elements
-    adjacent to an interior breakpoint would claim it and the assembled
-    basis would double-count there (partition of unity would give 2 at the
-    breakpoint).
+    Two-sided access is what discontinuous methods need: a DG numerical
+    flux is built from :math:`u^-` and :math:`u^+` at each interface, and
+    a gradient-jump error indicator for a :math:`C^0` space needs the same
+    of ``deriv=1``. In one dimension an interface *is* a point, so these
+    are ordinary evaluations with different ``side`` arguments.
 
     Parameters
     ----------
@@ -273,14 +311,6 @@ class PiecewiseBasis(Basis):
         what this one was. Within each element the derivative is still a
         polynomial of degree ``n_loc - 1 - deriv``, so the element basis
         shrinks in the usual way and the representation stays exact.
-
-        .. note::
-            The derivative is genuinely two-valued at an interior
-            breakpoint, so a quadrature rule with a node sitting exactly on
-            one (a *composite Lobatto* rule, say) samples whichever element
-            owns it under the half-open convention. The default rules put
-            their nodes strictly inside elements, so this only arises for an
-            explicitly supplied rule.
         """
         if deriv < 0:
             raise ValueError(f"deriv must be >= 0, got {deriv}")
@@ -318,25 +348,97 @@ class PiecewiseBasis(Basis):
 
         return assembly
 
-    def evaluate(self, x, deriv: int = 0, a=None, b=None):
-        scale, shift = UnitInterval().affine_params(a, b)
-        knots = scale * self.breakpoints + shift
-
+    def _blocks(self, x, masks, knots, deriv):
+        """Per-element evaluations, masked and concatenated to the broken
+        basis, then assembled. ``masks[e]`` selects the points element ``e``
+        owns; where that ownership comes from is the callers' business."""
         blocks = []
         for e in range(self.n_elements):
-            lo, hi = knots[e], knots[e + 1]
-            # Half-open ownership; the final element also owns its right end.
-            if e < self.n_elements - 1:
-                inside = (x >= lo) & (x < hi)
-            else:
-                inside = (x >= lo) & (x <= hi)
-            block = self.element_basis.evaluate(x, deriv=deriv, a=lo, b=hi)
-            blocks.append(np.where(inside[:, None], block, np.zeros_like(block)))
-
+            block = self.element_basis.evaluate(
+                x, deriv=deriv, a=knots[e], b=knots[e + 1]
+            )
+            blocks.append(np.where(masks[e][:, None], block, np.zeros_like(block)))
         broken = np.concatenate(blocks, axis=-1)  # (npts, n_broken)
         return broken @ self._assembly
 
-    def evaluate_expansion(self, coefficients, x, deriv: int = 0, a=None, b=None):
+    def evaluate(self, x, deriv: int = 0, a=None, b=None, side: str = RIGHT):
+        """Evaluate at arbitrary points, resolving breakpoints by ``side``.
+
+        Parameters
+        ----------
+        side : {"right", "left"}, optional
+            Which one-sided limit to take at a point lying exactly on an
+            interior breakpoint, where this basis is two-valued. ``"right"``
+            (default) makes ownership half-open ``[lo, hi)``; ``"left"``
+            makes it ``(lo, hi]``. Immaterial away from breakpoints, and for
+            ``deriv=0`` on a :math:`C^0` basis. See the class docstring.
+        """
+        _check_side(side)
+        scale, shift = UnitInterval().affine_params(a, b)
+        knots = scale * self.breakpoints + shift
+
+        masks = []
+        for e in range(self.n_elements):
+            lo, hi = knots[e], knots[e + 1]
+            # Exactly one element claims each breakpoint, so the assembled
+            # basis stays a partition of unity; `side` chooses which. The
+            # element at the far end also owns the domain's outer endpoint.
+            if side == RIGHT:
+                closed_end = e == self.n_elements - 1
+                masks.append(
+                    (x >= lo) & (x <= hi) if closed_end else (x >= lo) & (x < hi)
+                )
+            else:
+                closed_end = e == 0
+                masks.append(
+                    (x >= lo) & (x <= hi) if closed_end else (x > lo) & (x <= hi)
+                )
+
+        return self._blocks(x, masks, knots, deriv)
+
+    def _evaluate_at_nodes(self, rule, deriv=0, a=None, b=None):
+        """Evaluate at a quadrature rule's nodes, using the rule's recorded
+        element ownership instead of the coordinate convention.
+
+        A composite rule may place nodes exactly on interior breakpoints --
+        a Lobatto sub-rule places one there from *each* side, so the
+        breakpoint appears twice in ``nodes`` with identical coordinates but
+        different provenance. Locating by coordinate assigns both copies to
+        the same element, which drops one element's endpoint contribution
+        and silently mis-integrates a discontinuous basis. Using
+        ``rule.elements`` distinguishes them exactly.
+
+        The rule's breakpoints need only be a *superset* of this basis's
+        (see :meth:`required_breakpoints`), so a rule element is mapped to
+        the basis element containing it. That map is static, which also
+        makes the resulting masks static -- one fewer runtime comparison in
+        the traced graph, and one fewer branch point for autodiff.
+        """
+        x = rule.scaled_points(a=a, b=b)
+        if rule.elements is None:
+            # No element structure to draw on (a plain, non-composite rule).
+            # `FunctionSpace` rejects such a rule for this basis, so this is
+            # only reachable via a direct call.
+            return self.evaluate(x, deriv=deriv, a=a, b=b)
+
+        scale, shift = UnitInterval().affine_params(a, b)
+        knots = scale * self.breakpoints + shift
+
+        # Each rule element lies inside exactly one basis element, since the
+        # rule's breakpoints are a superset of this basis's.
+        rule_bp = np.asarray(rule.breakpoints)
+        owner = np.clip(
+            np.searchsorted(self.breakpoints, rule_bp[:-1], side="right") - 1,
+            0,
+            self.n_elements - 1,
+        )[rule.elements]
+
+        masks = [owner == e for e in range(self.n_elements)]
+        return self._blocks(x, masks, knots, deriv)
+
+    def evaluate_expansion(
+        self, coefficients, x, deriv: int = 0, a=None, b=None, side: str = RIGHT
+    ):
         """Locate each point's element and gather only that element's
         coefficients, instead of building the full ``(npts, n_basis)``
         matrix.
@@ -352,7 +454,11 @@ class PiecewiseBasis(Basis):
         evaluating the element basis on ``[lo, hi]``) is what keeps this to
         a single call: ``lo``/``hi`` differ per point, and the element bases
         take scalar domain parameters.
+
+        ``side`` resolves breakpoints exactly as in :meth:`evaluate`, which
+        this must agree with pointwise.
         """
+        _check_side(side)
         symbolic = isinstance(x, SymbolicArray) or isinstance(
             coefficients, SymbolicArray
         )
@@ -360,7 +466,7 @@ class PiecewiseBasis(Basis):
         knots = scale * self.breakpoints + shift
         npts = np.shape(x)[0]
 
-        element = _locate(knots, x, symbolic)
+        element = _locate(knots, x, symbolic, side)
         lo = _gather(knots, element, symbolic, npts)
         hi = _gather(knots, element + 1, symbolic, npts)
 

@@ -244,9 +244,10 @@ class FunctionSpace:
             Shape ``(space.n_basis, self.n_basis)``.
         """
         target = self if space is None else space
-        x, w = target._quad_points_weights()
-        phi = target._basis_eval(x)  # (npts, n_target)
-        dphi = self._basis_eval(x, deriv=deriv)  # (npts, n_basis)
+        rule = target.quad_rule
+        _, w = target._quad_points_weights(rule)
+        phi = target._basis_eval_at_nodes(rule)  # (npts, n_target)
+        dphi = self._basis_eval_at_nodes(rule, deriv=deriv)  # (npts, n_basis)
         M = phi.T @ (w[:, None] * phi)
         return np.linalg.solve(M, phi.T @ (w[:, None] * dphi))  # type: ignore[no-any-return]
 
@@ -255,6 +256,19 @@ class FunctionSpace:
 
     def _basis_eval(self, x, deriv: int = 0):
         return self.basis.evaluate(x, deriv=deriv, **self._domain_kwargs())
+
+    def _basis_eval_at_nodes(self, rule: Quadrature, deriv: int = 0):
+        """Design matrix at ``rule``'s nodes.
+
+        Distinct from ``_basis_eval(rule.scaled_points(...))`` only for a
+        basis that is discontinuous at its breakpoints, where the rule's
+        record of which element each node came from resolves an ambiguity
+        the coordinates cannot. See :meth:`Basis._evaluate_at_nodes`.
+        """
+        return self.basis._evaluate_at_nodes(rule, deriv=deriv, **self._domain_kwargs())
+
+    def _resolve_rule(self, quad_rule: Quadrature | None = None) -> Quadrature:
+        return quad_rule if quad_rule is not None else self.quad_rule
 
     def _quad_points_weights(self, quad_rule: Quadrature | None = None):
         rule = quad_rule if quad_rule is not None else self.quad_rule
@@ -275,7 +289,7 @@ class FunctionSpace:
         weights = rule.scaled_weights(**domain_kwargs, density=self.basis.density)
         return rule.scaled_points(**domain_kwargs), weights
 
-    def evaluate(self, coefficients: np.ndarray, x, deriv: int = 0):
+    def evaluate(self, coefficients: np.ndarray, x, deriv: int = 0, **kwargs):
         """Evaluate :math:`\\sum_i c_i \\, \\phi_i(x)` (or its ``deriv``-th
         derivative) at ``x``, for coefficients ``c = coefficients``.
 
@@ -289,6 +303,10 @@ class FunctionSpace:
             Evaluation points, shape ``(npts,)``.
         deriv : int, optional
             Derivative order. Default 0.
+        side: str, optional
+            Forwarded to the basis, for options only some families accept, e.g.
+            currently ``side`` (:class:`PiecewiseBasis`), selecting which
+            one-sided limit to take at a breakpoint with discontinuous elements.
 
         Returns
         -------
@@ -300,7 +318,7 @@ class FunctionSpace:
         # the full (npts, n_basis) matrix. The default implementation is
         # exactly that matrix product.
         return self.basis.evaluate_expansion(
-            coefficients, x, deriv=deriv, **self._domain_kwargs()
+            coefficients, x, deriv=deriv, **self._domain_kwargs(), **kwargs
         )
 
     def inner_product(
@@ -332,8 +350,9 @@ class FunctionSpace:
         the same shape; for a per-component inner product, slice the
         coefficients and call this once per component.
         """
-        x, w = self._quad_points_weights(quad_rule)
-        phi = self._basis_eval(x)  # (npts, n_basis)
+        rule = self._resolve_rule(quad_rule)
+        _, w = self._quad_points_weights(rule)
+        phi = self._basis_eval_at_nodes(rule)  # (npts, n_basis)
         integrand = (phi @ c1) * (phi @ c2)  # (npts,) or (npts, m)
         if integrand.ndim > 1:
             # `ndim` is a static (trace-time) property, so this branches on
@@ -345,8 +364,8 @@ class FunctionSpace:
         """Mass matrix :math:`M_{ij} = \\int \\phi_i \\, \\phi_j \\, w \\, dx`,
         approximated via ``self.quad_rule``.
         """
-        x, w = self._quad_points_weights()
-        phi = self._basis_eval(x)  # (npts, n_basis)
+        _, w = self._quad_points_weights()
+        phi = self._basis_eval_at_nodes(self.quad_rule)  # (npts, n_basis)
         return phi.T @ (w[:, None] * phi)
 
     def stiffness_matrix(self) -> np.ndarray:
@@ -358,7 +377,7 @@ class FunctionSpace:
         a Laplacian is the gradient one -- a sum over dimensions of the
         per-direction stiffness, using the unit multi-indices as ``deriv``.
         """
-        x, w = self._quad_points_weights()
+        _, w = self._quad_points_weights()
         ndim = self.basis.ndim
         if ndim == 1:
             derivs: list = [1]
@@ -369,7 +388,7 @@ class FunctionSpace:
 
         stiffness = None
         for deriv in derivs:
-            dphi = self._basis_eval(x, deriv=deriv)
+            dphi = self._basis_eval_at_nodes(self.quad_rule, deriv=deriv)
             block = dphi.T @ (w[:, None] * dphi)
             stiffness = block if stiffness is None else stiffness + block
         return stiffness
@@ -408,9 +427,12 @@ class FunctionSpace:
         """
         from ._function import Function  # avoid a circular import
 
-        x, w = self._quad_points_weights(quad_rule)
-        phi = self._basis_eval(x)  # (npts, n_basis)
+        rule = self._resolve_rule(quad_rule)
+        x, w = self._quad_points_weights(rule)
+        phi = self._basis_eval_at_nodes(rule)  # (npts, n_basis)
         M = phi.T @ (w[:, None] * phi)
+        # `f` is an ordinary function of position, so it needs the coordinates
+        # and has no breakpoint ambiguity of its own to resolve.
         fx = f(x)
 
         # `ndim` is a static (trace-time) property, so this branches on shape

@@ -140,6 +140,26 @@ class TensorQuadratureRule:
         dimensions are independent and may use different families."""
         return tuple(rule.measure for rule in self.rules)
 
+    @functools.cached_property
+    def elements(self) -> np.ndarray | None:
+        """Owning sub-element per node and dimension, shape ``(n, ndim)``,
+        or ``None`` if no dimension has element structure.
+
+        Mirrors :attr:`nodes`: column ``d`` indexes dimension ``d``'s
+        elements, and is all-zero for a dimension whose rule is not
+        composite. See :attr:`~archimedes.quadrature.Quadrature.elements`
+        for why this is recorded rather than recovered from coordinates.
+        """
+        if all(rule.elements is None for rule in self.rules):
+            return None
+        # Same Cartesian expansion as `nodes`, so the two stay row-aligned.
+        per_dim = [
+            np.zeros(len(rule), dtype=int) if rule.elements is None else rule.elements
+            for rule in self.rules
+        ]
+        grids = np.meshgrid(*per_dim, indexing="ij")
+        return np.stack([g.ravel() for g in grids], axis=-1)
+
     @property
     def breakpoints(self) -> tuple[np.ndarray | None, ...]:
         """Per-dimension element boundaries, one entry per dimension, each

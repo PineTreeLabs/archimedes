@@ -51,6 +51,23 @@ class Quadrature(Protocol):
         """
 
     @property
+    def elements(self) -> Any:
+        """Which sub-element each node came from, or ``None`` for a rule with
+        no element structure.
+
+        Shape ``(n,)`` for a one-dimensional rule and ``(n, ndim)`` for a
+        multi-dimensional one, mirroring ``nodes``. Present exactly when
+        ``breakpoints`` is.
+
+        This is *provenance* that coordinates cannot recover. A composite
+        rule places nodes on its element boundaries -- a Lobatto sub-rule
+        puts one there from each side, so the boundary appears twice in
+        ``nodes`` -- and a basis that is discontinuous there needs to know
+        which element each copy belongs to. Locating by coordinate instead
+        assigns both copies to the same element and silently mis-integrates.
+        """
+
+    @property
     def measures(self) -> tuple[Measure, ...]:
         """The measure integrated against in each dimension, always a tuple
         of length ``ndim``."""
@@ -129,11 +146,19 @@ class QuadratureRule:
         For a composite rule (see :func:`composite`), the element boundaries
         it was tiled across, on ``measure.support``; ``None`` for a plain
         rule.
+    elements : array_like, optional
+        For a composite rule, the index of the element each node came from,
+        shape ``(n,)``. Required whenever ``breakpoints`` is given and
+        forbidden otherwise -- a rule that claims element structure but
+        cannot say which element a node belongs to is exactly the state that
+        makes a discontinuous basis mis-integrate. See
+        :attr:`Quadrature.elements`.
 
     Raises
     ------
     ValueError
-        If ``nodes`` and ``weights`` do not have the same shape.
+        If ``nodes`` and ``weights`` do not have the same shape, or if
+        ``breakpoints`` and ``elements`` are not both given or both omitted.
     """
 
     nodes: np.ndarray  # shape (n,), on `measure.support`
@@ -141,6 +166,7 @@ class QuadratureRule:
     name: str  # name for the rule
     measure: Measure
     breakpoints: np.ndarray | None = None  # element boundaries, if composite
+    elements: np.ndarray | None = None  # owning element per node, if composite
 
     def __post_init__(self):
         # Static data, safe to unconditionally convert to NumPy arrays
@@ -150,11 +176,33 @@ class QuadratureRule:
             object.__setattr__(
                 self, "breakpoints", np.asarray(self.breakpoints, dtype=float)
             )
+        if self.elements is not None:
+            object.__setattr__(self, "elements", np.asarray(self.elements, dtype=int))
         if self.nodes.shape != self.weights.shape:
             raise ValueError(
                 f"nodes {self.nodes.shape} and weights {self.weights.shape} "
                 "must have the same shape"
             )
+        if (self.breakpoints is None) != (self.elements is None):
+            raise ValueError(
+                "`breakpoints` and `elements` must be given together: a rule "
+                "with element structure must say which element each node "
+                "belongs to, since a discontinuous basis cannot recover that "
+                "from the coordinates alone"
+            )
+        if self.elements is not None:
+            if self.elements.shape != self.nodes.shape:
+                raise ValueError(
+                    f"elements {self.elements.shape} must have the same shape "
+                    f"as nodes {self.nodes.shape}"
+                )
+            n_elements = len(self.breakpoints) - 1  # type: ignore[arg-type]
+            if self.elements.min() < 0 or self.elements.max() >= n_elements:
+                raise ValueError(
+                    f"elements must index the {n_elements} intervals between "
+                    f"`breakpoints`, got values in "
+                    f"[{self.elements.min()}, {self.elements.max()}]"
+                )
 
     def __len__(self) -> int:
         return len(self.nodes)
@@ -191,6 +239,7 @@ class QuadratureRule:
             and np.array_equal(self.nodes, other.nodes)
             and np.array_equal(self.weights, other.weights)
             and _breakpoints_equal(self.breakpoints, other.breakpoints)
+            and _breakpoints_equal(self.elements, other.elements)
         )
 
     def __hash__(self) -> int:
@@ -423,9 +472,14 @@ def composite(base: QuadratureRule, breakpoints: np.ndarray) -> QuadratureRule:
 
     nodes = []
     weights = []
-    for t0, t1 in zip(breakpoints[:-1], breakpoints[1:]):
+    elements = []
+    for e, (t0, t1) in enumerate(zip(breakpoints[:-1], breakpoints[1:])):
         nodes.append(base.scaled_points(t0, t1))
         weights.append(base.scaled_weights(t0, t1))
+        # Recorded rather than left to be re-derived from the coordinates:
+        # a node on an element boundary belongs to the element it was
+        # generated for, which its coordinate alone cannot say.
+        elements.append(np.full(len(base), e, dtype=int))
 
     return QuadratureRule(
         np.concatenate(nodes),
@@ -433,4 +487,5 @@ def composite(base: QuadratureRule, breakpoints: np.ndarray) -> QuadratureRule:
         measure=base.measure,
         name=base.name,
         breakpoints=breakpoints,
+        elements=np.concatenate(elements),
     )

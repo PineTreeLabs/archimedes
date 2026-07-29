@@ -83,6 +83,47 @@ def _dim_kwargs(basis: Basis, spec: Any) -> dict:
     )
 
 
+class _DimensionView:
+    """One dimension of a tensor rule, presented as a 1-D quadrature rule.
+
+    A tensor rule's ``nodes``/``elements`` are ``(n, ndim)``; a univariate
+    factor needs column ``d`` of each, at the *full* node count (every
+    combination), not the ``n_d`` of the underlying per-dimension rule. So
+    this is a view of the expanded arrays rather than ``rule.rules[d]``.
+
+    Only the members :meth:`Basis._evaluate_at_nodes` implementations touch
+    are provided, which is why this is a plain adapter and not a
+    ``Quadrature``: weights are meaningless here (they do not factor per
+    dimension row-wise), and nothing downstream asks for them.
+    """
+
+    def __init__(self, rule, dim: int):
+        self._rule = rule
+        self._dim = dim
+
+    @property
+    def breakpoints(self):
+        return self._rule.breakpoints[self._dim]
+
+    @property
+    def elements(self):
+        elements = self._rule.elements
+        return None if elements is None else elements[:, self._dim]
+
+    def scaled_points(self, **domain_kwargs):
+        return self._rule.scaled_points(dims=self._rule_dims(**domain_kwargs))[
+            :, self._dim
+        ]
+
+    def _rule_dims(self, **domain_kwargs):
+        """This dimension's parameters in the slot the tensor rule expects,
+        with the others left at their reference domains -- only column
+        ``self._dim`` of the result is ever read."""
+        dims: list = [None] * self._rule.ndim
+        dims[self._dim] = domain_kwargs
+        return dims
+
+
 def _row_kron(mats: list) -> np.ndarray:
     """Row-wise Kronecker (Khatri-Rao) product of design matrices.
 
@@ -329,6 +370,25 @@ class TensorBasis(Basis):
         return _row_kron(
             [
                 basis.evaluate(x[:, d], deriv=alpha[d], **_dim_kwargs(basis, spec))
+                for d, (basis, spec) in enumerate(zip(self.bases, specs))
+            ]
+        )
+
+    def _evaluate_at_nodes(self, rule, deriv=0, dims=None):
+        """Per-dimension evaluation at the rule's nodes, so a factor that
+        needs element provenance (a :class:`PiecewiseBasis`) gets its own
+        dimension's slice of it.
+
+        ``rule.elements`` is ``(n, ndim)`` alongside ``rule.nodes``, so each
+        factor is handed a one-dimensional view of both.
+        """
+        alpha = self._multi_index(deriv)
+        specs = self._dim_specs(dims)
+        return _row_kron(
+            [
+                basis._evaluate_at_nodes(
+                    _DimensionView(rule, d), deriv=alpha[d], **_dim_kwargs(basis, spec)
+                )
                 for d, (basis, spec) in enumerate(zip(self.bases, specs))
             ]
         )

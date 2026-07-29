@@ -190,6 +190,32 @@ def test_breakpoints_is_always_a_full_length_tuple():
     assert rule.breakpoints == (None, None, None)
 
 
+def test_elements_is_none_without_composite_factors():
+    assert tensor(_gl(2), _gl(3)).elements is None
+
+
+def test_elements_mirrors_nodes():
+    # Column d indexes dimension d's elements, row-aligned with `nodes`, so a
+    # univariate factor can be handed a 1-D view of both.
+    breaks = np.linspace(-1.0, 1.0, 3)
+    composite_rule = composite(_gl(2), breaks)  # 2 elements x 2 nodes
+    rule = tensor(composite_rule, _gl(3))
+    assert rule.elements.shape == (len(rule), 2)
+    # Dimension 0 varies slowest, matching the node ordering.
+    np.testing.assert_array_equal(
+        rule.elements[:, 0], np.repeat(composite_rule.elements, 3)
+    )
+    # A non-composite dimension has no elements of its own.
+    np.testing.assert_array_equal(rule.elements[:, 1], 0)
+
+
+def test_elements_zero_fills_non_composite_dimensions():
+    breaks = np.linspace(-1.0, 1.0, 3)
+    rule = tensor(_gl(2), composite(_gl(2), breaks))
+    np.testing.assert_array_equal(rule.elements[:, 0], 0)
+    assert set(rule.elements[:, 1]) == {0, 1}
+
+
 # -- domain parameter forms --
 
 

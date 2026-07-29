@@ -146,6 +146,32 @@ class Basis(metaclass=abc.ABCMeta):
         """
         return self.evaluate(x, deriv=deriv, **domain_kwargs) @ coefficients
 
+    def _evaluate_at_nodes(self, rule, deriv=0, **domain_kwargs) -> np.ndarray:
+        """Design matrix at a quadrature rule's nodes.
+
+        Equivalent to ``evaluate(rule.scaled_points(...), deriv)``, which is
+        the default implementation, but lets a family use the *provenance*
+        a rule carries and coordinates do not: which sub-element each node
+        came from (see
+        :attr:`~archimedes.quadrature.Quadrature.elements`).
+
+        Only :class:`PiecewiseBasis` needs this, and only because it is
+        discontinuous at its breakpoints: a rule may legitimately place
+        nodes exactly there, where the value depends on which element the
+        node belongs to and the coordinate cannot say. Every smooth family
+        is single-valued everywhere, so the default is exact for them.
+
+        Used by :class:`FunctionSpace` wherever it integrates
+        (``mass_matrix``, ``stiffness_matrix``, ``inner_product``,
+        ``project``, ``diff_matrix``). Evaluation at *user-supplied* points
+        goes through :meth:`evaluate`/:meth:`evaluate_expansion` instead,
+        which have no provenance to draw on and resolve breakpoints by the
+        documented ``side`` convention.
+        """
+        return self.evaluate(
+            rule.scaled_points(**domain_kwargs), deriv=deriv, **domain_kwargs
+        )
+
     def _product_basis(self, other: "Basis") -> "Basis":
         """A basis large enough to represent products from this basis and
         ``other`` *exactly*.

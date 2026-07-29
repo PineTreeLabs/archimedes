@@ -115,12 +115,14 @@ def test_merged_vertex_dof_spans_both_elements(local, breakpoints):
 
 
 @pytest.mark.parametrize("continuity", [-1, 0])
-def test_partition_of_unity(local, breakpoints, continuity):
-    # Half-open element ownership: with closed intervals both elements would
-    # claim an interior breakpoint and the assembled basis would sum to 2.
+@pytest.mark.parametrize("side", ["left", "right"])
+def test_partition_of_unity(local, breakpoints, continuity, side):
+    # Coordinate-only evaluation: whichever `side` is chosen, exactly one
+    # element claims each breakpoint. With closed intervals both neighbours
+    # would claim it and the assembled basis would sum to 2 there.
     basis = PiecewiseBasis(local, breakpoints, continuity=continuity)
     x = np.concatenate([np.linspace(-1, 1, 401), breakpoints])
-    phi = basis.evaluate(x)
+    phi = basis.evaluate(x, side=side)
     np.testing.assert_allclose(phi.sum(axis=1), 1.0, atol=1e-10)
 
 
@@ -240,7 +242,8 @@ def test_equality_and_hash(local, breakpoints):
 @pytest.mark.parametrize("continuity", [-1, 0])
 def test_static_and_dynamic_evaluation_agree(local, breakpoints, continuity):
     basis = PiecewiseBasis(local, breakpoints, continuity=continuity)
-    # Interior points plus exact breakpoints, where element ownership decides.
+    # Interior points plus exact breakpoints, where the `side` convention
+    # decides ownership (default "right").
     x = np.concatenate([np.array([-0.7, -0.1, 0.42, 0.9]), breakpoints])
     static_phi = basis.evaluate(x)
 

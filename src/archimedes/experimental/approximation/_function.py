@@ -50,13 +50,19 @@ class Function:
     coefficients: np.ndarray
     space: FunctionSpace
 
-    def __call__(self, x, deriv: int = 0):
+    def __call__(self, x, deriv: int = 0, **kwargs):
         """Evaluate this function (or its ``deriv``-th derivative) at ``x``.
 
         Returns shape ``(npts,)`` or ``(npts, m)``, matching
         ``coefficients``.
+
+        For a piecewise space, ``side="left"``/``"right"`` selects which
+        one-sided limit to take at a point lying exactly on a breakpoint,
+        where the function (or its derivative) is two-valued -- the values a
+        discontinuous-Galerkin flux or a gradient-jump error indicator are
+        built from. See :class:`PiecewiseBasis`.
         """
-        return self.space.evaluate(self.coefficients, x, deriv=deriv)
+        return self.space.evaluate(self.coefficients, x, deriv=deriv, **kwargs)
 
     def __add__(self, other: Function) -> Function:
         if not self.space._is_compatible_with(other.space):

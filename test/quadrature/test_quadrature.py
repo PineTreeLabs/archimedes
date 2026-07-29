@@ -1,3 +1,4 @@
+import dataclasses
 import math
 
 import numpy as np
@@ -657,3 +658,63 @@ class TestCompositeBreakpoints:
         np.testing.assert_allclose(tiled.nodes, base.nodes, atol=1e-14)
         assert tiled != base
         assert base != tiled
+
+
+class TestCompositeElements:
+    """A composite rule also records *which* element each node came from.
+
+    Coordinates cannot recover this: a Lobatto sub-rule places a node on each
+    interior breakpoint from both sides, so the same coordinate appears twice
+    with different provenance. A basis that is discontinuous there needs to
+    tell them apart.
+    """
+
+    def test_plain_rule_has_no_elements(self):
+        assert gauss_legendre(5).elements is None
+
+    def test_composite_records_one_element_index_per_node(self):
+        base = gauss_legendre(3)
+        rule = composite(base, np.linspace(-1.0, 1.0, 4))
+        np.testing.assert_array_equal(rule.elements, np.repeat([0, 1, 2], len(base)))
+
+    def test_boundary_nodes_are_duplicated_with_distinct_owners(self):
+        # The case that made coordinate lookup wrong: one coordinate, two
+        # nodes, two different elements.
+        rule = composite(gauss_lobatto(3), np.linspace(-1.0, 1.0, 3))
+        on_knot = np.isclose(rule.nodes, 0.0)
+        assert on_knot.sum() == 2
+        assert set(rule.elements[on_knot]) == {0, 1}
+
+    def test_equality_distinguishes_elements(self):
+        bp = np.array([-1.0, 0.0, 1.0])
+        rule = composite(gauss_legendre(2), bp)
+        shuffled = dataclasses.replace(rule, elements=rule.elements[::-1])
+        assert rule != shuffled
+
+    @pytest.mark.parametrize(
+        "kwargs,match",
+        [
+            ({"breakpoints": np.array([-1.0, 1.0])}, "must be given together"),
+            ({"elements": np.zeros(2, dtype=int)}, "must be given together"),
+            (
+                {
+                    "breakpoints": np.array([-1.0, 1.0]),
+                    "elements": np.zeros(3, dtype=int),
+                },
+                "same shape as nodes",
+            ),
+            (
+                {"breakpoints": np.array([-1.0, 1.0]), "elements": np.array([0, 5])},
+                "must index the 1 intervals",
+            ),
+        ],
+    )
+    def test_breakpoints_and_elements_must_be_consistent(self, kwargs, match):
+        with pytest.raises(ValueError, match=match):
+            QuadratureRule(
+                nodes=np.zeros(2),
+                weights=np.zeros(2),
+                name="test",
+                measure=LegendreMeasure(),
+                **kwargs,
+            )
