@@ -180,7 +180,7 @@ def test_inner_product_accepts_quad_rule_override(space):
     )
 
 
-# -- quad_points / test --
+# -- quad_points / quad_weights / galerkin --
 
 
 def test_quad_points_matches_scaled_points(space, quad_rule):
@@ -195,49 +195,75 @@ def test_quad_points_accepts_quad_rule_override(space):
     )
 
 
-def test_test_of_basis_itself_reproduces_mass_matrix(space):
-    # mass_matrix is `test` with residual_fn fixed to the (undifferentiated)
+def test_quad_weights_matches_scaled_weights(space, quad_rule):
+    expected = quad_rule.scaled_weights(a=-1.0, b=1.0, density=space.basis.density)
+    np.testing.assert_allclose(space.quad_weights(), expected)
+
+
+def test_quad_weights_accepts_quad_rule_override(space):
+    coarse = gauss_legendre(6)
+    np.testing.assert_allclose(
+        space.quad_weights(quad_rule=coarse),
+        coarse.scaled_weights(a=-1.0, b=1.0, density=space.basis.density),
+    )
+
+
+def test_quad_points_and_weights_reproduce_galerkin(space):
+    # quad_points/quad_weights are exactly what `galerkin` uses internally,
+    # so assembling the same contraction by hand must match it exactly.
+    def f(x):
+        return x**2 - x
+
+    x, w = space.quad_points(), space.quad_weights()
+    phi = space.basis.evaluate(x, a=-1.0, b=1.0)
+    by_hand = phi.T @ (w * f(x))
+    np.testing.assert_allclose(by_hand, space.galerkin(f), atol=1e-12)
+
+
+def test_galerkin_of_basis_itself_reproduces_mass_matrix(space):
+    # mass_matrix is `galerkin` with residual_fn fixed to the (undifferentiated)
     # basis design matrix itself: R_j = int phi_i phi_j w dx = M_ij.
     def all_basis_functions(x):
         return space.basis.evaluate(x, a=-1.0, b=1.0)
 
-    R = space.test(all_basis_functions)
+    R = space.galerkin(all_basis_functions)
     np.testing.assert_allclose(R, space.mass_matrix(), atol=1e-10)
 
 
-def test_test_of_derivative_matches_stiffness_matrix(space):
+def test_galerkin_of_derivative_matches_stiffness_matrix(space):
     def all_basis_derivatives(x):
         return space.basis.evaluate(x, deriv=1, a=-1.0, b=1.0)
 
-    R = space.test(all_basis_derivatives, deriv=1)
+    R = space.galerkin(all_basis_derivatives, test_deriv=1)
     np.testing.assert_allclose(R, space.stiffness_matrix(), atol=1e-10)
 
 
-def test_test_of_plain_function_matches_project_rhs(space):
-    # project's right-hand side is `test(f)` solved against the mass matrix;
-    # for an orthonormal basis M = I, so project(f).coefficients == test(f).
+def test_galerkin_of_plain_function_matches_project_rhs(space):
+    # project's right-hand side is `galerkin(f)` solved against the mass
+    # matrix; for an orthonormal basis M = I, so project(f).coefficients ==
+    # galerkin(f).
     def f(x):
         return x**2
 
     fn = space.project(f)
-    np.testing.assert_allclose(space.test(f), fn.coefficients, atol=1e-10)
+    np.testing.assert_allclose(space.galerkin(f), fn.coefficients, atol=1e-10)
 
 
-def test_test_accepts_vector_valued_residual(space):
+def test_galerkin_accepts_vector_valued_residual(space):
     def f(x):
         return np.stack([x, x**2], axis=-1)  # (npts, 2)
 
-    R = space.test(f)
+    R = space.galerkin(f)
     assert R.shape == (space.n_basis, 2)
-    np.testing.assert_allclose(R[:, 0], space.test(lambda x: x), atol=1e-12)
-    np.testing.assert_allclose(R[:, 1], space.test(lambda x: x**2), atol=1e-12)
+    np.testing.assert_allclose(R[:, 0], space.galerkin(lambda x: x), atol=1e-12)
+    np.testing.assert_allclose(R[:, 1], space.galerkin(lambda x: x**2), atol=1e-12)
 
 
-def test_test_accepts_quad_rule_override(space):
+def test_galerkin_accepts_quad_rule_override(space):
     coarse = gauss_legendre(6)
     np.testing.assert_allclose(
-        space.test(lambda x: x**2, quad_rule=coarse),
-        space.test(lambda x: x**2),
+        space.galerkin(lambda x: x**2, quad_rule=coarse),
+        space.galerkin(lambda x: x**2),
         atol=1e-10,
     )
 

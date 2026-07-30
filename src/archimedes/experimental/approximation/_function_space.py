@@ -18,6 +18,20 @@ if TYPE_CHECKING:
 __all__ = ["FunctionSpace"]
 
 
+def _contract(phi: np.ndarray, w: np.ndarray, r: np.ndarray) -> np.ndarray:
+    """The Galerkin contraction shared by every assembly method here:
+    :math:`\\Phi^\\top (w \\odot r)`, i.e. ``phi.T @ diag(w) @ r``.
+
+    ``phi`` is a ``(npts, n_basis)`` design matrix (the test side) and ``w``
+    the matching quadrature weights. ``r`` is the trial side, already
+    sampled at the same nodes: ``r.ndim == 1`` for a scalar integrand,
+    ``2`` for one stacked column-wise -- ``r = phi`` itself gives a
+    mass/stiffness block, ``r`` a vector-valued residual/right-hand side
+    otherwise.
+    """
+    return phi.T @ (w * r if r.ndim == 1 else w[:, None] * r)  # type: ignore[no-any-return]
+
+
 def _is_superset(have: np.ndarray, required: np.ndarray, tol: float = 1e-12) -> bool:
     """Whether every point of ``required`` appears in ``have``.
 
@@ -248,8 +262,8 @@ class FunctionSpace:
         _, w = target._quad_points_weights(rule)
         phi = target._basis_eval_at_nodes(rule)  # (npts, n_target)
         dphi = self._basis_eval_at_nodes(rule, deriv=deriv)  # (npts, n_basis)
-        M = phi.T @ (w[:, None] * phi)
-        return np.linalg.solve(M, phi.T @ (w[:, None] * dphi))  # type: ignore[no-any-return]
+        M = _contract(phi, w, phi)
+        return np.linalg.solve(M, _contract(phi, w, dphi))  # type: ignore[no-any-return]
 
     def _domain_kwargs(self) -> dict:
         return {f.name: getattr(self.domain, f.name) for f in tree.fields(self.domain)}
@@ -293,19 +307,33 @@ class FunctionSpace:
         """Quadrature nodes (``quad_rule``, default ``self.quad_rule``) mapped
         onto this space's domain.
 
-        The counterpart to :meth:`test`: gives user code the same points
-        ``test`` samples ``residual_fn`` at, for building a right-hand side
-        or a manufactured solution without reaching into ``quad_rule``,
-        ``domain``, and ``tree.fields`` by hand.
+        Together with :meth:`quad_weights`, the public quadrature interface
+        ``galerkin`` is built from -- for a constraint that isn't itself a
+        per-basis-function contraction (a global integral, say), user code
+        can assemble it directly the same way ``galerkin`` does internally,
+        without reaching into ``quad_rule``, ``domain``, and ``tree.fields``
+        by hand.
         """
         rule = self._resolve_rule(quad_rule)
         x, _ = self._quad_points_weights(rule)
         return x
 
-    def test(
+    def quad_weights(self, quad_rule: Quadrature | None = None) -> np.ndarray:
+        """Quadrature weights (``quad_rule``, default ``self.quad_rule``),
+        scaled onto this space's domain and normalized per
+        ``self.basis.density`` (see :meth:`Basis.density`).
+
+        The counterpart to :meth:`quad_points`; see there for why both are
+        public.
+        """
+        rule = self._resolve_rule(quad_rule)
+        _, w = self._quad_points_weights(rule)
+        return w
+
+    def galerkin(
         self,
         residual_fn: Callable,
-        deriv: int = 0,
+        test_deriv: int = 0,
         quad_rule: Quadrature | None = None,
     ) -> np.ndarray:
         """Galerkin-test ``residual_fn`` against every basis function.
@@ -314,22 +342,23 @@ class FunctionSpace:
             R_i = \\int r(x) \\, \\phi_i^{(k)}(x) \\, w(x) \\, dx, \\qquad
             R = \\Phi^{(k)\\top} (w \\odot r(x)),
 
-        where :math:`\\Phi^{(k)}` is the design matrix of the ``deriv``-th
-        (:math:`k`-th) derivative of *this* space's basis -- the test
-        side -- and :math:`r` = ``residual_fn`` is evaluated at the
-        quadrature nodes and may depend on trial functions of any derivative
-        order, independently of ``deriv``. That makes mixed-order weak forms
-        (e.g. an advection term :math:`\\int u'v\\,dx`) and matched-order
-        ones (e.g. Poisson's :math:`\\int u'v'\\,dx`) both work, since 
-        ``deriv`` only ever governs the test side.
+        where :math:`\\Phi^{(k)}` is the design matrix of the
+        ``test_deriv``-th (:math:`k`-th) derivative of *this* space's basis
+        -- the test side -- and :math:`r` = ``residual_fn`` is evaluated at
+        the quadrature nodes and may depend on trial functions of any
+        derivative order, independently of ``test_deriv``. That makes
+        mixed-order weak forms (e.g. an advection term :math:`\\int u'v\\,dx`)
+        and matched-order ones (e.g. Poisson's :math:`\\int u'v'\\,dx`) both
+        work, since ``test_deriv`` only ever governs the test side.
 
         This is the shared primitive behind :meth:`mass_matrix`,
         :meth:`stiffness_matrix`, and the right-hand side of :meth:`project`
-        -- each is ``test`` with ``residual_fn`` fixed to (a derivative of)
-        the basis itself or to a plain function of position. It is public
-        because assembling a nonlinear residual (e.g. for a Galerkin BVP)
-        needs the same contraction with a ``residual_fn`` that closes over a
-        trial :class:`Function`, which those three methods don't expose.
+        -- each is ``galerkin`` with ``residual_fn`` fixed to (a derivative
+        of) the basis itself or to a plain function of position. It is
+        public because assembling a nonlinear residual (e.g. for a Galerkin
+        BVP) needs the same contraction with a ``residual_fn`` that closes
+        over a trial :class:`Function`, which those three methods don't
+        expose.
 
         Parameters
         ----------
@@ -338,13 +367,13 @@ class FunctionSpace:
             array (``self.quad_points(quad_rule)``); must return an array of
             shape ``(npts,)`` (scalar-valued) or ``(npts, m)``
             (vector-valued, contracted independently per component).
-        deriv : int or tuple of int, optional
+        test_deriv : int or tuple of int, optional
             Derivative order of the *test* function; a multi-index for a
             :class:`TensorBasis`, a plain order otherwise. Default 0.
         quad_rule : QuadratureRule, optional
             Quadrature rule to use instead of ``self.quad_rule``. Must be
             accurate enough for the product of ``residual_fn`` and the
-            (``deriv``-th derivative of the) basis.
+            (``test_deriv``-th derivative of the) basis.
 
         Returns
         -------
@@ -367,9 +396,8 @@ class FunctionSpace:
         """
         rule = self._resolve_rule(quad_rule)
         x, w = self._quad_points_weights(rule)
-        phi = self._basis_eval_at_nodes(rule, deriv=deriv)  # (npts, n_basis)
-        r = residual_fn(x)
-        return phi.T @ (w * r if r.ndim == 1 else w[:, None] * r)  # type: ignore[no-any-return]
+        phi = self._basis_eval_at_nodes(rule, deriv=test_deriv)  # (npts, n_basis)
+        return _contract(phi, w, residual_fn(x))
 
     def evaluate(self, coefficients: np.ndarray, x, deriv: int = 0, side: str = RIGHT):
         """Evaluate :math:`\\sum_i c_i \\, \\phi_i(x)` (or its ``deriv``-th
@@ -447,7 +475,7 @@ class FunctionSpace:
         """
         _, w = self._quad_points_weights()
         phi = self._basis_eval_at_nodes(self.quad_rule)  # (npts, n_basis)
-        return phi.T @ (w[:, None] * phi)
+        return _contract(phi, w, phi)
 
     def stiffness_matrix(self) -> np.ndarray:
         """Stiffness matrix :math:`K_{ij} = \\int \\nabla \\phi_i \\cdot
@@ -470,7 +498,7 @@ class FunctionSpace:
         stiffness = None
         for deriv in derivs:
             dphi = self._basis_eval_at_nodes(self.quad_rule, deriv=deriv)
-            block = dphi.T @ (w[:, None] * dphi)
+            block = _contract(dphi, w, dphi)
             stiffness = block if stiffness is None else stiffness + block
         return stiffness
 
@@ -509,17 +537,14 @@ class FunctionSpace:
         from ._function import Function  # avoid a circular import
 
         rule = self._resolve_rule(quad_rule)
-        x, w = self._quad_points_weights(rule)
+        _, w = self._quad_points_weights(rule)
         phi = self._basis_eval_at_nodes(rule)  # (npts, n_basis)
-        M = phi.T @ (w[:, None] * phi)
-        # `f` is an ordinary function of position, so it needs the coordinates
-        # and has no breakpoint ambiguity of its own to resolve.
-        fx = f(x)
-
-        # `ndim` is a static (trace-time) property, so this branches on shape
-        # rather than on a value and is safe under `@arc.compile`. In the
-        # vector-valued case the right-hand side is the (n_basis, m) matrix of
-        # stacked component loads, which `solve` handles with a single
-        # factorization of the shared mass matrix.
-        rhs = phi.T @ (w * fx if fx.ndim == 1 else w[:, None] * fx)
+        M = _contract(phi, w, phi)
+        # `f` is an ordinary function of position, so `galerkin` -- which
+        # calls it on the quadrature nodes and Galerkin-tests the result --
+        # computes the right-hand side directly. In the vector-valued case
+        # this is the (n_basis, m) matrix of stacked component loads, which
+        # `solve` handles with a single factorization of the shared mass
+        # matrix.
+        rhs = self.galerkin(f, quad_rule=quad_rule)
         return Function(np.linalg.solve(M, rhs), self)

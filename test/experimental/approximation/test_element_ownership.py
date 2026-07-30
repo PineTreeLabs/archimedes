@@ -90,8 +90,8 @@ def test_stiffness_matrix_is_exact_with_boundary_nodes(continuity):
 
 @pytest.mark.parametrize("continuity", [-1, 0])
 @pytest.mark.parametrize("rule_name", sorted(BOUNDARY_NODE_RULES))
-def test_test_side_of_test_uses_recorded_ownership(continuity, rule_name):
-    # `test`'s *test* side shares `_basis_eval_at_nodes` with `mass_matrix`
+def test_test_side_of_galerkin_uses_recorded_ownership(continuity, rule_name):
+    # `galerkin`'s *test* side shares `_basis_eval_at_nodes` with `mass_matrix`
     # rather than evaluating the basis by coordinate, so testing a smooth
     # (coordinate-resolvable) residual_fn must be exact here too -- the same
     # ownership issue `test_mass_matrix_is_exact_whatever_the_rules_nodes`
@@ -112,8 +112,8 @@ def test_test_side_of_test_uses_recorded_ownership(continuity, rule_name):
     def f(x):
         return x**2 - 2 * x
 
-    got = space.test(f)
-    expected = exact.test(f)
+    got = space.galerkin(f)
+    expected = exact.galerkin(f)
     np.testing.assert_allclose(got, expected, rtol=1e-10, atol=1e-12)
 
 
