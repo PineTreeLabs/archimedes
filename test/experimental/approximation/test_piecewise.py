@@ -72,6 +72,50 @@ def test_boundary_dofs_lobatto(local):
     assert local.boundary_dofs() == (0, local.n_basis - 1)
 
 
+# -- global boundary DOFs --
+
+
+def test_piecewise_boundary_dofs_c0(local, breakpoints):
+    # The left end belongs to element 0's local `left` DOF and the right end
+    # to the last element's local `right` DOF, mapped through assembly.
+    basis = PiecewiseBasis(local, breakpoints, continuity=0)
+    assert basis.boundary_dofs() == (0, basis.n_basis - 1)
+
+
+def test_piecewise_boundary_dofs_discontinuous(local, breakpoints):
+    # No shared/global endpoint identity when elements are independent.
+    basis = PiecewiseBasis(local, breakpoints, continuity=-1)
+    assert basis.boundary_dofs() == (None, None)
+
+
+def test_piecewise_boundary_dofs_no_element_endpoint_dofs(breakpoints):
+    # A discontinuous tiling of an element basis with no boundary DOFs of its
+    # own (e.g. Gauss-Legendre nodes) has none globally either.
+    interior_only = LagrangeBasis(reference_nodes=gauss_legendre(3).nodes)
+    basis = PiecewiseBasis(interior_only, breakpoints, continuity=-1)
+    assert basis.boundary_dofs() == (None, None)
+
+
+def test_piecewise_boundary_dofs_agree_with_evaluation(local, breakpoints):
+    # The DOF identified as the boundary must actually be the one whose
+    # coefficient equals the endpoint value: a unit coefficient there and
+    # zero elsewhere should evaluate to 1 at that end and 0 at the other.
+    basis = PiecewiseBasis(local, breakpoints, continuity=0)
+    left, right = basis.boundary_dofs()
+
+    c_left = np.zeros(basis.n_basis)
+    c_left[left] = 1.0
+    np.testing.assert_allclose(
+        basis.evaluate_expansion(c_left, np.array([-1.0, 1.0])), [1.0, 0.0], atol=1e-10
+    )
+
+    c_right = np.zeros(basis.n_basis)
+    c_right[right] = 1.0
+    np.testing.assert_allclose(
+        basis.evaluate_expansion(c_right, np.array([-1.0, 1.0])), [0.0, 1.0], atol=1e-10
+    )
+
+
 # -- degree-of-freedom counting --
 
 

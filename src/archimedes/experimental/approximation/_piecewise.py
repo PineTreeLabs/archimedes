@@ -249,6 +249,28 @@ class PiecewiseBasis(Basis):
         ``continuity=-1``, jumps) at every interior breakpoint."""
         return self.breakpoints
 
+    def boundary_dofs(self) -> tuple[int | None, int | None]:
+        """Global indices of the DOFs at the two ends of the tiled domain,
+        or ``None`` where the element basis has no such DOF.
+
+        The left end belongs entirely to element 0 and the right end to the
+        last element, so this maps ``element_basis.boundary_dofs()`` through
+        ``assembly_matrix`` for those two elements. Under ``continuity=-1``
+        there is no shared/global endpoint identity (every element's DOFs are
+        independent), so this returns ``(None, None)`` regardless of the
+        element basis.
+        """
+        if self.continuity == DISCONTINUOUS:
+            return (None, None)
+        left, right = self.element_basis.boundary_dofs()
+        if left is None or right is None:
+            return (None, None)
+        n_loc = self.element_basis.n_basis
+        return (
+            int(np.argmax(self._assembly[left])),
+            int(np.argmax(self._assembly[(self.n_elements - 1) * n_loc + right])),
+        )
+
     def default_quadrature(self):
         """The element basis's own rule, tiled across the same breakpoints.
 
