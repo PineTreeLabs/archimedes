@@ -2,24 +2,20 @@
 
 Both were removed from the public API: they had zero consumers beyond these
 tests (confirmed by grep across src/test/docs), and are now one-off
-conveniences a user reconstructs from ``design_matrix``/``quadrature`` and
-``archimedes.quadrature.contract`` in a couple of lines, rather than the
-library shipping and maintaining them. These recreate them for test purposes
-only, to keep the correctness coverage they provided without reintroducing
-the methods themselves -- exactly the pattern a power user would follow.
+conveniences a user reconstructs from ``basis_matrix()``/``quadrature()`` in a
+couple of lines, rather than the library shipping and maintaining them. These
+recreate them for test purposes only, to keep the correctness coverage they
+provided without reintroducing the methods themselves -- exactly the pattern
+a power user would follow.
 """
-
-from archimedes.quadrature import contract
 
 
 def mass_matrix(space):
-    _, w = space.quadrature()
-    phi = space.design_matrix()
-    return contract(phi, w, phi)
+    phi = space.basis_matrix()
+    return phi.T @ phi.matrix
 
 
 def stiffness_matrix(space):
-    _, w = space.quadrature()
     ndim = space.basis.ndim
     if ndim == 1:
         derivs = [1]
@@ -28,7 +24,7 @@ def stiffness_matrix(space):
 
     stiffness = None
     for deriv in derivs:
-        dphi = space.design_matrix(deriv=deriv)
-        block = contract(dphi, w, dphi)
+        dphi = space.basis_matrix(deriv=deriv)
+        block = dphi.T @ dphi.matrix
         stiffness = block if stiffness is None else stiffness + block
     return stiffness

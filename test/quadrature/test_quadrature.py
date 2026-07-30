@@ -18,7 +18,6 @@ from archimedes.quadrature import (
     QuadratureRule,
     clenshaw_curtis,
     composite,
-    contract,
     gauss_hermite,
     gauss_laguerre,
     gauss_legendre,
@@ -107,61 +106,6 @@ def test_dot_errors():
         rule.sum(np.zeros((2, 2, 2)))
     with pytest.raises(ValueError):
         rule.sum(np.zeros(len(rule) + 1))
-
-
-# -- contract --
-
-
-def test_contract_single_column_matches_sum():
-    # A one-column "design matrix" of all ones reduces `contract` to a plain
-    # weighted sum -- the same operation `QuadratureRule.sum` performs, just
-    # keeping a length-1 axis instead of collapsing it.
-    rule = gauss_legendre(4)
-    values = np.cos(rule.nodes)
-    phi = np.ones((len(rule), 1))
-    result = contract(phi, rule.weights, values)
-    assert result.shape == (1,)
-    np.testing.assert_allclose(result[0], rule.sum(values))
-
-
-def test_contract_recovers_exact_moments():
-    # phi_i(x) = x^i for i = 0..3, tested against the constant 1: recovers
-    # the exact moments int x^i dx on [-1, 1] (0 for odd i, 2/(i+1) for even).
-    rule = gauss_legendre(10)
-    x = rule.nodes
-    phi = np.stack([x**i for i in range(4)], axis=-1)  # (npts, 4)
-    values = np.ones_like(x)
-    result = contract(phi, rule.weights, values)
-    expected = [2.0, 0.0, 2.0 / 3.0, 0.0]
-    np.testing.assert_allclose(result, expected, atol=1e-12)
-
-
-def test_contract_vector_valued_integrand():
-    rule = gauss_legendre(6)
-    x = rule.nodes
-    phi = np.stack([np.ones_like(x), x], axis=-1)  # (npts, 2)
-    values = np.stack([x**2, x**3], axis=-1)  # (npts, 2): int x^2, int x*x^3
-    result = contract(phi, rule.weights, values)
-    assert result.shape == (2, 2)
-    expected = np.array(
-        [
-            [rule.sum(x**2), rule.sum(x**3)],
-            [rule.sum(x**3), rule.sum(x**4)],
-        ]
-    )
-    np.testing.assert_allclose(result, expected, atol=1e-12)
-
-
-def test_contract_is_petrov_galerkin_agnostic():
-    # `phi` need not have anything to do with `values` beyond sharing nodes
-    # -- a design matrix of a different size than the trial side contracts
-    # fine, unlike `mass_matrix`-style methods that assumed phi == trial phi.
-    rule = gauss_legendre(8)
-    x = rule.nodes
-    test_phi = np.stack([x**i for i in range(5)], axis=-1)  # (npts, 5)
-    values = x**2  # the "trial side" -- degree 2, unrelated to test_phi's size
-    result = contract(test_phi, rule.weights, values)
-    assert result.shape == (5,)
 
 
 # -- Known rules: node generation and exact integration --

@@ -26,7 +26,6 @@ __all__ = [
     "Quadrature",
     "QuadratureRule",
     "composite",
-    "contract",
 ]
 
 
@@ -406,47 +405,6 @@ class QuadratureRule:
         """
         w = self.scaled_weights(*params, density=density, **kwparams)
         return _weighted_sum(w, values, axis, len(self))
-
-
-def contract(phi: np.ndarray, weights: np.ndarray, values: np.ndarray) -> np.ndarray:
-    """Quadrature-weighted contraction of ``values`` against every column of
-    ``phi``.
-
-    .. math::
-        R_i = \\sum_n w_n \\, \\phi_i(x_n) \\, v(x_n) \\quad \\text{for every }
-        i, \\qquad R = \\Phi^\\top (w \\odot v)
-
-    The extension of :meth:`QuadratureRule.sum` to the case where a
-    value is wanted *per column* of a matrix ``phi`` rather than a single value.
-    ``sum`` only ever collapses to one result (or one per component of a
-    vector-valued integrand); this keeps an extra axis instead of
-    collapsing it, which ``sum``'s shape contract (0-, 1-, or 2-D) can't
-    express.
-
-    ``phi``, ``weights``, and ``values`` must be sampled at the same nodes.
-
-    Parameters
-    ----------
-    phi : ndarray
-        Design matrix, shape ``(npts, k)`` -- e.g. a basis (or a derivative
-        of it) evaluated at the quadrature nodes, ``k`` however many
-        columns/test functions.
-    weights : ndarray
-        Quadrature weights, shape ``(npts,)``, matching ``phi``'s and
-        ``values``'s node axis.
-    values : ndarray
-        Integrand, already evaluated at the same nodes: shape ``(npts,)``
-        for a scalar integrand, or ``(npts, m)`` for a vector-valued one
-        (contracted independently per component).
-
-    Returns
-    -------
-    ndarray
-        Shape ``(k,)`` or ``(k, m)``.
-    """
-    if values.ndim == 1:
-        return phi.T @ (weights * values)  # type: ignore[no-any-return]
-    return phi.T @ (weights[:, None] * values)  # type: ignore[no-any-return]
 
 
 def composite(base: QuadratureRule, breakpoints: np.ndarray) -> QuadratureRule:

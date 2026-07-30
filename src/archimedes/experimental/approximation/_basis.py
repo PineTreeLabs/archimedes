@@ -175,7 +175,7 @@ class Basis(metaclass=abc.ABCMeta):
         is single-valued everywhere, so the default is exact for them.
 
         Used by :class:`FunctionSpace` wherever it integrates
-        (``design_matrix``, ``inner_product``, ``project``,
+        (``basis_matrix``, ``inner_product``, ``project``,
         ``diff_matrix``). Evaluation at *user-supplied* points
         goes through :meth:`evaluate`/:meth:`evaluate_expansion` instead,
         which have no provenance to draw on and resolve breakpoints by the

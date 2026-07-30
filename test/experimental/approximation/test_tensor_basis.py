@@ -28,7 +28,6 @@ from archimedes.measure import (
 )
 from archimedes.quadrature import (
     composite,
-    contract,
     gauss_hermite,
     gauss_legendre,
     gauss_lobatto,
@@ -244,12 +243,11 @@ def test_stiffness_matrix_is_the_gradient_form():
     # sum of the per-direction stiffnesses, not any single partial.
     basis = TensorBasis((_modal(4), _modal(4)))
     space = FunctionSpace(basis, domain=BOX)
-    x, w = space.quadrature()
-    expected = sum(
-        contract(space.design_matrix(deriv=d), w, space.design_matrix(deriv=d))
-        for d in [(1, 0), (0, 1)]
-    )
-    np.testing.assert_allclose(stiffness_matrix(space), expected, atol=1e-12)
+    blocks = []
+    for d in [(1, 0), (0, 1)]:
+        dphi = space.basis_matrix(deriv=d)
+        blocks.append(dphi.T @ dphi.matrix)
+    np.testing.assert_allclose(stiffness_matrix(space), sum(blocks), atol=1e-12)
 
 
 def test_stiffness_matrix_matches_a_known_laplacian_entry():

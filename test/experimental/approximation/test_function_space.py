@@ -14,7 +14,7 @@ from archimedes.measure import (
     RealLine,
     UnitInterval,
 )
-from archimedes.quadrature import contract, gauss_legendre
+from archimedes.quadrature import gauss_legendre
 
 
 @pytest.fixture
@@ -181,7 +181,7 @@ def test_inner_product_accepts_quad_rule_override(space):
     )
 
 
-# -- quadrature / design_matrix / contract --
+# -- quadrature / basis_matrix / BasisMatrix.T --
 
 
 def test_quadrature_matches_scaled_points_weights(space, quad_rule):
@@ -201,64 +201,97 @@ def test_quadrature_accepts_quad_rule_override(space):
     )
 
 
-def test_design_matrix_matches_direct_basis_evaluation(space):
-    x, _ = space.quadrature()
+def test_basis_matrix_matches_direct_basis_evaluation(space):
+    x, w = space.quadrature()
     expected = space.basis.evaluate(x, a=-1.0, b=1.0)
-    np.testing.assert_allclose(space.design_matrix(), expected)
+    phi = space.basis_matrix()
+    np.testing.assert_allclose(phi.matrix, expected)
+    np.testing.assert_allclose(phi.weights, w)
+    assert phi.space is space
+    assert phi.shape == expected.shape
 
 
-def test_design_matrix_of_derivative(space):
+def test_basis_matrix_of_derivative(space):
     x, _ = space.quadrature()
     expected = space.basis.evaluate(x, deriv=1, a=-1.0, b=1.0)
-    np.testing.assert_allclose(space.design_matrix(deriv=1), expected)
+    np.testing.assert_allclose(space.basis_matrix(deriv=1).matrix, expected)
 
 
-def test_design_matrix_accepts_quad_rule_override(space):
+def test_basis_matrix_accepts_quad_rule_override(space):
     coarse = gauss_legendre(6)
     x, _ = space.quadrature(quad_rule=coarse)
     expected = space.basis.evaluate(x, a=-1.0, b=1.0)
-    np.testing.assert_allclose(space.design_matrix(quad_rule=coarse), expected)
+    np.testing.assert_allclose(space.basis_matrix(quad_rule=coarse).matrix, expected)
 
 
-def test_contract_of_basis_against_itself_reproduces_mass_matrix(space):
-    # mass_matrix is `contract(phi, w, phi)`: R_ij = int phi_i phi_j w dx = M_ij.
-    x, w = space.quadrature()
-    phi = space.design_matrix()
-    R = contract(phi, w, phi)
-    np.testing.assert_allclose(R, mass_matrix(space), atol=1e-10)
+def test_basis_matrix_matmul_applies_to_coefficients(space):
+    c = np.array([1.0, -2.0, 0.5, 0.0, 3.0])
+    phi = space.basis_matrix()
+    np.testing.assert_allclose(phi @ c, phi.matrix @ c)
 
 
-def test_contract_of_derivative_against_itself_matches_stiffness_matrix(space):
-    x, w = space.quadrature()
-    dphi = space.design_matrix(deriv=1)
-    R = contract(dphi, w, dphi)
-    np.testing.assert_allclose(R, stiffness_matrix(space), atol=1e-10)
+def test_basis_matrix_adjoint_against_itself_reproduces_mass_matrix(space):
+    # mass_matrix is Phi^T Phi: M_ij = int phi_i phi_j w dx.
+    phi = space.basis_matrix()
+    M = phi.T @ phi.matrix
+    np.testing.assert_allclose(M, mass_matrix(space), atol=1e-10)
 
 
-def test_contract_of_plain_function_matches_project_rhs(space):
-    # project's right-hand side is `contract(phi, w, f(x))` solved against
-    # the mass matrix; for an orthonormal basis M = I, so
-    # project(f).coefficients == contract(phi, w, f(x)).
+def test_basis_matrix_adjoint_of_derivative_matches_stiffness_matrix(space):
+    dphi = space.basis_matrix(deriv=1)
+    K = dphi.T @ dphi.matrix
+    np.testing.assert_allclose(K, stiffness_matrix(space), atol=1e-10)
+
+
+def test_basis_matrix_adjoint_of_plain_function_matches_project_rhs(space):
+    # project's right-hand side is `phi.T @ f(x)` solved against the mass
+    # matrix; for an orthonormal basis M = I, so project(f).coefficients ==
+    # phi.T @ f(x).
     def f(x):
         return x**2
 
     fn = space.project(f)
-    x, w = space.quadrature()
-    phi = space.design_matrix()
-    np.testing.assert_allclose(contract(phi, w, f(x)), fn.coefficients, atol=1e-10)
+    x, _ = space.quadrature()
+    phi = space.basis_matrix()
+    np.testing.assert_allclose(phi.T @ f(x), fn.coefficients, atol=1e-10)
 
 
-def test_contract_accepts_vector_valued_integrand(space):
-    x, w = space.quadrature()
-    phi = space.design_matrix()
+def test_basis_matrix_adjoint_accepts_vector_valued_integrand(space):
+    x, _ = space.quadrature()
+    phi = space.basis_matrix()
 
     def f(x):
         return np.stack([x, x**2], axis=-1)  # (npts, 2)
 
-    R = contract(phi, w, f(x))
+    R = phi.T @ f(x)
     assert R.shape == (space.n_basis, 2)
-    np.testing.assert_allclose(R[:, 0], contract(phi, w, x), atol=1e-12)
-    np.testing.assert_allclose(R[:, 1], contract(phi, w, x**2), atol=1e-12)
+    np.testing.assert_allclose(R[:, 0], phi.T @ x, atol=1e-12)
+    np.testing.assert_allclose(R[:, 1], phi.T @ x**2, atol=1e-12)
+
+
+def test_basis_matrix_adjoint_round_trips_via_transpose():
+    space_local = FunctionSpace(
+        OrthogonalPolynomialBasis(LegendreMeasure(), n_basis=5),
+        domain=UnitInterval.Parameters(a=-1.0, b=1.0),
+    )
+    phi = space_local.basis_matrix()
+    assert phi.T.T is phi
+
+
+def test_basis_matrix_is_petrov_galerkin_agnostic(space, quad_rule):
+    # The adjoint doesn't require the "trial side" to have anything to do
+    # with phi's own column count -- a differently-sized test basis on the
+    # same quadrature nodes (a stand-in for a genuinely different test
+    # space) contracts fine.
+    other = FunctionSpace(
+        OrthogonalPolynomialBasis(LegendreMeasure(), n_basis=8),
+        domain=UnitInterval.Parameters(a=-1.0, b=1.0),
+        quad_rule=quad_rule,
+    )
+    test_phi = other.basis_matrix()
+    x, _ = space.quadrature()
+    R = test_phi.T @ (x**2)
+    assert R.shape == (8,)
 
 
 # -- density=True: a Hermite space projects directly to PCE moments --

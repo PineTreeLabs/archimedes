@@ -8,14 +8,14 @@ from typing import TYPE_CHECKING, Any, Callable
 import numpy as np
 
 from archimedes import tree
-from archimedes.quadrature import Quadrature, QuadratureRule, contract
+from archimedes.quadrature import Quadrature, QuadratureRule
 
 from ._basis import RIGHT, Basis
 
 if TYPE_CHECKING:
     from ._function import Function
 
-__all__ = ["FunctionSpace"]
+__all__ = ["BasisMatrix", "FunctionSpace"]
 
 
 def _is_superset(have: np.ndarray, required: np.ndarray, tol: float = 1e-12) -> bool:
@@ -27,6 +27,80 @@ def _is_superset(have: np.ndarray, required: np.ndarray, tol: float = 1e-12) -> 
     counts would prove nothing.
     """
     return bool(np.all([np.any(np.abs(have - point) <= tol) for point in required]))
+
+
+@tree.struct
+class BasisMatrix:
+    r"""A basis evaluated at a fixed set of quadrature nodes, bundled with
+    the matching weights so the two can never be supplied out of sync.
+
+    ``Phi[n, i]`` is the ``deriv``-th derivative of basis function ``i`` at
+    node ``n`` -- see :meth:`FunctionSpace.basis_matrix`, which builds one.
+    ``Phi`` maps coefficients to sampled values, :math:`\Phi c = \phi \cdot c`.
+
+    ``Phi.T`` is the adjoint of ``Phi`` under the Euclidean inner product on
+    coefficients and the weighted one on sampled values:
+    :math:`\langle \Phi c, r\rangle_w = \langle c, \Phi^\top r\rangle`, so
+    :math:`\Phi^\top r = \phi^\top (w \odot r)`. That makes the Galerkin
+    projection equation read almost like the math it's approximating:
+    ``M = phi.T @ phi.matrix`` is the Gram matrix :math:`\Phi^\top\Phi`
+    (the mass matrix), and ``phi.T @ f(x)`` is the load vector
+    :math:`\Phi^\top f` -- see :meth:`FunctionSpace.project`.
+
+    Parameters
+    ----------
+    matrix : ndarray
+        The design matrix ``Phi``, shape ``(npts, n_basis)``.
+    weights : ndarray
+        Quadrature weights matching ``matrix``'s node axis, shape
+        ``(npts,)``.
+    space : FunctionSpace
+        The space this basis matrix was evaluated for. Static.
+    """
+
+    matrix: np.ndarray
+    weights: np.ndarray
+    space: FunctionSpace = tree.field(static=True)
+
+    @property
+    def shape(self) -> tuple[int, int]:
+        return self.matrix.shape  # type: ignore[return-value]
+
+    def __matmul__(self, coefficients: np.ndarray) -> np.ndarray:
+        """:math:`\\Phi c`: sampled values at the quadrature nodes."""
+        return self.matrix @ coefficients  # type: ignore[no-any-return]
+
+    @property
+    def T(self) -> _BasisMatrixAdjoint:  # noqa: N802
+        """The adjoint :math:`\\Phi^\\top`; see the class docstring."""
+        return _BasisMatrixAdjoint(self)
+
+
+@tree.struct
+class _BasisMatrixAdjoint:
+    """``BasisMatrix.T``: apply via ``@``, undo via ``.T`` again."""
+
+    basis_matrix: BasisMatrix
+
+    def __matmul__(self, values: np.ndarray) -> np.ndarray:
+        """:math:`\\Phi^\\top r = \\phi^\\top (w \\odot r)`.
+
+        ``values`` (``r``) must already be sampled at
+        ``self.basis_matrix.space``'s quadrature nodes -- shape ``(npts,)``
+        for a scalar integrand, or ``(npts, m)`` for a vector-valued one
+        (contracted independently per component), or ``(npts, k)`` to
+        apply the adjoint to another design matrix at once (as in the Gram
+        matrix ``phi.T @ phi.matrix``).
+        """
+        
+        phi, w = self.basis_matrix.matrix, self.basis_matrix.weights
+        if values.ndim == 1:
+            return phi.T @ (w * values)  # type: ignore[no-any-return]
+        return phi.T @ (w[:, None] * values)  # type: ignore[no-any-return]
+
+    @property
+    def T(self) -> BasisMatrix:  # noqa: N802
+        return self.basis_matrix
 
 
 @tree.struct
@@ -245,11 +319,10 @@ class FunctionSpace:
         target = self if space is None else space
         rule = target.quad_rule
         target._check_quad_rule_size(rule)
-        _, w = target.quadrature(rule)
-        phi = target.design_matrix(quad_rule=rule)  # (npts, n_target)
-        dphi = self.design_matrix(deriv=deriv, quad_rule=rule)  # (npts, n_basis)
-        M = contract(phi, w, phi)
-        return np.linalg.solve(M, contract(phi, w, dphi))  # type: ignore[no-any-return]
+        phi = target.basis_matrix(quad_rule=rule)  # (npts, n_target)
+        dphi = self.basis_matrix(deriv=deriv, quad_rule=rule)  # (npts, n_basis)
+        M = phi.T @ phi.matrix
+        return np.linalg.solve(M, phi.T @ dphi.matrix)  # type: ignore[no-any-return]
 
     def _domain_kwargs(self) -> dict:
         return {f.name: getattr(self.domain, f.name) for f in tree.fields(self.domain)}
@@ -276,10 +349,9 @@ class FunctionSpace:
     def quadrature(
         self, quad_rule: Quadrature | None = None
     ) -> tuple[np.ndarray, np.ndarray]:
-        """Quadrature nodes and weights mapped onto this space's domain
+        """Quadrature nodes and weights mapped onto this space's domain.
 
-        This, together with :meth:`design_matrix` and
-        :func:`archimedes.quadrature.contract`, is what an assembly like
+        This, together with :meth:`basis_matrix`, is what an assembly like
         :meth:`project` is built from.
         """
         rule = self._resolve_rule(quad_rule)
@@ -291,19 +363,21 @@ class FunctionSpace:
         weights = rule.scaled_weights(**domain_kwargs, density=self.basis.density)
         return rule.scaled_points(**domain_kwargs), weights
 
-    def design_matrix(
+    def basis_matrix(
         self, deriv: int = 0, quad_rule: Quadrature | None = None
-    ) -> np.ndarray:
-        """The basis's design matrix at this space's (or ``quad_rule``'s)
-        quadrature nodes: ``Phi[n, i]`` is the ``deriv``-th derivative of
-        basis function ``i`` at node ``n``.
+    ) -> BasisMatrix:
+        """This space's basis evaluated at its (or ``quad_rule``'s)
+        quadrature nodes, as a :class:`BasisMatrix`.
 
-        Uses the quadrature rule's element ownership, so it is exact for a piecewise
-        basis even when discontinuous.
+        Uses the quadrature rule's element ownership, so it is exact for a
+        piecewise basis even when discontinuous -- see
+        :meth:`Basis._evaluate_at_nodes`.
 
-        Can be used together with :meth:`quadrature` and
-        :func:`archimedes.quadrature.contract` to construct an assembly like
-        :meth:`project` or a custom (Petrov)-Galerkin residual.
+        Together with :meth:`quadrature`, this is the public building-block
+        pair a custom (Petrov-)Galerkin residual or projection is built
+        from: this space's own ``basis_matrix()`` for Galerkin, another
+        space's for Petrov-Galerkin. See :meth:`project` for a worked
+        example.
 
         Parameters
         ----------
@@ -312,14 +386,13 @@ class FunctionSpace:
             plain order otherwise. Default 0.
         quad_rule : QuadratureRule, optional
             Quadrature rule to use instead of ``self.quad_rule``.
-
-        Returns
-        -------
-        ndarray
-            Shape ``(npts, n_basis)``.
         """
         rule = self._resolve_rule(quad_rule)
-        return self.basis._evaluate_at_nodes(rule, deriv=deriv, **self._domain_kwargs())
+        matrix = self.basis._evaluate_at_nodes(
+            rule, deriv=deriv, **self._domain_kwargs()
+        )
+        _, weights = self.quadrature(rule)
+        return BasisMatrix(matrix, weights, self)
 
     def evaluate(self, coefficients: np.ndarray, x, deriv: int = 0, side: str = RIGHT):
         """Evaluate :math:`\\sum_i c_i \\, \\phi_i(x)` (or its ``deriv``-th
@@ -370,8 +443,8 @@ class FunctionSpace:
         question to resolve: it's computed by evaluating both functions at
         the quadrature nodes and integrating the pointwise product, which
         is exact whenever ``quad_rule`` is accurate enough for that
-        product -- equivalently ``c1 @ Phi.T @ diag(w) @ Phi @ c2`` for the
-        design matrix ``Phi`` (see :meth:`design_matrix`), but computed
+        product -- equivalently ``c1 @ phi.T @ phi.matrix @ c2`` for the
+        basis matrix ``phi`` (see :meth:`basis_matrix`), but computed
         directly without forming that full ``(n_basis, n_basis)`` matrix.
 
         For vector-valued coefficients (shape ``(n_basis, m)``) the
@@ -384,7 +457,7 @@ class FunctionSpace:
         coefficients and call this once per component.
         """
         rule = self._resolve_rule(quad_rule)
-        phi = self.design_matrix(quad_rule=rule)  # (npts, n_basis)
+        phi = self.basis_matrix(quad_rule=rule)  # (npts, n_basis)
         integrand = (phi @ c1) * (phi @ c2)  # (npts,) or (npts, m)
         if integrand.ndim > 1:
             # `ndim` is a static (trace-time) property, so this branches on
@@ -395,13 +468,15 @@ class FunctionSpace:
     def project(self, f: Callable, quad_rule: Quadrature | None = None) -> Function:
         """Galerkin projection of ``f`` onto this space.
 
-        Solves ``M @ c = b`` for the coefficients ``c``, where ``M`` is the
-        mass matrix and ``b_i = int f(x) phi_i(x) w(x) dx``, both
-        approximated via ``quad_rule`` (default ``self.quad_rule``).
-        ``quad_rule`` must be accurate enough for the product of ``f`` and
-        the basis, which is generally a higher-order requirement than
-        exactness for the basis alone; pass an explicit ``quad_rule`` to
-        use something other than the space's natural default.
+        Solves ``M @ c = b`` for the coefficients ``c``, where, for the
+        basis matrix ``Phi`` (see :meth:`basis_matrix`), ``M = Phi.T @
+        Phi.matrix`` is the Gram (mass) matrix and ``b = Phi.T @ f(x)`` is
+        the load vector -- both approximated via ``quad_rule`` (default
+        ``self.quad_rule``). ``quad_rule`` must be accurate enough for the
+        product of ``f`` and the basis, which is generally a higher-order
+        requirement than exactness for the basis alone; pass an explicit
+        ``quad_rule`` to use something other than the space's natural
+        default.
 
         ``f`` may be vector-valued: if ``f(x)`` has shape ``(npts, m)``,
         each component is projected onto the same space and the result has
@@ -428,13 +503,13 @@ class FunctionSpace:
 
         rule = self._resolve_rule(quad_rule)
         self._check_quad_rule_size(rule)
-        x, w = self.quadrature(rule)
-        phi = self.design_matrix(quad_rule=rule)  # (npts, n_basis)
-        M = contract(phi, w, phi)
+        x, _ = self.quadrature(rule)
+        phi = self.basis_matrix(quad_rule=rule)  # (npts, n_basis)
+        M = phi.T @ phi.matrix
         # `f` is an ordinary function of position, so it needs the
         # coordinates and has no breakpoint ambiguity of its own to resolve.
         # In the vector-valued case the right-hand side is the (n_basis, m)
         # matrix of stacked component loads, which `solve` handles with a
         # single factorization of the shared mass matrix.
-        rhs = contract(phi, w, f(x))
+        rhs = phi.T @ f(x)
         return Function(np.linalg.solve(M, rhs), self)
