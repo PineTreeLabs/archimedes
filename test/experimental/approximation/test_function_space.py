@@ -52,7 +52,7 @@ def test_evaluate_matches_direct_basis_contraction(space):
     x = np.linspace(-1, 1, 9)
     phi = space.basis.evaluate(x, a=-1.0, b=1.0)  # (npts, n_basis)
     expected = phi @ coefficients
-    np.testing.assert_allclose(space.evaluate(coefficients, x), expected)
+    np.testing.assert_allclose(space._evaluate(coefficients, x), expected)
 
 
 def test_mass_matrix_is_identity_on_reference_domain(space):
@@ -156,7 +156,7 @@ def test_inner_product_matches_mass_matrix_quadratic_form(space):
     c1 = np.array([1.0, -2.0, 0.5, 0.0, 3.0])
     c2 = np.array([0.2, 1.0, -1.0, 4.0, 0.1])
     M = mass_matrix(space)
-    np.testing.assert_allclose(space.inner_product(c1, c2), c1 @ M @ c2, atol=1e-10)
+    np.testing.assert_allclose(space._inner_product(c1, c2), c1 @ M @ c2, atol=1e-10)
 
 
 def test_inner_product_of_orthonormal_basis_vectors_is_kronecker_delta(space):
@@ -166,7 +166,7 @@ def test_inner_product_of_orthonormal_basis_vectors_is_kronecker_delta(space):
             cj = np.eye(space.n_basis)[j]
             expected = 1.0 if i == j else 0.0
             np.testing.assert_allclose(
-                space.inner_product(ci, cj), expected, atol=1e-10
+                space._inner_product(ci, cj), expected, atol=1e-10
             )
 
 
@@ -175,8 +175,8 @@ def test_inner_product_accepts_quad_rule_override(space):
     c2 = np.array([0.2, 1.0, -1.0, 4.0, 0.1])
     coarse = gauss_legendre(6)
     np.testing.assert_allclose(
-        space.inner_product(c1, c2, quad_rule=coarse),
-        space.inner_product(c1, c2),
+        space._inner_product(c1, c2, quad_rule=coarse),
+        space._inner_product(c1, c2),
         atol=1e-10,
     )
 

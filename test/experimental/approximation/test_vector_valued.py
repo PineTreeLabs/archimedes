@@ -101,10 +101,10 @@ def test_evaluate_shapes(space):
     n = space.n_basis
     x = np.linspace(A, B, 7)
 
-    scalar = space.evaluate(np.ones(n), x)
+    scalar = space._evaluate(np.ones(n), x)
     assert scalar.shape == (7,)
 
-    vector = space.evaluate(np.ones((n, M_COMPONENTS)), x)
+    vector = space._evaluate(np.ones((n, M_COMPONENTS)), x)
     assert vector.shape == (7, M_COMPONENTS)
 
 
@@ -170,7 +170,7 @@ def test_inner_product_is_scalar_and_contracts(space):
     assert np.ndim(joint) == 0
 
     per_component = sum(
-        space.inner_product(fn.coefficients[:, k], gn.coefficients[:, k])
+        space._inner_product(fn.coefficients[:, k], gn.coefficients[:, k])
         for k in range(M_COMPONENTS)
     )
     np.testing.assert_allclose(joint, per_component, rtol=1e-10)
@@ -182,7 +182,7 @@ def test_norm_is_scalar_l2_norm_of_whole_function(space):
     assert np.ndim(norm) == 0
 
     component_norms = [
-        np.sqrt(space.inner_product(fn.coefficients[:, k], fn.coefficients[:, k]))
+        np.sqrt(space._inner_product(fn.coefficients[:, k], fn.coefficients[:, k]))
         for k in range(M_COMPONENTS)
     ]
     # Contraction means the whole-function norm is the root-sum-square of

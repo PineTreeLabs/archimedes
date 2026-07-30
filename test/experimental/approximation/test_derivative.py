@@ -246,28 +246,28 @@ def test_square_diff_matrix_reproduces_the_classical_one():
     space = FunctionSpace(basis, domain=DOMAIN)
     scale = (B - A) / 2
     np.testing.assert_allclose(
-        space.diff_matrix(), basis._diff_matrix / scale, atol=1e-11
+        space._diff_matrix(), basis._diff_matrix / scale, atol=1e-11
     )
 
 
 def test_square_diff_matrix_is_exact_in_the_same_space(space):
     # The same-space form collocation wants: coefficients keep their meaning.
     u = space.project(f_)
-    du = Function(space.diff_matrix() @ u.coefficients, space)
+    du = Function(space._diff_matrix() @ u.coefficients, space)
     np.testing.assert_allclose(du(X), df_(X), atol=1e-10)
 
 
 def test_diff_matrix_shape_follows_the_target(space):
     target = space._derivative_space()
-    assert space.diff_matrix().shape == (space.n_basis, space.n_basis)
-    assert space.diff_matrix(space=target).shape == (target.n_basis, space.n_basis)
+    assert space._diff_matrix().shape == (space.n_basis, space.n_basis)
+    assert space._diff_matrix(space=target).shape == (target.n_basis, space.n_basis)
 
 
 def test_diff_matrix_matches_function_derivative(space):
     u = space.project(f_)
     target = space._derivative_space()
     np.testing.assert_allclose(
-        space.diff_matrix(space=target) @ u.coefficients,
+        space._diff_matrix(space=target) @ u.coefficients,
         u.derivative().coefficients,
         atol=1e-10,
     )

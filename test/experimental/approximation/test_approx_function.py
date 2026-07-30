@@ -165,7 +165,7 @@ def test_grad_wrt_coefficients_matches_basis_values(space, quadratic):
 
 def test_dot_matches_space_inner_product(space, quadratic):
     cubic = space.project(lambda x: x**3)
-    expected = space.inner_product(quadratic.coefficients, cubic.coefficients)
+    expected = space._inner_product(quadratic.coefficients, cubic.coefficients)
     np.testing.assert_allclose(quadratic.dot(cubic), expected)
 
 

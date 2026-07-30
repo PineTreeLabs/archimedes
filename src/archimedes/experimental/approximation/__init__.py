@@ -3,8 +3,7 @@
 - ``Basis`` -- a basis family and its size (e.g. ``OrthogonalPolynomialBasis``);
   only evaluates, has no notion of a target domain or coefficients.
 - ``FunctionSpace`` -- a ``Basis`` on a fixed target domain, with
-  quadrature-based operations (``evaluate``, ``project``, ``quadrature``,
-  ``basis_matrix``).
+  quadrature-based operations (``project``, ``quadrature``, ``basis_matrix``).
 - ``BasisMatrix`` -- a basis evaluated at a fixed set of quadrature nodes,
   bundled with the matching weights; the public building block for a custom
   (Petrov-)Galerkin residual (``FunctionSpace.basis_matrix``).

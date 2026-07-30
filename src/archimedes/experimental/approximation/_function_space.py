@@ -43,7 +43,7 @@ class BasisMatrix:
     :math:`\langle \Phi c, r\rangle_w = \langle c, \Phi^\top r\rangle`, so
     :math:`\Phi^\top r = \phi^\top (w \odot r)`. That makes the Galerkin
     projection equation read almost like the math it's approximating:
-    ``M = phi.T @ phi.matrix`` is the Gram matrix :math:`\Phi^\top\Phi`
+    ``M = phi.T @ phi`` is the Gram matrix :math:`\Phi^\top\Phi`
     (the mass matrix), and ``phi.T @ f(x)`` is the load vector
     :math:`\Phi^\top f` -- see :meth:`FunctionSpace.project`.
 
@@ -82,7 +82,7 @@ class _BasisMatrixAdjoint:
 
     basis_matrix: BasisMatrix
 
-    def __matmul__(self, values: np.ndarray) -> np.ndarray:
+    def __matmul__(self, values: np.ndarray | BasisMatrix) -> np.ndarray:
         """:math:`\\Phi^\\top r = \\phi^\\top (w \\odot r)`.
 
         ``values`` (``r``) must already be sampled at
@@ -90,9 +90,11 @@ class _BasisMatrixAdjoint:
         for a scalar integrand, or ``(npts, m)`` for a vector-valued one
         (contracted independently per component), or ``(npts, k)`` to
         apply the adjoint to another design matrix at once (as in the Gram
-        matrix ``phi.T @ phi.matrix``).
+        matrix ``phi.T @ phi``).
         """
-        
+        if isinstance(values, BasisMatrix):
+            values = values.matrix
+
         phi, w = self.basis_matrix.matrix, self.basis_matrix.weights
         if values.ndim == 1:
             return phi.T @ (w * values)  # type: ignore[no-any-return]
@@ -132,12 +134,12 @@ class FunctionSpace:
         interval, ``RealLine.Parameters(mean=..., std=...)`` for a
         Hermite-derived one). A pytree leaf, so it may be traced.
     quad_rule : QuadratureRule, optional
-        The space's natural quadrature rule, used unconditionally by
-        ``diff_matrix`` (its integrands' required accuracy is fully
-        determined by ``basis``, so there's no reason to let it drift from
-        this default) and as the default for ``project`` (which accepts an
-        explicit override, since the right accuracy for a given target
-        function isn't knowable from the space alone). Static.
+        The space's natural quadrature rule, used unconditionally wherever
+        the required accuracy is fully determined by ``basis`` (its own
+        differentiation matrix, say, backing ``Function.derivative``), and
+        as the default for ``project`` (which accepts an explicit override,
+        since the right accuracy for a given target function isn't knowable
+        from the space alone). Static.
 
         Defaults to ``basis.default_quadrature()``, which is exact for
         those integrands by construction. An explicit rule is checked for
@@ -283,7 +285,7 @@ class FunctionSpace:
         """
         return FunctionSpace(self.basis._derivative_basis(deriv), domain=self.domain)
 
-    def diff_matrix(self, deriv=1, space: FunctionSpace | None = None) -> np.ndarray:
+    def _diff_matrix(self, deriv=1, space: FunctionSpace | None = None) -> np.ndarray:
         """Matrix mapping this space's coefficients to those of the
         ``deriv``-th derivative.
 
@@ -321,8 +323,8 @@ class FunctionSpace:
         target._check_quad_rule_size(rule)
         phi = target.basis_matrix(quad_rule=rule)  # (npts, n_target)
         dphi = self.basis_matrix(deriv=deriv, quad_rule=rule)  # (npts, n_basis)
-        M = phi.T @ phi.matrix
-        return np.linalg.solve(M, phi.T @ dphi.matrix)  # type: ignore[no-any-return]
+        M = phi.T @ phi
+        return np.linalg.solve(M, phi.T @ dphi)  # type: ignore[no-any-return]
 
     def _domain_kwargs(self) -> dict:
         return {f.name: getattr(self.domain, f.name) for f in tree.fields(self.domain)}
@@ -337,7 +339,7 @@ class FunctionSpace:
         # phi is (npts, n_basis), so phi.T @ diag(w) @ phi has rank at most
         # min(npts, n_basis) -- below n_basis points the mass matrix is
         # exactly (not just poorly) singular, and np.linalg.solve blows up
-        # rather than failing cleanly. Only `diff_matrix`/`project` solve
+        # rather than failing cleanly. Only `_diff_matrix`/`project` solve
         # such a system, so only they call this -- `quadrature` itself makes
         # no assumption about what its caller will do with the result.
         if len(rule) < self.n_basis:
@@ -394,7 +396,7 @@ class FunctionSpace:
         _, weights = self.quadrature(rule)
         return BasisMatrix(matrix, weights, self)
 
-    def evaluate(self, coefficients: np.ndarray, x, deriv: int = 0, side: str = RIGHT):
+    def _evaluate(self, coefficients: np.ndarray, x, deriv: int = 0, side: str = RIGHT):
         """Evaluate :math:`\\sum_i c_i \\, \\phi_i(x)` (or its ``deriv``-th
         derivative) at ``x``, for coefficients ``c = coefficients``.
 
@@ -426,7 +428,7 @@ class FunctionSpace:
             coefficients, x, deriv=deriv, side=side, **self._domain_kwargs()
         )
 
-    def inner_product(
+    def _inner_product(
         self,
         c1: np.ndarray,
         c2: np.ndarray,
@@ -443,7 +445,7 @@ class FunctionSpace:
         question to resolve: it's computed by evaluating both functions at
         the quadrature nodes and integrating the pointwise product, which
         is exact whenever ``quad_rule`` is accurate enough for that
-        product -- equivalently ``c1 @ phi.T @ phi.matrix @ c2`` for the
+        product -- equivalently ``c1 @ phi.T @ phi @ c2`` for the
         basis matrix ``phi`` (see :meth:`basis_matrix`), but computed
         directly without forming that full ``(n_basis, n_basis)`` matrix.
 
@@ -470,7 +472,7 @@ class FunctionSpace:
 
         Solves ``M @ c = b`` for the coefficients ``c``, where, for the
         basis matrix ``Phi`` (see :meth:`basis_matrix`), ``M = Phi.T @
-        Phi.matrix`` is the Gram (mass) matrix and ``b = Phi.T @ f(x)`` is
+        Phi`` is the Gram (mass) matrix and ``b = Phi.T @ f(x)`` is
         the load vector -- both approximated via ``quad_rule`` (default
         ``self.quad_rule``). ``quad_rule`` must be accurate enough for the
         product of ``f`` and the basis, which is generally a higher-order
@@ -505,7 +507,7 @@ class FunctionSpace:
         self._check_quad_rule_size(rule)
         x, _ = self.quadrature(rule)
         phi = self.basis_matrix(quad_rule=rule)  # (npts, n_basis)
-        M = phi.T @ phi.matrix
+        M = phi.T @ phi
         # `f` is an ordinary function of position, so it needs the
         # coordinates and has no breakpoint ambiguity of its own to resolve.
         # In the vector-valued case the right-hand side is the (n_basis, m)

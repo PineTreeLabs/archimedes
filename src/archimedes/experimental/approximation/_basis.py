@@ -174,9 +174,9 @@ class Basis(metaclass=abc.ABCMeta):
         node belongs to and the coordinate cannot say. Every smooth family
         is single-valued everywhere, so the default is exact for them.
 
-        Used by :class:`FunctionSpace` wherever it integrates
-        (``basis_matrix``, ``inner_product``, ``project``,
-        ``diff_matrix``). Evaluation at *user-supplied* points
+        Used by :class:`FunctionSpace` wherever it integrates (``basis_matrix``,
+        ``project``, and their private counterparts). Evaluation at
+        *user-supplied* points
         goes through :meth:`evaluate`/:meth:`evaluate_expansion` instead,
         which have no provenance to draw on and resolve breakpoints by the
         documented ``side`` convention.
@@ -223,8 +223,8 @@ class Basis(metaclass=abc.ABCMeta):
         space keeps the rule uniform so that every closed operation gives
         the tightest exact space and keeps downstream products from carrying
         extra unnecessary degrees of freedom. See also
-        :meth:`FunctionSpace.diff_matrix`, whose square (same-space) form is
-        the classical differentiation matrix.
+        :meth:`Function.derivative`, whose square (same-space) form is
+        built from the classical differentiation matrix.
 
         Raises
         ------

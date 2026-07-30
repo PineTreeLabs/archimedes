@@ -148,7 +148,7 @@ def test_derivative_of_a_c0_space_integrates_exactly():
     du = u.derivative()
     exact = FunctionSpace(du.space.basis, DOMAIN, quad_rule=REFERENCE)
     assert du.dot(du) == pytest.approx(
-        exact.inner_product(du.coefficients, du.coefficients), rel=1e-10
+        exact._inner_product(du.coefficients, du.coefficients), rel=1e-10
     )
 
 

@@ -66,7 +66,7 @@ class Function:
         dimension, with a bare string broadcasting. See
         :meth:`Basis.evaluate`.
         """
-        return self.space.evaluate(self.coefficients, x, deriv=deriv, side=side)
+        return self.space._evaluate(self.coefficients, x, deriv=deriv, side=side)
 
     def __add__(self, other: Function) -> Function:
         if not self.space._is_compatible_with(other.space):
@@ -139,8 +139,7 @@ class Function:
         Since the target is smaller, ``f + f.derivative()`` will not
         typecheck as-is; project one onto the other's space first, which is
         exact in either direction. For the derivative sampled at points
-        rather than as a ``Function``, ``f(x, deriv=k)`` is more direct, and
-        for the matrix itself see :meth:`FunctionSpace.diff_matrix`.
+        rather than as a ``Function``, ``f(x, deriv=k)`` is more direct.
 
         Parameters
         ----------
@@ -161,13 +160,12 @@ class Function:
         """
         target = space if space is not None else self.space._derivative_space(deriv)
         return Function(
-            self.space.diff_matrix(deriv, space=target) @ self.coefficients, target
+            self.space._diff_matrix(deriv, space=target) @ self.coefficients, target
         )
 
     def dot(self, other: Function, quad_rule: QuadratureRule | None = None):
         """Inner product :math:`\\langle f, g \\rangle` with another
-        ``Function`` on the same ``space``; see
-        ``FunctionSpace.inner_product``. Unlike ``__mul__``, this is safe
+        ``Function`` on the same ``space``. Unlike ``__mul__``, this is safe
         for any pair of same-space ``Function``s -- the result is a
         scalar, not another element of the space.
 
@@ -178,7 +176,7 @@ class Function:
             raise ValueError(
                 "Can only take the inner product of Functions on the same FunctionSpace"
             )
-        return self.space.inner_product(
+        return self.space._inner_product(
             self.coefficients, other.coefficients, quad_rule
         )
 

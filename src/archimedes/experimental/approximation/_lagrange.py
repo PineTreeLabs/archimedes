@@ -223,9 +223,9 @@ class LagrangeBasis(Basis):
         The nodes necessarily *move*: a smaller nodal space is a different
         set of points, so the result's coefficients are values at the new
         nodes rather than at this basis's. Collocation methods that need the
-        derivative sampled at the *original* nodes want the square
-        :meth:`FunctionSpace.diff_matrix` instead, which for this family is
-        exactly the classical barycentric differentiation matrix.
+        derivative sampled at the *original* nodes want
+        ``Function.derivative(space=self_space)`` instead, which for this
+        family is exactly the classical barycentric differentiation matrix.
         """
         if deriv < 0:
             raise ValueError(f"deriv must be >= 0, got {deriv}")
