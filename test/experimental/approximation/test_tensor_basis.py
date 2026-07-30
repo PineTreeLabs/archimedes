@@ -8,6 +8,7 @@ whole point (and would pass even if the Khatri-Rao ordering were wrong).
 
 import numpy as np
 import pytest
+from _helpers import mass_matrix, stiffness_matrix
 
 import archimedes as arc
 from archimedes.experimental.approximation import (
@@ -27,6 +28,7 @@ from archimedes.measure import (
 )
 from archimedes.quadrature import (
     composite,
+    contract,
     gauss_hermite,
     gauss_legendre,
     gauss_lobatto,
@@ -169,7 +171,7 @@ def test_projection_is_exact_for_non_separable_polynomials(space):
 
 def test_orthonormal_basis_has_identity_mass_matrix():
     space = FunctionSpace(TensorBasis((_modal(4), _modal(3))), domain=BOX)
-    np.testing.assert_allclose(space.mass_matrix(), np.eye(12), atol=1e-12)
+    np.testing.assert_allclose(mass_matrix(space), np.eye(12), atol=1e-12)
 
 
 def test_separable_functions_are_representable_too():
@@ -242,12 +244,12 @@ def test_stiffness_matrix_is_the_gradient_form():
     # sum of the per-direction stiffnesses, not any single partial.
     basis = TensorBasis((_modal(4), _modal(4)))
     space = FunctionSpace(basis, domain=BOX)
-    x, w = space._quad_points_weights()
+    x, w = space.quadrature()
     expected = sum(
-        space._basis_eval(x, deriv=d).T @ (w[:, None] * space._basis_eval(x, deriv=d))
+        contract(space.design_matrix(deriv=d), w, space.design_matrix(deriv=d))
         for d in [(1, 0), (0, 1)]
     )
-    np.testing.assert_allclose(space.stiffness_matrix(), expected, atol=1e-12)
+    np.testing.assert_allclose(stiffness_matrix(space), expected, atol=1e-12)
 
 
 def test_stiffness_matrix_matches_a_known_laplacian_entry():
@@ -256,7 +258,7 @@ def test_stiffness_matrix_matches_a_known_laplacian_entry():
     domain = ProductParameters(dims=(UnitInterval.Parameters(0.0, 1.0),) * 2)
     space = FunctionSpace(basis, domain=domain)
     c = space.project(lambda x: x[:, 0] * x[:, 1]).coefficients
-    assert c @ space.stiffness_matrix() @ c == pytest.approx(2.0 / 3.0)
+    assert c @ stiffness_matrix(space) @ c == pytest.approx(2.0 / 3.0)
 
 
 # -- mixed measures / PCE --

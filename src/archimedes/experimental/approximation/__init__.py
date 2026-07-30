@@ -3,8 +3,8 @@
 - ``Basis`` -- a basis family and its size (e.g. ``OrthogonalPolynomialBasis``);
   only evaluates, has no notion of a target domain or coefficients.
 - ``FunctionSpace`` -- a ``Basis`` on a fixed target domain, with
-  quadrature-based operations (``evaluate``, ``project``, ``mass_matrix``,
-  ``stiffness_matrix``).
+  quadrature-based operations (``evaluate``, ``project``, ``quadrature``,
+  ``design_matrix``).
 - ``Function`` -- a ``FunctionSpace`` plus a coefficient vector
 
 Bases are univariate by default. ``TensorBasis`` combines one per dimension

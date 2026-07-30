@@ -10,6 +10,7 @@ which *do* need to know about components -- ``project`` and
 
 import numpy as np
 import pytest
+from _helpers import mass_matrix
 
 import archimedes as arc
 from archimedes import tree
@@ -194,7 +195,7 @@ def test_norm_is_scalar_l2_norm_of_whole_function(space):
 def test_inner_product_matches_mass_matrix_contraction(space):
     fn = space.project(f_vec)
     gn = space.project(lambda x: f_vec(x) + 1.0)
-    M = space.mass_matrix()  # noqa: N806
+    M = mass_matrix(space)  # noqa: N806
     expected = np.sum(fn.coefficients * (M @ gn.coefficients))
     np.testing.assert_allclose(fn.dot(gn), expected, rtol=1e-9)
 
@@ -286,7 +287,7 @@ def test_gradient_of_vector_norm(space):
     assert grad.shape == (shape[0] * shape[1],)
 
     # d/dC sqrt(sum_k C_k . M . C_k) = (M @ C) / ||f||
-    M = space.mass_matrix()  # noqa: N806
+    M = mass_matrix(space)  # noqa: N806
     expected = ((M @ fn.coefficients) / fn.norm()).ravel()
     # atol: some entries are structurally zero (a component orthogonal to a
     # basis function), where a relative tolerance is meaningless.

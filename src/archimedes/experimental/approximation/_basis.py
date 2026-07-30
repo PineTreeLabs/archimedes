@@ -46,10 +46,9 @@ class Basis(metaclass=abc.ABCMeta):
     ``n_basis``.
 
     ``Basis`` only evaluates -- it has no notion of a coefficient vector or
-    a fixed target domain. See :class:`FunctionSpace`, which pairs a
-    ``Basis`` with a domain and quadrature-based operations (``project``,
-    ``mass_matrix``, ``stiffness_matrix``), and :class:`Function`, which
-    pairs a ``FunctionSpace`` with coefficients.
+    a fixed target domain. See :class:`FunctionSpace`, which combines a
+    ``Basis`` with a domain and quadrature-based operations, and :class:`Function`,
+    which further combines a ``FunctionSpace`` with coefficients.
     """
 
     ndim: int = 1
@@ -70,18 +69,6 @@ class Basis(metaclass=abc.ABCMeta):
     Only meaningful for families built on a classical-orthogonal-polynomial
     ``Measure`` (see :class:`OrthogonalPolynomialBasis`); other families
     (nodal, piecewise) have no such notion and leave this ``False``.
-
-    :class:`FunctionSpace` forwards this to
-    ``QuadratureRule.scaled_weights``/``scaled_points``' ``density``
-    argument wherever it draws quadrature weights (``mass_matrix``,
-    ``stiffness_matrix``, ``inner_product``, ``project``), so that with
-    ``density=True`` the mass matrix is still the identity but the
-    quadrature is now over a probability measure -- e.g. the coefficients
-    from ``project`` become directly interpretable moments, as in a
-    polynomial chaos expansion: ``c_0`` is the mean and ``sum(c[1:]**2)``
-    is the variance of the projected function, with no extra rescaling.
-    Default ``False``, matching the classical spectral-method convention
-    (orthonormal against the raw weight).
     """
 
     @property
@@ -188,8 +175,8 @@ class Basis(metaclass=abc.ABCMeta):
         is single-valued everywhere, so the default is exact for them.
 
         Used by :class:`FunctionSpace` wherever it integrates
-        (``mass_matrix``, ``stiffness_matrix``, ``inner_product``,
-        ``project``, ``diff_matrix``). Evaluation at *user-supplied* points
+        (``design_matrix``, ``inner_product``, ``project``,
+        ``diff_matrix``). Evaluation at *user-supplied* points
         goes through :meth:`evaluate`/:meth:`evaluate_expansion` instead,
         which have no provenance to draw on and resolve breakpoints by the
         documented ``side`` convention.

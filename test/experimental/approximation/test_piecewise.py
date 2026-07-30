@@ -1,6 +1,7 @@
 # ruff: noqa: N806  (M is the conventional name for a mass matrix)
 import numpy as np
 import pytest
+from _helpers import mass_matrix, stiffness_matrix
 
 import archimedes as arc
 from archimedes._core._array_impl import SymbolicArray
@@ -244,7 +245,7 @@ def test_mass_matrix_is_nonsingular(local, breakpoints):
         domain=UnitInterval.Parameters(a=0.0, b=3.0),
         quad_rule=composite(gauss_legendre(4), breakpoints),
     )
-    M = space.mass_matrix()
+    M = mass_matrix(space)
     np.testing.assert_allclose(M, M.T, atol=1e-12)
     assert np.linalg.matrix_rank(M) == space.n_basis
 
@@ -259,7 +260,7 @@ def test_stiffness_matrix_annihilates_constants(local, breakpoints):
         domain=UnitInterval.Parameters(a=0.0, b=3.0),
         quad_rule=composite(gauss_legendre(4), breakpoints),
     )
-    K = space.stiffness_matrix()  # noqa: N806
+    K = stiffness_matrix(space)
     np.testing.assert_allclose(K, K.T, atol=1e-12)
     np.testing.assert_allclose(K @ np.ones(space.n_basis), 0.0, atol=1e-10)
     assert np.linalg.matrix_rank(K) == space.n_basis - 1
@@ -331,9 +332,7 @@ class TestQuadratureCompatibility:
         exact = FunctionSpace(
             basis, domain=self.DOMAIN, quad_rule=composite(gauss_legendre(8), self.BP)
         )
-        np.testing.assert_allclose(
-            default.mass_matrix(), exact.mass_matrix(), atol=1e-12
-        )
+        np.testing.assert_allclose(mass_matrix(default), mass_matrix(exact), atol=1e-12)
 
     def test_space_without_quad_rule_projects_correctly(self, basis):
         space = FunctionSpace(basis, domain=self.DOMAIN)

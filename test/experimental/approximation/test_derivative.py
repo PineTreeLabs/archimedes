@@ -9,6 +9,7 @@ the independent path to the same values.
 
 import numpy as np
 import pytest
+from _helpers import mass_matrix, stiffness_matrix
 
 import archimedes as arc
 from archimedes.experimental.approximation import (
@@ -187,7 +188,7 @@ def test_jacobi_derivative_stays_orthonormal():
         OrthogonalPolynomialBasis(JacobiMeasure(1.5, 0.5), 6), domain=DOMAIN
     )
     derived = space._derivative_space()
-    np.testing.assert_allclose(derived.mass_matrix(), np.eye(5), atol=1e-12)
+    np.testing.assert_allclose(mass_matrix(derived), np.eye(5), atol=1e-12)
 
 
 def test_projecting_back_up_is_exact():
@@ -297,7 +298,7 @@ def test_stiffness_matrix_agrees_with_derivative_inner_products():
     u = space.project(f_)
     v = space.project(lambda x: x**2 - 3 * x)
     assert u.derivative().dot(v.derivative()) == pytest.approx(
-        u.coefficients @ space.stiffness_matrix() @ v.coefficients, rel=1e-10
+        u.coefficients @ stiffness_matrix(space) @ v.coefficients, rel=1e-10
     )
 
 

@@ -14,6 +14,7 @@ from ._quadrature_rule import (
     Quadrature,
     QuadratureRule,
     composite,
+    contract,
 )
 from ._tensor import TensorQuadratureRule, tensor
 
@@ -30,6 +31,7 @@ __all__ = [
     "golub_welsch",
     "from_measure",
     "composite",
+    "contract",
     "tensor",
     "integral",
 ]
