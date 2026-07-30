@@ -289,6 +289,88 @@ class FunctionSpace:
         weights = rule.scaled_weights(**domain_kwargs, density=self.basis.density)
         return rule.scaled_points(**domain_kwargs), weights
 
+    def quad_points(self, quad_rule: Quadrature | None = None) -> np.ndarray:
+        """Quadrature nodes (``quad_rule``, default ``self.quad_rule``) mapped
+        onto this space's domain.
+
+        The counterpart to :meth:`test`: gives user code the same points
+        ``test`` samples ``residual_fn`` at, for building a right-hand side
+        or a manufactured solution without reaching into ``quad_rule``,
+        ``domain``, and ``tree.fields`` by hand.
+        """
+        rule = self._resolve_rule(quad_rule)
+        x, _ = self._quad_points_weights(rule)
+        return x
+
+    def test(
+        self,
+        residual_fn: Callable,
+        deriv: int = 0,
+        quad_rule: Quadrature | None = None,
+    ) -> np.ndarray:
+        """Galerkin-test ``residual_fn`` against every basis function.
+
+        .. math::
+            R_i = \\int r(x) \\, \\phi_i^{(k)}(x) \\, w(x) \\, dx, \\qquad
+            R = \\Phi^{(k)\\top} (w \\odot r(x)),
+
+        where :math:`\\Phi^{(k)}` is the design matrix of the ``deriv``-th
+        (:math:`k`-th) derivative of *this* space's basis -- the test
+        side -- and :math:`r` = ``residual_fn`` is evaluated at the
+        quadrature nodes and may depend on trial functions of any derivative
+        order, independently of ``deriv``. That makes mixed-order weak forms
+        (e.g. an advection term :math:`\\int u'v\\,dx`) and matched-order
+        ones (e.g. Poisson's :math:`\\int u'v'\\,dx`) both work, since 
+        ``deriv`` only ever governs the test side.
+
+        This is the shared primitive behind :meth:`mass_matrix`,
+        :meth:`stiffness_matrix`, and the right-hand side of :meth:`project`
+        -- each is ``test`` with ``residual_fn`` fixed to (a derivative of)
+        the basis itself or to a plain function of position. It is public
+        because assembling a nonlinear residual (e.g. for a Galerkin BVP)
+        needs the same contraction with a ``residual_fn`` that closes over a
+        trial :class:`Function`, which those three methods don't expose.
+
+        Parameters
+        ----------
+        residual_fn : callable
+            Called once as ``residual_fn(x)`` on the full quadrature node
+            array (``self.quad_points(quad_rule)``); must return an array of
+            shape ``(npts,)`` (scalar-valued) or ``(npts, m)``
+            (vector-valued, contracted independently per component).
+        deriv : int or tuple of int, optional
+            Derivative order of the *test* function; a multi-index for a
+            :class:`TensorBasis`, a plain order otherwise. Default 0.
+        quad_rule : QuadratureRule, optional
+            Quadrature rule to use instead of ``self.quad_rule``. Must be
+            accurate enough for the product of ``residual_fn`` and the
+            (``deriv``-th derivative of the) basis.
+
+        Returns
+        -------
+        ndarray
+            Shape ``(n_basis,)`` or ``(n_basis, m)``, one equation per basis
+            function.
+
+        Notes
+        -----
+        The *test* side's design matrix always uses the quadrature rule's
+        recorded element ownership (see :meth:`Basis._evaluate_at_nodes`),
+        so it integrates a piecewise basis exactly whatever rule is used --
+        the same guarantee :meth:`mass_matrix`/:meth:`stiffness_matrix` have.
+        The *trial* side has no such guarantee of its own: ``residual_fn``
+        only ever receives coordinates, so if it evaluates a discontinuous
+        basis directly by coordinate (rather than through
+        :meth:`Function.__call__`, which resolves breakpoints via its
+        ``side`` argument) it cannot distinguish two quadrature nodes placed
+        at the same coordinate from different elements.
+        """
+        rule = self._resolve_rule(quad_rule)
+        x, w = self._quad_points_weights(rule)
+        phi = self._basis_eval_at_nodes(rule, deriv=deriv)  # (npts, n_basis)
+        r = residual_fn(x)
+        return phi.T @ (w * r if r.ndim == 1 else w[:, None] * r)  # type: ignore[no-any-return]
+
     def evaluate(self, coefficients: np.ndarray, x, deriv: int = 0, side: str = RIGHT):
         """Evaluate :math:`\\sum_i c_i \\, \\phi_i(x)` (or its ``deriv``-th
         derivative) at ``x``, for coefficients ``c = coefficients``.
@@ -351,14 +433,13 @@ class FunctionSpace:
         coefficients and call this once per component.
         """
         rule = self._resolve_rule(quad_rule)
-        _, w = self._quad_points_weights(rule)
         phi = self._basis_eval_at_nodes(rule)  # (npts, n_basis)
         integrand = (phi @ c1) * (phi @ c2)  # (npts,) or (npts, m)
         if integrand.ndim > 1:
             # `ndim` is a static (trace-time) property, so this branches on
             # shape rather than on a value and is safe under `@arc.compile`.
             integrand = np.sum(integrand, axis=-1)
-        return np.dot(w, integrand)
+        return rule.sum(integrand, **self._domain_kwargs(), density=self.basis.density)
 
     def mass_matrix(self) -> np.ndarray:
         """Mass matrix :math:`M_{ij} = \\int \\phi_i \\, \\phi_j \\, w \\, dx`,
