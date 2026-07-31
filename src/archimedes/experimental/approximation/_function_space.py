@@ -8,10 +8,20 @@ from typing import TYPE_CHECKING, Any, Callable
 import numpy as np
 
 from archimedes import tree
-from archimedes.measure import LegendreMeasure, UnitInterval
+from archimedes.measure import (
+    HalfLine,
+    HermiteMeasure,
+    HermiteNormMeasure,
+    JacobiMeasure,
+    LaguerreMeasure,
+    LegendreMeasure,
+    RealLine,
+    UnitInterval,
+)
 from archimedes.quadrature import Quadrature
 
 from ._basis import RIGHT, Basis, BasisMatrix
+from ._hermite import CubicHermiteBasis
 from ._lagrange import LagrangeBasis
 from ._orthogonal import OrthogonalPolynomialBasis
 from ._piecewise import PiecewiseBasis
@@ -101,9 +111,35 @@ def _resolve_element_basis(kind: str, order, nodes) -> Basis | tuple[Basis, ...]
         bases = tuple(OrthogonalPolynomialBasis(LegendreMeasure(), n) for n in orders)
     elif kind == "lagrange":
         bases = tuple(_resolve_lagrange_element(n, nodes) for n in orders)
+    elif kind == "hermite":
+        if nodes is not None:
+            raise ValueError("nodes is only meaningful for kind='lagrange'")
+        hermite = CubicHermiteBasis()
+        for n in orders:
+            if n != hermite.n_basis:
+                raise ValueError(
+                    f"kind='hermite' is a fixed cubic element (value + slope "
+                    f"at each end, {hermite.n_basis} DOFs); order must be "
+                    f"{hermite.n_basis}, got {n}"
+                )
+        bases = tuple(CubicHermiteBasis() for _ in orders)
     else:
-        raise ValueError(f"kind must be 'lagrange' or 'legendre', got {kind!r}")
+        raise ValueError(
+            f"kind must be 'lagrange', 'legendre', or 'hermite', got {kind!r}"
+        )
     return bases if isinstance(order, tuple) else bases[0]
+
+
+def _orthogonal_space(
+    cls, measure, n_basis: int, domain, density: bool, quad_rule
+) -> FunctionSpace:
+    """Shared body for the ``OrthogonalPolynomialBasis``-backed classmethod
+    constructors (:meth:`FunctionSpace.legendre`, ``.chebyshev``, ``.jacobi``,
+    ``.hermite``, ``.hermite_norm``, ``.laguerre``): only the measure and the
+    domain-parameter type differ between them.
+    """
+    basis = OrthogonalPolynomialBasis(measure, n_basis, density=density)
+    return cls(basis, domain, quad_rule=quad_rule)
 
 
 def _is_superset(have: np.ndarray, required: np.ndarray, tol: float = 1e-12) -> bool:
@@ -239,6 +275,136 @@ class FunctionSpace:
     # --- constructors ---
 
     @classmethod
+    def legendre(
+        cls,
+        n_basis: int,
+        a: float = -1.0,
+        b: float = 1.0,
+        density: bool = False,
+        quad_rule: Quadrature | None = None,
+    ) -> FunctionSpace:
+        """Global Legendre polynomial space on ``[a, b]``.
+
+        Sugar for ``FunctionSpace(OrthogonalPolynomialBasis(LegendreMeasure(),
+        n_basis, density=density), UnitInterval.Parameters(a=a, b=b),
+        quad_rule=quad_rule)``.
+        """
+        return _orthogonal_space(
+            cls,
+            LegendreMeasure(),
+            n_basis,
+            UnitInterval.Parameters(a=a, b=b),
+            density,
+            quad_rule,
+        )
+
+    @classmethod
+    def chebyshev(
+        cls,
+        n_basis: int,
+        a: float = -1.0,
+        b: float = 1.0,
+        second_kind: bool = False,
+        density: bool = False,
+        quad_rule: Quadrature | None = None,
+    ) -> FunctionSpace:
+        """Global Chebyshev polynomial space on ``[a, b]``.
+
+        Chebyshev polynomials are the special case of
+        :class:`~archimedes.measure.JacobiMeasure` with
+        :math:`\\alpha = \\beta = -1/2` (first kind, the default) or
+        :math:`\\alpha = \\beta = 1/2` (``second_kind=True``); see
+        :class:`~archimedes.measure.JacobiMeasure`.
+        """
+        exponent = 0.5 if second_kind else -0.5
+        return _orthogonal_space(
+            cls,
+            JacobiMeasure(exponent, exponent),
+            n_basis,
+            UnitInterval.Parameters(a=a, b=b),
+            density,
+            quad_rule,
+        )
+
+    @classmethod
+    def jacobi(
+        cls,
+        alpha: float,
+        beta: float,
+        n_basis: int,
+        a: float = -1.0,
+        b: float = 1.0,
+        density: bool = False,
+        quad_rule: Quadrature | None = None,
+    ) -> FunctionSpace:
+        """Global Jacobi polynomial space on ``[a, b]``; see
+        :class:`~archimedes.measure.JacobiMeasure` for ``alpha``/``beta``."""
+        return _orthogonal_space(
+            cls,
+            JacobiMeasure(alpha, beta),
+            n_basis,
+            UnitInterval.Parameters(a=a, b=b),
+            density,
+            quad_rule,
+        )
+
+    @classmethod
+    def hermite(
+        cls,
+        n_basis: int,
+        mean: float = 0.0,
+        std: float = 1.0,
+        kind: Literal["phys", "prob"] = "phys",
+        density: bool = False,
+        quad_rule: Quadrature | None = None,
+    ) -> FunctionSpace:
+        """Global Hermite polynomial space.
+    
+        *physicists'* Hermite polynomial space (weight
+        :math:`e^{-x^2}`); see :class:`~archimedes.measure.HermiteMeasure`.
+
+        *probabilists'* Hermite polynomial space (weight
+        :math:`e^{-x^2/2}`, the natural basis for a Gaussian random
+        variable); see :class:`~archimedes.measure.HermiteNormMeasure`
+        """
+        if kind == "prob":
+            measure = HermiteNormMeasure()
+        elif kind == "phys":
+            measure = HermiteMeasure()
+        else:
+            raise ValueError(
+                f"Hermite kind must be 'phys' or 'prob', got {kind!r}"
+            )
+        return _orthogonal_space(
+            cls,
+            measure,
+            n_basis,
+            RealLine.Parameters(mean=mean, std=std),
+            density,
+            quad_rule,
+        )
+
+    @classmethod
+    def laguerre(
+        cls,
+        n_basis: int,
+        rate: float = 1.0,
+        start: float = 0.0,
+        density: bool = False,
+        quad_rule: Quadrature | None = None,
+    ) -> FunctionSpace:
+        """Global Laguerre polynomial space on ``[start, inf)``; see
+        :class:`~archimedes.measure.LaguerreMeasure`."""
+        return _orthogonal_space(
+            cls,
+            LaguerreMeasure(),
+            n_basis,
+            HalfLine.Parameters(rate=rate, start=start),
+            density,
+            quad_rule,
+        )
+
+    @classmethod
     def piecewise(
         cls,
         kind: str,
@@ -264,17 +430,26 @@ class FunctionSpace:
 
         Parameters
         ----------
-        kind : {"lagrange", "legendre"}
-            Local basis family. ``"lagrange"`` is nodal (point-value
-            degrees of freedom); ``"legendre"`` is modal
-            (:class:`OrthogonalPolynomialBasis` on
-            :class:`~archimedes.measure.LegendreMeasure`), which has no
-            boundary degrees of freedom and so only supports
-            ``continuity=-1``.
+        kind : {"lagrange", "legendre", "hermite"}
+            Local basis family.
+
+            - ``"lagrange"`` is nodal (point-value degrees of freedom);
+              node placement is chosen by ``nodes``.
+            - ``"legendre"`` is modal (:class:`OrthogonalPolynomialBasis`
+              on :class:`~archimedes.measure.LegendreMeasure`), which has
+              no boundary degrees of freedom and so only supports
+              ``continuity=-1``.
+            - ``"hermite"`` is :class:`CubicHermiteBasis`: value *and*
+              slope degrees of freedom at each end, fixed at ``order=4``
+              (a cubic). Needed for ``continuity=1`` (:math:`C^1`); also
+              buildable at ``continuity=0`` or ``-1``, merging (or not)
+              only the value DOF.
+
         order : int or tuple of int
             Number of local degrees of freedom per element. A bare ``int``
             is shared by every element; a tuple gives one order per
             element (p-refinement) and must have one entry per element.
+            Fixed at ``4`` for ``kind="hermite"``.
         breakpoints : array_like
             Element boundaries **on the physical (target) domain**, shape
             ``(n_elements + 1,)``, strictly increasing. Unlike
@@ -284,12 +459,12 @@ class FunctionSpace:
             directly from the array rather than given separately.
         nodes : str, callable, or array_like, optional
             Node placement for a ``kind="lagrange"`` element, one of:
-            
+
                 - One of the family names ``"lobatto"``, ``"legendre"``,
                     ``"radau_left"``, ``"radau_right"``, ``"equispaced"``
                 - An explicit ``n -> nodes`` callable
                 - An explicit array of reference nodes.
-                
+
             Default (``None``) is Gauss-Lobatto, which keeps ``continuity=0``,
             since Lobatto includes both endpoints. Meaningless (and rejected)
             for non-Lagrange bases.

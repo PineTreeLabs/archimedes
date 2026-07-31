@@ -8,6 +8,7 @@ import numpy as np
 import pytest
 
 from archimedes.experimental.approximation import (
+    CubicHermiteBasis,
     FunctionSpace,
     LagrangeBasis,
     OrthogonalPolynomialBasis,
@@ -200,4 +201,41 @@ def test_quad_rule_passthrough_rejects_incompatible_rule():
     with pytest.raises(ValueError, match="only piecewise smooth"):
         FunctionSpace.piecewise(
             "lagrange", 3, np.linspace(0.0, 1.0, 4), quad_rule=gauss_legendre(5)
+        )
+
+
+# -- kind="hermite" --
+
+
+@pytest.mark.parametrize("continuity", [-1, 0, 1])
+def test_hermite_kind_matches_manual_construction(continuity):
+    breakpoints = np.linspace(0.0, 1.0, 6)
+    _, _, ref = _normalize_breakpoints(breakpoints)
+    manual = FunctionSpace(
+        PiecewiseBasis(CubicHermiteBasis(), ref, continuity=continuity),
+        UnitInterval.Parameters(a=0.0, b=1.0),
+    )
+    sugar = FunctionSpace.piecewise("hermite", 4, breakpoints, continuity=continuity)
+    assert sugar.n_basis == manual.n_basis
+    np.testing.assert_allclose(
+        sugar.basis_matrix().matrix, manual.basis_matrix().matrix
+    )
+
+
+def test_hermite_kind_requires_order_four():
+    with pytest.raises(ValueError, match="order must be 4"):
+        FunctionSpace.piecewise("hermite", 3, np.linspace(0.0, 1.0, 6), continuity=1)
+
+
+def test_hermite_kind_rejects_nodes():
+    with pytest.raises(ValueError, match="nodes is only meaningful"):
+        FunctionSpace.piecewise(
+            "hermite", 4, np.linspace(0.0, 1.0, 6), nodes="lobatto", continuity=1
+        )
+
+
+def test_hermite_kind_per_element_tuple_order_validates_each_entry():
+    with pytest.raises(ValueError, match="order must be 4"):
+        FunctionSpace.piecewise(
+            "hermite", (4, 4, 3), np.linspace(0.0, 1.0, 4), continuity=1
         )
