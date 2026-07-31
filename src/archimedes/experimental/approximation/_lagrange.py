@@ -119,7 +119,7 @@ class LagrangeBasis(Basis):
     ----------
     reference_nodes : array_like
         Interpolation nodes on the reference domain ``[-1, 1]``. Must be
-        distinct. Order determines the meaning of a ``Function``'s
+        distinct. Order determines the meaning of a ``BasisExpansion``'s
         coefficients (``coefficients[i]`` is the value at
         ``reference_nodes[i]``, once mapped to the target domain), but not
         the basis itself.
@@ -295,7 +295,7 @@ class LagrangeBasis(Basis):
         set of points, so the result's coefficients are values at the new
         nodes rather than at this basis's. Collocation methods that need the
         derivative sampled at the *original* nodes want
-        ``Function.derivative(space=self_space)`` instead, which for this
+        ``BasisExpansion.derivative(space=self_space)`` instead, which for this
         family is exactly the classical barycentric differentiation matrix.
         """
         if deriv < 0:

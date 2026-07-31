@@ -3,7 +3,7 @@ import pytest
 
 import archimedes as arc
 from archimedes.experimental.approximation import (
-    Function,
+    BasisExpansion,
     FunctionSpace,
     OrthogonalPolynomialBasis,
 )
@@ -103,7 +103,7 @@ def test_domain_parameters_are_traceable(space, quadratic):
             domain=UnitInterval.Parameters(a=a, b=b),
             quad_rule=space.quad_rule,
         )
-        return Function(c, moving)(np.array([x0]))[0]
+        return BasisExpansion(c, moving)(np.array([x0]))[0]
 
     # Matches the equivalent static-domain evaluation
     val = evaluate(quadratic.coefficients, -1.0, 1.0)
@@ -131,7 +131,7 @@ def test_call_compiles_and_matches_static_evaluation(space, quadratic):
 
     @arc.compile
     def traced(x, c):
-        return Function(c, space)(x)
+        return BasisExpansion(c, space)(x)
 
     dynamic_vals = np.array([float(traced(xi, quadratic.coefficients)) for xi in x])
     np.testing.assert_allclose(static_vals, dynamic_vals, atol=1e-12)
@@ -140,7 +140,7 @@ def test_call_compiles_and_matches_static_evaluation(space, quadratic):
 def test_grad_wrt_x(space, quadratic):
     @arc.compile
     def traced(x, c):
-        return Function(c, space)(x)
+        return BasisExpansion(c, space)(x)
 
     dfdx = arc.grad(traced, argnums=0)
     x = np.linspace(-0.8, 0.8, 5)
@@ -151,7 +151,7 @@ def test_grad_wrt_x(space, quadratic):
 def test_grad_wrt_coefficients_matches_basis_values(space, quadratic):
     @arc.compile
     def traced(x, c):
-        return Function(c, space)(x)
+        return BasisExpansion(c, space)(x)
 
     dfdc = arc.grad(traced, argnums=1)
     x0 = 0.37

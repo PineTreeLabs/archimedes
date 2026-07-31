@@ -14,7 +14,7 @@ from ._gauss_legendre import (
 )
 from ._quadrature_rule import QuadratureRule
 
-__all__ = ["integral"]
+__all__ = ["quadint"]
 
 _RULES: dict[str, Callable[[int], QuadratureRule]] = {
     "legendre": gauss_legendre,
@@ -25,7 +25,7 @@ _RULES: dict[str, Callable[[int], QuadratureRule]] = {
 }
 
 
-def integral(
+def quadint(
     func: Callable[..., np.ndarray],
     a: float,
     b: float,

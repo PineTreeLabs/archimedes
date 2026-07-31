@@ -13,7 +13,7 @@ from archimedes.experimental.approximation import (
     PiecewiseBasis,
 )
 from archimedes.measure import LegendreMeasure, UnitInterval
-from archimedes.quadrature import composite, gauss_legendre, gauss_lobatto
+from archimedes.quadrature import composite_quad, gauss_legendre, gauss_lobatto
 
 
 @pytest.fixture
@@ -355,14 +355,14 @@ class TestC1Continuity:
         # End-to-end: project a smooth function onto a C1 Hermite space on a
         # non-uniform mesh and physical domain, then check that evaluating
         # deriv=0..3 (not just deriv=0) reconstructs a sane, finite field --
-        # this is the direct FunctionSpace/Function-level analogue of the
+        # this is the direct FunctionSpace/BasisExpansion-level analogue of the
         # fused-vs-dense check above.
         a, b = -2.0, 6.0
         basis = PiecewiseBasis(hermite, self.BP, continuity=1)
         space = FunctionSpace(
             basis,
             domain=UnitInterval.Parameters(a=a, b=b),
-            quad_rule=composite(gauss_legendre(4), self.BP),
+            quad_rule=composite_quad(gauss_legendre(4), self.BP),
         )
 
         def f(x):
@@ -403,7 +403,7 @@ def test_projection_of_elementwise_representable_function(local, breakpoints):
         basis,
         domain=UnitInterval.Parameters(a=a, b=b),
         # Composite rule so quadrature resolves the element structure.
-        quad_rule=composite(gauss_legendre(4), breakpoints),
+        quad_rule=composite_quad(gauss_legendre(4), breakpoints),
     )
 
     # Globally quadratic: degree <= 2 on each element and continuous, so it
@@ -421,7 +421,7 @@ def test_mass_matrix_is_nonsingular(local, breakpoints):
     space = FunctionSpace(
         basis,
         domain=UnitInterval.Parameters(a=0.0, b=3.0),
-        quad_rule=composite(gauss_legendre(4), breakpoints),
+        quad_rule=composite_quad(gauss_legendre(4), breakpoints),
     )
     M = mass_matrix(space)
     np.testing.assert_allclose(M, M.T, atol=1e-12)
@@ -436,7 +436,7 @@ def test_stiffness_matrix_annihilates_constants(local, breakpoints):
     space = FunctionSpace(
         basis,
         domain=UnitInterval.Parameters(a=0.0, b=3.0),
-        quad_rule=composite(gauss_legendre(4), breakpoints),
+        quad_rule=composite_quad(gauss_legendre(4), breakpoints),
     )
     K = stiffness_matrix(space)
     np.testing.assert_allclose(K, K.T, atol=1e-12)
@@ -510,7 +510,9 @@ class TestQuadratureCompatibility:
         default = FunctionSpace(basis, domain=self.DOMAIN)
         # A much higher-order aligned rule must give the same mass matrix.
         exact = FunctionSpace(
-            basis, domain=self.DOMAIN, quad_rule=composite(gauss_legendre(8), self.BP)
+            basis,
+            domain=self.DOMAIN,
+            quad_rule=composite_quad(gauss_legendre(8), self.BP),
         )
         np.testing.assert_allclose(mass_matrix(default), mass_matrix(exact), atol=1e-12)
 
@@ -524,7 +526,7 @@ class TestQuadratureCompatibility:
         np.testing.assert_allclose(space.project(f)(x), f(x), atol=1e-9)
 
     def test_aligned_rule_accepted(self, basis):
-        rule = composite(gauss_legendre(4), self.BP)
+        rule = composite_quad(gauss_legendre(4), self.BP)
         assert FunctionSpace(basis, domain=self.DOMAIN, quad_rule=rule) is not None
 
     def test_refinement_accepted(self, basis):
@@ -532,13 +534,13 @@ class TestQuadratureCompatibility:
         # of the basis, so the integrand is a polynomial there.
         midpoints = (self.BP[:-1] + self.BP[1:]) / 2
         refined = np.unique(np.concatenate([self.BP, midpoints]))
-        rule = composite(gauss_legendre(4), refined)
+        rule = composite_quad(gauss_legendre(4), refined)
         assert FunctionSpace(basis, domain=self.DOMAIN, quad_rule=rule) is not None
 
     def test_misaligned_composite_rejected(self, basis):
         # Same number of elements, different partition -- silently produced a
         # ~2.5% error in the mass matrix before this was checked.
-        rule = composite(gauss_legendre(4), np.linspace(-1.0, 1.0, 4))
+        rule = composite_quad(gauss_legendre(4), np.linspace(-1.0, 1.0, 4))
         with pytest.raises(ValueError, match="must not straddle"):
             FunctionSpace(basis, domain=self.DOMAIN, quad_rule=rule)
 
@@ -613,18 +615,22 @@ class TestPerElementOrder:
                 (self._lobatto(3), modal, self._lobatto(4)), self.BP, continuity=-1
             )
 
-    def test_default_quadrature_matches_per_element_composite(
+    def test_default_quadrature_matches_per_element_composite_quad(
         self, basis, element_bases
     ):
         rule = basis.default_quadrature()
-        expected = composite([b.default_quadrature() for b in element_bases], self.BP)
+        expected = composite_quad(
+            [b.default_quadrature() for b in element_bases], self.BP
+        )
         assert rule == expected
 
     def test_default_quadrature_integrates_mass_matrix_exactly(self, basis):
         default = FunctionSpace(basis, domain=self.DOMAIN)
         # A much higher-order aligned rule must give the same mass matrix.
         exact = FunctionSpace(
-            basis, domain=self.DOMAIN, quad_rule=composite(gauss_legendre(8), self.BP)
+            basis,
+            domain=self.DOMAIN,
+            quad_rule=composite_quad(gauss_legendre(8), self.BP),
         )
         np.testing.assert_allclose(mass_matrix(default), mass_matrix(exact), atol=1e-12)
 
@@ -797,7 +803,7 @@ class TestEvaluateExpansion:
 
     def test_function_call_uses_fused_path(self, local, breakpoints):
         # FunctionSpace.evaluate routes through evaluate_expansion, so a
-        # Function's __call__ gets this for free.
+        # BasisExpansion's __call__ gets this for free.
         basis = PiecewiseBasis(local, breakpoints, continuity=0)
         space = FunctionSpace(basis, domain=UnitInterval.Parameters(a=self.A, b=self.B))
 

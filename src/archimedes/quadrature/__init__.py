@@ -8,14 +8,14 @@ from ._gauss_legendre import (
     gauss_lobatto,
     gauss_radau,
 )
-from ._golub_welsch import from_measure, golub_welsch
-from ._integral import integral
+from ._golub_welsch import golub_welsch, golub_welsch_rule
+from ._integral import quadint
 from ._quadrature_rule import (
     Quadrature,
     QuadratureRule,
-    composite,
+    composite_quad,
 )
-from ._tensor import TensorQuadratureRule, tensor
+from ._tensor import TensorQuadratureRule, tensor_quad
 
 __all__ = [
     "Quadrature",
@@ -28,8 +28,8 @@ __all__ = [
     "gauss_hermite",
     "gauss_laguerre",
     "golub_welsch",
-    "from_measure",
-    "composite",
-    "tensor",
-    "integral",
+    "golub_welsch_rule",
+    "composite_quad",
+    "tensor_quad",
+    "quadint",
 ]

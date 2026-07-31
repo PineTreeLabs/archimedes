@@ -25,7 +25,7 @@ from archimedes.measure import Measure
 __all__ = [
     "Quadrature",
     "QuadratureRule",
-    "composite",
+    "composite_quad",
 ]
 
 
@@ -143,9 +143,9 @@ class QuadratureRule:
     measure : Measure
         Weight function and reference domain the rule is defined on.
     breakpoints : array_like, optional
-        For a composite rule (see :func:`composite`), the element boundaries
-        it was tiled across, on ``measure.support``; ``None`` for a plain
-        rule.
+        For a composite rule (see :func:`composite_quad`), the element
+        boundaries it was tiled across, on ``measure.support``; ``None`` for
+        a plain rule.
     elements : array_like, optional
         For a composite rule, the index of the element each node came from,
         shape ``(n,)``. Required whenever ``breakpoints`` is given and
@@ -407,7 +407,7 @@ class QuadratureRule:
         return _weighted_sum(w, values, axis, len(self))
 
 
-def composite(
+def composite_quad(
     base: QuadratureRule | Sequence[QuadratureRule], breakpoints: np.ndarray
 ) -> QuadratureRule:
     """Tile ``base`` across elements of its reference domain.
@@ -426,8 +426,8 @@ def composite(
 
     ``base`` may instead be a sequence of rules, one per element, letting
     each element carry its own order (or even its own family) -- e.g.
-    ``composite([gauss_legendre(2), gauss_legendre(4)], breakpoints)`` for
-    two elements of different degree. A single ``base`` rule is exactly
+    ``composite_quad([gauss_legendre(2), gauss_legendre(4)], breakpoints)``
+    for two elements of different degree. A single ``base`` rule is exactly
     equivalent to passing that same rule ``len(breakpoints) - 1`` times.
 
     Only defined for families whose reference weight is uniform (see

@@ -29,7 +29,7 @@ from archimedes.measure import Measure, ReferenceDomain
 
 from ._quadrature_rule import QuadratureRule, _weighted_sum
 
-__all__ = ["TensorQuadratureRule", "tensor"]
+__all__ = ["TensorQuadratureRule", "tensor_quad"]
 
 
 def _dim_args(spec: Any) -> tuple[tuple, dict]:
@@ -85,8 +85,8 @@ class TensorQuadratureRule:
 
     See Also
     --------
-    tensor : Constructor taking the per-dimension rules variadically.
-    composite : Tile a rule across sub-elements *within* one dimension;
+    tensor_quad : Constructor taking the per-dimension rules variadically.
+    composite_quad : Tile a rule across sub-elements *within* one dimension;
         apply it per-dimension before tensoring to get a rectilinear mesh.
     """
 
@@ -358,23 +358,23 @@ class TensorQuadratureRule:
         return _weighted_sum(w, values, axis, len(self))
 
 
-def tensor(*rules: QuadratureRule) -> TensorQuadratureRule:
+def tensor_quad(*rules: QuadratureRule) -> TensorQuadratureRule:
     """Build a :class:`TensorQuadratureRule` from one rule per dimension.
 
     .. code-block:: python
 
-        from archimedes.quadrature import gauss_hermite, gauss_legendre, tensor
+        from archimedes.quadrature import gauss_hermite, gauss_legendre, tensor_quad
 
         # Two Gaussian inputs and one uniformly-bounded one
-        rule = tensor(
+        rule = tensor_quad(
             gauss_hermite(4, kind="prob"),
             gauss_hermite(4, kind="prob"),
             gauss_legendre(4),
         )
 
     To integrate over a rectilinear mesh rather than a single box, apply
-    :func:`composite` per dimension first -- ``tensor(composite(gl, bp_x),
-    composite(gl, bp_y))``.
+    :func:`composite_quad` per dimension first -- ``tensor_quad(composite_quad(gl,
+    bp_x), composite_quad(gl, bp_y))``.
 
     Parameters
     ----------

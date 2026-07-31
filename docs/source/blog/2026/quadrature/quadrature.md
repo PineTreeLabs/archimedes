@@ -51,7 +51,7 @@ w_i &\leftarrow \frac{b-a}{2} w_i
 \end{aligned}
 $$
 
-Definite integrals on finite domains can be calculated using Gauss-Legendre quadrature with the [`integral`](#archimedes.quadrature.integral) function:
+Definite integrals on finite domains can be calculated using Gauss-Legendre quadrature with the [`quadint`](#archimedes.quadrature.quadint) function:
 
 ```{code-cell} python
 :tags: [hide-cell]
@@ -72,7 +72,7 @@ a, b = -3, 3  # Integration limits
 J_ex = np.exp(b) - np.exp(a)  # Exact integral: e^b - e^a
 
 # 5-point Gauss-Legendre quadrature rule
-J_leg = arc.quadrature.integral(f, a, b, n=5)
+J_leg = arc.quadrature.quadint(f, a, b, n=5)
 
 print(f"Exact integral:          {J_ex:.6f}")
 print(f"Gauss-Legendre integral: {J_leg:.6f}")
@@ -89,7 +89,7 @@ def f(x):
 
 @arc.compile
 def integrate_f(a, b):
-    return arc.quadrature.integral(f, a, b, n=5)
+    return arc.quadrature.quadint(f, a, b, n=5)
 
 
 dJ_da, dJ_db = arc.grad(integrate_f, argnums=(0, 1))(a, b)
@@ -106,7 +106,7 @@ def f(x):
 
 
 a, b = 0, np.pi / 2  # Integration limits
-J_vec = arc.quadrature.integral(f, a, b, n=3)
+J_vec = arc.quadrature.quadint(f, a, b, n=3)
 
 print("Analytical integral: [1, 1]")
 print(f"Computed integral:   {J_vec}")
@@ -127,7 +127,7 @@ def g(x):
     a = np.sin(x)
     b = np.cos(x)
     # Compute integral using Gauss-Legendre quadrature
-    return arc.quadrature.integral(f, a, b, n=5)
+    return arc.quadrature.quadint(f, a, b, n=5)
 
 
 # Compute g'(x) using automatic differentiation
@@ -187,7 +187,7 @@ The second is [`QuadratureRule`](#archimedes.quadrature.QuadratureRule), which s
 If you're not constructing exotic custom quadrature rules, you shouldn't need to interact with either of these classes directly.
 Instead, there are two high-level interfaces:
 
-1. The [`integral`](#archimedes.quadrature.integral) function demonstrated earlier, which takes a callable function and does Gauss-Legendre quadrature on an unweighted finite interval
+1. The [`quadint`](#archimedes.quadrature.quadint) function demonstrated earlier, which takes a callable function and does Gauss-Legendre quadrature on an unweighted finite interval
 2. Convenience constructors for common `QuadratureRule`s like Gauss-Radau, Clenshaw-Curtis, Gauss-Hermite, etc.
 
 We've already seen #1 in action.

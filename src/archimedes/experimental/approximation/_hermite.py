@@ -55,7 +55,7 @@ class CubicHermiteBasis(Basis):
     d\phi_{10}/dt`, which is :math:`c_1` at the owning node since
     :math:`d\phi_{10}/dt = 1` there by construction.
 
-    **Derivatives leave this family.** For a :class:`Function` `f` constructed
+    **Derivatives leave this family.** For a :class:`BasisExpansion` `f` constructed
     with a piecewise cubic Hermite basis, `f.derivative()` is a piecewise
     *quadratic* function in a :class:`LagrangeBasis` (using Gauss-Lobatto nodes),
     since there is no smaller Hermite space for the derivative to live in.
@@ -72,7 +72,7 @@ class CubicHermiteBasis(Basis):
     @property
     def _dof_order(self) -> np.ndarray:
         """Derivative order of each column's degree of freedom.
-        
+
         ``[0, 1, 0, 1]``: columns 0, 2 are values; columns 1, 3 are
         physical derivatives. See the class docstring."""
         return np.array([0, 1, 0, 1], dtype=int)

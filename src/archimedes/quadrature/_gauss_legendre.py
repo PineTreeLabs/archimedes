@@ -3,7 +3,7 @@
 Includes Gauss-Legendre, Gauss-Radau, and Gauss-Lobatto rules, as well as
 Clenshaw-Curtis quadrature (Chebyshev-Lobatto nodes). All rules share the
 same Legendre measure, so they can be tiled into composite rules with
-:func:`composite`.
+:func:`composite_quad`.
 """
 
 from __future__ import annotations
@@ -145,7 +145,8 @@ def clenshaw_curtis(n: int) -> QuadratureRule:
     polynomials up to degree :math:`n - 1`, half that of Gauss-Legendre
     for the same node count. The weight function is still uniform,
     so this rule shares the Legendre measure with ``gauss_legendre``,
-    ``gauss_radau``, and ``gauss_lobatto``, and can be tiled with ``composite``.
+    ``gauss_radau``, and ``gauss_lobatto``, and can be tiled with
+    ``composite_quad``.
     The tradeoff for the lower degree of exactness is that
     Chebyshev-Lobatto nodes are nested across doublings of ``n`` and cheap,
     numerically stable to compute for very large ``n``.

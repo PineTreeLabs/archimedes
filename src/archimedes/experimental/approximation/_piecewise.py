@@ -317,9 +317,9 @@ class PiecewiseBasis(Basis):
 
     def default_quadrature(self):
         """Each element's own rule, tiled across the same breakpoints."""
-        from archimedes.quadrature import composite
+        from archimedes.quadrature import composite_quad
 
-        return composite(
+        return composite_quad(
             [eb.default_quadrature() for eb in self.element_basis], self.breakpoints
         )
 

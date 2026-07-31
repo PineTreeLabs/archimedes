@@ -99,9 +99,9 @@ class OrthogonalPolynomialBasis(Basis):
         which covers the degree-:math:`2(n_\\mathrm{basis} - 1)` mass-matrix
         integrand (and the lower-degree stiffness one).
         """
-        from archimedes.quadrature import from_measure
+        from archimedes.quadrature import golub_welsch_rule
 
-        return from_measure(self.measure, self.n_basis)
+        return golub_welsch_rule(self.measure, self.n_basis)
 
     def _product_basis(self, other):
         """Same measure, ``n_1 + n_2 - 1`` functions.

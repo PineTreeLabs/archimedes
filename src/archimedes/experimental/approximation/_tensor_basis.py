@@ -154,7 +154,7 @@ class TensorBasis(Basis):
         \\Phi_{(i_1, \\ldots, i_d)}(x) = \\phi^{(1)}_{i_1}(x_1) \\cdots
             \\phi^{(d)}_{i_d}(x_d),
 
-    so ``n_basis`` is the product of the factors' sizes and a ``Function``
+    so ``n_basis`` is the product of the factors' sizes and a ``BasisExpansion``
     on this basis spans the full ``(n_1, ..., n_d)`` coefficient array.
 
     The multi-index is flattened in **C order** -- last dimension varying
@@ -183,7 +183,7 @@ class TensorBasis(Basis):
 
     See Also
     --------
-    archimedes.quadrature.tensor : The matching quadrature construction.
+    archimedes.quadrature.tensor_quad : The matching quadrature construction.
     """
 
     bases: tuple[Basis, ...]
@@ -261,9 +261,9 @@ class TensorBasis(Basis):
         """The tensor product of the factors' own default rules, which is
         therefore exact for this basis's mass and stiffness integrands in
         each variable separately."""
-        from archimedes.quadrature import tensor
+        from archimedes.quadrature import tensor_quad
 
-        return tensor(*[basis.default_quadrature() for basis in self.bases])
+        return tensor_quad(*[basis.default_quadrature() for basis in self.bases])
 
     def _product_basis(self, other):
         """Tensor of the factors' product bases.

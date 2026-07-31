@@ -53,7 +53,7 @@ class Measure(metaclass=abc.ABCMeta):
     ``x``, ``y`` in ``support`` -- e.g. true for Legendre, false for Jacobi
     (singular at the endpoints) or Hermite/Laguerre (unbounded support).
     Used by consumers that need to know whether the weight's *shape* is
-    trivial, e.g. ``archimedes.quadrature.composite``, which can only tile a
+    trivial, e.g. ``archimedes.quadrature.composite_quad``, which can only tile a
     rule across sub-elements when there's no interior discontinuity in the
     weight to worry about."""
 

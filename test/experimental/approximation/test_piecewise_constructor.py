@@ -18,7 +18,7 @@ from archimedes.experimental.approximation._function_space import (
     _normalize_breakpoints,
 )
 from archimedes.measure import LegendreMeasure, UnitInterval
-from archimedes.quadrature import composite, gauss_legendre
+from archimedes.quadrature import composite_quad, gauss_legendre
 
 
 def test_matches_manual_construction():
@@ -189,7 +189,7 @@ def test_order_tuple_length_mismatch_rejected():
 def test_quad_rule_passthrough_accepts_compatible_rule():
     breakpoints = np.linspace(0.0, 1.0, 4)
     _, _, ref = _normalize_breakpoints(breakpoints)
-    rule = composite(gauss_legendre(5), ref)
+    rule = composite_quad(gauss_legendre(5), ref)
     sugar = FunctionSpace.piecewise("lagrange", 3, breakpoints, quad_rule=rule)
     assert sugar.quad_rule is rule
 

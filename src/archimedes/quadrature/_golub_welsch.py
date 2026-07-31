@@ -9,7 +9,7 @@ from archimedes.measure import Measure
 
 from ._quadrature_rule import QuadratureRule
 
-__all__ = ["golub_welsch", "from_measure"]
+__all__ = ["golub_welsch", "golub_welsch_rule"]
 
 
 def golub_welsch(alpha: np.ndarray, beta: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
@@ -48,7 +48,9 @@ def golub_welsch(alpha: np.ndarray, beta: np.ndarray) -> tuple[np.ndarray, np.nd
     return nodes, weights
 
 
-def from_measure(measure: Measure, n: int, name: str | None = None) -> QuadratureRule:
+def golub_welsch_rule(
+    measure: Measure, n: int, name: str | None = None
+) -> QuadratureRule:
     """Gauss quadrature rule for any ``Measure`` via its recurrence coefficients.
 
     Unlike :py:func:`~archimedes.quadrature.gauss_legendre` and friends,

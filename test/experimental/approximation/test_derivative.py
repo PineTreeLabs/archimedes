@@ -1,4 +1,4 @@
-"""Derivatives of Functions.
+"""Derivatives of BasisExpansions.
 
 A derivative lowers the degree, so the exact result lives in a *smaller*
 space -- the mirror of a product, which needs a larger one. Both follow the
@@ -14,8 +14,8 @@ from _helpers import mass_matrix, stiffness_matrix
 import archimedes as arc
 from archimedes.experimental.approximation import (
     Basis,
+    BasisExpansion,
     CubicHermiteBasis,
-    Function,
     FunctionSpace,
     LagrangeBasis,
     OrthogonalPolynomialBasis,
@@ -276,7 +276,7 @@ def test_c1_hermite_second_derivative_is_discontinuous():
 def test_hermite_function_derivative_matches_closed_form():
     # End-to-end: f_ is a global cubic, exactly representable (and C1 at the
     # breakpoints) in a piecewise Hermite space, so both the derivative
-    # Function and the pointwise deriv=1 evaluation should reproduce df_
+    # BasisExpansion and the pointwise deriv=1 evaluation should reproduce df_
     # to numerical precision.
     space = FunctionSpace(
         PiecewiseBasis(CubicHermiteBasis(), BREAKS, continuity=1), domain=DOMAIN
@@ -305,7 +305,7 @@ def test_square_diff_matrix_reproduces_the_classical_one():
 def test_square_diff_matrix_is_exact_in_the_same_space(space):
     # The same-space form collocation wants: coefficients keep their meaning.
     u = space.project(f_)
-    du = Function(space._diff_matrix() @ u.coefficients, space)
+    du = BasisExpansion(space._diff_matrix() @ u.coefficients, space)
     np.testing.assert_allclose(du(X), df_(X), atol=1e-10)
 
 
@@ -345,7 +345,7 @@ def test_undersized_explicit_space_projects_rather_than_failing():
 
 def test_stiffness_matrix_agrees_with_derivative_inner_products():
     # The end-to-end check that matters for FEM: assembling <u', v'> from
-    # derivative Functions gives the same answer as the stiffness matrix.
+    # derivative BasisExpansions gives the same answer as the stiffness matrix.
     space = SPACE_BUILDERS["nodal"]()
     u = space.project(f_)
     v = space.project(lambda x: x**2 - 3 * x)
@@ -411,7 +411,7 @@ def test_derivative_traces(space):
 
     @arc.compile
     def traced(c):
-        return Function(c, space).derivative()(X)
+        return BasisExpansion(c, space).derivative()(X)
 
     np.testing.assert_allclose(
         np.asarray(traced(u.coefficients)).ravel(), expected, atol=1e-10
@@ -424,7 +424,7 @@ def test_gradient_through_a_traced_domain_parameter():
 
     @arc.compile
     def energy(p):
-        u = Function(
+        u = BasisExpansion(
             coefficients, FunctionSpace(basis, UnitInterval.Parameters(A, p[0]))
         )
         du = u.derivative()

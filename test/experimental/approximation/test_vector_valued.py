@@ -16,14 +16,14 @@ import archimedes as arc
 from archimedes import tree
 from archimedes._core._array_impl import SymbolicArray
 from archimedes.experimental.approximation import (
-    Function,
+    BasisExpansion,
     FunctionSpace,
     LagrangeBasis,
     OrthogonalPolynomialBasis,
     PiecewiseBasis,
 )
 from archimedes.measure import LegendreMeasure, UnitInterval
-from archimedes.quadrature import composite, gauss_legendre, gauss_lobatto
+from archimedes.quadrature import composite_quad, gauss_legendre, gauss_lobatto
 
 A, B = 0.0, 2.0  # target domain
 BREAKPOINTS = np.linspace(-1.0, 1.0, 3)
@@ -54,7 +54,7 @@ def _piecewise():
         ),
         domain=UnitInterval.Parameters(a=A, b=B),
         # Composite rule so quadrature resolves the element structure.
-        quad_rule=composite(gauss_legendre(5), BREAKPOINTS),
+        quad_rule=composite_quad(gauss_legendre(5), BREAKPOINTS),
     )
 
 
@@ -238,7 +238,7 @@ def test_vector_evaluation_traces(space):
     @arc.compile
     def traced(coefficients):
         assert isinstance(coefficients, SymbolicArray)
-        return Function(coefficients, space)(x)
+        return BasisExpansion(coefficients, space)(x)
 
     np.testing.assert_allclose(traced(fn.coefficients), fn(x), atol=1e-10)
 
@@ -264,7 +264,9 @@ def test_vector_inner_product_traces(space):
     @arc.compile
     def traced(coefficients):
         assert isinstance(coefficients, SymbolicArray)
-        return Function(coefficients, space).dot(Function(coefficients, space))
+        return BasisExpansion(coefficients, space).dot(
+            BasisExpansion(coefficients, space)
+        )
 
     np.testing.assert_allclose(traced(fn.coefficients), fn.dot(fn), rtol=1e-10)
 
@@ -281,7 +283,7 @@ def test_gradient_of_vector_norm(space):
     shape = fn.coefficients.shape
 
     def objective(flat):
-        return Function(np.reshape(flat, shape), space).norm()
+        return BasisExpansion(np.reshape(flat, shape), space).norm()
 
     grad = arc.grad(objective)(fn.coefficients.ravel())
     assert grad.shape == (shape[0] * shape[1],)

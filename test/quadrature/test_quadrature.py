@@ -17,13 +17,13 @@ from archimedes.measure import (
 from archimedes.quadrature import (
     QuadratureRule,
     clenshaw_curtis,
-    composite,
+    composite_quad,
     gauss_hermite,
     gauss_laguerre,
     gauss_legendre,
     gauss_lobatto,
     gauss_radau,
-    integral,
+    quadint,
 )
 
 # -- QuadratureRule machinery --
@@ -242,9 +242,9 @@ def test_clenshaw_curtis_shares_legendre_measure():
     assert np.isclose(integral, expected)
 
 
-def test_clenshaw_curtis_composite():
+def test_clenshaw_curtis_composite_quad():
     # Same (uniform-weight) measure as Gauss-Legendre, so it tiles the same way
-    rule = composite(clenshaw_curtis(5), [-1.0, 0.0, 1.0])
+    rule = composite_quad(clenshaw_curtis(5), [-1.0, 0.0, 1.0])
     assert len(rule) == 10
     assert np.isclose(rule.integrate(lambda x: x**2), 2 / 3)
 
@@ -447,7 +447,7 @@ def test_density_weights_sum_to_one_all_families(rule_factory, params):
 
 
 def test_composite_matches_exact_integral():
-    rule = composite(gauss_legendre(3), [-1.0, 0.0, 1.0])
+    rule = composite_quad(gauss_legendre(3), [-1.0, 0.0, 1.0])
     assert len(rule) == 6
     assert np.isclose(np.sum(rule.weights), 2.0)
 
@@ -456,7 +456,7 @@ def test_composite_matches_exact_integral():
 
 
 def test_composite_nonuniform_breakpoints():
-    rule = composite(gauss_legendre(4), [-1.0, -0.2, 0.5, 1.0])
+    rule = composite_quad(gauss_legendre(4), [-1.0, -0.2, 0.5, 1.0])
     assert len(rule) == 12
     assert np.isclose(rule.integrate(lambda x: x**2), 2 / 3)
 
@@ -464,7 +464,7 @@ def test_composite_nonuniform_breakpoints():
 def test_composite_scaled_domain():
     # A composite rule is still an ordinary rule on the reference domain, so
     # it maps onto an arbitrary target interval like any other Legendre rule.
-    rule = composite(gauss_legendre(3), [-1.0, 0.0, 1.0])
+    rule = composite_quad(gauss_legendre(3), [-1.0, 0.0, 1.0])
     a, b = -2.0, 5.0
     integral = rule.integrate(lambda x: x**2, a, b)
     expected = (b**3 - a**3) / 3
@@ -478,29 +478,29 @@ def test_composite_requires_uniform_weight():
         measure=JacobiMeasure(alpha=1.0, beta=2.0),
     )
     with pytest.raises(ValueError):
-        composite(jacobi_rule, [-1.0, 0.0, 1.0])
+        composite_quad(jacobi_rule, [-1.0, 0.0, 1.0])
 
     laguerre_rule = QuadratureRule(
         *roots_laguerre(5), name="gauss_laguerre_5", measure=LaguerreMeasure()
     )
     with pytest.raises(ValueError):
-        composite(laguerre_rule, [0.0, 1.0, 2.0])
+        composite_quad(laguerre_rule, [0.0, 1.0, 2.0])
 
 
 def test_composite_breakpoints_validation():
     rule = gauss_legendre(3)
 
     with pytest.raises(ValueError):
-        composite(rule, [-1.0])  # too few entries
+        composite_quad(rule, [-1.0])  # too few entries
 
     with pytest.raises(ValueError):
-        composite(rule, [-1.0, 0.5, 0.0, 1.0])  # not strictly increasing
+        composite_quad(rule, [-1.0, 0.5, 0.0, 1.0])  # not strictly increasing
 
     with pytest.raises(ValueError):
-        composite(rule, [-0.5, 0.0, 1.0])  # doesn't span the reference domain
+        composite_quad(rule, [-0.5, 0.0, 1.0])  # doesn't span the reference domain
 
     with pytest.raises(ValueError):
-        composite(rule, [-1.0, 0.0, 0.5])  # doesn't span the reference domain
+        composite_quad(rule, [-1.0, 0.0, 0.5])  # doesn't span the reference domain
 
 
 # -- composite rules: per-element (varying order) --
@@ -509,7 +509,7 @@ def test_composite_breakpoints_validation():
 def test_composite_per_element_rules_varying_order():
     rules = [gauss_legendre(2), gauss_legendre(4), gauss_legendre(3)]
     bp = np.linspace(-1.0, 1.0, 4)  # 3 elements
-    rule = composite(rules, bp)
+    rule = composite_quad(rules, bp)
 
     assert len(rule) == 9
     np.testing.assert_array_equal(np.bincount(rule.elements), [2, 4, 3])
@@ -526,7 +526,7 @@ def test_composite_per_element_elements_provenance_with_lobatto():
     # apart, so `elements` provenance must still resolve correctly here.
     rules = [gauss_lobatto(2), gauss_lobatto(4)]
     bp = np.array([-1.0, 0.0, 1.0])
-    rule = composite(rules, bp)
+    rule = composite_quad(rules, bp)
 
     on_knot = np.isclose(rule.nodes, 0.0)
     assert on_knot.sum() == 2
@@ -539,7 +539,7 @@ def test_composite_rejects_wrong_rule_count():
     bp = np.linspace(-1.0, 1.0, 4)  # 3 elements
 
     with pytest.raises(ValueError, match="3 elements"):
-        composite(rules, bp)
+        composite_quad(rules, bp)
 
 
 def test_composite_rejects_mismatched_measures():
@@ -547,19 +547,19 @@ def test_composite_rejects_mismatched_measures():
         *roots_laguerre(3), name="gauss_laguerre_3", measure=LaguerreMeasure()
     )
     with pytest.raises(ValueError, match="same measure"):
-        composite([gauss_legendre(3), laguerre_rule], [-1.0, 0.0, 1.0])
+        composite_quad([gauss_legendre(3), laguerre_rule], [-1.0, 0.0, 1.0])
 
 
 def test_composite_per_element_name_field():
     # Same family (and hence same fixed rule name), different order per
     # element: the common name is kept.
-    same_name = composite([gauss_legendre(2), gauss_legendre(4)], [-1.0, 0.0, 1.0])
+    same_name = composite_quad([gauss_legendre(2), gauss_legendre(4)], [-1.0, 0.0, 1.0])
     assert same_name.name == "gauss_legendre"
 
     # Different families sharing a measure (Legendre and Lobatto both use
     # `LegendreMeasure`) give mismatched rule names, so the composite rule
     # falls back to a generic name rather than silently picking one.
-    mixed_name = composite([gauss_legendre(3), gauss_lobatto(4)], [-1.0, 0.0, 1.0])
+    mixed_name = composite_quad([gauss_legendre(3), gauss_lobatto(4)], [-1.0, 0.0, 1.0])
     assert mixed_name.name == "composite"
 
 
@@ -617,55 +617,55 @@ def test_compile_vector_integrand():
     np.testing.assert_allclose(result, [0.0, 2 / 3], atol=1e-10)
 
 
-# -- integral --
+# -- quadint --
 
 
-def test_integral_default_rule():
+def test_quadint_default_rule():
     a, b = -3.0, 3.0
     expected = np.exp(b) - np.exp(a)
-    assert np.isclose(integral(np.exp, a, b), expected)
+    assert np.isclose(quadint(np.exp, a, b), expected)
 
 
 @pytest.mark.parametrize(
     "rule", ["legendre", "radau_left", "radau_right", "lobatto", "clenshaw_curtis"]
 )
-def test_integral_rule_dispatch(rule):
+def test_quadint_rule_dispatch(rule):
     a, b = 0.0, np.pi
-    result = integral(np.sin, a, b, n=10, rule=rule)
+    result = quadint(np.sin, a, b, n=10, rule=rule)
     assert np.isclose(result, 2.0, atol=1e-8)
 
 
-def test_integral_unknown_rule():
+def test_quadint_unknown_rule():
     with pytest.raises(ValueError):
-        integral(np.sin, 0.0, 1.0, rule="simpson")
+        quadint(np.sin, 0.0, 1.0, rule="simpson")
 
 
 @pytest.mark.parametrize("a,b", [(-np.inf, 1.0), (0.0, np.inf), (-np.inf, np.inf)])
-def test_integral_infinite_bounds(a, b):
+def test_quadint_infinite_bounds(a, b):
     with pytest.raises(ValueError):
-        integral(lambda x: np.exp(-(x**2)), a, b)
+        quadint(lambda x: np.exp(-(x**2)), a, b)
 
 
-def test_integral_args_forwarding():
+def test_quadint_args_forwarding():
     def f(x, k):
         return x**k
 
-    result = integral(f, 0.0, 1.0, args=(3,))
+    result = quadint(f, 0.0, 1.0, args=(3,))
     assert np.isclose(result, 0.25)
 
 
-def test_integral_vector_integrand():
+def test_quadint_vector_integrand():
     def f(x):
         return np.stack([x, x**2])
 
-    result = integral(f, -1.0, 1.0, n=5, axis=-1)
+    result = quadint(f, -1.0, 1.0, n=5, axis=-1)
     np.testing.assert_allclose(result, [0.0, 2 / 3], atol=1e-10)
 
 
-def test_integral_compile_symbolic_interval():
+def test_quadint_compile_symbolic_interval():
     @arc.compile
     def quad(a, b):
-        return integral(lambda x: x**2, a, b, n=5)
+        return quadint(lambda x: x**2, a, b, n=5)
 
     result = quad(0.0, 2.0)
     assert np.isclose(float(result), 8 / 3)
@@ -702,14 +702,14 @@ class TestCompositeBreakpoints:
 
     def test_composite_records_breakpoints(self):
         bp = np.array([-1.0, -0.2, 1.0])
-        rule = composite(gauss_legendre(3), bp)
+        rule = composite_quad(gauss_legendre(3), bp)
         np.testing.assert_array_equal(rule.breakpoints, bp)
 
     def test_equality_distinguishes_breakpoints(self):
         bp = np.array([-1.0, 0.0, 1.0])
-        a = composite(gauss_legendre(3), bp)
-        b = composite(gauss_legendre(3), bp.copy())
-        c = composite(gauss_legendre(3), np.array([-1.0, 0.5, 1.0]))
+        a = composite_quad(gauss_legendre(3), bp)
+        b = composite_quad(gauss_legendre(3), bp.copy())
+        c = composite_quad(gauss_legendre(3), np.array([-1.0, 0.5, 1.0]))
         assert a == b
         assert a != c
 
@@ -718,7 +718,7 @@ class TestCompositeBreakpoints:
         # base, but is still a different kind of object to a consumer that
         # cares about alignment.
         base = gauss_legendre(4)
-        tiled = composite(base, np.array([-1.0, 1.0]))
+        tiled = composite_quad(base, np.array([-1.0, 1.0]))
         np.testing.assert_allclose(tiled.nodes, base.nodes, atol=1e-14)
         assert tiled != base
         assert base != tiled
@@ -738,20 +738,20 @@ class TestCompositeElements:
 
     def test_composite_records_one_element_index_per_node(self):
         base = gauss_legendre(3)
-        rule = composite(base, np.linspace(-1.0, 1.0, 4))
+        rule = composite_quad(base, np.linspace(-1.0, 1.0, 4))
         np.testing.assert_array_equal(rule.elements, np.repeat([0, 1, 2], len(base)))
 
     def test_boundary_nodes_are_duplicated_with_distinct_owners(self):
         # The case that made coordinate lookup wrong: one coordinate, two
         # nodes, two different elements.
-        rule = composite(gauss_lobatto(3), np.linspace(-1.0, 1.0, 3))
+        rule = composite_quad(gauss_lobatto(3), np.linspace(-1.0, 1.0, 3))
         on_knot = np.isclose(rule.nodes, 0.0)
         assert on_knot.sum() == 2
         assert set(rule.elements[on_knot]) == {0, 1}
 
     def test_equality_distinguishes_elements(self):
         bp = np.array([-1.0, 0.0, 1.0])
-        rule = composite(gauss_legendre(2), bp)
+        rule = composite_quad(gauss_legendre(2), bp)
         shuffled = dataclasses.replace(rule, elements=rule.elements[::-1])
         assert rule != shuffled
 

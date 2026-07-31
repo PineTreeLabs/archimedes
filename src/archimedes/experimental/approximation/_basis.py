@@ -122,7 +122,7 @@ class Basis(metaclass=abc.ABCMeta):
 
     ``Basis`` only evaluates -- it has no notion of a coefficient vector or
     a fixed target domain. See :class:`FunctionSpace`, which combines a
-    ``Basis`` with a domain and quadrature-based operations, and :class:`Function`,
+    ``Basis`` with a domain and quadrature-based operations, and :class:`BasisExpansion`,
     which further combines a ``FunctionSpace`` with coefficients.
     """
 
@@ -285,7 +285,7 @@ class Basis(metaclass=abc.ABCMeta):
         """
         raise NotImplementedError(
             f"{type(self).__name__} does not define a product basis; multiply "
-            f"the Functions into an explicitly chosen FunctionSpace instead"
+            f"the BasisExpansions into an explicitly chosen FunctionSpace instead"
         )
 
     def _derivative_basis(self, deriv=1) -> "Basis":
@@ -298,7 +298,7 @@ class Basis(metaclass=abc.ABCMeta):
         space keeps the rule uniform so that every closed operation gives
         the tightest exact space and keeps downstream products from carrying
         extra unnecessary degrees of freedom. See also
-        :meth:`Function.derivative`, whose square (same-space) form is
+        :meth:`BasisExpansion.derivative`, whose square (same-space) form is
         built from the classical differentiation matrix.
 
         Raises
