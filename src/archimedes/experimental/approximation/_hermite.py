@@ -40,10 +40,9 @@ class CubicHermiteBasis(Basis):
 
     **Domain mapping.** For a target element :math:`[a, b]` with
     ``scale = (b-a)/2`` (:class:`~archimedes.measure.UnitInterval`), each
-    basis function's *intrinsic* derivative order
-    (:attr:`~Basis.dof_order`, ``[0, 1, 0, 1]`` here) determines an *extra*
-    power of ``scale`` on top of the usual output-derivative chain-rule
-    factor:
+    basis function's *intrinsic* derivative order (``[0, 1, 0, 1]`` here)
+    determines an *extra* power of ``scale`` on top of the usual
+    output-derivative chain-rule factor:
 
     .. math::
         \phi_i^{(k)}(x) = \mathrm{scale}^{\,m_i - k} \, \phi_i^{(k)}(t(x)),
@@ -71,8 +70,10 @@ class CubicHermiteBasis(Basis):
         return UnitInterval.Parameters
 
     @property
-    def dof_order(self) -> np.ndarray:
-        """``[0, 1, 0, 1]``: columns 0, 2 are values; columns 1, 3 are
+    def _dof_order(self) -> np.ndarray:
+        """Derivative order of each column's degree of freedom.
+        
+        ``[0, 1, 0, 1]``: columns 0, 2 are values; columns 1, 3 are
         physical derivatives. See the class docstring."""
         return np.array([0, 1, 0, 1], dtype=int)
 
@@ -174,11 +175,11 @@ class CubicHermiteBasis(Basis):
         value_ref_factor = 0.5**deriv
         slope_ref_factor = 0.5 ** (deriv - 1)
 
-        # Physical-domain rescaling: value-type columns (dof_order=0) pick
-        # up scale**(-deriv); derivative-type columns (dof_order=1) pick up
+        # Physical-domain rescaling: value-type columns (_dof_order=0) pick
+        # up scale**(-deriv); derivative-type columns (_dof_order=1) pick up
         # scale**(1-deriv), so their coefficient is the physical derivative
         # at the owning endpoint regardless of element width -- see the
-        # class docstring and `Basis.dof_order`.
+        # class docstring and `Basis._dof_order`.
         value_scale = scale ** (-deriv)
         slope_scale = scale ** (1 - deriv)
 

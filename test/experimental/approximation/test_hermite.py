@@ -23,7 +23,7 @@ def test_equal_and_hashable(basis):
 
 
 def test_dof_order(basis):
-    np.testing.assert_array_equal(basis.dof_order, [0, 1, 0, 1])
+    np.testing.assert_array_equal(basis._dof_order, [0, 1, 0, 1])
 
 
 # -- cardinal-like properties at the endpoints --
@@ -77,7 +77,7 @@ def test_vanishes_beyond_polynomial_degree(basis):
 
 
 class TestDomainMapping:
-    """Regression coverage for the per-column `scale**(dof_order - deriv)`
+    """Regression coverage for the per-column `scale**(_dof_order - deriv)`
     factor (see the class docstring): a naive uniform `scale**deriv`, as
     every homogeneous family uses, would be wrong for the derivative-type
     columns as soon as the physical element width isn't 2 (i.e. `scale !=

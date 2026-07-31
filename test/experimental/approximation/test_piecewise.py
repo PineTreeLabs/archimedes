@@ -164,12 +164,12 @@ def test_dof_counts(local, breakpoints):
     cg = PiecewiseBasis(local, breakpoints, continuity=0)
 
     assert dg.n_elements == cg.n_elements == 3
-    assert dg.n_broken == cg.n_broken == 9
+    assert dg._n_broken == cg._n_broken == 9
     assert dg.n_basis == 9  # identity assembly
     assert cg.n_basis == 9 - 2  # one shared DOF per interior breakpoint
 
-    np.testing.assert_array_equal(dg.assembly_matrix, np.eye(9))
-    assert cg.assembly_matrix.shape == (9, 7)
+    np.testing.assert_array_equal(dg._assembly, np.eye(9))
+    assert cg._assembly.shape == (9, 7)
 
 
 def test_no_dead_dofs(local, breakpoints):
@@ -256,9 +256,9 @@ class TestC1Continuity:
         # 3 elements * 4 local DOFs = 12 broken; 2 interior breakpoints, each
         # merging 2 DOFs (value + slope) -> 12 - 2*2 = 8.
         assert basis.n_elements == 3
-        assert basis.n_broken == 12
+        assert basis._n_broken == 12
         assert basis.n_basis == 8
-        assert basis.assembly_matrix.shape == (12, 8)
+        assert basis._assembly.shape == (12, 8)
 
     def test_boundary_dofs(self, basis):
         assert basis.boundary_dofs(0) == (0, basis.n_basis - 2)
@@ -584,9 +584,9 @@ class TestPerElementOrder:
         return PiecewiseBasis(element_bases, self.BP, continuity=0)
 
     def test_dof_counts(self, basis):
-        assert basis.n_broken == 3 + 5 + 4
+        assert basis._n_broken == 3 + 5 + 4
         assert basis.n_basis == (3 + 5 + 4) - 2  # one merged DOF per interior knot
-        assert basis.assembly_matrix.shape == (12, 10)
+        assert basis._assembly.shape == (12, 10)
 
     def test_boundary_dofs(self, basis):
         assert basis.boundary_dofs() == (0, basis.n_basis - 1)

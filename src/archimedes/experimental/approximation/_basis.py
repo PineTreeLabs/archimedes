@@ -327,7 +327,7 @@ class Basis(metaclass=abc.ABCMeta):
         )
 
     @property
-    def dof_order(self) -> np.ndarray:
+    def _dof_order(self) -> np.ndarray:
         """The intrinsic derivative order of each basis function's
         coefficient, shape ``(n_basis,)``.
 
@@ -337,15 +337,17 @@ class Basis(metaclass=abc.ABCMeta):
         enough to remap a whole basis onto a different target domain. The
         default here reflects that: all zeros.
 
-        A family whose coefficients are not all the same *kind* of quantity
-        --
+        Purely an implementation detail of that remapping -- not something
+        a caller needs, only the small set of families and internals
+        (:class:`PiecewiseBasis`'s fused
+        :meth:`~PiecewiseBasis.evaluate_expansion` path) that must apply a
+        *per-column* power of ``scale`` rather than one factor for the whole
+        matrix. A family whose coefficients are not all the same *kind* of
+        quantity --
         :class:`~archimedes.experimental.approximation.CubicHermiteBasis`
         is the first example, whose odd-indexed coefficients are physical
         derivatives rather than values -- overrides this so that
-        :meth:`evaluate` (and :class:`PiecewiseBasis`'s fused
-        :meth:`~PiecewiseBasis.evaluate_expansion` path) can apply a
-        *per-column* power of ``scale`` (``scale ** (dof_order - deriv)``)
-        rather than one factor for the whole matrix.
+        :meth:`evaluate` can apply ``scale ** (dof_order - deriv)`` per column.
         """
         return np.zeros(self.n_basis, dtype=int)  # type: ignore[attr-defined]
 

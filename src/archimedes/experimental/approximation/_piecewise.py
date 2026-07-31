@@ -98,40 +98,18 @@ class PiecewiseBasis(Basis):
 
     **Continuity.** Tiling alone produces a "broken" (discontinuous) basis
     with ``n_elements * element_basis.n_basis`` degrees of freedom.
-    Continuity is then imposed as a linear *assembly* map applied to that
-    broken basis,
-
-    .. math::
-        \\Phi_{\\mathrm{global}}(x) = \\Phi_{\\mathrm{broken}}(x) \\, T,
-
-    where ``T`` (``assembly_matrix``) has shape ``(n_broken, n_basis)``:
-
-    - ``continuity=-1`` -- ``T`` is the identity; element DOFs are
-      independent and the basis jumps at interior breakpoints.
-    - ``continuity=q >= 0`` -- ``T`` merges each element's ``order``-th
-      boundary DOF (see :meth:`Basis.boundary_dofs`) with the next
-      element's same-``order`` DOF, for every ``order`` from ``0``
-      through ``q``, giving ``n_broken - (n_elements - 1) * (q + 1)``
-      continuous DOFs. ``q=0`` merges only values (the usual "C0"/"CG"
-      finite-element basis); ``q=1`` additionally merges first
-      derivatives ("C1"), which is what a cubic Hermite element needs to
-      represent a 4th-order (Euler-Bernoulli-type) weak form. Each merged
-      DOF is a single basis function supported on *both* adjacent
-      elements -- the standard "hat" for finite elements, generalized to
-      slope-matching and beyond.
-
-    Because continuity is just a right-multiplication, everything built on
-    ``Basis`` (mass/stiffness matrices, projection, inner products) works
-    through it unchanged.
-
-    The merge itself is always a plain identification (no rescaling): a
-    family whose higher-order DOFs represent *physical* quantities invariant
-    to element width -- e.g.
-    :class:`~archimedes.experimental.approximation.CubicHermiteBasis`, whose
-    slope DOFs are physical derivatives, not reference-domain ones -- can be
-    assembled at ``continuity=1`` or above with no extra machinery here; any
-    necessary element-width rescaling is the element basis's own
-    responsibility (see :attr:`Basis.dof_order`).
+    ``continuity=-1`` keeps it that way; a nonnegative ``continuity=q``
+    merges each pair of adjacent elements' DOFs of every order ``0``
+    through ``q`` into one shared DOF -- values at ``q=0`` (the usual
+    "C0"/"CG" finite-element basis), additionally first derivatives at
+    ``q=1`` ("C1", what a cubic Hermite element needs to represent a
+    4th-order, Euler-Bernoulli-type weak form), and so on. The merge is a
+    linear *assembly* map, a plain right-multiplication on the broken
+    basis's design matrix, so everything built on ``Basis``
+    (mass/stiffness matrices, projection, inner products) works through it
+    unchanged; see :meth:`_build_assembly` for the construction and
+    :class:`~archimedes.experimental.approximation.CubicHermiteBasis` for
+    the kind of basis this generalizes to.
 
     **Element ownership at a breakpoint.** This basis can be two-valued at its
     interior breakpoints (always for the derivatives of :math:`C^0` functions,
@@ -283,7 +261,7 @@ class PiecewiseBasis(Basis):
         return len(self.breakpoints) - 1
 
     @property
-    def n_broken(self) -> int:
+    def _n_broken(self) -> int:
         """Degrees of freedom before continuity is imposed."""
         return sum(eb.n_basis for eb in self.element_basis)
 
@@ -291,11 +269,6 @@ class PiecewiseBasis(Basis):
     def n_basis(self) -> int:
         """Degrees of freedom after continuity is imposed."""
         return self._assembly.shape[1]
-
-    @property
-    def assembly_matrix(self) -> np.ndarray:
-        """The ``(n_broken, n_basis)`` map from broken to global DOFs."""
-        return self._assembly
 
     @property
     def Parameters(self) -> type:  # noqa: N802
@@ -336,7 +309,7 @@ class PiecewiseBasis(Basis):
         _, right = self.element_basis[-1].boundary_dofs(order)
         if left is None or right is None:
             return (None, None)
-        last_offset = self.n_broken - self.element_basis[-1].n_basis
+        last_offset = self._n_broken - self.element_basis[-1].n_basis
         return (
             int(np.argmax(self._assembly[left])),
             int(np.argmax(self._assembly[last_offset + right])),
@@ -387,7 +360,7 @@ class PiecewiseBasis(Basis):
         The derivative can in general leave the original space rather than being
         contained in a subspace of it, so differentiating ``deriv`` times can only
         be relied on for continuity down to ``q - deriv``.
-        
+
         For example, a :math:`C^0` (``q=0``) function's derivative jumps at every
         breakpoint; a :math:`C^1` (``q=1``, e.g. cubic Hermite) function's *first*
         derivative is still continuous (``max(1 - 1, -1) = 0``), while its *second*
@@ -407,20 +380,38 @@ class PiecewiseBasis(Basis):
         )
 
     def _build_assembly(self) -> np.ndarray:
-        """Build ``T`` by merging one DOF pair per ``order`` at interior breakpoints.
+        r"""Build the assembly map ``T``, shape ``(n_broken, n_basis)``, such
+        that :math:`\Phi_{\mathrm{global}}(x) = \Phi_{\mathrm{broken}}(x) \,
+        T`. Because continuity is just this right-multiplication, everything
+        built on ``Basis`` (mass/stiffness matrices, projection, inner
+        products) works through it unchanged.
 
-        The merge is a bare identity for every order, including derivative
-        ones: any rescaling needed to make a derivative-type DOF comparable
-        across elements of different width is the element basis's own
-        responsibility.
+        - ``continuity=-1`` -- ``T`` is the identity; element DOFs are
+          independent and the basis jumps at interior breakpoints.
+        - ``continuity=q >= 0`` -- ``T`` merges each element's ``order``-th
+          boundary DOF (see :meth:`Basis.boundary_dofs`) with the next
+          element's same-``order`` DOF, for every ``order`` from ``0``
+          through ``q``, giving ``_n_broken - (n_elements - 1) * (q + 1)``
+          continuous DOFs. Each merged DOF is a single basis function
+          supported on *both* adjacent elements -- the standard "hat" for
+          finite elements, generalized to slope-matching and beyond.
+
+        The merge itself is always a bare identity, including for a
+        derivative-type DOF (``order >= 1``): any rescaling needed to make
+        it comparable across elements of different width is the element
+        basis's own responsibility (see :attr:`Basis._dof_order`), not this
+        assembly's. So generalizing from one merged order (``C0``) to
+        several is purely bookkeeping -- track one "previous element's
+        global index" per order instead of one overall, keyed by which
+        local index each order's ``boundary_dofs`` reports.
         """
         element_bases = self.element_basis
         if self.continuity == DISCONTINUOUS:
-            return np.eye(self.n_broken)
+            return np.eye(self._n_broken)
 
         n_orders = self.continuity + 1
-        n_global = self.n_broken - (self.n_elements - 1) * n_orders
-        assembly = np.zeros((self.n_broken, n_global))
+        n_global = self._n_broken - (self.n_elements - 1) * n_orders
+        assembly = np.zeros((self._n_broken, n_global))
 
         # Global index of each element's first *unshared* DOF.
         offset = 0
@@ -594,18 +585,18 @@ class PiecewiseBasis(Basis):
         vector_valued = np.ndim(coefficients) > 1
 
         n_loc = shared.n_basis
-        dof_order = shared.dof_order  # (n_loc,); all zeros for a homogeneous family
+        dof_order = shared._dof_order  # (n_loc,); all zeros for a homogeneous family
         total = None
         for k in range(n_loc):
             c_k = _gather(broken, element * n_loc + k, symbolic, npts)
             # Chain rule for the map into the reference coordinate: dt/dx =
             # 2/width per derivative order requested, offset by this column's
-            # own intrinsic DOF order (see `Basis.dof_order`) -- e.g. a
+            # own intrinsic DOF order (see `Basis._dof_order`) -- e.g. a
             # Hermite slope-type column (order 1) needs one fewer power of
             # 2/width than a value-type column (order 0) at the same `deriv`,
             # since its coefficient is already a physical derivative. A
-            # homogeneous family has `dof_order` all zeros, so this reduces to
-            # the single scalar factor every column used to share.
+            # homogeneous family has `_dof_order` all zeros, so this reduces
+            # to the single scalar factor every column used to share.
             col_scale = (2.0 / width) ** (deriv - dof_order[k])
             phi_k = phi[:, k] * col_scale
             term = phi_k[:, None] * c_k if vector_valued else phi_k * c_k
