@@ -245,7 +245,7 @@ class LagrangeBasis(Basis):
             )
         return self._derived(self.n_basis - deriv)
 
-    def boundary_dofs(self) -> tuple[int | None, int | None]:
+    def boundary_dofs(self, order: int = 0) -> tuple[int | None, int | None]:
         """Indices of the nodes at :math:`t = \\pm 1`, or ``None`` if the
         corresponding endpoint isn't a node.
 
@@ -253,7 +253,13 @@ class LagrangeBasis(Basis):
         one; Gauss-Legendre includes neither. Since ``ell_i(x_j) =
         delta_ij``, an endpoint node's coefficient *is* the endpoint value,
         which is what :math:`C^0` assembly identifies across elements.
+
+        Every degree of freedom here is a plain nodal value (``order=0``);
+        this family has no derivative-type DOF, so any other ``order``
+        returns ``(None, None)``.
         """
+        if order != 0:
+            return (None, None)
         nodes = self.reference_nodes
         left = int(np.argmin(np.abs(nodes + 1.0)))
         right = int(np.argmin(np.abs(nodes - 1.0)))

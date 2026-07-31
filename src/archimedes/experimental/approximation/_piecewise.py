@@ -10,7 +10,7 @@ import numpy as np
 from archimedes._core._array_impl import SymbolicArray, _unwrap_sym_array
 from archimedes.measure import UnitInterval
 
-from ._basis import LEFT, RIGHT, Basis, _check_side
+from ._basis import RIGHT, Basis, _check_side
 
 __all__ = ["PiecewiseBasis"]
 
@@ -79,6 +79,11 @@ DISCONTINUOUS = -1
 C0 = 0
 """``continuity`` value for value-continuity at element boundaries ("CG")."""
 
+C1 = 1
+"""``continuity`` value additionally matching first derivatives at element
+boundaries -- what a cubic Hermite element needs for a 4th-order
+(Euler-Bernoulli-type) weak form."""
+
 
 @dataclasses.dataclass(frozen=True)
 class PiecewiseBasis(Basis):
@@ -103,24 +108,35 @@ class PiecewiseBasis(Basis):
 
     - ``continuity=-1`` -- ``T`` is the identity; element DOFs are
       independent and the basis jumps at interior breakpoints.
-    - ``continuity=0`` -- ``T`` merges each element's right-endpoint DOF
-      with the next element's left-endpoint DOF, giving ``n_broken -
-      (n_elements - 1)`` continuous DOFs. The merged ("vertex") DOF is a
-      single basis function supported on *both* adjacent elements -- the
-      standard "hat" for finite elements.
+    - ``continuity=q >= 0`` -- ``T`` merges each element's ``order``-th
+      boundary DOF (see :meth:`Basis.boundary_dofs`) with the next
+      element's same-``order`` DOF, for every ``order`` from ``0``
+      through ``q``, giving ``n_broken - (n_elements - 1) * (q + 1)``
+      continuous DOFs. ``q=0`` merges only values (the usual "C0"/"CG"
+      finite-element basis); ``q=1`` additionally merges first
+      derivatives ("C1"), which is what a cubic Hermite element needs to
+      represent a 4th-order (Euler-Bernoulli-type) weak form. Each merged
+      DOF is a single basis function supported on *both* adjacent
+      elements -- the standard "hat" for finite elements, generalized to
+      slope-matching and beyond.
 
     Because continuity is just a right-multiplication, everything built on
     ``Basis`` (mass/stiffness matrices, projection, inner products) works
     through it unchanged.
 
-    Higher continuity (:math:`C^1` and up) is not yet supported: it would
-    need *derivative* degrees of freedom to identify, requiring Hermite
-    elements or similar (not yet implemented).
+    The merge itself is always a plain identification (no rescaling): a
+    family whose higher-order DOFs represent *physical* quantities invariant
+    to element width -- e.g.
+    :class:`~archimedes.experimental.approximation.CubicHermiteBasis`, whose
+    slope DOFs are physical derivatives, not reference-domain ones -- can be
+    assembled at ``continuity=1`` or above with no extra machinery here; any
+    necessary element-width rescaling is the element basis's own
+    responsibility (see :attr:`Basis.dof_order`).
 
     **Element ownership at a breakpoint.** This basis can be two-valued at its
     interior breakpoints (always for the derivatives of :math:`C^0` functions,
     and also the value when ``continuity=-1``) so evaluating exactly *on* one
-    requires choosing a side. Evaluation** follows the ``side`` argument: ``"right"``
+    requires choosing a side. **Evaluation** follows the ``side`` argument: ``"right"``
     (the default) makes ownership half-open ``[lo, hi)``, giving the limit
     from above, and ``"left"`` gives ``(lo, hi]`` and the limit from
     below.
@@ -141,17 +157,21 @@ class PiecewiseBasis(Basis):
         per-element ("p-refined") accuracy. A tuple must have exactly one
         entry per element and every entry must agree on ``measures`` (so the
         assembled basis has one coherent per-dimension weight). For
-        ``continuity=0`` every element's basis must expose endpoint DOFs via
-        ``boundary_dofs`` (e.g. a :class:`LagrangeBasis` whose nodes include
-        both endpoints). Always stored (and compared/hashed) as a
-        per-element tuple, regardless of which form was passed in.
+        ``continuity=q`` every element's basis must expose endpoint DOFs of
+        every order ``0`` through ``q`` via ``boundary_dofs`` (e.g. a
+        :class:`LagrangeBasis` whose nodes include both endpoints, for
+        ``q=0``; a :class:`~archimedes.experimental.approximation.CubicHermiteBasis`
+        for ``q=1``). Always stored (and compared/hashed) as a per-element
+        tuple, regardless of which form was passed in.
     breakpoints : array_like
         Element boundaries on the reference domain, shape ``(k + 1,)`` for
         ``k`` elements. Must be strictly increasing and span ``[-1, 1]``
         exactly.
     continuity : int, optional
-        ``-1`` for a discontinuous basis, ``0`` for value continuity.
-        Default ``0``.
+        ``-1`` for a discontinuous basis; a nonnegative ``q`` for
+        continuity through order ``q`` (``0`` for value continuity, ``1``
+        additionally for first-derivative continuity, and so on -- see
+        the class docstring). Default ``0``.
     """
 
     element_basis: Basis | tuple[Basis, ...]
@@ -210,21 +230,23 @@ class PiecewiseBasis(Basis):
                 "weight"
             )
 
-        if self.continuity not in (DISCONTINUOUS, C0):
+        if self.continuity < DISCONTINUOUS:
             raise ValueError(
-                f"continuity must be -1 (discontinuous) or 0 (C0), got "
-                f"{self.continuity}"
+                f"continuity must be >= -1 (discontinuous), got {self.continuity}"
             )
-        if self.continuity == C0:
+        if self.continuity >= C0:
             for eb in element_bases:
-                left, right = eb.boundary_dofs()
-                if left is None or right is None:
-                    raise ValueError(
-                        f"continuity=0 requires every element basis to have "
-                        f"degrees of freedom at both endpoints, but "
-                        f"{type(eb).__name__}.boundary_dofs() returned "
-                        f"{(left, right)}"
-                    )
+                for order in range(self.continuity + 1):
+                    left, right = eb.boundary_dofs(order)
+                    if left is None or right is None:
+                        raise ValueError(
+                            f"continuity={self.continuity} requires every "
+                            f"element basis to have degrees of freedom at "
+                            f"both endpoints for every order 0.."
+                            f"{self.continuity}, but "
+                            f"{type(eb).__name__}.boundary_dofs({order}) "
+                            f"returned {(left, right)}"
+                        )
 
         object.__setattr__(self, "element_basis", element_bases)
         object.__setattr__(self, "breakpoints", bp)
@@ -284,8 +306,8 @@ class PiecewiseBasis(Basis):
     @property
     def measures(self):
         """The element bases' shared weight
-        
-        Confirmed to be the same across elements at construction.
+
+        Verified at construction to be the same across elements.
         Tiling rescales the reference weight onto each element but
         does not change which family it is.
         """
@@ -297,21 +319,21 @@ class PiecewiseBasis(Basis):
         ``continuity=-1``, jumps) at every interior breakpoint."""
         return self.breakpoints
 
-    def boundary_dofs(self) -> tuple[int | None, int | None]:
-        """Global indices of the DOFs at the two ends of the tiled domain,
-        or ``None`` where the element basis has no such DOF.
+    def boundary_dofs(self, order: int = 0) -> tuple[int | None, int | None]:
+        """Global indices of the DOFs at the two ends of the tiled domain.
+
+        ``None`` where the element basis has no such DOF.
 
         The left end belongs entirely to element 0 and the right end to the
         last element, so this maps each end element's own
-        ``boundary_dofs()`` through ``assembly_matrix``. Under
-        ``continuity=-1`` there is no shared/global endpoint identity (every
-        element's DOFs are independent), so this returns ``(None, None)``
-        regardless of the element basis.
+        ``boundary_dofs(order)``. Under ``continuity=-1`` there is no shared/global
+        endpoint identity (every element's DOFs are independent), so this returns
+        ``(None, None)`` regardless of the element basis.
         """
         if self.continuity == DISCONTINUOUS:
             return (None, None)
-        left, _ = self.element_basis[0].boundary_dofs()
-        _, right = self.element_basis[-1].boundary_dofs()
+        left, _ = self.element_basis[0].boundary_dofs(order)
+        _, right = self.element_basis[-1].boundary_dofs(order)
         if left is None or right is None:
             return (None, None)
         last_offset = self.n_broken - self.element_basis[-1].n_basis
@@ -360,16 +382,19 @@ class PiecewiseBasis(Basis):
         )
 
     def _derivative_basis(self, deriv=1):
-        """Same breakpoints, per-element derivative basis, **discontinuous**.
+        """Same breakpoints, per-element derivative basis, weaker continuity.
 
-        The derivative in general leaves the original space rather than landing
-        in a subspace of it: a :math:`C^0` function has a derivative that jumps
-        at every interior breakpoint, so the result is a ``continuity=-1``
-        (discontinuous) basis regardless of what this one was. Within each element
-        the derivative is still a polynomial of degree ``n_loc - 1 - deriv``, so
-        that element's basis shrinks in the usual way and the representation stays
-        exact -- independently per element, whether or not the elements share an
-        order.
+        The derivative can in general leave the original space rather than being
+        contained in a subspace of it, so differentiating ``deriv`` times can only
+        be relied on for continuity down to ``q - deriv``.
+        
+        For example, a :math:`C^0` (``q=0``) function's derivative jumps at every
+        breakpoint; a :math:`C^1` (``q=1``, e.g. cubic Hermite) function's *first*
+        derivative is still continuous (``max(1 - 1, -1) = 0``), while its *second*
+        derivative need not be (``max(1 - 2, -1) = -1``). Within each element the
+        derivative is still a polynomial of degree ``n_loc - 1 - deriv``, so that
+        element's basis shrinks in the usual way and the representation stays exact,
+        whether or not the elements share an order.
         """
         if deriv < 0:
             raise ValueError(f"deriv must be >= 0, got {deriv}")
@@ -378,34 +403,51 @@ class PiecewiseBasis(Basis):
         return PiecewiseBasis(
             tuple(eb._derivative_basis(deriv) for eb in self.element_basis),
             self.breakpoints,
-            continuity=DISCONTINUOUS,
+            continuity=max(self.continuity - deriv, DISCONTINUOUS),
         )
 
     def _build_assembly(self) -> np.ndarray:
+        """Build ``T`` by merging one DOF pair per ``order`` at interior breakpoints.
+
+        The merge is a bare identity for every order, including derivative
+        ones: any rescaling needed to make a derivative-type DOF comparable
+        across elements of different width is the element basis's own
+        responsibility.
+        """
         element_bases = self.element_basis
         if self.continuity == DISCONTINUOUS:
             return np.eye(self.n_broken)
 
-        n_global = self.n_broken - (self.n_elements - 1)
+        n_orders = self.continuity + 1
+        n_global = self.n_broken - (self.n_elements - 1) * n_orders
         assembly = np.zeros((self.n_broken, n_global))
 
         # Global index of each element's first *unshared* DOF.
         offset = 0
         row_offset = 0
-        prev_right_global = None
+        prev_global_by_order: list[int | None] = [None] * n_orders
         for e, eb in enumerate(element_bases):
-            left, right = eb.boundary_dofs()
             n_loc = eb.n_basis
+            left_by_order = [eb.boundary_dofs(o)[0] for o in range(n_orders)]
+            right_by_order = [eb.boundary_dofs(o)[1] for o in range(n_orders)]
+            # Local index -> which order it's the "left" DOF for, so a plain
+            # membership test below can dispatch to the right previous-global
+            # tracker regardless of how many orders are being merged.
+            left_local_to_order = {left: o for o, left in enumerate(left_by_order)}
+
             local_to_global = {}
             for i in range(n_loc):
-                if e > 0 and i == left:
-                    local_to_global[i] = prev_right_global
+                if e > 0 and i in left_local_to_order:
+                    order = left_local_to_order[i]
+                    local_to_global[i] = prev_global_by_order[order]
                 else:
                     local_to_global[i] = offset
                     offset += 1
             for i, g in local_to_global.items():
                 assembly[row_offset + i, g] = 1.0
-            prev_right_global = local_to_global[right]
+            prev_global_by_order = [
+                local_to_global[right_by_order[o]] for o in range(n_orders)
+            ]
             row_offset += n_loc
 
         return assembly
@@ -552,21 +594,27 @@ class PiecewiseBasis(Basis):
         vector_valued = np.ndim(coefficients) > 1
 
         n_loc = shared.n_basis
+        dof_order = shared.dof_order  # (n_loc,); all zeros for a homogeneous family
         total = None
         for k in range(n_loc):
             c_k = _gather(broken, element * n_loc + k, symbolic, npts)
-            phi_k = phi[:, k]
+            # Chain rule for the map into the reference coordinate: dt/dx =
+            # 2/width per derivative order requested, offset by this column's
+            # own intrinsic DOF order (see `Basis.dof_order`) -- e.g. a
+            # Hermite slope-type column (order 1) needs one fewer power of
+            # 2/width than a value-type column (order 0) at the same `deriv`,
+            # since its coefficient is already a physical derivative. A
+            # homogeneous family has `dof_order` all zeros, so this reduces to
+            # the single scalar factor every column used to share.
+            col_scale = (2.0 / width) ** (deriv - dof_order[k])
+            phi_k = phi[:, k] * col_scale
             term = phi_k[:, None] * c_k if vector_valued else phi_k * c_k
             total = term if total is None else total + term
-
-        # Chain rule for the map into the reference coordinate, one factor
-        # of dt/dx = 2/width per derivative order.
-        jacobian = (2.0 / width) ** deriv
 
         # `evaluate` masks every element, so a point outside the domain
         # contributes nothing; `low`/`searchsorted` instead clamp to the end
         # element, which would extrapolate. Mask to keep the two paths equal.
         inside = (x >= knots[0]) & (x <= knots[-1])
         if vector_valued:
-            return np.where(inside[:, None], jacobian[:, None] * total, 0.0)
-        return np.where(inside, jacobian * total, 0.0)
+            return np.where(inside[:, None], total, 0.0)
+        return np.where(inside, total, 0.0)

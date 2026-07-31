@@ -6,6 +6,7 @@ from _helpers import mass_matrix, stiffness_matrix
 import archimedes as arc
 from archimedes._core._array_impl import SymbolicArray
 from archimedes.experimental.approximation import (
+    CubicHermiteBasis,
     FunctionSpace,
     LagrangeBasis,
     OrthogonalPolynomialBasis,
@@ -24,6 +25,11 @@ def local():
 @pytest.fixture
 def breakpoints():
     return np.linspace(-1.0, 1.0, 4)  # 3 elements
+
+
+@pytest.fixture
+def hermite():
+    return CubicHermiteBasis()
 
 
 # -- construction / validation --
@@ -48,6 +54,23 @@ def test_rejects_too_few_breakpoints(local):
 
 def test_rejects_unsupported_continuity(local, breakpoints):
     with pytest.raises(ValueError):
+        PiecewiseBasis(local, breakpoints, continuity=-2)
+
+
+def test_c1_with_hermite_element_succeeds(hermite, breakpoints):
+    # continuity=1 (matching values *and* first derivatives) is only
+    # rejected when the element basis can't supply an order-1 boundary DOF
+    # -- it's not a blanket "not yet implemented" any more.
+    basis = PiecewiseBasis(hermite, breakpoints, continuity=1)
+    assert basis.continuity == 1
+
+
+def test_c1_requires_element_basis_with_order_one_boundary_dofs(local, breakpoints):
+    # LagrangeBasis has no derivative-type DOF (boundary_dofs(1) is always
+    # (None, None)), so continuity=1 must still be rejected for it even
+    # though continuity=0 works fine for the same element basis.
+    assert local.boundary_dofs(1) == (None, None)
+    with pytest.raises(ValueError, match=r"order 0\.\.1"):
         PiecewiseBasis(local, breakpoints, continuity=1)
 
 
@@ -213,6 +236,145 @@ def test_c0_derivative_is_discontinuous_at_breakpoints(local, breakpoints):
     left = basis.evaluate(np.array([knot - eps]), deriv=1)
     right = basis.evaluate(np.array([knot + eps]), deriv=1)
     assert not np.allclose(left, right, atol=1e-3)
+
+
+# -- C1 continuity (cubic Hermite) --
+
+
+class TestC1Continuity:
+    """continuity=1 merges both the value and the first-derivative DOF at
+    each interior breakpoint -- the assembly generalization this module was
+    missing before ``CubicHermiteBasis`` existed to exercise it."""
+
+    BP = np.array([-1.0, -0.3, 0.4, 1.0])  # deliberately uneven, 3 elements
+
+    @pytest.fixture
+    def basis(self, hermite):
+        return PiecewiseBasis(hermite, self.BP, continuity=1)
+
+    def test_dof_counts(self, basis):
+        # 3 elements * 4 local DOFs = 12 broken; 2 interior breakpoints, each
+        # merging 2 DOFs (value + slope) -> 12 - 2*2 = 8.
+        assert basis.n_elements == 3
+        assert basis.n_broken == 12
+        assert basis.n_basis == 8
+        assert basis.assembly_matrix.shape == (12, 8)
+
+    def test_boundary_dofs(self, basis):
+        assert basis.boundary_dofs(0) == (0, basis.n_basis - 2)
+        assert basis.boundary_dofs(1) == (1, basis.n_basis - 1)
+        assert basis.boundary_dofs(2) == (None, None)
+
+    def test_value_and_slope_continuous_curvature_need_not_be(self, basis):
+        # C1 constrains value and first derivative, not second: deriv=0,1
+        # must agree across a breakpoint, deriv=2 need not.
+        eps = 1e-9
+        rng = np.random.default_rng(0)
+        coefficients = rng.normal(size=basis.n_basis)
+        for knot in self.BP[1:-1]:
+            left0 = basis.evaluate_expansion(
+                coefficients, np.array([knot - eps]), side="left"
+            )
+            right0 = basis.evaluate_expansion(
+                coefficients, np.array([knot + eps]), side="right"
+            )
+            np.testing.assert_allclose(left0, right0, atol=1e-4)
+
+            left1 = basis.evaluate_expansion(
+                coefficients, np.array([knot - eps]), deriv=1, side="left"
+            )
+            right1 = basis.evaluate_expansion(
+                coefficients, np.array([knot + eps]), deriv=1, side="right"
+            )
+            np.testing.assert_allclose(left1, right1, atol=1e-3)
+
+            left2 = basis.evaluate_expansion(
+                coefficients, np.array([knot - eps]), deriv=2, side="left"
+            )
+            right2 = basis.evaluate_expansion(
+                coefficients, np.array([knot + eps]), deriv=2, side="right"
+            )
+            assert not np.allclose(left2, right2, atol=1e-2)
+
+    def test_merged_value_dof_spans_both_elements(self, basis):
+        x = np.linspace(-1, 1, 801)
+        phi = basis.evaluate(x)
+        knot = self.BP[1]
+        shared = np.argmax(np.abs(phi[np.argmin(np.abs(x - knot))]))
+        col = phi[:, shared]
+        assert np.abs(col[x < knot]).max() > 1e-6
+        assert np.abs(col[x > knot]).max() > 1e-6
+
+    def test_merged_slope_dof_spans_both_elements(self, basis):
+        x = np.linspace(-1, 1, 801)
+        dphi = basis.evaluate(x, deriv=1)
+        knot = self.BP[1]
+        shared = np.argmax(np.abs(dphi[np.argmin(np.abs(x - knot))]))
+        col = dphi[:, shared]
+        assert np.abs(col[x < knot]).max() > 1e-6
+        assert np.abs(col[x > knot]).max() > 1e-6
+
+    @pytest.mark.parametrize("deriv", [0, 1, 2, 3])
+    def test_evaluate_expansion_fused_path_matches_dense_path(self, basis, deriv):
+        # The critical regression test: `evaluate_expansion`'s fused fast
+        # path (taken because every element shares one `CubicHermiteBasis`
+        # instance) must agree with the dense `evaluate(...) @ coefficients`
+        # path even though the physical domain isn't (-1, 1) and the mesh is
+        # non-uniform -- exactly the case that exposed the per-column scale
+        # bug (a single scalar Jacobian is wrong for a heterogeneous-DOF
+        # basis at deriv >= 1 whenever the element width isn't 2).
+        a, b = 2.0, 9.0
+        scale, shift = UnitInterval().affine_params(a, b)
+        x = np.concatenate(
+            [np.linspace(-1.2, 1.2, 37) * scale + shift, self.BP * scale + shift]
+        )
+        rng = np.random.default_rng(1)
+        coefficients = rng.normal(size=basis.n_basis)
+
+        dense = basis.evaluate(x, deriv=deriv, a=a, b=b) @ coefficients
+        fused = basis.evaluate_expansion(coefficients, x, deriv=deriv, a=a, b=b)
+        np.testing.assert_allclose(fused, dense, atol=1e-8)
+
+    def test_evaluate_expansion_symbolic_matches_numeric(self, basis):
+        a, b = 2.0, 9.0
+        rng = np.random.default_rng(2)
+        coefficients = rng.normal(size=basis.n_basis)
+        x = np.linspace(a, b, 11)
+        expected = basis.evaluate_expansion(coefficients, x, deriv=1, a=a, b=b)
+
+        @arc.compile
+        def traced(xx, cc):
+            assert isinstance(xx, SymbolicArray)
+            return basis.evaluate_expansion(cc, xx, deriv=1, a=a, b=b)
+
+        np.testing.assert_allclose(
+            np.asarray(traced(x, coefficients)).ravel(), expected, atol=1e-9
+        )
+
+    def test_project_and_reconstruct_derivatives(self, hermite):
+        # End-to-end: project a smooth function onto a C1 Hermite space on a
+        # non-uniform mesh and physical domain, then check that evaluating
+        # deriv=0..3 (not just deriv=0) reconstructs a sane, finite field --
+        # this is the direct FunctionSpace/Function-level analogue of the
+        # fused-vs-dense check above.
+        a, b = -2.0, 6.0
+        basis = PiecewiseBasis(hermite, self.BP, continuity=1)
+        space = FunctionSpace(
+            basis,
+            domain=UnitInterval.Parameters(a=a, b=b),
+            quad_rule=composite(gauss_legendre(4), self.BP),
+        )
+
+        def f(x):
+            return np.sin(0.5 * x) + 0.1 * x**2
+
+        fn = space.project(f)
+        x = np.linspace(a, b, 41)
+        np.testing.assert_allclose(fn(x), f(x), atol=1e-2)
+        for deriv in (0, 1, 2, 3):
+            dense = basis.evaluate(x, deriv=deriv, a=a, b=b) @ fn.coefficients
+            fused = fn(x, deriv=deriv)
+            np.testing.assert_allclose(fused, dense, atol=1e-8)
 
 
 # -- domain mapping --

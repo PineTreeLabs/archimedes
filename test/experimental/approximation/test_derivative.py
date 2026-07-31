@@ -14,6 +14,7 @@ from _helpers import mass_matrix, stiffness_matrix
 import archimedes as arc
 from archimedes.experimental.approximation import (
     Basis,
+    CubicHermiteBasis,
     Function,
     FunctionSpace,
     LagrangeBasis,
@@ -245,6 +246,42 @@ def test_already_discontinuous_stays_discontinuous():
 def test_zeroth_derivative_returns_the_same_basis():
     basis = PiecewiseBasis(_lobatto(4), BREAKS, continuity=0)
     assert basis._derivative_basis(0) is basis
+
+
+# -- C1 (Hermite): continuity drops by exactly one order per differentiation --
+
+
+def test_c1_hermite_first_derivative_is_c0():
+    # Continuity through order q means differentiating `deriv` times can only
+    # be relied on for continuity `q - deriv`: a C1 (Hermite) function's
+    # *first* derivative is exactly C0 (matching slopes is the Hermite DOF
+    # itself), not forced all the way down to discontinuous.
+    basis = PiecewiseBasis(CubicHermiteBasis(), BREAKS, continuity=1)
+    derived = basis._derivative_basis(1)
+    assert derived.continuity == 0
+    np.testing.assert_allclose(derived.breakpoints, BREAKS)
+
+
+def test_c1_hermite_second_derivative_is_discontinuous():
+    # Curvature/moment need not match across elements -- the familiar
+    # "moment jump" in Hermite beam finite elements.
+    basis = PiecewiseBasis(CubicHermiteBasis(), BREAKS, continuity=1)
+    assert basis._derivative_basis(2).continuity == -1
+
+
+def test_hermite_function_derivative_matches_closed_form():
+    # End-to-end: f_ is a global cubic, exactly representable (and C1 at the
+    # breakpoints) in a piecewise Hermite space, so both the derivative
+    # Function and the pointwise deriv=1 evaluation should reproduce df_
+    # to numerical precision.
+    space = FunctionSpace(
+        PiecewiseBasis(CubicHermiteBasis(), BREAKS, continuity=1), domain=DOMAIN
+    )
+    u = space.project(f_)
+    du = u.derivative()
+    assert du.space.basis.continuity == 0
+    np.testing.assert_allclose(du(X), df_(X), atol=1e-8)
+    np.testing.assert_allclose(du(X), u(X, deriv=1), atol=1e-8)
 
 
 # -- diff_matrix --

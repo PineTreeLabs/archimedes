@@ -18,6 +18,7 @@ tensor basis still evaluates to a ``(npts, n_basis)`` design matrix.
 from ._basis import Basis, BasisMatrix
 from ._function import Function
 from ._function_space import FunctionSpace
+from ._hermite import CubicHermiteBasis
 from ._lagrange import LagrangeBasis
 from ._orthogonal import OrthogonalPolynomialBasis
 from ._piecewise import PiecewiseBasis
@@ -26,6 +27,7 @@ from ._tensor_basis import ProductParameters, TensorBasis
 __all__ = [
     "Basis",
     "BasisMatrix",
+    "CubicHermiteBasis",
     "Function",
     "FunctionSpace",
     "LagrangeBasis",

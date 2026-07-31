@@ -14,6 +14,7 @@ import archimedes as arc
 from archimedes._core._array_impl import SymbolicArray
 from archimedes.experimental.approximation import (
     Basis,
+    CubicHermiteBasis,
     Function,
     FunctionSpace,
     LagrangeBasis,
@@ -237,6 +238,20 @@ def test_basis_without_product_support_raises():
 
     with pytest.raises(NotImplementedError, match="does not define a product basis"):
         Constant()._product_basis(Constant())
+
+
+def test_hermite_has_no_product_basis():
+    # A cubic times a cubic is degree 6, not representable in this 4-dim
+    # family; CubicHermiteBasis doesn't override `_product_basis`, so this
+    # is the base class's NotImplementedError, propagated unchanged through
+    # PiecewiseBasis's own per-element `_product_basis`.
+    hermite = CubicHermiteBasis()
+    with pytest.raises(NotImplementedError, match="does not define a product basis"):
+        hermite._product_basis(hermite)
+
+    basis = PiecewiseBasis(hermite, BREAKPOINTS, continuity=1)
+    with pytest.raises(NotImplementedError, match="does not define a product basis"):
+        basis._product_basis(basis)
 
 
 # -- continuity of piecewise products --

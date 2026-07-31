@@ -5,6 +5,7 @@
 - Chebyshev
 - Fourier
 - Monomials
+- Bernstein polynomials
 - RBF
 - B-splines
 - PCHIP

@@ -307,6 +307,18 @@ class Basis(metaclass=abc.ABCMeta):
             If ``deriv`` is not a valid derivative order for this basis.
         NotImplementedError
             If this family has no derivative-space construction.
+
+        Notes
+        -----
+        The result is usually, but not necessarily, in the the *same family*
+        at a lower order. A family whose degrees of freedom are not all the
+        same *kind* of quantity (e.g.
+        :class:`~archimedes.experimental.approximation.CubicHermiteBasis`,
+        whose coefficients are a mix of values and physical derivatives) may
+        have no derivative-space construction *of its own kind*: the
+        derivative of a cubic Hermite element is a plain polynomial with no
+        value/slope split, so its derivative basis is a quadratic
+        :class:`LagrangeBasis`.
         """
         raise NotImplementedError(
             f"{type(self).__name__} does not define a derivative basis; "
@@ -314,22 +326,50 @@ class Basis(metaclass=abc.ABCMeta):
             f"explicitly chosen FunctionSpace"
         )
 
-    def boundary_dofs(self) -> tuple[int | None, int | None]:
-        """Indices of the degrees of freedom that *are* the values at the
-        left and right ends of the domain, or ``None`` where there is no
-        such DOF.
+    @property
+    def dof_order(self) -> np.ndarray:
+        """The intrinsic derivative order of each basis function's
+        coefficient, shape ``(n_basis,)``.
+
+        Every family so far is *homogeneous*: each coefficient is a plain
+        value (a nodal value, a modal amplitude), which is why a single
+        ``scale`` factor per requested ``deriv`` (see :meth:`evaluate`) is
+        enough to remap a whole basis onto a different target domain. The
+        default here reflects that: all zeros.
+
+        A family whose coefficients are not all the same *kind* of quantity
+        --
+        :class:`~archimedes.experimental.approximation.CubicHermiteBasis`
+        is the first example, whose odd-indexed coefficients are physical
+        derivatives rather than values -- overrides this so that
+        :meth:`evaluate` (and :class:`PiecewiseBasis`'s fused
+        :meth:`~PiecewiseBasis.evaluate_expansion` path) can apply a
+        *per-column* power of ``scale`` (``scale ** (dof_order - deriv)``)
+        rather than one factor for the whole matrix.
+        """
+        return np.zeros(self.n_basis, dtype=int)  # type: ignore[attr-defined]
+
+    def boundary_dofs(self, order: int = 0) -> tuple[int | None, int | None]:
+        """Indices of the degrees of freedom that *are* the ``order``-th
+        derivative at the left and right ends of the domain, or ``None``
+        where there is no such DOF.
 
         Only meaningful for nodal families: a Lagrange basis whose nodes
         include both endpoints has :math:`\\ell_i(x_{\\mathrm{left}}) =
         \\delta_{i,\\mathrm{left}}`, so coefficient ``left`` is exactly the
-        endpoint value. A modal family (e.g.
+        endpoint value (``order=0``). A modal family (e.g.
         :class:`OrthogonalPolynomialBasis`) has no such DOF -- its endpoint
         value is a combination of every coefficient -- and neither does a
         nodal basis whose nodes are all interior (Gauss-Legendre points).
+        ``order=1`` asks instead for the DOF that *is* the physical first
+        derivative at that endpoint -- meaningful only for a family with
+        derivative-type degrees of freedom, e.g.
+        :class:`~archimedes.experimental.approximation.CubicHermiteBasis`.
 
-        Used by :class:`PiecewiseBasis` to impose :math:`C^0` continuity by
-        identifying adjacent elements' endpoint DOFs. The default returns
-        ``(None, None)``, i.e. "continuity >= 0 not supported"; families
+        Used by :class:`PiecewiseBasis` to impose continuity by identifying
+        adjacent elements' endpoint DOFs, one ``order`` at a time up to its
+        ``continuity``. The default returns ``(None, None)`` for every
+        ``order``, i.e. "no continuity of any order supported"; families
         that can support it override this.
         """
         return (None, None)
