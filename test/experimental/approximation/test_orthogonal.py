@@ -7,10 +7,10 @@ import archimedes as arc
 from archimedes._core._array_impl import SymbolicArray
 from archimedes.experimental.approximation import OrthogonalPolynomialBasis
 from archimedes.measure import (
-    HermiteMeasure,
-    HermiteNormMeasure,
     LaguerreMeasure,
     LegendreMeasure,
+    PhysicistsHermiteMeasure,
+    ProbabilistsHermiteMeasure,
 )
 from archimedes.quadrature import gauss_hermite, gauss_laguerre, gauss_legendre
 
@@ -89,7 +89,9 @@ def test_density_orthonormal_against_probability_measure():
     # (mass-1) quadrature weights should give the identity, same as the
     # raw-weight case gives for density=False.
     mean, std = 1.5, 2.0
-    basis = OrthogonalPolynomialBasis(HermiteNormMeasure(), n_basis=5, density=True)
+    basis = OrthogonalPolynomialBasis(
+        ProbabilistsHermiteMeasure(), n_basis=5, density=True
+    )
     rule = gauss_hermite(15, kind="prob")
     x = rule.scaled_points(mean, std)
     w = rule.scaled_weights(mean, std, density=True)
@@ -103,12 +105,14 @@ def test_density_rescales_by_sqrt_mass_relative_to_raw():
     # of measure.mass(...) -- so phi_density = phi_raw * sqrt(mass) exactly,
     # for every degree.
     mean, std = 0.0, 3.0
-    raw = OrthogonalPolynomialBasis(HermiteNormMeasure(), n_basis=4)
-    density = OrthogonalPolynomialBasis(HermiteNormMeasure(), n_basis=4, density=True)
+    raw = OrthogonalPolynomialBasis(ProbabilistsHermiteMeasure(), n_basis=4)
+    density = OrthogonalPolynomialBasis(
+        ProbabilistsHermiteMeasure(), n_basis=4, density=True
+    )
     x = np.linspace(-5, 5, 11)
     phi_raw = raw.evaluate(x, mean=mean, std=std)
     phi_density = density.evaluate(x, mean=mean, std=std)
-    mass = HermiteNormMeasure().mass(mean=mean, std=std)
+    mass = ProbabilistsHermiteMeasure().mass(mean=mean, std=std)
     np.testing.assert_allclose(phi_density, phi_raw * np.sqrt(mass), atol=1e-10)
 
 
@@ -121,7 +125,7 @@ def test_density_defaults_to_false():
 
 
 def test_generic_orthonormality_hermite():
-    basis = OrthogonalPolynomialBasis(HermiteMeasure(), n_basis=5)
+    basis = OrthogonalPolynomialBasis(PhysicistsHermiteMeasure(), n_basis=5)
     rule = gauss_hermite(15, kind="phys")
     phi = basis.evaluate(rule.nodes)
     M = phi.T @ (rule.weights[:, None] * phi)

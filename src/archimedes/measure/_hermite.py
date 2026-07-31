@@ -7,17 +7,17 @@ import numpy as np
 from ._base import Measure
 from ._domain import RealLine
 
-__all__ = ["HermiteMeasure", "HermiteNormMeasure"]
+__all__ = ["PhysicistsHermiteMeasure", "ProbabilistsHermiteMeasure"]
 
 
-class HermiteMeasure(Measure):
+class PhysicistsHermiteMeasure(Measure):
     """Measure for the physicists' Hermite polynomial family.
 
     Weight :math:`w(x) = e^{-x^2}` on :math:`(-\\infty, \\infty)`.
 
     The associated orthogonal polynomials are the *physicists'* Hermite
     polynomials :math:`H_n(x)` (as opposed to the *probabilists'*
-    convention used by :class:`HermiteNormMeasure`, which instead uses
+    convention used by :class:`ProbabilistsHermiteMeasure`, which instead uses
     weight :math:`e^{-x^2/2}`). The zeroth moment of the weight is
     :math:`\\int_{-\\infty}^\\infty e^{-x^2} \\, dx = \\sqrt{\\pi}`.
     """
@@ -46,14 +46,14 @@ class HermiteMeasure(Measure):
         return alpha, beta
 
 
-class HermiteNormMeasure(Measure):
+class ProbabilistsHermiteMeasure(Measure):
     """Measure for the probabilists' Hermite polynomial family.
 
     Weight :math:`w(x) = e^{-x^2/2}` on :math:`(-\\infty, \\infty)`.
 
     The associated orthogonal polynomials are the *probabilists'* Hermite
     polynomials :math:`\\mathit{He}_n(x)` (as opposed to the *physicists'*
-    convention used by :class:`HermiteMeasure`, with weight
+    convention used by :class:`PhysicistsHermiteMeasure`, with weight
     :math:`e^{-x^2}`). Up to normalization, this weight is exactly the
     density of a standard normal distribution:
     :math:`e^{-x^2/2} = \\sqrt{2\\pi} \\, \\phi(x)`, where :math:`\\phi` is

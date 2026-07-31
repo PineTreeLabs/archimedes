@@ -24,9 +24,9 @@ from archimedes.experimental.approximation import (
     TensorBasis,
 )
 from archimedes.measure import (
-    HermiteNormMeasure,
     JacobiMeasure,
     LegendreMeasure,
+    ProbabilistsHermiteMeasure,
     UnitInterval,
 )
 from archimedes.quadrature import gauss_lobatto, gauss_radau
@@ -173,7 +173,11 @@ def test_derivative_space_is_smaller(space):
 
 
 def test_polynomial_families_keep_their_measure_and_normalization():
-    for measure in (LegendreMeasure(), JacobiMeasure(1.5, 0.5), HermiteNormMeasure()):
+    for measure in (
+        LegendreMeasure(),
+        JacobiMeasure(1.5, 0.5),
+        ProbabilistsHermiteMeasure(),
+    ):
         basis = OrthogonalPolynomialBasis(measure, 5, density=True)
         derived = basis._derivative_basis()
         assert derived.measure == measure

@@ -101,7 +101,7 @@ def integral(
     this is not done automatically. If your integrand already has the
     appropriate decay, construct a ``QuadratureRule`` directly with an
     :py:class:`~archimedes.measure.LaguerreMeasure`
-    or :py:class:`~archimedes.measure.HermiteMeasure`
+    or :py:class:`~archimedes.measure.PhysicistsHermiteMeasure`
     instead of using this function.
 
     See Also

@@ -10,8 +10,8 @@ from archimedes.experimental.approximation import (
     PiecewiseBasis,
 )
 from archimedes.measure import (
-    HermiteNormMeasure,
     LegendreMeasure,
+    ProbabilistsHermiteMeasure,
     RealLine,
     UnitInterval,
 )
@@ -156,7 +156,7 @@ def test_project_rejects_test_space_with_different_n_basis(space, quad_rule):
 
 def test_project_rejects_test_space_with_different_domain(space):
     test_space = FunctionSpace(
-        OrthogonalPolynomialBasis(HermiteNormMeasure(), n_basis=5),
+        OrthogonalPolynomialBasis(ProbabilistsHermiteMeasure(), n_basis=5),
         domain=RealLine.Parameters(),
     )
     with pytest.raises(ValueError, match="domain"):
@@ -350,7 +350,9 @@ def test_basis_matrix_is_petrov_galerkin_agnostic(space, quad_rule):
 
 @pytest.fixture
 def hermite_space():
-    basis = OrthogonalPolynomialBasis(HermiteNormMeasure(), n_basis=4, density=True)
+    basis = OrthogonalPolynomialBasis(
+        ProbabilistsHermiteMeasure(), n_basis=4, density=True
+    )
     return FunctionSpace(basis, domain=basis.Parameters(mean=0.0, std=2.0))
 
 
@@ -376,7 +378,7 @@ def test_density_false_project_does_not_give_moments_directly(hermite_space):
     # Contrast case: the default (density=False) convention is orthonormal
     # against the *raw* weight, so c_0 is off from the true mean by a factor
     # of sqrt(mass) -- confirming the two conventions really do differ.
-    raw_basis = OrthogonalPolynomialBasis(HermiteNormMeasure(), n_basis=4)
+    raw_basis = OrthogonalPolynomialBasis(ProbabilistsHermiteMeasure(), n_basis=4)
     raw_space = FunctionSpace(raw_basis, domain=hermite_space.domain)
     std = hermite_space.domain.std
     fn = raw_space.project(lambda x: x**2)

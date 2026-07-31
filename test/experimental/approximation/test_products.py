@@ -21,7 +21,12 @@ from archimedes.experimental.approximation import (
     OrthogonalPolynomialBasis,
     PiecewiseBasis,
 )
-from archimedes.measure import HermiteMeasure, LegendreMeasure, RealLine, UnitInterval
+from archimedes.measure import (
+    LegendreMeasure,
+    PhysicistsHermiteMeasure,
+    RealLine,
+    UnitInterval,
+)
 from archimedes.quadrature import gauss_lobatto
 
 A, B = 0.0, 2.0
@@ -172,21 +177,21 @@ def test_undersized_explicit_space_projects_rather_than_failing(space):
 
 def test_different_measures_rejected():
     legendre = OrthogonalPolynomialBasis(LegendreMeasure(), 3)
-    hermite = OrthogonalPolynomialBasis(HermiteMeasure(), 3)
+    hermite = OrthogonalPolynomialBasis(PhysicistsHermiteMeasure(), 3)
     with pytest.raises(ValueError, match="same measure"):
         legendre._product_basis(hermite)
 
 
 def test_different_density_rejected():
-    raw = OrthogonalPolynomialBasis(HermiteMeasure(), 3)
-    density = OrthogonalPolynomialBasis(HermiteMeasure(), 3, density=True)
+    raw = OrthogonalPolynomialBasis(PhysicistsHermiteMeasure(), 3)
+    density = OrthogonalPolynomialBasis(PhysicistsHermiteMeasure(), 3, density=True)
     with pytest.raises(ValueError, match="same normalization"):
         raw._product_basis(density)
 
 
 def test_matching_density_forwarded_to_product():
-    left = OrthogonalPolynomialBasis(HermiteMeasure(), 3, density=True)
-    right = OrthogonalPolynomialBasis(HermiteMeasure(), 4, density=True)
+    left = OrthogonalPolynomialBasis(PhysicistsHermiteMeasure(), 3, density=True)
+    right = OrthogonalPolynomialBasis(PhysicistsHermiteMeasure(), 4, density=True)
     product = left._product_basis(right)
     assert product.density is True
 
@@ -214,7 +219,7 @@ def test_structurally_different_domains_rejected():
         OrthogonalPolynomialBasis(LegendreMeasure(), 3), domain=DOMAIN
     )
     line = FunctionSpace(
-        OrthogonalPolynomialBasis(HermiteMeasure(), 3),
+        OrthogonalPolynomialBasis(PhysicistsHermiteMeasure(), 3),
         domain=RealLine.Parameters(),
     )
     with pytest.raises(ValueError, match="structurally identical domains"):

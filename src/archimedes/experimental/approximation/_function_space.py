@@ -3,18 +3,18 @@
 from __future__ import annotations
 
 import functools
-from typing import TYPE_CHECKING, Any, Callable
+from typing import TYPE_CHECKING, Any, Callable, Literal
 
 import numpy as np
 
 from archimedes import tree
 from archimedes.measure import (
     HalfLine,
-    HermiteMeasure,
-    HermiteNormMeasure,
     JacobiMeasure,
     LaguerreMeasure,
     LegendreMeasure,
+    PhysicistsHermiteMeasure,
+    ProbabilistsHermiteMeasure,
     RealLine,
     UnitInterval,
 )
@@ -135,8 +135,8 @@ def _orthogonal_space(
 ) -> FunctionSpace:
     """Shared body for the ``OrthogonalPolynomialBasis``-backed classmethod
     constructors (:meth:`FunctionSpace.legendre`, ``.chebyshev``, ``.jacobi``,
-    ``.hermite``, ``.hermite_norm``, ``.laguerre``): only the measure and the
-    domain-parameter type differ between them.
+    ``.hermite``, ``.laguerre``): only the measure and the domain-parameter
+    type differ between them.
     """
     basis = OrthogonalPolynomialBasis(measure, n_basis, density=density)
     return cls(basis, domain, quad_rule=quad_rule)
@@ -358,23 +358,47 @@ class FunctionSpace:
         density: bool = False,
         quad_rule: Quadrature | None = None,
     ) -> FunctionSpace:
-        """Global Hermite polynomial space.
-    
-        *physicists'* Hermite polynomial space (weight
-        :math:`e^{-x^2}`); see :class:`~archimedes.measure.HermiteMeasure`.
+        """Global Hermite polynomial space on the real line.
 
-        *probabilists'* Hermite polynomial space (weight
-        :math:`e^{-x^2/2}`, the natural basis for a Gaussian random
-        variable); see :class:`~archimedes.measure.HermiteNormMeasure`
+        ``kind`` selects which classical Hermite convention:
+
+        - ``"phys"`` (default): the *physicists'* convention, reference
+          weight :math:`e^{-x^2}`
+          (:class:`~archimedes.measure.PhysicistsHermiteMeasure`).
+        - ``"prob"``: the *probabilists'* convention, reference weight
+          :math:`e^{-x^2/2}` (:class:`~archimedes.measure.ProbabilistsHermiteMeasure`),
+          the *un-normalized* standard normal density.
+
+        Neither weight integrates to 1 on its own for either ``kind``; for normalized
+        (e.g. probability density models, polynomial chaos expansions), set
+        ``density=True`` to normalize for either convention.
+
+        Parameters
+        ----------
+        n_basis : int
+            Number of basis functions.
+        mean, std : float, optional
+            Location/scale of the target domain; see
+            :class:`~archimedes.measure.RealLine`. Default ``0``, ``1``.
+        kind : {"phys", "prob"}, optional
+            Classical Hermite convention, as above. Default ``"phys"``.
+        density : bool, optional
+            Normalize against the probability density rather than the raw
+            weight; see :attr:`Basis.density`. Default ``False``.
+        quad_rule : QuadratureRule, optional
+            Forwarded to the underlying ``FunctionSpace`` constructor.
+
+        Raises
+        ------
+        ValueError
+            If ``kind`` is not ``"phys"`` or ``"prob"``.
         """
         if kind == "prob":
-            measure = HermiteNormMeasure()
+            measure = ProbabilistsHermiteMeasure()
         elif kind == "phys":
-            measure = HermiteMeasure()
+            measure = PhysicistsHermiteMeasure()
         else:
-            raise ValueError(
-                f"Hermite kind must be 'phys' or 'prob', got {kind!r}"
-            )
+            raise ValueError(f"Hermite kind must be 'phys' or 'prob', got {kind!r}")
         return _orthogonal_space(
             cls,
             measure,

@@ -13,8 +13,8 @@ import pytest
 
 import archimedes as arc
 from archimedes.measure import (
-    HermiteNormMeasure,
     LegendreMeasure,
+    ProbabilistsHermiteMeasure,
     RealLine,
     UnitInterval,
 )
@@ -71,7 +71,7 @@ def test_reference_weights_sum_to_product_of_masses():
 
 def test_measures_are_per_dimension():
     rule = tensor(_gh(3), _gl(3))
-    assert rule.measures == (HermiteNormMeasure(), LegendreMeasure())
+    assert rule.measures == (ProbabilistsHermiteMeasure(), LegendreMeasure())
     # There is deliberately no single `.measure`.
     assert not hasattr(rule, "measure")
 
@@ -91,7 +91,7 @@ def test_repr():
     rule = tensor(_gh(3), _gl(4))
     text = repr(rule)
     assert "ndim=2" in text and "n=12" in text
-    assert "HermiteNormMeasure" in text and "LegendreMeasure" in text
+    assert "ProbabilistsHermiteMeasure" in text and "LegendreMeasure" in text
 
 
 def test_equality_and_hash():

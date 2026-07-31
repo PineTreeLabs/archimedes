@@ -11,11 +11,11 @@ from scipy.special import (
 )
 
 from archimedes.measure import (
-    HermiteMeasure,
-    HermiteNormMeasure,
     JacobiMeasure,
     LaguerreMeasure,
     LegendreMeasure,
+    PhysicistsHermiteMeasure,
+    ProbabilistsHermiteMeasure,
 )
 from archimedes.quadrature import from_measure, golub_welsch
 
@@ -59,7 +59,7 @@ def test_from_measure_laguerre_matches_scipy(n):
 
 @pytest.mark.parametrize("n", N_VALUES)
 def test_from_measure_hermite_matches_scipy(n):
-    rule = from_measure(HermiteMeasure(), n)
+    rule = from_measure(PhysicistsHermiteMeasure(), n)
     nodes, weights = roots_hermite(n)
     np.testing.assert_allclose(rule.nodes, nodes, atol=1e-8)
     np.testing.assert_allclose(rule.weights, weights, atol=1e-8)
@@ -67,7 +67,7 @@ def test_from_measure_hermite_matches_scipy(n):
 
 @pytest.mark.parametrize("n", N_VALUES)
 def test_from_measure_hermitenorm_matches_scipy(n):
-    rule = from_measure(HermiteNormMeasure(), n)
+    rule = from_measure(ProbabilistsHermiteMeasure(), n)
     nodes, weights = roots_hermitenorm(n)
     np.testing.assert_allclose(rule.nodes, nodes, atol=1e-8)
     np.testing.assert_allclose(rule.weights, weights, atol=1e-8)
@@ -101,7 +101,7 @@ def test_from_measure_laguerre_exact_to_2n_minus_1():
 
 def test_from_measure_hermite_exact_to_2n_minus_1():
     # int_{-inf}^{inf} e^{-x^2} x^4 dx = 3 sqrt(pi) / 4
-    rule = from_measure(HermiteMeasure(), 3)
+    rule = from_measure(PhysicistsHermiteMeasure(), 3)
     assert np.isclose(rule.integrate(lambda x: x**4), 3 * np.sqrt(np.pi) / 4)
 
 

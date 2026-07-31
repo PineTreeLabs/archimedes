@@ -1,6 +1,6 @@
 """Tests for the ``OrthogonalPolynomialBasis``-backed ``FunctionSpace``
 classmethod constructors: ``.legendre``, ``.chebyshev``, ``.jacobi``,
-``.hermite``, ``.hermite_norm``, ``.laguerre``. Each is thin sugar over
+``.hermite``, ``.laguerre``. Each is thin sugar over
 ``FunctionSpace(OrthogonalPolynomialBasis(measure, n_basis), domain)``, so
 these mostly check that the right measure/domain-parameter type is built
 and that ``density``/``quad_rule`` are forwarded correctly.
@@ -15,11 +15,11 @@ from archimedes.experimental.approximation import (
 )
 from archimedes.measure import (
     HalfLine,
-    HermiteMeasure,
-    HermiteNormMeasure,
     JacobiMeasure,
     LaguerreMeasure,
     LegendreMeasure,
+    PhysicistsHermiteMeasure,
+    ProbabilistsHermiteMeasure,
     RealLine,
     UnitInterval,
 )
@@ -52,22 +52,33 @@ def test_jacobi_forwards_alpha_beta_and_domain():
     assert sugar.n_basis == 5
 
 
-def test_hermite_uses_physicists_measure_and_real_line_domain():
+def test_hermite_defaults_to_physicists_measure():
     sugar = FunctionSpace.hermite(4, mean=1.0, std=2.0)
-    assert isinstance(sugar.basis.measure, HermiteMeasure)
+    assert isinstance(sugar.basis.measure, PhysicistsHermiteMeasure)
     assert sugar.domain == RealLine.Parameters(mean=1.0, std=2.0)
 
 
-def test_hermite_norm_uses_probabilists_measure():
-    sugar = FunctionSpace.hermite_norm(4)
-    assert isinstance(sugar.basis.measure, HermiteNormMeasure)
+def test_hermite_kind_phys_is_explicit_default():
+    assert FunctionSpace.hermite(4, kind="phys") == FunctionSpace.hermite(4)
 
 
-def test_hermite_norm_forwards_density():
-    sugar = FunctionSpace.hermite_norm(4, density=True)
-    assert sugar.basis.density is True
-    default = FunctionSpace.hermite_norm(4)
-    assert default.basis.density is False
+def test_hermite_kind_prob_uses_probabilists_measure():
+    sugar = FunctionSpace.hermite(4, kind="prob")
+    assert isinstance(sugar.basis.measure, ProbabilistsHermiteMeasure)
+
+
+def test_hermite_rejects_unknown_kind():
+    with pytest.raises(ValueError, match="Hermite kind must be"):
+        FunctionSpace.hermite(4, kind="bogus")
+
+
+def test_hermite_forwards_density_regardless_of_kind():
+    # `density=True` is what normalizes to a probability measure, for
+    # either `kind` -- neither measure's own weight integrates to 1 on
+    # its own.
+    for kind in ("phys", "prob"):
+        assert FunctionSpace.hermite(4, kind=kind, density=True).basis.density is True
+        assert FunctionSpace.hermite(4, kind=kind).basis.density is False
 
 
 def test_laguerre_uses_half_line_domain():

@@ -7,9 +7,9 @@ from typing import Literal
 from scipy.special import roots_hermite, roots_hermitenorm
 
 from archimedes.measure import (
-    HermiteMeasure,
-    HermiteNormMeasure,
     Measure,
+    PhysicistsHermiteMeasure,
+    ProbabilistsHermiteMeasure,
 )
 
 from ._quadrature_rule import QuadratureRule
@@ -31,9 +31,9 @@ def gauss_hermite(n: int, kind: Literal["phys", "prob"] = "phys") -> QuadratureR
     kind : {"phys", "prob"}, optional
         Which classical Hermite convention to use. ``"phys"`` (default) is
         the *physicists'* convention, with reference weight
-        :math:`e^{-x^2}` (:class:`HermiteMeasure`). ``"prob"`` is the
+        :math:`e^{-x^2}` (:class:`PhysicistsHermiteMeasure`). ``"prob"`` is the
         *probabilists'* convention, with reference weight
-        :math:`e^{-x^2/2}` (:class:`HermiteNormMeasure`) -- up to
+        :math:`e^{-x^2/2}` (:class:`ProbabilistsHermiteMeasure`) -- up to
         normalization, the standard normal density. Neither weight
         integrates to 1 on its own; pass ``density=True`` to
         ``QuadratureRule.integrate``/``sum``/``scaled_weights`` for weights
@@ -53,10 +53,10 @@ def gauss_hermite(n: int, kind: Literal["phys", "prob"] = "phys") -> QuadratureR
     measure: Measure
     if kind == "prob":
         x, w = roots_hermitenorm(n)
-        measure = HermiteNormMeasure()
+        measure = ProbabilistsHermiteMeasure()
     elif kind == "phys":
         x, w = roots_hermite(n)
-        measure = HermiteMeasure()
+        measure = PhysicistsHermiteMeasure()
     else:
         raise ValueError(f"kind must be 'phys' or 'prob', got {kind!r}")
     return QuadratureRule(x, w, measure=measure, name="gauss_hermite")

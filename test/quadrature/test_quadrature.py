@@ -8,11 +8,11 @@ from scipy.special import roots_hermite, roots_hermitenorm, roots_jacobi, roots_
 
 import archimedes as arc
 from archimedes.measure import (
-    HermiteMeasure,
-    HermiteNormMeasure,
     JacobiMeasure,
     LaguerreMeasure,
     LegendreMeasure,
+    PhysicistsHermiteMeasure,
+    ProbabilistsHermiteMeasure,
 )
 from archimedes.quadrature import (
     QuadratureRule,
@@ -253,7 +253,7 @@ def test_gauss_hermite():
     n = 5
     rule = gauss_hermite(n)
     assert len(rule) == n
-    assert isinstance(rule.measure, HermiteMeasure)
+    assert isinstance(rule.measure, PhysicistsHermiteMeasure)
 
     # Exact for polynomials up to degree 2n - 1 = 9
     assert np.isclose(rule.integrate(lambda x: np.ones_like(x)), np.sqrt(np.pi))
@@ -265,7 +265,7 @@ def test_gauss_hermite_prob():
     n = 5
     rule = gauss_hermite(n, kind="prob")
     assert len(rule) == n
-    assert isinstance(rule.measure, HermiteNormMeasure)
+    assert isinstance(rule.measure, ProbabilistsHermiteMeasure)
 
     assert np.isclose(rule.integrate(lambda x: np.ones_like(x)), np.sqrt(2 * np.pi))
     assert np.isclose(rule.integrate(lambda x: x**2), np.sqrt(2 * np.pi))
@@ -323,7 +323,9 @@ def test_gauss_laguerre_rate_scaling():
 def test_gauss_hermite_exact_moments():
     n = 5
     x, w = roots_hermite(n)
-    rule = QuadratureRule(x, w, name="gauss_hermite_5", measure=HermiteMeasure())
+    rule = QuadratureRule(
+        x, w, name="gauss_hermite_5", measure=PhysicistsHermiteMeasure()
+    )
 
     assert np.isclose(rule.integrate(lambda x: np.ones_like(x)), np.sqrt(np.pi))
     assert np.isclose(rule.integrate(lambda x: x**2), np.sqrt(np.pi) / 2)
@@ -333,7 +335,9 @@ def test_gauss_hermite_exact_moments():
 def test_gauss_hermite_mean_std_scaling():
     n = 5
     x, w = roots_hermite(n)
-    rule = QuadratureRule(x, w, name="gauss_hermite_5", measure=HermiteMeasure())
+    rule = QuadratureRule(
+        x, w, name="gauss_hermite_5", measure=PhysicistsHermiteMeasure()
+    )
 
     mean, std = 1.0, 2.0
     integral = rule.integrate(lambda x: np.ones_like(x), mean=mean, std=std)
@@ -344,7 +348,7 @@ def test_gauss_hermitenorm_exact_moments():
     n = 5
     x, w = roots_hermitenorm(n)
     rule = QuadratureRule(
-        x, w, name="gauss_hermitenorm_5", measure=HermiteNormMeasure()
+        x, w, name="gauss_hermitenorm_5", measure=ProbabilistsHermiteMeasure()
     )
 
     assert np.isclose(rule.integrate(lambda x: np.ones_like(x)), np.sqrt(2 * np.pi))
@@ -353,12 +357,12 @@ def test_gauss_hermitenorm_exact_moments():
 
 
 def test_gauss_hermitenorm_matches_gaussian_expectation():
-    # Unlike HermiteMeasure, mean/std here are exactly the mean and standard
+    # Unlike PhysicistsHermiteMeasure, mean/std here are exactly the mean and standard
     # deviation of a Gaussian density -- no sqrt(2) correction needed.
     n = 6
     x, w = roots_hermitenorm(n)
     rule = QuadratureRule(
-        x, w, name="gauss_hermitenorm_6", measure=HermiteNormMeasure()
+        x, w, name="gauss_hermitenorm_6", measure=ProbabilistsHermiteMeasure()
     )
 
     mean, std = 2.0, 3.0
@@ -588,7 +592,7 @@ def test_compile_symbolic_rate():
 def test_compile_symbolic_mean_std():
     x, w = roots_hermitenorm(5)
     rule = QuadratureRule(
-        x, w, name="gauss_hermitenorm_5", measure=HermiteNormMeasure()
+        x, w, name="gauss_hermitenorm_5", measure=ProbabilistsHermiteMeasure()
     )
 
     @arc.compile

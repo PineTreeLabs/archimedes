@@ -21,8 +21,8 @@ from archimedes.experimental.approximation import (
     TensorBasis,
 )
 from archimedes.measure import (
-    HermiteNormMeasure,
     LegendreMeasure,
+    ProbabilistsHermiteMeasure,
     RealLine,
     UnitInterval,
 )
@@ -85,9 +85,13 @@ def test_sizes_and_shape():
 
 def test_measures_are_per_dimension():
     basis = TensorBasis(
-        (OrthogonalPolynomialBasis(HermiteNormMeasure(), 3), _modal(3), _nodal(3))
+        (
+            OrthogonalPolynomialBasis(ProbabilistsHermiteMeasure(), 3),
+            _modal(3),
+            _nodal(3),
+        )
     )
-    assert basis.measures == (HermiteNormMeasure(), LegendreMeasure(), None)
+    assert basis.measures == (ProbabilistsHermiteMeasure(), LegendreMeasure(), None)
 
 
 def test_measures_default_to_none_for_weightless_families():
@@ -104,7 +108,7 @@ def test_density_is_shared_across_factors():
     assert plain.density is False
     normalized = TensorBasis(
         tuple(
-            OrthogonalPolynomialBasis(HermiteNormMeasure(), 3, density=True)
+            OrthogonalPolynomialBasis(ProbabilistsHermiteMeasure(), 3, density=True)
             for _ in range(2)
         )
     )
@@ -267,7 +271,7 @@ def test_mixed_measures_with_density_give_moments():
     # an orthonormal expansion is the mean and sum(c[1:]**2) the variance.
     basis = TensorBasis(
         tuple(
-            OrthogonalPolynomialBasis(HermiteNormMeasure(), 4, density=True)
+            OrthogonalPolynomialBasis(ProbabilistsHermiteMeasure(), 4, density=True)
             for _ in range(2)
         )
     )
@@ -283,7 +287,7 @@ def test_mixed_measures_with_density_give_moments():
 def test_gaussian_and_uniform_dimensions_together():
     basis = TensorBasis(
         (
-            OrthogonalPolynomialBasis(HermiteNormMeasure(), 4, density=True),
+            OrthogonalPolynomialBasis(ProbabilistsHermiteMeasure(), 4, density=True),
             OrthogonalPolynomialBasis(LegendreMeasure(), 4, density=True),
         )
     )

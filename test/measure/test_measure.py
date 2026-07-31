@@ -5,11 +5,11 @@ from scipy.special import beta as beta_fn
 from archimedes import tree
 from archimedes.measure import (
     HalfLine,
-    HermiteMeasure,
-    HermiteNormMeasure,
     JacobiMeasure,
     LaguerreMeasure,
     LegendreMeasure,
+    PhysicistsHermiteMeasure,
+    ProbabilistsHermiteMeasure,
     RealLine,
     UnitInterval,
 )
@@ -81,7 +81,7 @@ def test_laguerre_measure():
 
 
 def test_hermite_measure():
-    measure = HermiteMeasure()
+    measure = PhysicistsHermiteMeasure()
     assert measure.uniform_weight is False
     assert measure.support == (-np.inf, np.inf)
     np.testing.assert_allclose(
@@ -140,8 +140,8 @@ def test_families_sharing_a_domain_share_its_parameters_type():
     # parameters belong to the domain, so sharing one means sharing them.
     assert type(JacobiMeasure(alpha=1.0, beta=2.0).domain) is UnitInterval
     assert type(LegendreMeasure().domain) is UnitInterval
-    assert type(HermiteMeasure().domain) is RealLine
-    assert type(HermiteNormMeasure().domain) is RealLine
+    assert type(PhysicistsHermiteMeasure().domain) is RealLine
+    assert type(ProbabilistsHermiteMeasure().domain) is RealLine
     assert type(LaguerreMeasure().domain) is HalfLine
 
 
@@ -177,7 +177,9 @@ def test_hermite_parameters_defaults_and_validation(domain_cls):
 def test_measure_mass_reference_domain():
     # mass() with no args is just reference_mass (scale == 1)
     assert LegendreMeasure().mass() == LegendreMeasure().reference_mass
-    assert HermiteMeasure().mass() == HermiteMeasure().reference_mass
+    assert (
+        PhysicistsHermiteMeasure().mass() == PhysicistsHermiteMeasure().reference_mass
+    )
     assert LaguerreMeasure().mass() == LaguerreMeasure().reference_mass
 
 
@@ -186,7 +188,7 @@ def test_measure_mass_mapped_domain():
     assert LegendreMeasure().mass(0.0, 4.0) == 4.0
 
     # Hermite (prob.): mass scales by std, matching the affine Jacobian
-    measure = HermiteNormMeasure()
+    measure = ProbabilistsHermiteMeasure()
     assert np.isclose(measure.mass(mean=1.0, std=2.0), 2.0 * measure.reference_mass)
 
     # mass() is exactly what scaled_weights(density=True) divides by
@@ -201,7 +203,10 @@ def test_hermite_and_hermitenorm_share_a_domain_parameters_type():
     # byte-identical affine_params. Only the *weight* differs (and hence the
     # interpretation of `std` relative to it -- see the measure docstrings),
     # which is a Measure concern, not a domain one.
-    assert HermiteMeasure().domain.Parameters is HermiteNormMeasure().domain.Parameters
+    assert (
+        PhysicistsHermiteMeasure().domain.Parameters
+        is ProbabilistsHermiteMeasure().domain.Parameters
+    )
 
 
 # -- recurrence_coeffs --
@@ -259,7 +264,7 @@ def test_laguerre_recurrence_coeffs():
 
 
 def test_hermite_recurrence_coeffs():
-    measure = HermiteMeasure()
+    measure = PhysicistsHermiteMeasure()
     alpha, beta = measure.recurrence_coeffs(4)
     np.testing.assert_array_equal(alpha, [0.0, 0.0, 0.0, 0.0])
     assert beta[0] == measure.reference_mass
@@ -267,7 +272,7 @@ def test_hermite_recurrence_coeffs():
 
 
 def test_hermite_norm_recurrence_coeffs():
-    measure = HermiteNormMeasure()
+    measure = ProbabilistsHermiteMeasure()
     alpha, beta = measure.recurrence_coeffs(4)
     np.testing.assert_array_equal(alpha, [0.0, 0.0, 0.0, 0.0])
     assert beta[0] == measure.reference_mass
@@ -275,7 +280,7 @@ def test_hermite_norm_recurrence_coeffs():
 
 
 def test_hermite_norm_measure():
-    measure = HermiteNormMeasure()
+    measure = ProbabilistsHermiteMeasure()
     assert measure.uniform_weight is False
     assert measure.support == (-np.inf, np.inf)
     np.testing.assert_allclose(
@@ -306,13 +311,14 @@ def test_measure_equality_is_by_type():
     # separately-constructed instances must compare (and hash) equal --
     # otherwise a FunctionSpace built from one wouldn't match the other.
     assert LegendreMeasure() == LegendreMeasure()
-    assert LegendreMeasure() != HermiteMeasure()
+    assert LegendreMeasure() != PhysicistsHermiteMeasure()
     assert hash(LegendreMeasure()) == hash(LegendreMeasure())
-    assert len({LegendreMeasure(), LegendreMeasure(), HermiteMeasure()}) == 2
+    assert len({LegendreMeasure(), LegendreMeasure(), PhysicistsHermiteMeasure()}) == 2
 
-    # HermiteMeasure vs. HermiteNormMeasure share a domain but are distinct
-    # measures (different weights), so they must not compare equal.
-    assert HermiteMeasure() != HermiteNormMeasure()
+    # PhysicistsHermiteMeasure vs. ProbabilistsHermiteMeasure share a domain
+    # but are distinct measures (different weights), so they must not
+    # compare equal.
+    assert PhysicistsHermiteMeasure() != ProbabilistsHermiteMeasure()
 
 
 def test_measure_equality_against_non_measure_is_not_implemented():
