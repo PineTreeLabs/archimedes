@@ -467,24 +467,40 @@ class FunctionSpace:
             integrand = np.sum(integrand, axis=-1)
         return rule.sum(integrand, **self._domain_kwargs(), density=self.basis.density)
 
-    def project(self, f: Callable, quad_rule: Quadrature | None = None) -> Function:
-        """Galerkin projection of ``f`` onto this space.
+    def project(
+        self,
+        f: Callable,
+        quad_rule: Quadrature | None = None,
+        test_space: "FunctionSpace | None" = None,
+    ) -> Function:
+        """Galerkin (or Petrov-Galerkin) projection of ``f`` onto this space.
 
-        Solves ``M @ c = b`` for the coefficients ``c``, where, for the
-        basis matrix ``Phi`` (see :meth:`basis_matrix`), ``M = Phi.T @
-        Phi`` is the Gram (mass) matrix and ``b = Phi.T @ f(x)`` is
-        the load vector -- both approximated via ``quad_rule`` (default
-        ``self.quad_rule``). ``quad_rule`` must be accurate enough for the
-        product of ``f`` and the basis, which is generally a higher-order
-        requirement than exactness for the basis alone; pass an explicit
-        ``quad_rule`` to use something other than the space's natural
-        default.
+        Solves ``M @ c = b`` for the coefficients ``c``, where, for this
+        (trial) space's basis matrix ``Phi`` and ``test_space``'s basis
+        matrix ``Psi`` (see :meth:`basis_matrix`), ``M = Psi.T @ Phi`` is
+        the Gram matrix and ``b = Psi.T @ f(x)`` is the load vector -- both
+        approximated via ``quad_rule`` (default ``self.quad_rule``).
+        ``quad_rule`` must be accurate enough for the product of ``f`` and
+        both bases, which is generally a higher-order requirement than
+        exactness for either basis alone; pass an explicit ``quad_rule`` to
+        use something other than the space's natural default.
+
+        ``test_space`` defaults to this space (standard Galerkin, ``M`` the
+        mass matrix). Passing a different space performs Petrov-Galerkin
+        projection: the residual ``f - Phi @ c`` is made orthogonal to
+        ``test_space`` rather than to this space. ``test_space`` must have
+        the same ``n_basis`` as this space (so ``M`` is square) and must
+        denote the same physical domain (checked structurally only, as in
+        :meth:`_is_compatible_with`, since domains may be traced). The
+        result is still returned **in this (trial) space** -- ``test_space``
+        only supplies the orthogonality condition used to solve for ``c``,
+        not how ``c`` is interpreted, since ``c`` are always coefficients of
+        *this* space's basis functions.
 
         ``f`` may be vector-valued: if ``f(x)`` has shape ``(npts, m)``,
-        each component is projected onto the same space and the result has
-        coefficients of shape ``(n_basis, m)``. The mass matrix is shared
-        across components, so this costs one basis evaluation rather than
-        ``m`` of them.
+        each component is projected and the result has coefficients of
+        shape ``(n_basis, m)``. ``M`` is shared across components, so this
+        costs one basis evaluation rather than ``m`` of them.
 
         Parameters
         ----------
@@ -494,24 +510,43 @@ class FunctionSpace:
             ``(npts,)`` (scalar-valued) or ``(npts, m)`` (vector-valued).
         quad_rule : QuadratureRule, optional
             Quadrature rule to use instead of ``self.quad_rule``.
+        test_space : FunctionSpace, optional
+            Test space for a Petrov-Galerkin projection. Default this
+            (trial) space, giving standard Galerkin projection.
 
         Returns
         -------
         Function
-            The projected function, in this space, with coefficients of
-            shape ``(n_basis,)`` or ``(n_basis, m)`` to match ``f``.
+            The projected function, in this (trial) space, with
+            coefficients of shape ``(n_basis,)`` or ``(n_basis, m)`` to
+            match ``f``.
         """
         from ._function import Function  # avoid a circular import
+
+        test = self if test_space is None else test_space
+        if test_space is not None:
+            if test.n_basis != self.n_basis:
+                raise ValueError(
+                    f"test_space must have the same n_basis as this (trial) "
+                    f"space for a square Petrov-Galerkin system; got "
+                    f"test_space.n_basis={test.n_basis} vs "
+                    f"n_basis={self.n_basis}"
+                )
+            if tree.structure(test.domain) != tree.structure(self.domain):
+                raise ValueError(
+                    "test_space must denote the same domain as this (trial) space"
+                )
 
         rule = self._resolve_rule(quad_rule)
         self._check_quad_rule_size(rule)
         x, _ = self.quadrature(rule)
-        phi = self.basis_matrix(quad_rule=rule)  # (npts, n_basis)
-        M = phi.T @ phi
+        phi = self.basis_matrix(quad_rule=rule)  # (npts, n_basis) trial
+        psi = test.basis_matrix(quad_rule=rule)  # (npts, n_basis) test
+        M = psi.T @ phi
         # `f` is an ordinary function of position, so it needs the
         # coordinates and has no breakpoint ambiguity of its own to resolve.
         # In the vector-valued case the right-hand side is the (n_basis, m)
         # matrix of stacked component loads, which `solve` handles with a
-        # single factorization of the shared mass matrix.
-        rhs = phi.T @ f(x)
+        # single factorization of the shared Gram matrix.
+        rhs = psi.T @ f(x)
         return Function(np.linalg.solve(M, rhs), self)

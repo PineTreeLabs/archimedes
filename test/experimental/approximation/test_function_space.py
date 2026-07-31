@@ -7,6 +7,7 @@ from archimedes.experimental.approximation import (
     Function,
     FunctionSpace,
     OrthogonalPolynomialBasis,
+    PiecewiseBasis,
 )
 from archimedes.measure import (
     HermiteNormMeasure,
@@ -132,6 +133,57 @@ def test_project_on_non_reference_domain(quad_rule):
     fn = space.project(f)
     x = np.linspace(0, 4, 17)
     np.testing.assert_allclose(fn(x), f(x), atol=1e-8)
+
+
+def test_project_with_test_space_equal_to_self_matches_default(space):
+    # test_space=space should be indistinguishable from the (default)
+    # standard Galerkin path -- exercises the "not None" branch of the new
+    # checks without changing the math.
+    default = space.project(lambda x: x**2)
+    explicit = space.project(lambda x: x**2, test_space=space)
+    np.testing.assert_allclose(default.coefficients, explicit.coefficients)
+
+
+def test_project_rejects_test_space_with_different_n_basis(space, quad_rule):
+    test_space = FunctionSpace(
+        OrthogonalPolynomialBasis(LegendreMeasure(), n_basis=3),
+        domain=UnitInterval.Parameters(a=-1.0, b=1.0),
+        quad_rule=quad_rule,
+    )
+    with pytest.raises(ValueError, match="n_basis"):
+        space.project(lambda x: x**2, test_space=test_space)
+
+
+def test_project_rejects_test_space_with_different_domain(space):
+    test_space = FunctionSpace(
+        OrthogonalPolynomialBasis(HermiteNormMeasure(), n_basis=5),
+        domain=RealLine.Parameters(),
+    )
+    with pytest.raises(ValueError, match="domain"):
+        space.project(lambda x: x**2, test_space=test_space)
+
+
+def test_project_petrov_galerkin_recovers_exact_polynomial(space):
+    # A genuinely different test space -- 5 discontinuous piecewise-constant
+    # "bumps", not another basis for the same degree-4 polynomial span --
+    # still recovers x^2 exactly: the true expansion's residual is
+    # identically zero, so it satisfies *any* set of orthogonality
+    # conditions, as long as the resulting (square) system is nonsingular.
+    test_space = FunctionSpace(
+        PiecewiseBasis(
+            OrthogonalPolynomialBasis(LegendreMeasure(), n_basis=1),
+            breakpoints=np.linspace(-1, 1, 6),
+            continuity=-1,
+        ),
+        domain=UnitInterval.Parameters(a=-1.0, b=1.0),
+    )
+    assert test_space.n_basis == space.n_basis
+
+    fn = space.project(lambda x: x**2, test_space=test_space)
+    assert fn.space is space
+
+    x = np.linspace(-1, 1, 13)
+    np.testing.assert_allclose(fn(x), x**2, atol=1e-10)
 
 
 def test_project_of_function_outside_basis_degree_is_approximate(quad_rule):
