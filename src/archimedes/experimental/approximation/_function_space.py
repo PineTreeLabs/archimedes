@@ -997,7 +997,7 @@ class FunctionSpace:
         rhs = psi.T @ f(x)
         return BasisExpansion(np.linalg.solve(M, rhs), self)
 
-    def function(self, coefficients: np.ndarray) -> BasisExpansion:
+    def function(self, coefficients: np.ndarray | None = None) -> BasisExpansion:
         """A :class:`BasisExpansion` on this space with known ``coefficients``.
 
         Sugar for ``BasisExpansion(coefficients, self)`` -- the natural
@@ -1007,10 +1007,14 @@ class FunctionSpace:
 
         Parameters
         ----------
-        coefficients : array_like
+        coefficients : array_like or None, optional
             Expansion coefficients, shape ``(n_basis,)`` for a scalar-valued
             function or ``(n_basis, m)`` for one mapping to an ``m``-vector.
+            If ``None``, the expansion is initialized to zero. Default ``None``.
         """
         from ._basis_expansion import BasisExpansion  # avoid a circular import
+
+        if coefficients is None:
+            coefficients = np.zeros(self.n_basis)
 
         return BasisExpansion(coefficients, self)

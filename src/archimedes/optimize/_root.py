@@ -23,7 +23,7 @@ __all__ = ["implicit", "root"]
 
 
 if TYPE_CHECKING:
-    from ..typing import ArrayLike, Tree
+    from ..typing import Tree
 
 
 def implicit(
@@ -175,7 +175,7 @@ def implicit(
 
     # Define a function that will solve the root-finding problem
     # This function will be evaluated with SymbolicArray objects.
-    def _solve(x0: ArrayLike | Tree, *args) -> ArrayLike | Tree:
+    def _solve(x0: Tree, *args) -> Tree:
         # `x0` may be a flat array or an arbitrary struct/tree; flatten it into
         # a single vector for CasADi, and keep `unravel_x0` around to restore
         # the original tree structure for both the residual evaluation and
@@ -411,6 +411,6 @@ def root(
         static_argnames=static_argnames,
         **options,
     )
-    x: ArrayLike = g(x0, *args)
+    x: Tree = g(x0, *args)
 
     return x
