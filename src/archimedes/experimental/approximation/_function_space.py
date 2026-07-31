@@ -2,20 +2,108 @@
 
 from __future__ import annotations
 
-import dataclasses
+import functools
 from typing import TYPE_CHECKING, Any, Callable
 
 import numpy as np
 
 from archimedes import tree
-from archimedes.quadrature import Quadrature, QuadratureRule
+from archimedes.measure import LegendreMeasure, UnitInterval
+from archimedes.quadrature import Quadrature
 
 from ._basis import RIGHT, Basis, BasisMatrix
+from ._lagrange import LagrangeBasis
+from ._orthogonal import OrthogonalPolynomialBasis
+from ._piecewise import PiecewiseBasis
 
 if TYPE_CHECKING:
     from ._function import Function
 
 __all__ = ["FunctionSpace"]
+
+
+def _normalize_breakpoints(breakpoints) -> tuple[float, float, np.ndarray]:
+    """Physical-domain ``breakpoints`` (spanning ``[a, b]``) to ``(a, b,
+    ref)``, ``ref`` being the same partition on the reference domain
+    ``[-1, 1]`` that :class:`PiecewiseBasis` itself expects.
+
+    ``a``/``b`` are read directly from the array's own endpoints -- the
+    caller never states them separately, so there is no second coordinate
+    system to keep in sync by hand.
+    """
+    bp = np.asarray(breakpoints, dtype=float)
+    if bp.ndim != 1 or len(bp) < 2:
+        raise ValueError(
+            f"breakpoints must be 1-D with at least 2 entries, got shape {bp.shape}"
+        )
+    if np.any(np.diff(bp) <= 0):
+        raise ValueError("breakpoints must be strictly increasing")
+
+    a, b = float(bp[0]), float(bp[-1])
+    scale, shift = UnitInterval().affine_params(a, b)
+    ref = (bp - shift) / scale
+    # Pin the endpoints exactly: PiecewiseBasis checks `bp[0] != -1.0` by
+    # equality, not tolerance, and the affine round-trip is not guaranteed
+    # to land there in floating point.
+    ref[0], ref[-1] = -1.0, 1.0
+    return a, b, ref
+
+
+_NODE_FAMILIES = {
+    "lobatto": LagrangeBasis.gauss_lobatto,
+    "legendre": LagrangeBasis.gauss_legendre,
+    "radau_left": functools.partial(LagrangeBasis.gauss_radau, endpoint="left"),
+    "radau_right": functools.partial(LagrangeBasis.gauss_radau, endpoint="right"),
+    "equispaced": LagrangeBasis.equispaced,
+}
+
+
+def _resolve_lagrange_element(n: int, nodes) -> LagrangeBasis:
+    """One order-``n`` :class:`LagrangeBasis` element for
+    :meth:`FunctionSpace.piecewise`'s ``nodes`` argument -- a node-family
+    name, an explicit callable/array, or (``None``) the family default.
+
+    Dispatches on ``type(nodes)`` rather than comparing ``nodes`` against
+    each family name with ``==`` directly: once an array-like reaches this
+    function, ``array == "lobatto"`` is itself an elementwise comparison
+    (not a clean ``False``), so a string check must run first.
+    """
+    if nodes is None:
+        return LagrangeBasis.gauss_lobatto(n)
+    if isinstance(nodes, str):
+        if nodes not in _NODE_FAMILIES:
+            raise ValueError(
+                f"unknown nodes family {nodes!r}; expected one of "
+                f"{sorted(_NODE_FAMILIES)}, a callable, or an array of "
+                f"reference nodes"
+            )
+        return _NODE_FAMILIES[nodes](n)
+    if callable(nodes):
+        return LagrangeBasis(reference_nodes=nodes(n), node_family=nodes)
+    arr = np.asarray(nodes, dtype=float)
+    if len(arr) != n:
+        raise ValueError(f"nodes has {len(arr)} points but order={n}")
+    return LagrangeBasis(reference_nodes=arr)
+
+
+def _resolve_element_basis(kind: str, order, nodes) -> Basis | tuple[Basis, ...]:
+    """The (possibly per-element) local ``Basis`` for
+    :meth:`FunctionSpace.piecewise`'s ``kind``/``order``/``nodes``.
+
+    Returns a single ``Basis`` for a scalar ``order`` (the common, uniform
+    case -- letting :class:`PiecewiseBasis` tile it, which also keeps its
+    ``_uniform`` fast path), or a tuple for a per-element ``order`` tuple.
+    """
+    orders = order if isinstance(order, tuple) else (order,)
+    if kind == "legendre":
+        if nodes is not None:
+            raise ValueError("nodes is only meaningful for kind='lagrange'")
+        bases = tuple(OrthogonalPolynomialBasis(LegendreMeasure(), n) for n in orders)
+    elif kind == "lagrange":
+        bases = tuple(_resolve_lagrange_element(n, nodes) for n in orders)
+    else:
+        raise ValueError(f"kind must be 'lagrange' or 'legendre', got {kind!r}")
+    return bases if isinstance(order, tuple) else bases[0]
 
 
 def _is_superset(have: np.ndarray, required: np.ndarray, tol: float = 1e-12) -> bool:
@@ -147,6 +235,90 @@ class FunctionSpace:
                     f"breakpoints)` over a superset of the basis breakpoints, "
                     f"or omit `quad_rule` to use `basis.default_quadrature()`."
                 )
+
+    # --- constructors ---
+
+    @classmethod
+    def piecewise(
+        cls,
+        kind: str,
+        order: int | tuple[int, ...],
+        breakpoints,
+        *,
+        nodes: str | np.ndarray | Callable[[int], np.ndarray] | None = None,
+        continuity: int = 0,
+        quad_rule: Quadrature | None = None,
+    ) -> FunctionSpace:
+        """A piecewise ``FunctionSpace``: a local basis tiled across
+        ``breakpoints``, on the domain those breakpoints themselves span.
+
+        Sugar over :class:`PiecewiseBasis` -- it builds the local
+        ``element_basis`` and the target-domain ``UnitInterval.Parameters``
+        for you, so neither ``LagrangeBasis``/``OrthogonalPolynomialBasis``
+        nor ``UnitInterval`` need to be named directly for the common cases
+        below. For anything else (a heterogeneous per-element family, a
+        symbolic/traced domain independent of the mesh, an explicit
+        reference-domain ``quad_rule``), build a ``PiecewiseBasis`` directly
+        and pass it to the general ``FunctionSpace(basis, domain)``
+        constructor -- nothing here is reachable only through this method.
+
+        Parameters
+        ----------
+        kind : {"lagrange", "legendre"}
+            Local basis family. ``"lagrange"`` is nodal (point-value
+            degrees of freedom); ``"legendre"`` is modal
+            (:class:`OrthogonalPolynomialBasis` on
+            :class:`~archimedes.measure.LegendreMeasure`), which has no
+            boundary degrees of freedom and so only supports
+            ``continuity=-1``.
+        order : int or tuple of int
+            Number of local degrees of freedom per element. A bare ``int``
+            is shared by every element; a tuple gives one order per
+            element (p-refinement) and must have one entry per element.
+        breakpoints : array_like
+            Element boundaries **on the physical (target) domain**, shape
+            ``(n_elements + 1,)``, strictly increasing. Unlike
+            ``PiecewiseBasis.breakpoints`` (which lives on the reference
+            domain ``[-1, 1]``), this spans the whole target domain --
+            ``breakpoints[0]``/``breakpoints[-1]`` *are* ``a``/``b``, read
+            directly from the array rather than given separately.
+        nodes : str, callable, or array_like, optional
+            Node placement for a ``kind="lagrange"`` element, one of:
+            
+                - One of the family names ``"lobatto"``, ``"legendre"``,
+                    ``"radau_left"``, ``"radau_right"``, ``"equispaced"``
+                - An explicit ``n -> nodes`` callable
+                - An explicit array of reference nodes.
+                
+            Default (``None``) is Gauss-Lobatto, which keeps ``continuity=0``,
+            since Lobatto includes both endpoints. Meaningless (and rejected)
+            for non-Lagrange bases.
+        continuity : int, optional
+            ``0`` (the default) for value-continuity (:math:`C^0`), ``-1``
+            for a discontinuous (broken) basis. Forwarded to
+            :class:`PiecewiseBasis` unchanged; see there for what each
+            value requires of the element basis.
+        quad_rule : QuadratureRule, optional
+            Forwarded to the underlying ``FunctionSpace`` constructor.
+            Default ``basis.default_quadrature()``.
+
+        Returns
+        -------
+        FunctionSpace
+        """
+        a, b, ref_breakpoints = _normalize_breakpoints(breakpoints)
+        n_elements = len(ref_breakpoints) - 1
+        if isinstance(order, tuple) and len(order) != n_elements:
+            raise ValueError(
+                f"order has {len(order)} entries but breakpoints describe "
+                f"{n_elements} elements"
+            )
+
+        element_basis = _resolve_element_basis(kind, order, nodes)
+        basis = PiecewiseBasis(element_basis, ref_breakpoints, continuity=continuity)
+        return cls(basis, UnitInterval.Parameters(a=a, b=b), quad_rule=quad_rule)
+
+    # --- implementation ---
 
     @property
     def n_basis(self) -> int:

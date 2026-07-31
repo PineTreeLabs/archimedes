@@ -5,7 +5,8 @@ import archimedes as arc
 from archimedes._core._array_impl import SymbolicArray
 from archimedes.experimental.approximation import LagrangeBasis, PiecewiseBasis
 from archimedes.measure import UnitInterval
-from archimedes.quadrature import gauss_lobatto
+from archimedes.quadrature import gauss_legendre as gauss_legendre_rule
+from archimedes.quadrature import gauss_lobatto, gauss_radau
 
 
 @pytest.fixture
@@ -260,3 +261,99 @@ class TestHigherDerivatives:
         got = pw.evaluate(x, deriv=deriv)
         assert got.shape == (len(x), pw.n_basis)
         assert np.isfinite(got).all()
+
+
+# -- named node-family constructors --
+
+
+class TestNodeFamilyConstructors:
+    """Each classmethod's ``reference_nodes`` match the corresponding
+    ``archimedes.quadrature`` rule (or ``np.linspace``) directly, and its
+    ``node_family`` regenerates the same points at a different size --
+    which is also what :meth:`_derivative_basis`/:meth:`_product_basis`
+    rely on to stay in the same family.
+    """
+
+    def test_gauss_lobatto_nodes(self):
+        basis = LagrangeBasis.gauss_lobatto(6)
+        np.testing.assert_array_equal(basis.reference_nodes, gauss_lobatto(6).nodes)
+        assert basis.node_family is None  # the family default, left unset
+
+    def test_gauss_legendre_nodes(self):
+        basis = LagrangeBasis.gauss_legendre(6)
+        np.testing.assert_array_equal(
+            basis.reference_nodes, gauss_legendre_rule(6).nodes
+        )
+        assert basis.boundary_dofs() == (None, None)  # no endpoint nodes
+
+    @pytest.mark.parametrize("endpoint", ["left", "right"])
+    def test_gauss_radau_nodes(self, endpoint):
+        basis = LagrangeBasis.gauss_radau(6, endpoint=endpoint)
+        np.testing.assert_array_equal(
+            basis.reference_nodes, gauss_radau(6, endpoint=endpoint).nodes
+        )
+        # Radau fixes exactly one endpoint -- the other is interior.
+        left, right = basis.boundary_dofs()
+        assert (left is not None) != (right is not None)
+
+    def test_gauss_radau_rejects_bad_endpoint(self):
+        with pytest.raises(ValueError, match="endpoint must be"):
+            LagrangeBasis.gauss_radau(6, endpoint="middle")
+
+    def test_equispaced_nodes(self):
+        basis = LagrangeBasis.equispaced(5)
+        np.testing.assert_array_equal(basis.reference_nodes, np.linspace(-1.0, 1.0, 5))
+        assert basis.boundary_dofs() == (0, 4)  # both endpoints included
+
+    @pytest.mark.parametrize(
+        "ctor", [LagrangeBasis.gauss_legendre, LagrangeBasis.equispaced]
+    )
+    def test_node_family_equal_across_independent_instances(self, ctor):
+        # The subtlety this whole test class exists to pin down: an inline
+        # `lambda` (or a `functools.partial`, which -- perhaps surprisingly
+        # -- has no value-based `__eq__` either) would make two otherwise-
+        # identical instances compare unequal, silently breaking
+        # `_product_basis` and basis equality between two spaces built the
+        # same way.
+        a, b = ctor(6), ctor(6)
+        assert a == b
+        assert hash(a) == hash(b)
+
+    def test_gauss_radau_node_family_differs_by_endpoint(self):
+        left = LagrangeBasis.gauss_radau(6, endpoint="left")
+        right = LagrangeBasis.gauss_radau(6, endpoint="right")
+        assert left != right
+        assert left.node_family != right.node_family
+
+    def test_gauss_radau_node_family_equal_for_same_endpoint(self):
+        a = LagrangeBasis.gauss_radau(6, endpoint="left")
+        b = LagrangeBasis.gauss_radau(6, endpoint="left")
+        assert a == b
+        assert hash(a) == hash(b)
+
+    @pytest.mark.parametrize(
+        "ctor",
+        [
+            LagrangeBasis.gauss_legendre,
+            LagrangeBasis.equispaced,
+            lambda n: LagrangeBasis.gauss_radau(n, endpoint="left"),
+        ],
+    )
+    def test_derivative_basis_regenerates_from_same_family(self, ctor):
+        basis = ctor(6)
+        derived = basis._derivative_basis(2)
+        assert derived.node_family == basis.node_family
+        assert derived.n_basis == 4
+
+    def test_product_basis_regenerates_from_same_family(self):
+        a = LagrangeBasis.gauss_legendre(4)
+        b = LagrangeBasis.gauss_legendre(5)
+        prod = a._product_basis(b)
+        assert prod.node_family == a.node_family
+        assert prod.n_basis == 8
+
+    def test_product_basis_rejects_mismatched_family(self):
+        a = LagrangeBasis.gauss_radau(5, endpoint="left")
+        b = LagrangeBasis.gauss_radau(5, endpoint="right")
+        with pytest.raises(ValueError, match="node_family"):
+            a._product_basis(b)

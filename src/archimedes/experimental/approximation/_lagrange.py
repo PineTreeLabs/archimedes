@@ -39,6 +39,28 @@ def _lobatto_nodes(n: int) -> np.ndarray:
     return np.zeros(1) if n < 2 else gauss_lobatto(n).nodes
 
 
+def _gauss_legendre_nodes(n: int) -> np.ndarray:
+    from archimedes.quadrature import gauss_legendre
+
+    return gauss_legendre(n).nodes
+
+
+def _gauss_radau_left_nodes(n: int) -> np.ndarray:
+    from archimedes.quadrature import gauss_radau
+
+    return gauss_radau(n, endpoint="left").nodes
+
+
+def _gauss_radau_right_nodes(n: int) -> np.ndarray:
+    from archimedes.quadrature import gauss_radau
+
+    return gauss_radau(n, endpoint="right").nodes
+
+
+def _equispaced_nodes(n: int) -> np.ndarray:
+    return np.linspace(-1.0, 1.0, n)
+
+
 def _differentiation_matrix(nodes: np.ndarray, weights: np.ndarray) -> np.ndarray:
     """``D[i, j] = ell_j'(x_i)``, the classical barycentric differentiation
     matrix. Used only *at* the nodes, where the general formula is 0/0."""
@@ -162,6 +184,55 @@ class LagrangeBasis(Basis):
 
     def __hash__(self) -> int:
         return hash((type(self), self.reference_nodes.tobytes(), self.node_family))
+
+    # --- constructors ---
+
+    @classmethod
+    def gauss_lobatto(cls, n: int) -> "LagrangeBasis":
+        """``n`` Gauss-Lobatto nodes -- this family's default, so
+        ``node_family`` is left at ``None`` rather than set explicitly."""
+        return cls(reference_nodes=_lobatto_nodes(n))
+
+    @classmethod
+    def gauss_legendre(cls, n: int) -> "LagrangeBasis":
+        """``n`` Gauss-Legendre nodes (no endpoints); pseudospectral
+        collocation at Gauss points."""
+        return cls(
+            reference_nodes=_gauss_legendre_nodes(n), node_family=_gauss_legendre_nodes
+        )
+
+    @classmethod
+    def gauss_radau(cls, n: int, endpoint: str = "left") -> "LagrangeBasis":
+        """``n`` Gauss-Radau nodes, fixing ``endpoint`` (``"left"`` or
+        ``"right"``); see :func:`archimedes.quadrature.gauss_radau`.
+
+        Dispatches to one of two named module-level functions rather than
+        parametrizing a single one with a closure or ``functools.partial``
+        over ``endpoint``: two independently-constructed instances must
+        compare equal to be usable together (:meth:`_product_basis`, basis
+        equality), which requires the *same* ``node_family`` object each
+        time -- a fresh ``lambda`` per call never satisfies that, and
+        neither does ``functools.partial``, which (perhaps surprisingly)
+        has no value-based ``__eq__`` of its own either.
+        """
+        if endpoint == "left":
+            return cls(
+                reference_nodes=_gauss_radau_left_nodes(n),
+                node_family=_gauss_radau_left_nodes,
+            )
+        if endpoint == "right":
+            return cls(
+                reference_nodes=_gauss_radau_right_nodes(n),
+                node_family=_gauss_radau_right_nodes,
+            )
+        raise ValueError(f"endpoint must be 'left' or 'right', got {endpoint!r}")
+
+    @classmethod
+    def equispaced(cls, n: int) -> "LagrangeBasis":
+        """``n`` evenly spaced nodes, including both endpoints."""
+        return cls(reference_nodes=_equispaced_nodes(n), node_family=_equispaced_nodes)
+
+    # --- implementation ---
 
     def _nodes_for(self, n: int) -> np.ndarray:
         """``n`` nodes from this basis's family, for a derived basis."""
