@@ -21,6 +21,7 @@ from archimedes.measure import (
 from archimedes.quadrature import Quadrature
 
 from ._basis import RIGHT, Basis, BasisMatrix
+from ._fourier import FourierBasis
 from ._hermite import CubicHermiteBasis
 from ._lagrange import LagrangeBasis
 from ._orthogonal import OrthogonalPolynomialBasis
@@ -408,6 +409,47 @@ class FunctionSpace:
             density,
             quad_rule,
         )
+
+    @classmethod
+    def fourier(
+        cls,
+        n_basis: int,
+        a: float = -1.0,
+        b: float = 1.0,
+        kind: Literal["full", "cosine", "sine"] = "full",
+        density: bool = False,
+        quad_rule: Quadrature | None = None,
+    ) -> FunctionSpace:
+        """Global (periodic) Fourier space on ``[a, b]``
+
+        Treated as one periodic domain: ``a`` and ``b`` are the same point.
+
+        Parameters
+        ----------
+        n_basis : int
+            Number of basis functions; see :class:`FourierBasis` for the
+            ``kind``-dependent convention (``kind="full"`` requires an odd
+            value).
+        a, b : float, optional
+            Bounds of the target period. Default ``-1``, ``1``.
+        kind : {"full", "cosine", "sine"}, optional
+            Which trigonometric family; see :class:`FourierBasis`. Default
+            ``"full"``.
+        density : bool, optional
+            Normalize against the probability density rather than the raw
+            weight; see :attr:`Basis.density`. Default ``False``.
+        quad_rule : QuadratureRule, optional
+            Forwarded to the underlying ``FunctionSpace`` constructor.
+
+        Raises
+        ------
+        ValueError
+            If ``kind`` is not ``"full"``, ``"cosine"``, or ``"sine"``, or
+            if ``n_basis`` is invalid for the chosen ``kind`` (see
+            :class:`FourierBasis`).
+        """
+        basis = FourierBasis(n_basis, kind=kind, density=density)
+        return cls(basis, UnitInterval.Parameters(a=a, b=b), quad_rule=quad_rule)
 
     @classmethod
     def laguerre(

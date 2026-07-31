@@ -26,6 +26,7 @@ from ._basis import Basis, BasisMatrix
 from ._basis_expansion import BasisExpansion, FunctionSpace
 from ._concat import ConcatBasis
 from ._constrained import ConstrainedBasis
+from ._fourier import FourierBasis
 from ._hermite import CubicHermiteBasis
 from ._lagrange import LagrangeBasis
 from ._orthogonal import OrthogonalPolynomialBasis
@@ -39,6 +40,7 @@ __all__ = [
     "ConcatBasis",
     "ConstrainedBasis",
     "CubicHermiteBasis",
+    "FourierBasis",
     "FunctionSpace",
     "LagrangeBasis",
     "OrthogonalPolynomialBasis",

@@ -16,6 +16,7 @@ from archimedes.experimental.approximation import (
     Basis,
     BasisExpansion,
     CubicHermiteBasis,
+    FourierBasis,
     FunctionSpace,
     LagrangeBasis,
     OrthogonalPolynomialBasis,
@@ -298,6 +299,87 @@ def test_single_node_lagrange_product():
     assert product.n_basis == 1
     x = np.linspace(-1.0, 1.0, 5)
     np.testing.assert_allclose(product.evaluate(x), np.ones((5, 1)), atol=1e-12)
+
+
+# -- FourierBasis: product-to-sum closure table --
+# Fourier's own basis functions aren't polynomials, so this doesn't fit the
+# generic `space`/`f_`/`g_` fixture above -- a dedicated section, same as
+# the piecewise-specific tests above it.
+
+
+@pytest.mark.parametrize(
+    "kind1,n1,kind2,n2,expected_kind,expected_n",
+    [
+        ("full", 5, "full", 3, "full", 7),  # N=2+1=3 -> 2*3+1=7
+        ("full", 5, "cosine", 3, "full", 9),  # N=2+2=4 -> 2*4+1=9
+        ("full", 5, "sine", 2, "full", 9),  # N=2+2=4 -> 2*4+1=9
+        ("cosine", 3, "full", 5, "full", 9),  # order shouldn't matter
+        ("cosine", 3, "cosine", 4, "cosine", 6),  # N=2+3=5 -> 5+1=6
+        ("sine", 2, "sine", 3, "cosine", 6),  # N=2+3=5 -> lands in cosine, 5+1=6
+        ("cosine", 3, "sine", 3, "sine", 5),  # N=2+3=5 -> sine, n_basis=5
+        ("sine", 3, "cosine", 3, "sine", 5),  # order shouldn't matter
+    ],
+)
+def test_fourier_product_closure_table(kind1, n1, kind2, n2, expected_kind, expected_n):
+    left = FourierBasis(n1, kind=kind1)
+    right = FourierBasis(n2, kind=kind2)
+    product = left._product_basis(right)
+    assert product.kind == expected_kind
+    assert product.n_basis == expected_n
+
+
+def test_fourier_product_is_exact():
+    domain = UnitInterval.Parameters(a=-1.0, b=1.0)
+    space = FunctionSpace(FourierBasis(5, kind="full"), domain=domain)
+
+    def f(x):
+        return 1.0 + 2 * np.cos(np.pi * x) - np.sin(np.pi * x)
+
+    def g(x):
+        return np.cos(2 * np.pi * x) + 3 * np.sin(np.pi * x)
+
+    fexp, gexp = space.project(f), space.project(g)
+    product = fexp * gexp
+    assert product.space.basis.kind == "full"
+    x = np.linspace(-1.0, 1.0, 41)
+    np.testing.assert_allclose((fexp * gexp)(x), f(x) * g(x), atol=1e-10)
+
+
+def test_fourier_sine_squared_lands_in_cosine():
+    domain = UnitInterval.Parameters(a=-1.0, b=1.0)
+    space = FunctionSpace(FourierBasis(2, kind="sine"), domain=domain)
+
+    def f(x):
+        return np.sin(np.pi * x)
+
+    fexp = space.project(f)
+    squared = fexp * fexp
+    assert squared.space.basis.kind == "cosine"
+    x = np.linspace(-1.0, 1.0, 41)
+    np.testing.assert_allclose(squared(x), f(x) ** 2, atol=1e-10)
+
+
+def test_fourier_different_density_rejected():
+    raw = FourierBasis(5, kind="full", density=False)
+    density = FourierBasis(5, kind="full", density=True)
+    with pytest.raises(ValueError, match="same normalization"):
+        raw._product_basis(density)
+
+
+def test_fourier_matching_density_forwarded_to_product():
+    left = FourierBasis(3, kind="cosine", density=True)
+    right = FourierBasis(4, kind="cosine", density=True)
+    product = left._product_basis(right)
+    assert product.density is True
+
+
+def test_fourier_different_basis_families_rejected():
+    fourier = FourierBasis(5, kind="full")
+    modal = OrthogonalPolynomialBasis(LegendreMeasure(), 3)
+    with pytest.raises(ValueError, match="cannot form a product basis"):
+        fourier._product_basis(modal)
+    with pytest.raises(ValueError, match="cannot form a product basis"):
+        modal._product_basis(fourier)
 
 
 # -- symbolic --

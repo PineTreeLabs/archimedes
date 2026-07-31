@@ -23,6 +23,7 @@ from archimedes.quadrature import (
     gauss_legendre,
     gauss_lobatto,
     gauss_radau,
+    periodic_trapezoidal,
     quadint,
 )
 
@@ -247,6 +248,63 @@ def test_clenshaw_curtis_composite_quad():
     rule = composite_quad(clenshaw_curtis(5), [-1.0, 0.0, 1.0])
     assert len(rule) == 10
     assert np.isclose(rule.integrate(lambda x: x**2), 2 / 3)
+
+
+@pytest.mark.parametrize("n", [1, 2, 3, 5, 8])
+def test_periodic_trapezoidal_properties(n):
+    rule = periodic_trapezoidal(n)
+    assert len(rule) == n
+    assert rule.nodes[0] == -1.0
+    assert rule.nodes[-1] < 1.0  # half-open: no node at the identified +1 endpoint
+    assert np.all(np.diff(rule.nodes) > 0)
+    assert np.all(rule.weights > 0)
+    np.testing.assert_allclose(rule.weights, 2.0 / n)
+    assert np.isclose(np.sum(rule.weights), 2.0)
+
+
+@pytest.mark.parametrize("n", [3, 5, 8])
+def test_periodic_trapezoidal_exact_for_trig_polynomials(n):
+    rule = periodic_trapezoidal(n)
+    # Exact (to machine precision) for cos(k*pi*t)/sin(k*pi*t), 1 <= k <= n-1
+    for k in range(n):
+        expected_cos = 2.0 if k == 0 else 0.0
+        assert np.isclose(
+            rule.integrate(lambda x, k=k: np.cos(k * np.pi * x)),
+            expected_cos,
+            atol=1e-10,
+        )
+        if k >= 1:
+            assert np.isclose(
+                rule.integrate(lambda x, k=k: np.sin(k * np.pi * x)),
+                0.0,
+                atol=1e-10,
+            )
+
+
+@pytest.mark.parametrize("n", [3, 5, 8])
+def test_periodic_trapezoidal_aliases_at_nyquist(n):
+    # At k = n the sampled signal is indistinguishable from the constant, so
+    # the rule silently returns the wrong (nonzero) answer instead of 0.
+    rule = periodic_trapezoidal(n)
+    result = rule.integrate(lambda x: np.cos(n * np.pi * x))
+    assert not np.isclose(result, 0.0, atol=1e-6)
+    # cos(n*pi*x_j) = cos(n*pi*(-1) + 2*pi*j) = cos(n*pi) = (-1)**n at every
+    # node, so the (wrong) aliased "integral" is 2*(-1)**n.
+    assert np.isclose(result, 2.0 * (-1) ** n)
+
+
+def test_periodic_trapezoidal_shares_legendre_measure():
+    rule = periodic_trapezoidal(5)
+    assert isinstance(rule.measure, LegendreMeasure)
+
+    a, b = -2.0, 5.0
+    integral = rule.integrate(lambda x: np.ones_like(x), a, b)
+    assert np.isclose(integral, b - a)
+
+
+def test_periodic_trapezoidal_invalid_n():
+    with pytest.raises(ValueError):
+        periodic_trapezoidal(0)
 
 
 def test_gauss_hermite():

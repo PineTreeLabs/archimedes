@@ -1,20 +1,20 @@
 
 ## Basis implementations
 
-- Cubic Hermite
-- Chebyshev
+- ~~Cubic Hermite~~
+- ~~Chebyshev~~
 - Fourier
 - Monomials
 - Bernstein polynomials
 - RBF
 - B-splines
-- PCHIP
+- ~~PCHIP~~ (deferred - this is an interpolation function that produces a standard cubic Hermite polynomial)
 - Karhunen-Loeve
 - Support for POD/eigenfunction expansions/model reduction?
 - Quintic Hermite / higher-order C1 elements (natural extension of CubicHermiteBasis)
 - Sinc basis (Boyd ch. 16) -- alternative to Hermite/Laguerre on unbounded domains
 - Rational Chebyshev (Boyd ch. 17, TL/TB) -- alternative to Hermite/Laguerre on semi-infinite/infinite domains
-- SEM bubble/vertex bases - more generally, constrained/derived and concatenated bases
+- ~~SEM bubble/vertex bases - more generally, constrained/derived and concatenated bases~~
 
 ## Examples:
 
@@ -22,9 +22,10 @@
 2. Gray-box system ID
 3. Spectral/pseudospectral PDE solves (+ method of lines) - scalar PDEs (convection-diffusion, KdV, similar)
 4. 1D FEM - nonlinear Poisson, Euler-Bernoulli, Timoshenko beam (shear locking), fluid flow?
-5. Boundary value problems - Sturm-Liouville, Blasius
-6. Trajectory optimization (pseudospectral/Hermite-Simpson) - block push problem, Cart-Pole swingup
-7. Lagrangian continuum mechanics - elastic pendulum
+5. Boundary value problems - Blasius
+6. ~~Eigenvalue problem - Sturm-Liouville with custom basis~~
+7. Trajectory optimization (pseudospectral/Hermite-Simpson) - block push problem, Cart-Pole swingup
+8. Lagrangian continuum mechanics - elastic pendulum
 
 ## Challenge/motivating problems
 

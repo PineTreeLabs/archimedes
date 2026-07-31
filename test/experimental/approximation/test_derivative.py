@@ -16,6 +16,7 @@ from archimedes.experimental.approximation import (
     Basis,
     BasisExpansion,
     CubicHermiteBasis,
+    FourierBasis,
     FunctionSpace,
     LagrangeBasis,
     OrthogonalPolynomialBasis,
@@ -525,6 +526,110 @@ def test_node_family_returning_the_wrong_count_is_rejected():
     )
     with pytest.raises(ValueError, match=r"node_family\(4\) returned shape"):
         basis._derivative_basis()
+
+
+# -- FourierBasis: derivatives cycle by kind (deriv mod 2), never exhaust --
+# Fourier's own basis functions aren't polynomials, so this doesn't fit the
+# generic `space`/`f_`/`g_` fixture above -- a dedicated section, same as
+# the piecewise/Hermite-specific tests above it.
+
+FOURIER_DOMAIN = UnitInterval.Parameters(a=-1.0, b=1.0)
+XF = np.linspace(-0.93, 0.93, 15)
+
+
+def f_periodic(x):
+    return 1.0 + 2 * np.cos(np.pi * x) - 3 * np.sin(np.pi * x) + np.cos(2 * np.pi * x)
+
+
+def df_periodic(x):
+    return (
+        -2 * np.pi * np.sin(np.pi * x)
+        - 3 * np.pi * np.cos(np.pi * x)
+        - 2 * np.pi * np.sin(2 * np.pi * x)
+    )
+
+
+@pytest.mark.parametrize("deriv", [0, 1, 2, 3, 4, 7, 50, 101])
+def test_fourier_full_derivative_basis_is_self_at_every_order(deriv):
+    # Never shrinks, never raises -- closed under differentiation at every
+    # order, unlike every polynomial family.
+    basis = FourierBasis(5, kind="full")
+    assert basis._derivative_basis(deriv) is basis
+
+
+@pytest.mark.parametrize("deriv", [0, 1, 2, 3, 4, 5, 50, 101])
+def test_fourier_cosine_alternates_kind_by_parity(deriv):
+    basis = FourierBasis(4, kind="cosine")  # max_mode = 3
+    derived = basis._derivative_basis(deriv)
+    if deriv % 2 == 0:
+        assert derived is basis
+    else:
+        assert derived.kind == "sine"
+        assert derived.n_basis == 3  # shrinks by 1: max_mode unchanged
+
+
+@pytest.mark.parametrize("deriv", [0, 1, 2, 3, 4, 5, 50, 101])
+def test_fourier_sine_alternates_kind_by_parity(deriv):
+    basis = FourierBasis(3, kind="sine")  # max_mode = 3
+    derived = basis._derivative_basis(deriv)
+    if deriv % 2 == 0:
+        assert derived is basis
+    else:
+        assert derived.kind == "cosine"
+        assert derived.n_basis == 4  # grows by 1: max_mode unchanged
+
+
+def test_fourier_derivative_never_exhausts_the_degree():
+    # Contrast with `test_derivative_past_the_degree_is_an_error`: a periodic
+    # family never runs out of room, however high the order.
+    for basis in (
+        FourierBasis(5, kind="full"),
+        FourierBasis(4, kind="cosine"),
+        FourierBasis(4, kind="sine"),
+    ):
+        basis._derivative_basis(200)  # must not raise
+
+
+def test_fourier_cosine_constant_only_has_no_odd_derivative_space():
+    # The one genuinely degenerate case: differentiating a bare constant an
+    # odd number of times is identically zero, with no space of its own.
+    basis = FourierBasis(1, kind="cosine")
+    assert basis._derivative_basis(2) is basis
+    with pytest.raises(ValueError, match="identically zero"):
+        basis._derivative_basis(1)
+
+
+def test_fourier_negative_derivative_order_rejected():
+    with pytest.raises(ValueError, match="deriv must be >= 0"):
+        FourierBasis(5)._derivative_basis(-1)
+
+
+@pytest.mark.parametrize("kind,n_basis", [("full", 5), ("cosine", 4), ("sine", 4)])
+def test_fourier_derivative_agrees_with_pointwise_evaluation(kind, n_basis):
+    space = FunctionSpace(FourierBasis(n_basis, kind=kind), domain=FOURIER_DOMAIN)
+    u = space.project(f_periodic if kind != "sine" else lambda x: np.sin(np.pi * x))
+    np.testing.assert_allclose(u.derivative()(XF), u(XF, deriv=1), atol=1e-9)
+    np.testing.assert_allclose(u.derivative(2)(XF), u(XF, deriv=2), atol=1e-9)
+
+
+def test_fourier_full_derivative_matches_analytic():
+    space = FunctionSpace(FourierBasis(5, kind="full"), domain=FOURIER_DOMAIN)
+    u = space.project(f_periodic)
+    np.testing.assert_allclose(u.derivative()(XF), df_periodic(XF), atol=1e-9)
+
+
+def test_fourier_derivative_traces():
+    space = FunctionSpace(FourierBasis(5, kind="full"), domain=FOURIER_DOMAIN)
+    u = space.project(f_periodic)
+    expected = u.derivative()(XF)
+
+    @arc.compile
+    def traced(c):
+        return BasisExpansion(c, space).derivative()(XF)
+
+    np.testing.assert_allclose(
+        np.asarray(traced(u.coefficients)).ravel(), expected, atol=1e-9
+    )
 
 
 def test_basis_without_derivative_support_raises():

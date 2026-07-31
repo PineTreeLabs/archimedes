@@ -21,6 +21,7 @@ from archimedes.experimental.approximation import (
     Basis,
     BasisExpansion,
     CubicHermiteBasis,
+    FourierBasis,
     FunctionSpace,
     LagrangeBasis,
     OrthogonalPolynomialBasis,
@@ -262,8 +263,9 @@ def test_integral_traces(space):
     [
         OrthogonalPolynomialBasis(LegendreMeasure(), 4),
         LagrangeBasis(reference_nodes=gauss_lobatto(4).nodes),
+        FourierBasis(3, kind="sine"),
     ],
-    ids=["modal", "nodal"],
+    ids=["modal", "nodal", "fourier"],
 )
 def test_negative_integral_order_rejected(basis):
     with pytest.raises(ValueError, match="order must be >= 0"):
@@ -280,6 +282,8 @@ def test_zeroth_integral_returns_the_same_basis():
     assert basis._integral_basis(0) is basis
     lagrange = _lobatto(4)
     assert lagrange._integral_basis(0) is lagrange
+    fourier = FourierBasis(3, kind="sine")
+    assert fourier._integral_basis(0) is fourier
 
 
 def test_basis_without_integral_support_raises():
@@ -326,6 +330,81 @@ def test_piecewise_function_integral_raises():
         NotImplementedError, match="running constant carried across elements"
     ):
         space.project(f_).integral()
+
+
+# -- FourierBasis: only "sine" has an integral basis, and only at order=1 --
+# Fourier's own basis functions aren't polynomials, so this doesn't fit the
+# generic `space`/`f_`/`g_` fixture above -- a dedicated section, same as
+# the Hermite/piecewise-specific tests above it.
+
+FOURIER_DOMAIN = UnitInterval.Parameters(a=-1.0, b=1.0)
+XF = np.linspace(-0.93, 0.93, 15)
+
+
+def test_fourier_full_and_cosine_integral_basis_raises():
+    # Both contain the constant/DC basis function, whose antiderivative is a
+    # non-periodic linear ramp -- a different reason than Hermite/piecewise
+    # raise for theirs.
+    for basis in (FourierBasis(5, kind="full"), FourierBasis(4, kind="cosine")):
+        with pytest.raises(NotImplementedError, match="linear ramp"):
+            basis._integral_basis()
+
+
+def test_fourier_sine_integral_basis_grows_by_one():
+    basis = FourierBasis(3, kind="sine")
+    grown = basis._integral_basis(1)
+    assert grown.kind == "cosine"
+    assert grown.n_basis == 4
+
+
+def test_fourier_sine_integral_order_two_raises():
+    # The order-1 result is "cosine", which can't itself be integrated.
+    basis = FourierBasis(3, kind="sine")
+    with pytest.raises(NotImplementedError, match="only order=1 is supported"):
+        basis._integral_basis(2)
+
+
+def test_fourier_sine_integral_dc_coefficient_is_generically_nonzero():
+    # Documents *why* the integral basis must grow: pinning the antiderivative
+    # to vanish at a boundary forces a nonzero constant term back in, since
+    # cos(k*theta(boundary)) = (-1)**k != 0 for every mode.
+    space = FunctionSpace(FourierBasis(3, kind="sine"), domain=FOURIER_DOMAIN)
+    u = space.project(lambda x: np.sin(np.pi * x))
+    antideriv = u.integral()
+    assert abs(antideriv.coefficients[0]) > 1e-6
+
+
+@pytest.mark.parametrize("boundary", ["left", "right"])
+def test_fourier_sine_integral_matches_analytic_antiderivative(boundary):
+    # F(x) = -cos(pi*x)/pi + C. Since cos(theta(a)) == cos(theta(b)) always
+    # (cos is even and theta(a) = -pi, theta(b) = pi), both boundary choices
+    # pin the same C here -- both are checked to confirm the kwarg is honored
+    # at its own endpoint, not because the results are expected to differ.
+    space = FunctionSpace(FourierBasis(3, kind="sine"), domain=FOURIER_DOMAIN)
+    u = space.project(lambda x: np.sin(np.pi * x))
+    antideriv = u.integral(boundary=boundary)
+    assert antideriv.space.basis.kind == "cosine"
+
+    def expected(x):
+        return -np.cos(np.pi * x) / np.pi - 1.0 / np.pi
+
+    np.testing.assert_allclose(antideriv(XF), expected(XF), atol=1e-9)
+    endpoint = np.array([-1.0 if boundary == "left" else 1.0])
+    np.testing.assert_allclose(antideriv(endpoint)[0], 0.0, atol=1e-10)
+
+
+def test_fourier_sine_integral_traces():
+    space = FunctionSpace(FourierBasis(3, kind="sine"), domain=FOURIER_DOMAIN)
+    u = space.project(lambda x: np.sin(np.pi * x))
+    expected = u.integral()(XF)
+
+    @arc.compile
+    def traced(c):
+        return BasisExpansion(c, space).integral()(XF)
+
+    np.testing.assert_allclose(
+        np.asarray(traced(u.coefficients)).ravel(), expected, atol=1e-9
+    )
 
 
 def test_unbounded_domain_rejected_for_integral():
