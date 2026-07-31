@@ -23,7 +23,7 @@ __all__ = ["implicit", "root"]
 
 
 if TYPE_CHECKING:
-    from ..typing import ArrayLike
+    from ..typing import ArrayLike, Tree
 
 
 def implicit(
@@ -46,7 +46,8 @@ def implicit(
     ----------
     func : callable
         The implicit function, with signature ``func(x, *args)``. Must return a
-        residual with the same shape and dtype as the input ``x``.
+        residual with the same tree structure (and per-leaf shape and dtype) as
+        the input ``x``. ``x`` can be a flat array or an arbitrary tree/struct.
     static_argnames : tuple of str, optional
         Names of arguments that should be treated as static (non-symbolic)
         parameters. Static arguments are not differentiated through and
@@ -174,16 +175,15 @@ def implicit(
 
     # Define a function that will solve the root-finding problem
     # This function will be evaluated with SymbolicArray objects.
-    def _solve(x0: ArrayLike, *args) -> ArrayLike:
-        ret_shape = x0.shape
-        ret_dtype = x0.dtype
-
-        # TODO: Shape checking for bounds
-        if len(ret_shape) > 1 and ret_shape[1] > 1:
-            raise ValueError(
-                "Only scalar and vector decision variables are supported. "
-                f"Got shape {ret_shape}"
-            )
+    def _solve(x0: ArrayLike | Tree, *args) -> ArrayLike | Tree:
+        # `x0` may be a flat array or an arbitrary struct/tree; flatten it into
+        # a single vector for CasADi, and keep `unravel_x0` around to restore
+        # the original tree structure for both the residual evaluation and
+        # the final solution.
+        x0_flat, unravel_x0 = tree.ravel(x0)
+        x0_flat = cast(SymbolicArray, x0_flat)
+        ret_shape = x0_flat.shape
+        ret_dtype = x0_flat.dtype
 
         # Flatten the symbolic arguments into a single vector `z` to pass to CasADi.
         # If there is static data this needs to be stripped out before
@@ -203,31 +203,37 @@ def implicit(
         # function, we'll flatten all the symbolic args into a single array
         # `z` and then create a CasADi Function object that evaluates
         # the residual.
-        # TODO: Shouldn't something get unraveled here?
         z, _unravel = tree.ravel(sym_args)
 
         has_aux = z.size != 0  # Does the function have additional inputs?
 
-        # Define a state variable for the optimization
-        x = sym_like(x0, name="x", kind="MX")
+        # Define a state variable for the optimization, then restore it to
+        # the tree structure of `x0` before evaluating the user's function.
+        x_flat = sym_like(x0_flat, name="x", kind="MX")
+        x = unravel_x0(x_flat)
         g = func(x, *args)  # Evaluate the residual symbolically
 
+        # The residual should have the same tree structure as `x0`; flatten it
+        # the same way so it can be compared and passed to CasADi.
+        g_flat, _ = tree.ravel(g)
+
         # For type checking
-        g = cast(SymbolicArray, g)
+        g_flat = cast(SymbolicArray, g_flat)
         z = cast(SymbolicArray, z)
 
-        if g.shape != ret_shape or g.dtype != ret_dtype:
+        if g_flat.shape != ret_shape or g_flat.dtype != ret_dtype:
             raise ShapeDtypeError(
-                f"Expected shape {ret_shape} and dtype {ret_dtype}, "
-                f"got shape {g.shape} and dtype {g.dtype}.  The shape and "
-                "dtype of the residual must match those of the input variable."
+                f"Expected shape {ret_shape} and dtype {ret_dtype} once "
+                f"flattened, got shape {g_flat.shape} and dtype {g_flat.dtype}. "
+                "The (flattened) shape and dtype of the residual must match "
+                "those of the input variable."
             )
 
         # Note that the return of _this_ function is actually the residual,
         # but since the `rootfinder` will have the same signature, we'll name
         # the output of the residual `x` in anticipation that we will be
         # enclosing it in the `rootfinder`.
-        sym_args = [x._sym]
+        sym_args = [x_flat._sym]
         arg_names = ["x"]
         if has_aux:
             sym_args.append(z._sym)
@@ -237,26 +243,27 @@ def implicit(
         # to the first argument, so ["x"] becomes ["x0"].  The output will be
         # under the original key "x" regardless of what the specified return name
         # is in the Function object.  Here we use "res" as this return name.
-        cs_func = cs.Function("F", sym_args, [g._sym], arg_names, ["res"])
+        cs_func = cs.Function("F", sym_args, [g_flat._sym], arg_names, ["res"])
         root_solver = cs.rootfinder("solver", solver, cs_func, options)
 
         # Before calling the CasADi rootfinder, we have to make sure
         # the input data is either a CasADi symbol or a NumPy array
         z_arg = False if z is None else z
-        x0, z_arg = map(_unwrap_sym_array, (x0, z_arg))  # type: ignore[assignment]
+        x0_arg, z_arg = map(_unwrap_sym_array, (x0_flat, z_arg))  # type: ignore[assignment]
 
         # The return is a dict with keys for the outputs of the residual
         # function.  The key "x" will contain the root of the function.
         if has_aux:
-            sol = root_solver(x0=x0, z=z_arg)
+            sol = root_solver(x0=x0_arg, z=z_arg)
         else:
-            sol = root_solver(x0=x0)
+            sol = root_solver(x0=x0_arg)
 
-        return SymbolicArray(
+        x_sol_flat = SymbolicArray(
             sol["x"],
             dtype=ret_dtype,
             shape=ret_shape,
         )
+        return unravel_x0(x_sol_flat)
 
     # The first arg name for the input function is the variable, which
     # gets replaced by the initial guess in the new function.  Otherwise
@@ -278,13 +285,13 @@ def implicit(
 
 def root(
     func: Callable,
-    x0: ArrayLike,
+    x0: Tree,
     args: Sequence[Any] = (),
     static_argnames: str | Sequence[str] | None = None,
     method: str = "newton",
     tol: float | None = None,
     **options,
-) -> ArrayLike:
+) -> Tree:
     """Find a root of a nonlinear function.
 
     Solves the equation ``f(x) = 0`` for ``x``, where ``f`` is a vector function of
@@ -294,11 +301,13 @@ def root(
     ----------
     func : callable
         The function whose root to find, with signature ``func(x, *args)``.
-        The function should return an array of the same shape as `x``.
-        For systems of equations, ``func`` should return a vector of residuals.
-    x0 : array_like
-        Initial guess for the solution. The shape of this array determines
-        the dimensionality of the problem to be solved.
+        The function should return a result with the same tree structure (and
+        per-leaf shape and dtype) as ``x``. For systems of equations, ``func``
+        should return a vector of residuals.
+    x0 : Tree
+        Initial guess for the solution. Can be a flat array or an arbitrary
+        tree structure (nested dict, dataclass, ``@struct``, etc.), in which
+        case the solution will preserve that structure.
     args : tuple, optional
         Extra arguments passed to the function.
     static_argnames : tuple of str, optional
@@ -333,9 +342,10 @@ def root(
 
     Returns
     -------
-    x : array_like
-        The solution found, with the same shape as the initial guess ``x0``.
-        If the algorithm fails to converge, the best estimate is returned.
+    x : Tree
+        The solution found, with the same tree structure as the initial guess
+        ``x0``. If the algorithm fails to converge, the best estimate is
+        returned.
 
     Notes
     -----

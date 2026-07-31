@@ -25,6 +25,7 @@ from ._hermite import CubicHermiteBasis
 from ._lagrange import LagrangeBasis
 from ._orthogonal import OrthogonalPolynomialBasis
 from ._piecewise import PiecewiseBasis
+from ._tensor_basis import ProductParameters, TensorBasis
 
 if TYPE_CHECKING:
     from ._basis_expansion import BasisExpansion
@@ -516,6 +517,40 @@ class FunctionSpace:
         element_basis = _resolve_element_basis(kind, order, nodes)
         basis = PiecewiseBasis(element_basis, ref_breakpoints, continuity=continuity)
         return cls(basis, UnitInterval.Parameters(a=a, b=b), quad_rule=quad_rule)
+
+    @classmethod
+    def tensor(
+        cls, *spaces: FunctionSpace, quad_rule: Quadrature | None = None
+    ) -> FunctionSpace:
+        """The tensor-product space of independent univariate ``spaces``.
+
+        Parameters
+        ----------
+        *spaces : FunctionSpace
+            One univariate space per dimension, in order.
+        quad_rule : QuadratureRule, optional
+            Forwarded to the underlying ``FunctionSpace`` constructor.
+            Default is the tensor product of the factors' own default
+            rules; see :meth:`TensorBasis.default_quadrature`.
+
+        Raises
+        ------
+        ValueError
+            If fewer than one space is given, or any space is not
+            univariate (``basis.ndim != 1``).
+        """
+        if len(spaces) < 1:
+            raise ValueError("FunctionSpace.tensor needs at least one space")
+        for i, space in enumerate(spaces):
+            if space.basis.ndim != 1:
+                raise ValueError(
+                    f"spaces[{i}] is {space.basis.ndim}-dimensional; tensor "
+                    f"factors must be univariate (tensor products are "
+                    f"associative, so flatten rather than nest)"
+                )
+        basis = TensorBasis(tuple(space.basis for space in spaces))
+        domain = ProductParameters(dims=tuple(space.domain for space in spaces))
+        return cls(basis, domain, quad_rule=quad_rule)
 
     # --- implementation ---
 
