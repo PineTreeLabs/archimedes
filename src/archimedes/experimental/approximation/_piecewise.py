@@ -379,6 +379,35 @@ class PiecewiseBasis(Basis):
             continuity=max(self.continuity - deriv, DISCONTINUOUS),
         )
 
+    def _integral_basis(self, order=1):
+        """Not implemented: unlike :meth:`_derivative_basis`, growing each
+        element's basis is not enough on its own.
+
+        A derivative is exact element-by-element with no cross-element
+        bookkeeping, since differentiating cannot lower continuity below
+        ``-1`` and the standard DOF-merge assembly (:meth:`_build_assembly`)
+        already handles whatever continuity remains. An antiderivative
+        instead needs continuity to go *up*, which the assembly cannot
+        produce by itself: it merges DOFs that are already the same shared
+        quantity in both elements, but a modal family like Legendre has no
+        boundary DOF to merge in the first place (:meth:`boundary_dofs`
+        returns ``(None, None)`` regardless of order), even though the
+        antiderivative of a Legendre element genuinely must be continuous
+        with its neighbor. What's needed instead is a running constant
+        carried from each element into the next -- the piecewise analogue
+        of :meth:`BasisExpansion.integral`'s single boundary pin, but
+        applied once per element rather than once globally. That
+        construction doesn't exist yet.
+        """
+        raise NotImplementedError(
+            f"{type(self).__name__} does not define an integral basis: an "
+            f"exact piecewise antiderivative needs a running constant "
+            f"carried across elements to stay continuous, not just a "
+            f"larger per-element basis, and that construction isn't "
+            f"implemented. Project onto a global (non-piecewise) space "
+            f"first if you need an exact `.integral()`."
+        )
+
     def _build_assembly(self) -> np.ndarray:
         r"""Build the assembly map ``T``, shape ``(n_broken, n_basis)``, such
         that :math:`\Phi_{\mathrm{global}}(x) = \Phi_{\mathrm{broken}}(x) \,

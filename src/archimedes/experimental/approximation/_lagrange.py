@@ -316,6 +316,20 @@ class LagrangeBasis(Basis):
             )
         return self._derived(self.n_basis - deriv)
 
+    def _integral_basis(self, order=1):
+        """``n_basis + order`` nodes from this basis's ``node_family``.
+
+        Dual of :meth:`_derivative_basis`: growing rather than shrinking
+        the node set, so (unlike differentiation) this is always defined.
+        As with :meth:`_derivative_basis`, the result's nodes -- and so the
+        meaning of its coefficients -- differ from this basis's own.
+        """
+        if order < 0:
+            raise ValueError(f"order must be >= 0, got {order}")
+        if order == 0:
+            return self
+        return self._derived(self.n_basis + order)
+
     def boundary_dofs(self, order: int = 0) -> tuple[int | None, int | None]:
         """Indices of the nodes at :math:`t = \\pm 1`, or ``None`` if the
         corresponding endpoint isn't a node.

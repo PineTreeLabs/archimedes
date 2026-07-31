@@ -326,6 +326,45 @@ class Basis(metaclass=abc.ABCMeta):
             f"explicitly chosen FunctionSpace"
         )
 
+    def _integral_basis(self, order: int = 1) -> "Basis":
+        """The smallest basis whose ``order``-th derivatives span this
+        family's elements exactly -- the dual of :meth:`_derivative_basis`.
+
+        Where :meth:`_derivative_basis` returns a *smaller* space
+        (differentiating lowers polynomial degree), this returns a *larger*
+        one: integrating raises degree by one per order. Unlike
+        differentiation, this never runs out of room -- there is always a
+        space big enough to hold the antiderivative exactly -- so the only
+        real question is which one, not whether one exists. See
+        :meth:`BasisExpansion.integral`, whose boundary condition pins the
+        extra degree(s) of freedom this introduces.
+
+        Raises
+        ------
+        ValueError
+            If ``order`` is not a valid integration order for this basis.
+        NotImplementedError
+            If this family has no integral-space construction.
+
+        Notes
+        -----
+        Not every family has one, even though a derivative basis is more
+        often definable: a family whose degrees of freedom mix different
+        *kinds* of quantity (e.g. :class:`~archimedes.experimental.approximation.CubicHermiteBasis`,
+        value and physical-derivative DOFs) has no larger member of its own
+        kind to grow into, unlike a plain polynomial family, which always
+        does. :class:`~archimedes.experimental.approximation.PiecewiseBasis`
+        raises for a different reason: an exact piecewise antiderivative
+        needs a running constant carried across elements, which is a
+        different (not yet implemented) construction from anything here.
+        """
+        raise NotImplementedError(
+            f"{type(self).__name__} does not define an integral basis; "
+            f"approximate instead by projecting the target function onto a "
+            f"FunctionSpace that does (e.g. FunctionSpace.legendre) and "
+            f"calling `.integral()` on that projection"
+        )
+
     @property
     def _dof_order(self) -> np.ndarray:
         """The intrinsic derivative order of each basis function's

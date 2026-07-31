@@ -157,6 +157,21 @@ class OrthogonalPolynomialBasis(Basis):
             self.measure, self.n_basis - deriv, density=self.density
         )
 
+    def _integral_basis(self, order=1):
+        """Same measure and normalization, ``n_basis + order`` functions.
+
+        Dual of :meth:`_derivative_basis`: integrating raises the
+        polynomial degree by one per order rather than lowering it, so
+        (unlike differentiation) this is always defined.
+        """
+        if order < 0:
+            raise ValueError(f"order must be >= 0, got {order}")
+        if order == 0:
+            return self
+        return OrthogonalPolynomialBasis(
+            self.measure, self.n_basis + order, density=self.density
+        )
+
     def evaluate(self, x, deriv: int = 0, side: str = RIGHT, **domain_kwargs):
         # `side` is validated but unused: these polynomials are smooth, so
         # both one-sided limits agree everywhere. See `Basis.evaluate`.

@@ -167,6 +167,107 @@ class BasisExpansion:
             self.space._diff_matrix(deriv, space=target) @ self.coefficients, target
         )
 
+    def integral(
+        self,
+        order: int = 1,
+        boundary: str = "left",
+        space: FunctionSpace | None = None,
+    ) -> BasisExpansion:
+        """The ``order``-th antiderivative :math:`F^{(-\\mathrm{order})}`.
+
+        Numerically exact, and the dual of :meth:`derivative`: the result is returned
+        in the smallest space that represents it, which for a polynomial family is
+        *larger* than this one (integrating raises the degree). This is needed to
+        make the antiderivative well-defined: an indefinite integral is only unique
+        up to an additive constant (per order), and ``boundary`` pins it by requiring
+        :math:`F` (and, for ``order > 1``, its derivatives through order ``order - 1``)
+        to vanish at that endpoint of the domain:
+        
+            - ``"left"`` (the default) gives :math:`F(x) = \\int_a^x f(t)\\,dt`,
+                so :math:`F(a) = 0`
+            - ``"right"`` gives :math:`F(x) = \\int_b^x f(t)\\,dt = -\\int_x^b f(t)\\,dt`,
+                so :math:`F(b) = 0`
+
+        The two differ by the whole-domain definite integral:
+        ``f.integral(boundary="right") == f.integral(boundary="left") - total``
+
+        Parameters
+        ----------
+        order : int, optional
+            Number of times to integrate. Default 1.
+        boundary : {"left", "right"}, optional
+            Domain endpoint at which the antiderivative (and its lower
+            derivatives, for ``order > 1``) vanishes. Default ``"left"``.
+        space : FunctionSpace, optional
+            Result space, overriding the automatic one. Must have exactly
+            ``self.space.n_basis + order`` basis functions.
+
+        Returns
+        -------
+        BasisExpansion
+            The antiderivative, in the result space, with coefficients of
+            shape ``(n_basis,)`` or ``(n_basis, m)`` matching this function.
+
+        Raises
+        ------
+        NotImplementedError
+            If this function's space has no integral-space construction --
+            e.g. :class:`~archimedes.experimental.approximation.PiecewiseBasis`.
+        ValueError
+            If the domain has no finite endpoints to anchor at (Hermite,
+            Laguerre), or if an explicit ``space`` is the wrong size.
+        """
+        target = space if space is not None else self.space._integral_space(order)
+        return BasisExpansion(
+            self.space._integral_matrix(order, boundary=boundary, space=target)
+            @ self.coefficients,
+            target,
+        )
+
+    def integrate(self, a: float | None = None, b: float | None = None):
+        """Definite integral :math:`\\int_a^b f(x)\\,dx`.
+
+        Wherever :meth:`integral` is defined for this space, this is built directly
+        on it: :math:`F(b) - F(a)`, exact to quadrature roundoff, for *any* ``a``,
+        ``b`` within the domain.
+
+        Where :meth:`integral` isn't defined the *whole-domain* integral
+        (``a=None, b=None``) is still available, computed directly from this space's
+        own quadrature rule.
+
+        Parameters
+        ----------
+        a, b : float, optional
+            Integration bounds. Default the domain's own endpoints (the
+            whole-domain integral).
+
+        Returns
+        -------
+        ndarray or float
+            Shape ``()`` for a scalar-valued function, ``(m,)`` for a
+            vector-valued one.
+
+        Raises
+        ------
+        NotImplementedError
+            If this function's space has no integral-space construction
+            and ``a``/``b`` narrow the bounds below the whole domain.
+        ValueError
+            If the domain has no finite endpoints to integrate over
+            (Hermite, Laguerre).
+        """
+        try:
+            antideriv = self.integral()
+        except NotImplementedError:
+            if a is not None or b is not None:
+                raise
+            x, w = self.space.quadrature()
+            return w @ self(x)
+        domain = self.space.domain
+        lo = domain.a if a is None else a
+        hi = domain.b if b is None else b
+        return antideriv(np.array([hi]))[0] - antideriv(np.array([lo]))[0]
+
     def dot(self, other: BasisExpansion, quad_rule: QuadratureRule | None = None):
         """Inner product :math:`\\langle f, g \\rangle` with another
         ``BasisExpansion`` on the same ``space``. Unlike ``__mul__``, this is safe

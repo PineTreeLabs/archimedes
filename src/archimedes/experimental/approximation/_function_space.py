@@ -580,6 +580,121 @@ class FunctionSpace:
         """
         return FunctionSpace(self.basis._derivative_basis(deriv), domain=self.domain)
 
+    def _integral_space(self, order=1) -> FunctionSpace:
+        """The smallest space whose elements' ``order``-th derivatives span
+        this space's elements exactly -- the dual of :meth:`_derivative_space`.
+
+        Larger than this space for a polynomial family (integrating raises
+        the degree); see :meth:`Basis._integral_basis`.
+        """
+        return FunctionSpace(self.basis._integral_basis(order), domain=self.domain)
+
+    def _integral_matrix(
+        self,
+        order: int = 1,
+        boundary: str = "left",
+        space: FunctionSpace | None = None,
+    ) -> np.ndarray:
+        r"""Matrix mapping this space's coefficients to those of the
+        ``order``-th antiderivative, pinned to vanish (along with its first
+        ``order - 1`` derivatives) at the domain's ``boundary`` endpoint.
+
+        Built one order at a time. For a single order, the target space
+        :math:`W` (this space's :meth:`_integral_space`) is exactly one
+        derivative-order larger, so its own differentiation matrix ``D =
+        W._diff_matrix(1, space=self)`` (shape ``(n, n + 1)``) is *surjective*
+        onto this space with a 1-D nullspace (the constants). Appending one
+        row pinning :math:`F(\mathrm{boundary}) = 0` -- evaluating :math:`W`'s
+        basis at the chosen endpoint -- makes the system square and
+        determines the unique antiderivative that both differentiates back to
+        the input and vanishes there:
+
+        .. math::
+            \begin{bmatrix} D \\ \phi_W(x_{\mathrm{boundary}})^\top \end{bmatrix}
+            F = \begin{bmatrix} I \\ 0 \end{bmatrix}
+
+        Composing this step ``order`` times gives the standard iterated
+        indefinite integral, vanishing together with its first ``order - 1``
+        derivatives at the anchor (the usual Cauchy-formula convention for
+        repeated integration) -- rather than solving one larger system with
+        ``order`` boundary rows, which would need deciding what those extra
+        rows should be instead of reusing this same one-condition step.
+
+        Requires a domain with finite, literal endpoints to evaluate at:
+        :class:`~archimedes.measure.RealLine`/:class:`~archimedes.measure.HalfLine`-
+        parametrized bases (Hermite, Laguerre) have no boundary to anchor at
+        and are rejected.
+
+        Parameters
+        ----------
+        order : int, optional
+            Number of times to integrate. Default 1.
+        boundary : {"left", "right"}, optional
+            Domain endpoint at which the antiderivative (and its lower
+            derivatives, for ``order > 1``) vanishes. Default ``"left"``.
+        space : FunctionSpace, optional
+            Target space, overriding the default minimal
+            :meth:`_integral_space`. Must have exactly ``self.n_basis +
+            order`` basis functions -- unlike :meth:`_diff_matrix`, a
+            target of the "wrong" size has no well-defined exact (or
+            least-squares) antiderivative to fall back on here.
+
+        Returns
+        -------
+        ndarray
+            Shape ``(space.n_basis, self.n_basis)``.
+        """
+        if order < 0:
+            raise ValueError(f"order must be >= 0, got {order}")
+
+        if order == 0:
+            target = space if space is not None else self._integral_space(0)
+            if target.n_basis != self.n_basis:
+                raise ValueError(
+                    f"space has {target.n_basis} basis functions, expected "
+                    f"{self.n_basis} (this space's n_basis) for order=0"
+                )
+            return np.eye(self.n_basis)
+
+        if boundary not in ("left", "right"):
+            raise ValueError(f"boundary must be 'left' or 'right', got {boundary!r}")
+        if not (hasattr(self.domain, "a") and hasattr(self.domain, "b")):
+            raise ValueError(
+                f"integral() needs a domain with finite endpoints to anchor "
+                f"the constant of integration; {type(self.basis).__name__} "
+                f"is defined on {type(self.domain).__name__}, which has none"
+            )
+        x_bnd = np.array([self.domain.a if boundary == "left" else self.domain.b])
+
+        matrix = np.eye(self.n_basis)
+        current = self
+        for _ in range(order):
+            step_target = current._integral_space(1)
+            rule = step_target.quad_rule
+            step_target._check_quad_rule_size(rule)
+            # (current.n_basis, step_target.n_basis): D @ F recovers the
+            # derivative of F's coefficients in this (smaller) space.
+            D = step_target._diff_matrix(1, space=current)
+            phi_bnd = step_target._basis_eval(x_bnd)[0]  # (step_target.n_basis,)
+            system = np.concatenate([D, phi_bnd[None, :]], axis=0)
+            rhs = np.concatenate(
+                [np.eye(current.n_basis), np.zeros((1, current.n_basis))], axis=0
+            )
+            step = np.linalg.solve(
+                system, rhs
+            )  # (step_target.n_basis, current.n_basis)
+            matrix = step @ matrix
+            current = step_target
+
+        target = space if space is not None else current
+        if target.n_basis != current.n_basis:
+            raise ValueError(
+                f"space has {target.n_basis} basis functions, expected "
+                f"{current.n_basis} (this space's n_basis + order) for an "
+                f"exact antiderivative"
+            )
+        return matrix
+
     def _diff_matrix(self, deriv=1, space: FunctionSpace | None = None) -> np.ndarray:
         """Matrix mapping this space's coefficients to those of the
         ``deriv``-th derivative.
