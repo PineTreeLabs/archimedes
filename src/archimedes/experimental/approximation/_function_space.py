@@ -10,12 +10,12 @@ import numpy as np
 from archimedes import tree
 from archimedes.quadrature import Quadrature, QuadratureRule
 
-from ._basis import RIGHT, Basis
+from ._basis import RIGHT, Basis, BasisMatrix
 
 if TYPE_CHECKING:
     from ._function import Function
 
-__all__ = ["BasisMatrix", "FunctionSpace"]
+__all__ = ["FunctionSpace"]
 
 
 def _is_superset(have: np.ndarray, required: np.ndarray, tol: float = 1e-12) -> bool:
@@ -27,82 +27,6 @@ def _is_superset(have: np.ndarray, required: np.ndarray, tol: float = 1e-12) -> 
     counts would prove nothing.
     """
     return bool(np.all([np.any(np.abs(have - point) <= tol) for point in required]))
-
-
-@tree.struct
-class BasisMatrix:
-    r"""A basis evaluated at a fixed set of quadrature nodes, bundled with
-    the matching weights so the two can never be supplied out of sync.
-
-    ``Phi[n, i]`` is the ``deriv``-th derivative of basis function ``i`` at
-    node ``n`` -- see :meth:`FunctionSpace.basis_matrix`, which builds one.
-    ``Phi`` maps coefficients to sampled values, :math:`\Phi c = \phi \cdot c`.
-
-    ``Phi.T`` is the adjoint of ``Phi`` under the Euclidean inner product on
-    coefficients and the weighted one on sampled values:
-    :math:`\langle \Phi c, r\rangle_w = \langle c, \Phi^\top r\rangle`, so
-    :math:`\Phi^\top r = \phi^\top (w \odot r)`. That makes the Galerkin
-    projection equation read almost like the math it's approximating:
-    ``M = phi.T @ phi`` is the Gram matrix :math:`\Phi^\top\Phi`
-    (the mass matrix), and ``phi.T @ f(x)`` is the load vector
-    :math:`\Phi^\top f` -- see :meth:`FunctionSpace.project`.
-
-    Parameters
-    ----------
-    matrix : ndarray
-        The design matrix ``Phi``, shape ``(npts, n_basis)``.
-    weights : ndarray
-        Quadrature weights matching ``matrix``'s node axis, shape
-        ``(npts,)``.
-    space : FunctionSpace
-        The space this basis matrix was evaluated for. Static.
-    """
-
-    matrix: np.ndarray
-    weights: np.ndarray
-    space: FunctionSpace = tree.field(static=True)
-
-    @property
-    def shape(self) -> tuple[int, int]:
-        return self.matrix.shape  # type: ignore[return-value]
-
-    def __matmul__(self, coefficients: np.ndarray) -> np.ndarray:
-        """:math:`\\Phi c`: sampled values at the quadrature nodes."""
-        return self.matrix @ coefficients  # type: ignore[no-any-return]
-
-    @property
-    def T(self) -> _BasisMatrixAdjoint:  # noqa: N802
-        """The adjoint :math:`\\Phi^\\top`; see the class docstring."""
-        return _BasisMatrixAdjoint(self)
-
-
-@tree.struct
-class _BasisMatrixAdjoint:
-    """``BasisMatrix.T``: apply via ``@``, undo via ``.T`` again."""
-
-    basis_matrix: BasisMatrix
-
-    def __matmul__(self, values: np.ndarray | BasisMatrix) -> np.ndarray:
-        """:math:`\\Phi^\\top r = \\phi^\\top (w \\odot r)`.
-
-        ``values`` (``r``) must already be sampled at
-        ``self.basis_matrix.space``'s quadrature nodes -- shape ``(npts,)``
-        for a scalar integrand, or ``(npts, m)`` for a vector-valued one
-        (contracted independently per component), or ``(npts, k)`` to
-        apply the adjoint to another design matrix at once (as in the Gram
-        matrix ``phi.T @ phi``).
-        """
-        if isinstance(values, BasisMatrix):
-            values = values.matrix
-
-        phi, w = self.basis_matrix.matrix, self.basis_matrix.weights
-        if values.ndim == 1:
-            return phi.T @ (w * values)  # type: ignore[no-any-return]
-        return phi.T @ (w[:, None] * values)  # type: ignore[no-any-return]
-
-    @property
-    def T(self) -> BasisMatrix:  # noqa: N802
-        return self.basis_matrix
 
 
 @tree.struct
@@ -394,7 +318,7 @@ class FunctionSpace:
             rule, deriv=deriv, **self._domain_kwargs()
         )
         _, weights = self.quadrature(rule)
-        return BasisMatrix(matrix, weights, self)
+        return BasisMatrix(matrix, weights)
 
     def _evaluate(self, coefficients: np.ndarray, x, deriv: int = 0, side: str = RIGHT):
         """Evaluate :math:`\\sum_i c_i \\, \\phi_i(x)` (or its ``deriv``-th

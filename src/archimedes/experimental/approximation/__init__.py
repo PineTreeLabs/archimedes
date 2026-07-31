@@ -15,9 +15,9 @@ per-dimension target domains; everything above it works unchanged, since a
 tensor basis still evaluates to a ``(npts, n_basis)`` design matrix.
 """
 
-from ._basis import Basis
+from ._basis import Basis, BasisMatrix
 from ._function import Function
-from ._function_space import BasisMatrix, FunctionSpace
+from ._function_space import FunctionSpace
 from ._lagrange import LagrangeBasis
 from ._orthogonal import OrthogonalPolynomialBasis
 from ._piecewise import PiecewiseBasis

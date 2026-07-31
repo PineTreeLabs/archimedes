@@ -259,7 +259,6 @@ def test_basis_matrix_matches_direct_basis_evaluation(space):
     phi = space.basis_matrix()
     np.testing.assert_allclose(phi.matrix, expected)
     np.testing.assert_allclose(phi.weights, w)
-    assert phi.space is space
     assert phi.shape == expected.shape
 
 
