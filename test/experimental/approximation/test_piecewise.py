@@ -69,6 +69,22 @@ def test_c0_requires_both_endpoints(breakpoints):
         PiecewiseBasis(interior_only, breakpoints, continuity=0)
 
 
+# -- per-element bases (tuple form) --
+
+
+def test_construct_with_tuple_of_uniform_bases_equals_scalar(local, breakpoints):
+    scalar = PiecewiseBasis(local, breakpoints, continuity=0)
+    tupled = PiecewiseBasis((local, local, local), breakpoints, continuity=0)
+
+    assert tupled == scalar
+    assert hash(tupled) == hash(scalar)
+
+
+def test_tuple_length_must_match_n_elements(local, breakpoints):
+    with pytest.raises(ValueError):
+        PiecewiseBasis((local, local), breakpoints, continuity=0)  # 3 elements
+
+
 def test_boundary_dofs_lobatto(local):
     assert local.boundary_dofs() == (0, local.n_basis - 1)
 
@@ -324,7 +340,9 @@ class TestQuadratureCompatibility:
     def test_default_quadrature_is_composite_over_own_breakpoints(self, basis):
         rule = basis.default_quadrature()
         np.testing.assert_array_equal(rule.breakpoints, self.BP)
-        assert len(rule) == basis.n_elements * len(basis.element_basis.reference_nodes)
+        # `element_basis` is always normalized to a per-element tuple, even
+        # in the (here, uniform) scalar-constructor case.
+        assert len(rule) == sum(len(b.reference_nodes) for b in basis.element_basis)
 
     def test_default_quadrature_integrates_mass_matrix_exactly(self, basis):
         default = FunctionSpace(basis, domain=self.DOMAIN)
@@ -379,6 +397,132 @@ class TestQuadratureCompatibility:
         # n_basis; the default must never trip that guard.
         basis = PiecewiseBasis(local, self.BP, continuity=continuity)
         assert len(basis.default_quadrature()) >= basis.n_basis
+
+
+# -- per-element order (heterogeneous element_basis) --
+
+
+class TestPerElementOrder:
+    """``element_basis`` may be a tuple with one entry per element, each of a
+    different order (or even family), not just a single shared instance."""
+
+    BP = np.linspace(-1.0, 1.0, 4)  # 3 elements
+    DOMAIN = UnitInterval.Parameters(a=0.0, b=3.0)
+
+    @staticmethod
+    def _lobatto(n):
+        return LagrangeBasis(reference_nodes=gauss_lobatto(n).nodes)
+
+    @pytest.fixture
+    def element_bases(self):
+        return (self._lobatto(3), self._lobatto(5), self._lobatto(4))
+
+    @pytest.fixture
+    def basis(self, element_bases):
+        return PiecewiseBasis(element_bases, self.BP, continuity=0)
+
+    def test_dof_counts(self, basis):
+        assert basis.n_broken == 3 + 5 + 4
+        assert basis.n_basis == (3 + 5 + 4) - 2  # one merged DOF per interior knot
+        assert basis.assembly_matrix.shape == (12, 10)
+
+    def test_boundary_dofs(self, basis):
+        assert basis.boundary_dofs() == (0, basis.n_basis - 1)
+
+    def test_c0_requires_boundary_dofs_on_every_element(self):
+        # Gauss-Legendre nodes are all interior -> no boundary DOFs, even
+        # though the other two elements have them.
+        interior_only = LagrangeBasis(reference_nodes=gauss_legendre(3).nodes)
+        with pytest.raises(ValueError):
+            PiecewiseBasis(
+                (self._lobatto(3), interior_only, self._lobatto(4)),
+                self.BP,
+                continuity=0,
+            )
+
+    def test_measures_mismatch_across_elements_rejected(self):
+        # A modal basis has a real measure; a nodal one has None -- mixing
+        # them leaves the assembled basis with no single coherent weight.
+        # continuity=-1 so this isn't rejected by the boundary-dof check
+        # first (a modal basis has no boundary DOFs either).
+        modal = OrthogonalPolynomialBasis(LegendreMeasure(), n_basis=3)
+        with pytest.raises(ValueError, match="measure"):
+            PiecewiseBasis(
+                (self._lobatto(3), modal, self._lobatto(4)), self.BP, continuity=-1
+            )
+
+    def test_default_quadrature_matches_per_element_composite(
+        self, basis, element_bases
+    ):
+        rule = basis.default_quadrature()
+        expected = composite([b.default_quadrature() for b in element_bases], self.BP)
+        assert rule == expected
+
+    def test_default_quadrature_integrates_mass_matrix_exactly(self, basis):
+        default = FunctionSpace(basis, domain=self.DOMAIN)
+        # A much higher-order aligned rule must give the same mass matrix.
+        exact = FunctionSpace(
+            basis, domain=self.DOMAIN, quad_rule=composite(gauss_legendre(8), self.BP)
+        )
+        np.testing.assert_allclose(mass_matrix(default), mass_matrix(exact), atol=1e-12)
+
+    @pytest.mark.parametrize("side", ["left", "right"])
+    def test_partition_of_unity(self, basis, side):
+        x = np.concatenate([np.linspace(-1, 1, 401), self.BP])
+        phi = basis.evaluate(x, side=side)
+        np.testing.assert_allclose(phi.sum(axis=1), 1.0, atol=1e-10)
+
+    def test_c0_is_continuous_at_breakpoints(self, basis):
+        eps = 1e-9
+        for knot in self.BP[1:-1]:
+            left = basis.evaluate(np.array([knot - eps]))
+            right = basis.evaluate(np.array([knot + eps]))
+            np.testing.assert_allclose(left, right, atol=1e-6)
+
+    def test_evaluate_expansion_matches_evaluate(self, basis):
+        # Heterogeneous element_basis falls back to the dense
+        # evaluate(x) @ coefficients path -- no fused fast path is possible
+        # once elements genuinely differ.
+        rng = np.random.default_rng(0)
+        coefficients = rng.normal(size=basis.n_basis)
+        x = np.concatenate([np.linspace(-1.3, 1.3, 23), self.BP])
+        dense = basis.evaluate(x) @ coefficients
+        fused = basis.evaluate_expansion(coefficients, x)
+        np.testing.assert_allclose(fused, dense, atol=1e-9)
+
+    def test_evaluate_expansion_symbolic_matches_numeric(self, basis):
+        rng = np.random.default_rng(1)
+        coefficients = rng.normal(size=basis.n_basis)
+        x = np.concatenate([np.linspace(-1.3, 1.3, 23), self.BP])
+        expected = basis.evaluate_expansion(coefficients, x)
+
+        @arc.compile
+        def traced(xx, cc):
+            assert isinstance(xx, SymbolicArray)
+            return basis.evaluate_expansion(cc, xx)
+
+        np.testing.assert_allclose(
+            np.asarray(traced(x, coefficients)).ravel(), expected, atol=1e-10
+        )
+
+    def test_evaluate_expansion_fast_path_used_when_uniform(self):
+        # A uniform *tuple* (not just the scalar form) must still agree with
+        # the scalar-constructed basis -- the fast path is keyed on value
+        # equality across elements, not on how the basis was constructed.
+        uniform = PiecewiseBasis(
+            (self._lobatto(3), self._lobatto(3), self._lobatto(3)),
+            self.BP,
+            continuity=0,
+        )
+        scalar = PiecewiseBasis(self._lobatto(3), self.BP, continuity=0)
+        rng = np.random.default_rng(2)
+        coefficients = rng.normal(size=scalar.n_basis)
+        x = np.linspace(-1.0, 1.0, 11)
+        np.testing.assert_allclose(
+            uniform.evaluate_expansion(coefficients, x),
+            scalar.evaluate_expansion(coefficients, x),
+            atol=1e-12,
+        )
 
 
 # -- fused evaluation (locate-and-gather) --

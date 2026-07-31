@@ -407,7 +407,9 @@ class QuadratureRule:
         return _weighted_sum(w, values, axis, len(self))
 
 
-def composite(base: QuadratureRule, breakpoints: np.ndarray) -> QuadratureRule:
+def composite(
+    base: QuadratureRule | Sequence[QuadratureRule], breakpoints: np.ndarray
+) -> QuadratureRule:
     """Tile ``base`` across elements of its reference domain.
 
     Partitions ``base.measure.support`` at ``breakpoints`` and applies
@@ -422,6 +424,12 @@ def composite(base: QuadratureRule, breakpoints: np.ndarray) -> QuadratureRule:
     the same as building the elements directly on the rescaled sub-intervals
     of ``[a, b]``.
 
+    ``base`` may instead be a sequence of rules, one per element, letting
+    each element carry its own order (or even its own family) -- e.g.
+    ``composite([gauss_legendre(2), gauss_legendre(4)], breakpoints)`` for
+    two elements of different degree. A single ``base`` rule is exactly
+    equivalent to passing that same rule ``len(breakpoints) - 1`` times.
+
     Only defined for families whose reference weight is uniform (see
     ``Measure.uniform_weight``) -- otherwise each interior element
     boundary would pick up a spurious copy of the weight's shape, which is
@@ -429,9 +437,12 @@ def composite(base: QuadratureRule, breakpoints: np.ndarray) -> QuadratureRule:
 
     Parameters
     ----------
-    base : QuadratureRule
-        Rule to tile across elements. ``base.measure.uniform_weight`` must be
-        ``True``.
+    base : QuadratureRule or sequence of QuadratureRule
+        Rule (or per-element rules) to tile across elements. Every rule's
+        ``measure.uniform_weight`` must be ``True``, and (since the result
+        has a single ``measure`` field) every rule must share the same
+        ``measure``. A sequence must have exactly ``len(breakpoints) - 1``
+        entries, one per element.
     breakpoints : array_like
         Element boundaries, shape ``(k + 1,)`` for ``k`` elements. Must be
         strictly increasing and span ``base.measure.support``
@@ -440,30 +451,53 @@ def composite(base: QuadratureRule, breakpoints: np.ndarray) -> QuadratureRule:
     Returns
     -------
     rule : QuadratureRule
-        Composite rule with ``k * len(base)`` nodes on the same reference
-        domain as ``base``.
+        Composite rule on the same reference domain as ``base``, with
+        ``sum(len(r) for r in rules)`` nodes (``k * len(base)`` when ``base``
+        is a single rule). ``name`` is the common rule name if every
+        per-element rule shares one, else the generic ``"composite"``.
 
     Raises
     ------
     ValueError
-        If ``base.measure.uniform_weight`` is ``False``, if ``breakpoints`` has
-        fewer than 2 entries or is not strictly increasing, or if it does
-        not span ``base.measure.support`` exactly.
+        If any rule's ``measure.uniform_weight`` is ``False``, if the rules
+        do not all share the same ``measure``, if a sequence of rules does
+        not have one entry per element, if ``breakpoints`` has fewer than 2
+        entries or is not strictly increasing, or if it does not span
+        ``base.measure.support`` exactly.
     """
-    if not base.measure.uniform_weight:
-        raise ValueError(
-            f"composite quadrature requires a measure with a uniform "
-            f"reference weight, got {type(base.measure).__name__}"
-        )
     breakpoints = np.asarray(breakpoints, dtype=float)
     if breakpoints.ndim != 1 or len(breakpoints) < 2:
         raise ValueError(
             f"breakpoints must be 1-D with at least 2 entries, got shape "
             f"{breakpoints.shape}"
         )
+    n_elements = len(breakpoints) - 1
+
+    if isinstance(base, QuadratureRule):
+        rules = [base] * n_elements
+    else:
+        rules = list(base)
+        if len(rules) != n_elements:
+            raise ValueError(
+                f"breakpoints describe {n_elements} elements, so `base` must "
+                f"supply exactly {n_elements} rules, got {len(rules)}"
+            )
+
+    measure = rules[0].measure
+    if not measure.uniform_weight:
+        raise ValueError(
+            f"composite quadrature requires a measure with a uniform "
+            f"reference weight, got {type(measure).__name__}"
+        )
+    if any(rule.measure != measure for rule in rules):
+        raise ValueError(
+            "composite quadrature requires every per-element rule to share "
+            "the same measure, so the result has one well-defined weight"
+        )
+
     if np.any(np.diff(breakpoints) <= 0):
         raise ValueError("breakpoints must be strictly increasing")
-    lo, hi = base.measure.support
+    lo, hi = measure.support
     if breakpoints[0] != lo or breakpoints[-1] != hi:
         raise ValueError(
             f"breakpoints must span the reference domain {(lo, hi)}, got "
@@ -473,19 +507,21 @@ def composite(base: QuadratureRule, breakpoints: np.ndarray) -> QuadratureRule:
     nodes = []
     weights = []
     elements = []
-    for e, (t0, t1) in enumerate(zip(breakpoints[:-1], breakpoints[1:])):
-        nodes.append(base.scaled_points(t0, t1))
-        weights.append(base.scaled_weights(t0, t1))
-        # Recorded rather than left to be re-derived from the coordinates:
-        # a node on an element boundary belongs to the element it was
+    for e, (rule, t0, t1) in enumerate(zip(rules, breakpoints[:-1], breakpoints[1:])):
+        nodes.append(rule.scaled_points(t0, t1))
+        weights.append(rule.scaled_weights(t0, t1))
+        # A node on an element boundary belongs to the element it was
         # generated for, which its coordinate alone cannot say.
-        elements.append(np.full(len(base), e, dtype=int))
+        elements.append(np.full(len(rule), e, dtype=int))
+
+    names = {rule.name for rule in rules}
+    name = names.pop() if len(names) == 1 else "composite"
 
     return QuadratureRule(
         np.concatenate(nodes),
         np.concatenate(weights),
-        measure=base.measure,
-        name=base.name,
+        measure=measure,
+        name=name,
         breakpoints=breakpoints,
         elements=np.concatenate(elements),
     )

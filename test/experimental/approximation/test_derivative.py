@@ -164,8 +164,8 @@ def test_derivative_space_is_smaller(space):
     du = u.derivative()
     if isinstance(space.basis, PiecewiseBasis):
         # Sizing is per element, then reassembled under continuity.
-        assert du.space.basis.element_basis.n_basis == (
-            space.basis.element_basis.n_basis - 1
+        assert du.space.basis.element_basis[0].n_basis == (
+            space.basis.element_basis[0].n_basis - 1
         )
     else:
         assert du.space.n_basis == space.n_basis - 1
@@ -210,6 +210,17 @@ def test_piecewise_derivative_becomes_discontinuous():
     derived = basis._derivative_basis()
     assert derived.continuity == -1
     np.testing.assert_allclose(derived.breakpoints, BREAKS)
+
+
+def test_piecewise_derivative_with_varying_order():
+    # Per-element bases of different order each shrink by their own local
+    # degree, and the result is still forced discontinuous.
+    basis = PiecewiseBasis(
+        (_lobatto(3), _lobatto(5), _lobatto(4)), BREAKS, continuity=0
+    )
+    derived = basis._derivative_basis()
+    assert derived.continuity == -1
+    assert [b.n_basis for b in derived.element_basis] == [2, 4, 3]
 
 
 def test_piecewise_derivative_of_p1_elements_is_dg_p0():

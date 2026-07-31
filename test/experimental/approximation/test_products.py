@@ -73,9 +73,9 @@ def test_product_space_size(space):
     product = f * g
     if isinstance(space.basis, PiecewiseBasis):
         # Sizing is per element, then reassembled under continuity.
-        n_local = space.basis.element_basis.n_basis
+        n_local = space.basis.element_basis[0].n_basis
         expected_local = 2 * n_local - 1
-        assert product.space.basis.element_basis.n_basis == expected_local
+        assert product.space.basis.element_basis[0].n_basis == expected_local
     else:
         assert product.space.n_basis == n1 + n2 - 1
 
@@ -251,6 +251,15 @@ def test_piecewise_product_takes_weaker_continuity(left, right, expected):
     a = PiecewiseBasis(_lobatto(3), BREAKPOINTS, continuity=left)
     b = PiecewiseBasis(_lobatto(3), BREAKPOINTS, continuity=right)
     assert a._product_basis(b).continuity == expected
+
+
+def test_product_basis_with_varying_order():
+    # Per-element product sizes follow the same n_1 + n_2 - 1 rule as the
+    # scalar case, applied element by element.
+    left = PiecewiseBasis((_lobatto(3), _lobatto(5)), BREAKPOINTS, continuity=-1)
+    right = PiecewiseBasis((_lobatto(2), _lobatto(4)), BREAKPOINTS, continuity=-1)
+    product = left._product_basis(right)
+    assert [b.n_basis for b in product.element_basis] == [3 + 2 - 1, 5 + 4 - 1]
 
 
 def test_discontinuous_product_is_exact():

@@ -499,6 +499,66 @@ def test_composite_breakpoints_validation():
         composite(rule, [-1.0, 0.0, 0.5])  # doesn't span the reference domain
 
 
+# -- composite rules: per-element (varying order) --
+
+
+def test_composite_per_element_rules_varying_order():
+    rules = [gauss_legendre(2), gauss_legendre(4), gauss_legendre(3)]
+    bp = np.linspace(-1.0, 1.0, 4)  # 3 elements
+    rule = composite(rules, bp)
+
+    assert len(rule) == 9
+    np.testing.assert_array_equal(np.bincount(rule.elements), [2, 4, 3])
+    np.testing.assert_array_equal(rule.breakpoints, bp)
+
+    # Each panel is exact for a quadratic, well within every panel's own
+    # (much lower) exactness degree.
+    assert np.isclose(rule.integrate(lambda x: x**2), 2 / 3)
+
+
+def test_composite_per_element_elements_provenance_with_lobatto():
+    # Differently-sized Lobatto sub-rules each place a node on the shared
+    # interior breakpoint; coordinate lookup can't tell the two copies
+    # apart, so `elements` provenance must still resolve correctly here.
+    rules = [gauss_lobatto(2), gauss_lobatto(4)]
+    bp = np.array([-1.0, 0.0, 1.0])
+    rule = composite(rules, bp)
+
+    on_knot = np.isclose(rule.nodes, 0.0)
+    assert on_knot.sum() == 2
+    assert set(rule.elements[on_knot]) == {0, 1}
+    np.testing.assert_array_equal(np.bincount(rule.elements), [2, 4])
+
+
+def test_composite_rejects_wrong_rule_count():
+    rules = [gauss_legendre(2), gauss_legendre(3)]  # 2 rules
+    bp = np.linspace(-1.0, 1.0, 4)  # 3 elements
+
+    with pytest.raises(ValueError, match="3 elements"):
+        composite(rules, bp)
+
+
+def test_composite_rejects_mismatched_measures():
+    laguerre_rule = QuadratureRule(
+        *roots_laguerre(3), name="gauss_laguerre_3", measure=LaguerreMeasure()
+    )
+    with pytest.raises(ValueError, match="same measure"):
+        composite([gauss_legendre(3), laguerre_rule], [-1.0, 0.0, 1.0])
+
+
+def test_composite_per_element_name_field():
+    # Same family (and hence same fixed rule name), different order per
+    # element: the common name is kept.
+    same_name = composite([gauss_legendre(2), gauss_legendre(4)], [-1.0, 0.0, 1.0])
+    assert same_name.name == "gauss_legendre"
+
+    # Different families sharing a measure (Legendre and Lobatto both use
+    # `LegendreMeasure`) give mismatched rule names, so the composite rule
+    # falls back to a generic name rather than silently picking one.
+    mixed_name = composite([gauss_legendre(3), gauss_lobatto(4)], [-1.0, 0.0, 1.0])
+    assert mixed_name.name == "composite"
+
+
 # -- arc.compile integration: symbolic domain/measure parameters --
 
 
