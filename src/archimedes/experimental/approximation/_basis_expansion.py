@@ -182,7 +182,7 @@ class BasisExpansion:
         up to an additive constant (per order), and ``boundary`` pins it by requiring
         :math:`F` (and, for ``order > 1``, its derivatives through order ``order - 1``)
         to vanish at that endpoint of the domain:
-        
+
             - ``"left"`` (the default) gives :math:`F(x) = \\int_a^x f(t)\\,dt`,
                 so :math:`F(a) = 0`
             - ``"right"`` gives :math:`F(x) = \\int_b^x f(t)\\,dt = -\\int_x^b f(t)\\,dt`,

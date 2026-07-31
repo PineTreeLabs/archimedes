@@ -14,19 +14,7 @@
 - Quintic Hermite / higher-order C1 elements (natural extension of CubicHermiteBasis)
 - Sinc basis (Boyd ch. 16) -- alternative to Hermite/Laguerre on unbounded domains
 - Rational Chebyshev (Boyd ch. 17, TL/TB) -- alternative to Hermite/Laguerre on semi-infinite/infinite domains
-- SEM bubble/vertex bases?
-- Constrained/derived bases: build a basis as a linear combination of another
-  basis (e.g. Chebyshev, Legendre) whose functions satisfy given linear
-  constraints (Dirichlet/Neumann/periodic BCs) by construction, via the null
-  space of a constraint matrix evaluated at the reference domain. See
-  `_constrained.py` sketch -- open question is whether this belongs as a
-  built-in wrapper or is better left to worked examples.
-
-Not a basis (moved to Examples): Timoshenko beam theory doesn't need its own
-basis family -- it's normally discretized with plain (often mixed-order)
-Lagrange elements for the independently-interpolated deflection/rotation
-fields, unlike Euler-Bernoulli which needs C1 (Hermite) elements.
-
+- SEM bubble/vertex bases - more generally, constrained/derived and concatenated bases
 
 ## Examples:
 

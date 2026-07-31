@@ -13,11 +13,19 @@ Bases are univariate by default. ``TensorBasis`` combines one per dimension
 into a multivariate basis, with ``ProductParameters`` carrying the
 per-dimension target domains; everything above it works unchanged, since a
 tensor basis still evaluates to a ``(npts, n_basis)`` design matrix.
+
+Two composition primitives build custom bases out of existing ones:
+``ConstrainedBasis`` recombines *one* basis's functions by a fixed matrix
+(e.g. the null space of a boundary-condition constraint), and ``ConcatBasis``
+stacks functions from *several* bases side by side (e.g. spectral-element
+vertex + bubble functions). Composing the two covers the common custom-basis
+recipes without a dedicated class per recipe.
 """
 
 from ._basis import Basis, BasisMatrix
-from ._basis_expansion import BasisExpansion
-from ._basis_expansion import FunctionSpace
+from ._basis_expansion import BasisExpansion, FunctionSpace
+from ._concat import ConcatBasis
+from ._constrained import ConstrainedBasis
 from ._hermite import CubicHermiteBasis
 from ._lagrange import LagrangeBasis
 from ._orthogonal import OrthogonalPolynomialBasis
@@ -28,6 +36,8 @@ __all__ = [
     "Basis",
     "BasisExpansion",
     "BasisMatrix",
+    "ConcatBasis",
+    "ConstrainedBasis",
     "CubicHermiteBasis",
     "FunctionSpace",
     "LagrangeBasis",
