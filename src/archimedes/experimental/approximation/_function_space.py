@@ -782,13 +782,14 @@ class FunctionSpace:
         quadrature nodes, as a :class:`BasisMatrix`.
 
         Uses the quadrature rule's element ownership, so it is exact for a
-        piecewise basis even when discontinuous -- see
-        :meth:`Basis._evaluate_at_nodes`.
+        piecewise basis even when discontinuous.
 
-        Together with :meth:`quadrature`, this is the public building-block
-        pair a custom (Petrov-)Galerkin residual or projection is built
-        from: this space's own ``basis_matrix()`` for Galerkin, another
-        space's for Petrov-Galerkin. See :meth:`project` for a worked
+        The returned :class:`BasisMatrix` carries its own nodes
+        (``Phi.nodes``), so a custom (Petrov-)Galerkin residual or
+        projection needs only this method: evaluate pointwise expressions at
+        ``Phi.nodes`` and test them against ``Phi.T``. Call
+        :meth:`quadrature` directly only when weights are wanted without a
+        basis matrix (a plain integral). See :meth:`project` for a worked
         example.
 
         Parameters
@@ -803,8 +804,8 @@ class FunctionSpace:
         matrix = self.basis._evaluate_at_nodes(
             rule, deriv=deriv, **self._domain_kwargs()
         )
-        _, weights = self.quadrature(rule)
-        return BasisMatrix(matrix, weights)
+        nodes, weights = self.quadrature(rule)
+        return BasisMatrix(matrix, weights, nodes)
 
     def _evaluate(self, coefficients: np.ndarray, x, deriv: int = 0, side: str = RIGHT):
         """Evaluate :math:`\\sum_i c_i \\, \\phi_i(x)` (or its ``deriv``-th

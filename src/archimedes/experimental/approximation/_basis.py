@@ -52,10 +52,13 @@ class BasisMatrix:
     weights : ndarray
         Quadrature weights matching ``matrix``'s node axis, shape
         ``(npts,)``.
+    nodes : ndarray
+        Points ``matrix``'s rows were evaluated at, shape ``(npts,)``.
     """
 
     matrix: np.ndarray
     weights: np.ndarray
+    nodes: np.ndarray
 
     @property
     def shape(self) -> tuple[int, int]:
