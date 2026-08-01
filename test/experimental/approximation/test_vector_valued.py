@@ -16,7 +16,7 @@ import archimedes as arc
 from archimedes import tree
 from archimedes._core._array_impl import SymbolicArray
 from archimedes.experimental.approximation import (
-    BasisExpansion,
+    Function,
     FunctionSpace,
     LagrangeBasis,
     OrthogonalPolynomialBasis,
@@ -238,7 +238,7 @@ def test_vector_evaluation_traces(space):
     @arc.compile
     def traced(coefficients):
         assert isinstance(coefficients, SymbolicArray)
-        return BasisExpansion(coefficients, space)(x)
+        return Function(coefficients, space)(x)
 
     np.testing.assert_allclose(traced(fn.coefficients), fn(x), atol=1e-10)
 
@@ -264,9 +264,7 @@ def test_vector_inner_product_traces(space):
     @arc.compile
     def traced(coefficients):
         assert isinstance(coefficients, SymbolicArray)
-        return BasisExpansion(coefficients, space).dot(
-            BasisExpansion(coefficients, space)
-        )
+        return Function(coefficients, space).dot(Function(coefficients, space))
 
     np.testing.assert_allclose(traced(fn.coefficients), fn.dot(fn), rtol=1e-10)
 
@@ -283,7 +281,7 @@ def test_gradient_of_vector_norm(space):
     shape = fn.coefficients.shape
 
     def objective(flat):
-        return BasisExpansion(np.reshape(flat, shape), space).norm()
+        return Function(np.reshape(flat, shape), space).norm()
 
     grad = arc.grad(objective)(fn.coefficients.ravel())
     assert grad.shape == (shape[0] * shape[1],)

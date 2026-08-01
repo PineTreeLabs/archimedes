@@ -55,7 +55,7 @@ class CubicHermiteBasis(Basis):
     d\phi_{10}/dt`, which is :math:`c_1` at the owning node since
     :math:`d\phi_{10}/dt = 1` there by construction.
 
-    **Derivatives leave this family.** For a :class:`BasisExpansion` `f` constructed
+    **Derivatives leave this family.** For a :class:`Function` `f` constructed
     with a piecewise cubic Hermite basis, `f.derivative()` is a piecewise
     *quadratic* function in a :class:`LagrangeBasis` (using Gauss-Lobatto nodes),
     since there is no smaller Hermite space for the derivative to live in.

@@ -1,4 +1,4 @@
-"""Pointwise products of BasisExpansions.
+"""Pointwise products of Functions.
 
 The product of two basis expansions does not lie in either operand's space,
 but for polynomial families the space it *does* lie in is known statically:
@@ -14,9 +14,9 @@ import archimedes as arc
 from archimedes._core._array_impl import SymbolicArray
 from archimedes.experimental.approximation import (
     Basis,
-    BasisExpansion,
     CubicHermiteBasis,
     FourierBasis,
+    Function,
     FunctionSpace,
     LagrangeBasis,
     OrthogonalPolynomialBasis,
@@ -393,7 +393,7 @@ def test_product_traces(space):
     @arc.compile
     def traced(cf, cg):
         assert isinstance(cf, SymbolicArray)
-        product = BasisExpansion(cf, f.space) * BasisExpansion(cg, g.space)
+        product = Function(cf, f.space) * Function(cg, g.space)
         return product(x)
 
     np.testing.assert_allclose(

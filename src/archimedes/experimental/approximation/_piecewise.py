@@ -395,7 +395,7 @@ class PiecewiseBasis(Basis):
         antiderivative of a Legendre element genuinely must be continuous
         with its neighbor. What's needed instead is a running constant
         carried from each element into the next -- the piecewise analogue
-        of :meth:`BasisExpansion.integral`'s single boundary pin, but
+        of :meth:`Function.integral`'s single boundary pin, but
         applied once per element rather than once globally. That
         construction doesn't exist yet.
         """

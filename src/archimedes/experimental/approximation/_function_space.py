@@ -29,7 +29,7 @@ from ._piecewise import PiecewiseBasis
 from ._tensor_basis import ProductParameters, TensorBasis
 
 if TYPE_CHECKING:
-    from ._basis_expansion import BasisExpansion
+    from ._function import Function
 
 __all__ = ["FunctionSpace"]
 
@@ -164,13 +164,13 @@ class FunctionSpace:
     rather than on any one element of it: evaluation, (Galerkin) projection,
     and the quadrature nodes/weights lower-level assembly is built from.
 
-    See :class:`BasisExpansion` for a specific element of the space (a
+    See :class:`Function` for a specific element of the space (a
     coefficient vector).
 
     This is a ``@struct`` rather than a plain dataclass so that ``domain``
     is a pytree leaf: the domain parameters can be symbolically traced,
     and so optimized over (moving the endpoints of an element, say) jointly
-    with a ``BasisExpansion``'s coefficients. ``basis`` and ``quad_rule`` are
+    with a ``Function``'s coefficients. ``basis`` and ``quad_rule`` are
     static -- they carry structure, not numbers.
 
     Parameters
@@ -186,7 +186,7 @@ class FunctionSpace:
     quad_rule : QuadratureRule, optional
         The space's natural quadrature rule, used unconditionally wherever
         the required accuracy is fully determined by ``basis`` (its own
-        differentiation matrix, say, backing ``BasisExpansion.derivative``), and
+        differentiation matrix, say, backing ``Function.derivative``), and
         as the default for ``project`` (which accepts an explicit override,
         since the right accuracy for a given target function isn't knowable
         from the space alone). Static.
@@ -609,12 +609,12 @@ class FunctionSpace:
 
         Domain values can't be compared once traced: two symbolic
         parametrizations raise ``TypeError`` under ``bool()`` unless they
-        happen to be the same objects, and independently-traced ``BasisExpansion``
+        happen to be the same objects, and independently-traced ``Function``
         arguments get distinct symbols even when their source domains were
         numerically identical. So value comparison would be both
         undecidable and prone to false rejection.
 
-        This means a caller can add two ``BasisExpansion``s whose domains differ
+        This means a caller can add two ``Function``s whose domains differ
         *numerically* -- e.g. ``(a=0, b=1)`` and ``(a=0, b=2)`` -- without
         an error. **Callers are responsible for ensuring the domains agree
         numerically**; only the structure is enforced here.
@@ -641,7 +641,7 @@ class FunctionSpace:
         """
         if tree.structure(self.domain) != tree.structure(other.domain):
             raise ValueError(
-                "product requires BasisExpansions on structurally identical domains"
+                "product requires Functions on structurally identical domains"
             )
         return FunctionSpace(self.basis._product_basis(other.basis), domain=self.domain)
 
@@ -794,7 +794,7 @@ class FunctionSpace:
             **this** space, giving the square ``(n_basis, n_basis)``
             differentiation matrix -- the form collocation and operator
             assembly want, since it keeps the coefficients' meaning (nodal
-            values, modal amplitudes) unchanged. Use :meth:`BasisExpansion.derivative`
+            values, modal amplitudes) unchanged. Use :meth:`Function.derivative`
             for the minimal target.
 
             A target too small to hold the derivative gives its projection,
@@ -893,7 +893,7 @@ class FunctionSpace:
         coefficients : ndarray
             Shape ``(n_basis,)`` for a scalar-valued function, or
             ``(n_basis, m)`` for an ``m``-component vector-valued one (see
-            :class:`BasisExpansion`).
+            :class:`Function`).
         x : array_like
             Evaluation points, shape ``(npts,)``.
         deriv : int, optional
@@ -927,8 +927,8 @@ class FunctionSpace:
         ``c1``, ``c2``, approximated via ``quad_rule`` (default
         ``self.quad_rule``).
 
-        Unlike a product of two ``BasisExpansion``s (deliberately unsupported --
-        see :class:`BasisExpansion`), an inner product returns a scalar rather
+        Unlike a product of two ``Function``s (deliberately unsupported --
+        see :class:`Function`), an inner product returns a scalar rather
         than another element of the space, so there's no aliasing/closure
         question to resolve: it's computed by evaluating both functions at
         the quadrature nodes and integrating the pointwise product, which
@@ -940,7 +940,7 @@ class FunctionSpace:
         For vector-valued coefficients (shape ``(n_basis, m)``) the
         integrand is contracted over components, :math:`\\langle f, g
         \\rangle = \\int f \\cdot g \\, w \\, dx`, so the result is a
-        scalar in that case too and :meth:`BasisExpansion.norm` is the
+        scalar in that case too and :meth:`Function.norm` is the
         :math:`L^2` norm of the whole vector-valued function rather than
         an array of per-component norms. Both coefficient arrays must have
         the same shape; for a per-component inner product, slice the
@@ -960,7 +960,7 @@ class FunctionSpace:
         f: Callable,
         quad_rule: Quadrature | None = None,
         test_space: "FunctionSpace | None" = None,
-    ) -> BasisExpansion:
+    ) -> Function:
         """Galerkin (or Petrov-Galerkin) projection of ``f`` onto this space.
 
         Solves ``M @ c = b`` for the coefficients ``c``, where, for this
@@ -1004,12 +1004,12 @@ class FunctionSpace:
 
         Returns
         -------
-        BasisExpansion
+        Function
             The projected function, in this (trial) space, with
             coefficients of shape ``(n_basis,)`` or ``(n_basis, m)`` to
             match ``f``.
         """
-        from ._basis_expansion import BasisExpansion  # avoid a circular import
+        from ._function import Function  # avoid a circular import
 
         test = self if test_space is None else test_space
         if test_space is not None:
@@ -1037,12 +1037,12 @@ class FunctionSpace:
         # matrix of stacked component loads, which `solve` handles with a
         # single factorization of the shared Gram matrix.
         rhs = psi.T @ f(x)
-        return BasisExpansion(np.linalg.solve(M, rhs), self)
+        return Function(np.linalg.solve(M, rhs), self)
 
-    def function(self, coefficients: np.ndarray | None = None) -> BasisExpansion:
-        """A :class:`BasisExpansion` on this space with known ``coefficients``.
+    def function(self, coefficients: np.ndarray | None = None) -> Function:
+        """A :class:`Function` on this space with known ``coefficients``.
 
-        Sugar for ``BasisExpansion(coefficients, self)`` -- the natural
+        Sugar for ``Function(coefficients, self)`` -- the natural
         constructor when the coefficients are already in hand (solved for
         directly, deserialized, ...), as opposed to :meth:`project`, which
         computes them from a target function.
@@ -1054,9 +1054,9 @@ class FunctionSpace:
             function or ``(n_basis, m)`` for one mapping to an ``m``-vector.
             If ``None``, the expansion is initialized to zero. Default ``None``.
         """
-        from ._basis_expansion import BasisExpansion  # avoid a circular import
+        from ._function import Function  # avoid a circular import
 
         if coefficients is None:
             coefficients = np.zeros(self.n_basis)
 
-        return BasisExpansion(coefficients, self)
+        return Function(coefficients, self)

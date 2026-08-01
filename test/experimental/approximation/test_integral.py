@@ -1,4 +1,4 @@
-"""Antiderivatives and definite integrals of BasisExpansions.
+"""Antiderivatives and definite integrals of Functions.
 
 Integrating raises the degree, so the exact result lives in a *larger*
 space -- the mirror of a derivative, which needs a smaller one (and the same
@@ -19,9 +19,9 @@ import pytest
 import archimedes as arc
 from archimedes.experimental.approximation import (
     Basis,
-    BasisExpansion,
     CubicHermiteBasis,
     FourierBasis,
+    Function,
     FunctionSpace,
     LagrangeBasis,
     OrthogonalPolynomialBasis,
@@ -248,7 +248,7 @@ def test_integral_traces(space):
 
     @arc.compile
     def traced(c):
-        return BasisExpansion(c, space).integral()(X)
+        return Function(c, space).integral()(X)
 
     np.testing.assert_allclose(
         np.asarray(traced(u.coefficients)).ravel(), expected, atol=1e-9
@@ -400,7 +400,7 @@ def test_fourier_sine_integral_traces():
 
     @arc.compile
     def traced(c):
-        return BasisExpansion(c, space).integral()(XF)
+        return Function(c, space).integral()(XF)
 
     np.testing.assert_allclose(
         np.asarray(traced(u.coefficients)).ravel(), expected, atol=1e-9

@@ -101,7 +101,7 @@ def test_test_side_of_basis_matrix_uses_recorded_ownership(continuity, rule_name
     # *trial* side -- the integrand's own dependence on x -- has no such
     # guarantee: it only ever sees coordinates, so a discontinuous basis
     # evaluated by coordinate can't resolve which copy of a duplicated
-    # breakpoint node it's at. That's not exercised here; `BasisExpansion.__call__`
+    # breakpoint node it's at. That's not exercised here; `Function.__call__`
     # resolves it via `side` instead.)
     basis = _basis(continuity)
     space = FunctionSpace(basis, DOMAIN, quad_rule=BOUNDARY_NODE_RULES[rule_name])

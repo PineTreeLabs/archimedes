@@ -355,7 +355,7 @@ class TestC1Continuity:
         # End-to-end: project a smooth function onto a C1 Hermite space on a
         # non-uniform mesh and physical domain, then check that evaluating
         # deriv=0..3 (not just deriv=0) reconstructs a sane, finite field --
-        # this is the direct FunctionSpace/BasisExpansion-level analogue of the
+        # this is the direct FunctionSpace/Function-level analogue of the
         # fused-vs-dense check above.
         a, b = -2.0, 6.0
         basis = PiecewiseBasis(hermite, self.BP, continuity=1)
@@ -438,7 +438,7 @@ class TestModalDiscontinuous:
         # End-to-end via the public `FunctionSpace.piecewise` API: project a
         # polynomial (exactly representable per element) onto a multi-element
         # discontinuous Legendre space and check it round-trips -- the
-        # direct FunctionSpace/BasisExpansion-level analogue of the
+        # direct FunctionSpace/Function-level analogue of the
         # fused-vs-dense check above, and the scenario the bug was originally
         # found in.
         a, b = 0.0, 2 * np.pi
@@ -880,7 +880,7 @@ class TestEvaluateExpansion:
 
     def test_function_call_uses_fused_path(self, local, breakpoints):
         # FunctionSpace.evaluate routes through evaluate_expansion, so a
-        # BasisExpansion's __call__ gets this for free.
+        # Function's __call__ gets this for free.
         basis = PiecewiseBasis(local, breakpoints, continuity=0)
         space = FunctionSpace(basis, domain=UnitInterval.Parameters(a=self.A, b=self.B))
 

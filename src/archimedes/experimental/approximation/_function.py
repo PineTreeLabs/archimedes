@@ -10,7 +10,7 @@ from archimedes.quadrature import QuadratureRule
 from ._basis import RIGHT
 from ._function_space import FunctionSpace
 
-__all__ = ["BasisExpansion"]
+__all__ = ["Function"]
 
 
 def _pointwise(u, v):
@@ -22,7 +22,7 @@ def _pointwise(u, v):
 
 
 @tree.struct
-class BasisExpansion:
+class Function:
     """A specific element of a :class:`FunctionSpace`:
 
     .. math::
@@ -30,14 +30,14 @@ class BasisExpansion:
 
     Only evaluation and the operations that are exact and stay in the same
     space are supported: addition and scalar multiplication with another
-    ``BasisExpansion`` on the same ``space``. A general product of two
-    ``BasisExpansion``s is not yet supported, since the product of two finite basis
+    ``Function`` on the same ``space``. A general product of two
+    ``Function``s is not yet supported, since the product of two finite basis
     expansions isn't generally representable in the same finite space.
 
-    ``BasisExpansion`` is a struct with two fields: ``coefficients`` (the expansion
+    ``Function`` is a struct with two fields: ``coefficients`` (the expansion
     coefficients) and ``space`` (the :class:`FunctionSpace` that defines the
     basis and domain). Since ``FunctionSpace`` is also a struct, the entire
-    BasisExpansion can be symbolically traced, flattened, used in optimization problems, etc.
+    Function can be symbolically traced, flattened, used in optimization problems, etc.
 
     **Vector-valued functions.** ``coefficients`` may have shape
     ``(n_basis,)`` for a scalar-valued function or ``(n_basis, m)`` for one
@@ -68,28 +68,24 @@ class BasisExpansion:
         """
         return self.space._evaluate(self.coefficients, x, deriv=deriv, side=side)
 
-    def __add__(self, other: BasisExpansion) -> BasisExpansion:
+    def __add__(self, other: Function) -> Function:
         if not self.space._is_compatible_with(other.space):
-            raise ValueError(
-                "Can only add BasisExpansions defined on the same FunctionSpace"
-            )
-        return BasisExpansion(self.coefficients + other.coefficients, self.space)
+            raise ValueError("Can only add Functions defined on the same FunctionSpace")
+        return Function(self.coefficients + other.coefficients, self.space)
 
-    def __mul__(self, other) -> BasisExpansion:
-        """Scalar multiple, or the pointwise product of two ``BasisExpansion``s.
+    def __mul__(self, other) -> Function:
+        """Scalar multiple, or the pointwise product of two ``Function``s.
 
-        A scalar multiple stays in the same space. A ``BasisExpansion`` product
+        A scalar multiple stays in the same space. A ``Function`` product
         does not -- see :meth:`multiply`.
         """
-        if isinstance(other, BasisExpansion):
+        if isinstance(other, Function):
             return self.multiply(other)
-        return BasisExpansion(other * self.coefficients, self.space)
+        return Function(other * self.coefficients, self.space)
 
     __rmul__ = __mul__
 
-    def multiply(
-        self, other: BasisExpansion, space: FunctionSpace | None = None
-    ) -> BasisExpansion:
+    def multiply(self, other: Function, space: FunctionSpace | None = None) -> Function:
         """Pointwise product :math:`(fg)(x) = f(x) \\, g(x)`.
 
         The product of two basis expansions does not lie in either operand's
@@ -106,7 +102,7 @@ class BasisExpansion:
 
         Parameters
         ----------
-        other : BasisExpansion
+        other : Function
             The other factor. Must be on a compatible space; see
             :meth:`FunctionSpace._product_space`.
         space : FunctionSpace, optional
@@ -117,7 +113,7 @@ class BasisExpansion:
 
         Returns
         -------
-        BasisExpansion
+        Function
             The product, in the result space.
         """
         result_space = (
@@ -130,8 +126,8 @@ class BasisExpansion:
             # integrand by construction.
         )
 
-    def derivative(self, deriv=1, space: FunctionSpace | None = None) -> BasisExpansion:
-        """The ``deriv``-th derivative :math:`f^{(k)}`, as a ``BasisExpansion``.
+    def derivative(self, deriv=1, space: FunctionSpace | None = None) -> Function:
+        """The ``deriv``-th derivative :math:`f^{(k)}`, as a ``Function``.
 
         Exact, not an approximation: the result is returned in the smallest
         space that represents it, which for a polynomial family is *smaller*
@@ -143,7 +139,7 @@ class BasisExpansion:
         Since the target is smaller, ``f + f.derivative()`` will not
         typecheck as-is; project one onto the other's space first, which is
         exact in either direction. For the derivative sampled at points
-        rather than as a ``BasisExpansion``, ``f(x, deriv=k)`` is more direct.
+        rather than as a ``Function``, ``f(x, deriv=k)`` is more direct.
 
         Parameters
         ----------
@@ -158,12 +154,12 @@ class BasisExpansion:
 
         Returns
         -------
-        BasisExpansion
+        Function
             The derivative, in the result space, with coefficients of shape
             ``(n_basis,)`` or ``(n_basis, m)`` matching this function.
         """
         target = space if space is not None else self.space._derivative_space(deriv)
-        return BasisExpansion(
+        return Function(
             self.space._diff_matrix(deriv, space=target) @ self.coefficients, target
         )
 
@@ -172,7 +168,7 @@ class BasisExpansion:
         order: int = 1,
         boundary: str = "left",
         space: FunctionSpace | None = None,
-    ) -> BasisExpansion:
+    ) -> Function:
         """The ``order``-th antiderivative :math:`F^{(-\\mathrm{order})}`.
 
         Numerically exact, and the dual of :meth:`derivative`: the result is returned
@@ -204,7 +200,7 @@ class BasisExpansion:
 
         Returns
         -------
-        BasisExpansion
+        Function
             The antiderivative, in the result space, with coefficients of
             shape ``(n_basis,)`` or ``(n_basis, m)`` matching this function.
 
@@ -218,7 +214,7 @@ class BasisExpansion:
             Laguerre), or if an explicit ``space`` is the wrong size.
         """
         target = space if space is not None else self.space._integral_space(order)
-        return BasisExpansion(
+        return Function(
             self.space._integral_matrix(order, boundary=boundary, space=target)
             @ self.coefficients,
             target,
@@ -268,10 +264,10 @@ class BasisExpansion:
         hi = domain.b if b is None else b
         return antideriv(np.array([hi]))[0] - antideriv(np.array([lo]))[0]
 
-    def dot(self, other: BasisExpansion, quad_rule: QuadratureRule | None = None):
+    def dot(self, other: Function, quad_rule: QuadratureRule | None = None):
         """Inner product :math:`\\langle f, g \\rangle` with another
-        ``BasisExpansion`` on the same ``space``. Unlike ``__mul__``, this is safe
-        for any pair of same-space ``BasisExpansion``s -- the result is a
+        ``Function`` on the same ``space``. Unlike ``__mul__``, this is safe
+        for any pair of same-space ``Function``s -- the result is a
         scalar, not another element of the space.
 
         For vector-valued coefficients the integrand is contracted over
@@ -279,7 +275,7 @@ class BasisExpansion:
         """
         if not self.space._is_compatible_with(other.space):
             raise ValueError(
-                "Can only take the inner product of BasisExpansions on the same FunctionSpace"
+                "Can only take the inner product of Functions on the same FunctionSpace"
             )
         return self.space._inner_product(
             self.coefficients, other.coefficients, quad_rule

@@ -7,7 +7,7 @@
 - ``BasisMatrix`` -- a basis evaluated at a fixed set of quadrature nodes,
   bundled with the matching weights; the public building block for a custom
   (Petrov-)Galerkin residual (``FunctionSpace.basis_matrix``).
-- ``BasisExpansion`` -- a ``FunctionSpace`` plus a coefficient vector
+- ``Function`` -- a ``FunctionSpace`` plus a coefficient vector
 
 Bases are univariate by default. ``TensorBasis`` combines one per dimension
 into a multivariate basis, with ``ProductParameters`` carrying the
@@ -23,10 +23,10 @@ recipes without a dedicated class per recipe.
 """
 
 from ._basis import Basis, BasisMatrix
-from ._basis_expansion import BasisExpansion, FunctionSpace
 from ._concat import ConcatBasis
 from ._constrained import ConstrainedBasis
 from ._fourier import FourierBasis
+from ._function import Function, FunctionSpace
 from ._hermite import CubicHermiteBasis
 from ._lagrange import LagrangeBasis
 from ._orthogonal import OrthogonalPolynomialBasis
@@ -35,12 +35,12 @@ from ._tensor_basis import ProductParameters, TensorBasis
 
 __all__ = [
     "Basis",
-    "BasisExpansion",
     "BasisMatrix",
     "ConcatBasis",
     "ConstrainedBasis",
     "CubicHermiteBasis",
     "FourierBasis",
+    "Function",
     "FunctionSpace",
     "LagrangeBasis",
     "OrthogonalPolynomialBasis",

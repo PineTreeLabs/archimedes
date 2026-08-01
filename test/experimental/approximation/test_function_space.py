@@ -4,7 +4,7 @@ import pytest
 from _helpers import mass_matrix, stiffness_matrix
 
 from archimedes.experimental.approximation import (
-    BasisExpansion,
+    Function,
     FunctionSpace,
     OrthogonalPolynomialBasis,
     PiecewiseBasis,
@@ -92,7 +92,7 @@ def test_project_recovers_exact_polynomial(space):
 
     x = np.linspace(-1, 1, 13)
     np.testing.assert_allclose(fn(x), x**2, atol=1e-10)
-    assert isinstance(fn, BasisExpansion)
+    assert isinstance(fn, Function)
 
 
 def test_project_uses_space_quad_rule_by_default(space, quad_rule):

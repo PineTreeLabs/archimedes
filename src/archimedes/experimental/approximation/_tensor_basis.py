@@ -154,7 +154,7 @@ class TensorBasis(Basis):
         \\Phi_{(i_1, \\ldots, i_d)}(x) = \\phi^{(1)}_{i_1}(x_1) \\cdots
             \\phi^{(d)}_{i_d}(x_d),
 
-    so ``n_basis`` is the product of the factors' sizes and a ``BasisExpansion``
+    so ``n_basis`` is the product of the factors' sizes and a ``Function``
     on this basis spans the full ``(n_1, ..., n_d)`` coefficient array.
 
     The multi-index is flattened in **C order** -- last dimension varying

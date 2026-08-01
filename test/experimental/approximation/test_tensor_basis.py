@@ -12,7 +12,7 @@ from _helpers import mass_matrix, stiffness_matrix
 
 import archimedes as arc
 from archimedes.experimental.approximation import (
-    BasisExpansion,
+    Function,
     FunctionSpace,
     LagrangeBasis,
     OrthogonalPolynomialBasis,
@@ -380,7 +380,7 @@ def test_traces_and_differentiates(space):
 
     @arc.compile
     def evaluate(c):
-        return BasisExpansion(c, space)(x)
+        return Function(c, space)(x)
 
     np.testing.assert_allclose(
         np.asarray(evaluate(u.coefficients)).ravel(), expected, atol=1e-11
