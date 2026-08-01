@@ -3,7 +3,7 @@
 
 - ~~Cubic Hermite~~
 - ~~Chebyshev~~
-- Fourier
+- ~~Fourier~~
 - Monomials
 - Bernstein polynomials
 - RBF
@@ -18,8 +18,8 @@
 
 ## Examples:
 
-1. Polynomial chaos expansion - Hohmann maneuver
-2. Gray-box system ID
+1. ~~Polynomial chaos expansion - Hohmann maneuver~~
+2. Gray-box system ID: nonlinear friction?
 3. Spectral/pseudospectral PDE solves (+ method of lines) - scalar PDEs (convection-diffusion, KdV, similar)
 4. 1D FEM - nonlinear Poisson, Euler-Bernoulli, Timoshenko beam (shear locking), fluid flow?
 5. Boundary value problems - Blasius
