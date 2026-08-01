@@ -92,6 +92,12 @@ class OrthogonalPolynomialBasis(Basis):
         :class:`~archimedes.measure.HalfLine` (Laguerre)."""
         return type(self.measure.domain).Parameters
 
+    @property
+    def _reference_scale_exponent(self) -> float:
+        """``0.5`` with the raw weight (``density=False``), ``0.0`` with
+        ``density=True``; see :attr:`Basis._reference_scale_exponent`."""
+        return 0.0 if self.density else 0.5
+
     def default_quadrature(self):
         """Gauss rule of ``n_basis`` points for this basis's own measure.
 

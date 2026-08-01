@@ -393,6 +393,33 @@ class Basis(metaclass=abc.ABCMeta):
         """
         return np.zeros(self.n_basis, dtype=int)  # type: ignore[attr-defined]
 
+    @property
+    def _reference_scale_exponent(self) -> float:
+        """Extra, *uniform* (same for every column) power of ``scale`` needed
+        on top of the per-column ``(2/width) ** (deriv - dof_order[k])``
+        chain-rule factor to turn a *reference*-domain ``evaluate(t, deriv)``
+        call (``t`` already mapped into ``[-1, 1]``, no domain kwargs) into
+        the correct *physical*-domain value.
+
+        Zero by default: a family whose coefficients are plain values with no
+        domain-dependent normalization of their own.
+
+        :class:`OrthogonalPolynomialBasis` overrides this to ``0.0`` (with
+        ``density=True``) or ``0.5`` (``density=False``): its ``evaluate``
+        normalizes by :math:`\\sqrt{\\mathrm{mass}(a, b) \\cdot \\beta_1 \\cdots
+        \\beta_k}`, and since ``mass`` scales as one power of ``scale`` (see
+        ``Measure.mass``) while each ``beta`` scales as two, the physical
+        basis function picks up a uniform extra factor of
+        :math:`\\mathrm{scale}^{-1/2}` relative to the reference one --
+        *unless* ``density=True`` folds ``mass`` out of the normalization
+        entirely, in which case there is no such extra factor.
+
+        Purely an implementation detail of :class:`PiecewiseBasis`'s fused
+        :meth:`~PiecewiseBasis.evaluate_expansion` path, not something a
+        caller needs directly.
+        """
+        return 0.0
+
     def boundary_dofs(self, order: int = 0) -> tuple[int | None, int | None]:
         """Indices of the degrees of freedom that *are* the ``order``-th
         derivative at the left and right ends of the domain, or ``None``

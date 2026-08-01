@@ -377,6 +377,83 @@ class TestC1Continuity:
             np.testing.assert_allclose(fused, dense, atol=1e-8)
 
 
+class TestModalDiscontinuous:
+    """A modal (`OrthogonalPolynomialBasis`) element under `continuity=-1` --
+    the one continuity level a modal basis supports (see
+    `test_c0_requires_element_basis_with_boundary_dofs`). Unlike a nodal or
+    Hermite element, its `evaluate` normalizes by `measure.mass(a, b)`
+    (`Basis._reference_scale_exponent`), which the fused fast path used to
+    silently ignore -- forwarding no domain kwargs at all to the shared
+    per-element basis, defaulting to the *reference* interval's normalization
+    regardless of the element's actual physical width. That's invisible for a
+    single element spanning the whole physical domain (width happens to
+    match), which is why it went uncaught until multiple elements exposed a
+    per-element width different from the reference one."""
+
+    BP = np.array([-1.0, -0.3, 0.4, 1.0])  # deliberately uneven, 3 elements
+
+    @pytest.fixture
+    def modal(self):
+        return OrthogonalPolynomialBasis(LegendreMeasure(), n_basis=4)
+
+    @pytest.fixture
+    def basis(self, modal):
+        return PiecewiseBasis(modal, self.BP, continuity=-1)
+
+    @pytest.mark.parametrize("deriv", [0, 1, 2, 3])
+    def test_evaluate_expansion_fused_path_matches_dense_path(self, basis, deriv):
+        # Non-uniform mesh and a physical domain far from (-1, 1), exactly
+        # like `TestC1Continuity`'s regression test -- the element width
+        # must differ from the reference width of 2 for the bug to show up.
+        a, b = 2.0, 9.0
+        scale, shift = UnitInterval().affine_params(a, b)
+        x = np.concatenate(
+            [np.linspace(-1.2, 1.2, 37) * scale + shift, self.BP * scale + shift]
+        )
+        rng = np.random.default_rng(1)
+        coefficients = rng.normal(size=basis.n_basis)
+
+        dense = basis.evaluate(x, deriv=deriv, a=a, b=b) @ coefficients
+        fused = basis.evaluate_expansion(coefficients, x, deriv=deriv, a=a, b=b)
+        np.testing.assert_allclose(fused, dense, atol=1e-8)
+
+    @pytest.mark.parametrize("deriv", [0, 1, 2])
+    def test_evaluate_expansion_fused_path_matches_dense_path_density(self, deriv):
+        # `density=True` folds the mass out of the normalization entirely, a
+        # different branch of `_reference_scale_exponent` (0.0 rather than
+        # 0.5) -- must also agree with the dense path.
+        modal = OrthogonalPolynomialBasis(LegendreMeasure(), n_basis=4, density=True)
+        basis = PiecewiseBasis(modal, self.BP, continuity=-1)
+        a, b = 2.0, 9.0
+        scale, shift = UnitInterval().affine_params(a, b)
+        x = np.linspace(-1.2, 1.2, 37) * scale + shift
+        rng = np.random.default_rng(2)
+        coefficients = rng.normal(size=basis.n_basis)
+
+        dense = basis.evaluate(x, deriv=deriv, a=a, b=b) @ coefficients
+        fused = basis.evaluate_expansion(coefficients, x, deriv=deriv, a=a, b=b)
+        np.testing.assert_allclose(fused, dense, atol=1e-8)
+
+    def test_project_and_reconstruct(self, modal):
+        # End-to-end via the public `FunctionSpace.piecewise` API: project a
+        # polynomial (exactly representable per element) onto a multi-element
+        # discontinuous Legendre space and check it round-trips -- the
+        # direct FunctionSpace/BasisExpansion-level analogue of the
+        # fused-vs-dense check above, and the scenario the bug was originally
+        # found in.
+        a, b = 0.0, 2 * np.pi
+        space = FunctionSpace.piecewise(
+            "legendre", 4, np.linspace(a, b, 9), continuity=-1
+        )
+
+        def f(x):
+            return x**2 - 3 * x + 1
+
+        fn = space.project(f)
+        x = np.linspace(a, b, 41)
+        np.testing.assert_allclose(fn(x), f(x), atol=1e-10)
+
+
 # -- domain mapping --
 
 

@@ -615,6 +615,12 @@ class PiecewiseBasis(Basis):
 
         n_loc = shared.n_basis
         dof_order = shared._dof_order  # (n_loc,); all zeros for a homogeneous family
+        # Extra *uniform* power of scale a family like `OrthogonalPolynomialBasis`
+        # needs on top of the per-column chain rule, since its own normalization
+        # is domain-size-dependent; zero for a family (Lagrange, Hermite) whose
+        # reference-domain shape functions are already the physical ones up to
+        # the chain rule alone. See `Basis._reference_scale_exponent`.
+        scale_exponent = shared._reference_scale_exponent
         total = None
         for k in range(n_loc):
             c_k = _gather(broken, element * n_loc + k, symbolic, npts)
@@ -626,7 +632,7 @@ class PiecewiseBasis(Basis):
             # since its coefficient is already a physical derivative. A
             # homogeneous family has `_dof_order` all zeros, so this reduces
             # to the single scalar factor every column used to share.
-            col_scale = (2.0 / width) ** (deriv - dof_order[k])
+            col_scale = (2.0 / width) ** (deriv - dof_order[k] + scale_exponent)
             phi_k = phi[:, k] * col_scale
             term = phi_k[:, None] * c_k if vector_valued else phi_k * c_k
             total = term if total is None else total + term
