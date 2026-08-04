@@ -4,7 +4,7 @@
 - ~~Cubic Hermite~~
 - ~~Chebyshev~~
 - ~~Fourier~~
-- Monomials
+- ~~Monomials~~
 - Bernstein polynomials
 - RBF
 - B-splines

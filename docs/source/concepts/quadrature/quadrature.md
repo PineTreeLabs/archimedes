@@ -9,24 +9,34 @@ kernelspec:
   name: archimedes
 ---
 
+```{code-cell} python
+:tags: [hide-cell]
+# ruff: noqa: N802, N803, N806, N815, N816
 
-# Gaussian quadrature
+import matplotlib.pyplot as plt
+import numpy as np
 
-**_A new quadrature module and an update on the function approximation roadmap_**
+import archimedes as arc
 
-Jared Callaham • 24 Jul 2026
+np.random.seed(0)
+```
 
----
+```{code-cell} python
+:tags: [remove-cell]
+from pathlib import Path
 
-The latest source includes a new [`quadrature`](#archimedes.quadrature) module including support for Gaussian quadrature implementations that are compatible with Archimedes' symbolic tracing, autodiff, and code generation.
+plot_dir = Path.cwd() / "_plots"
+plot_dir.mkdir(exist_ok=True)
+```
 
-Of course, you could always have just called SciPy yourself to compute the weights and nodes and then done `np.dot(f(x), w)` in an Archimedes-traced function.
-The reason there's a quadrature module at all is to begin to introduce some new abstractions that will eventually become the foundation for function approximation functionality loosely inspired by [ApproxFun.jl](https://juliaapproximation.github.io/ApproxFun.jl/stable/) and [FEniCS/Firedrake's UFL](https://docs.fenicsproject.org/ufl/main/manual/introduction.html).
-While I think the high-level quadrature functions I'll introduce below should be more or less in their final form, it's possible some of the structure of the quadrature module will change once the function approximation infrastructure starts to fill in, which is why this feature isn't included in a versioned release quite yet.
+# Quadrature
 
-With that in mind, I wanted to give a quick tour of the new quadrature capabilities and sketch out where the function approximation work is heading.
+_Quadrature_ is the name given to a set of algorithms that perform approximate numerical integration of arbitrary functions.
+The [`quadrature`](#archimedes.quadrature) module includes support for Gaussian quadrature implementations that are compatible with Archimedes' symbolic tracing, autodiff, and code generation.
 
-## Gaussian quadrature
+This page gives an introduction to numerical quadrature in Archimedes, including the relationship between Gaussian quadrature rules and classical orthogonal polynomials, and how this relationship translates into the concepts of [`Measure`](#archimedes.measure.Measure) and [`QuadratureRule`](#archimedes.quadrature.QuadratureRule).
+
+## Quickstart
 
 Gaussian quadrature approximates a weighted integral with a discrete sum over (generally non-uniform) nodes and weights:
 
@@ -54,16 +64,6 @@ $$
 Definite integrals on finite domains can be calculated using Gauss-Legendre quadrature with the [`quadint`](#archimedes.quadrature.quadint) function:
 
 ```{code-cell} python
-:tags: [hide-cell]
-# ruff: noqa: N816
-
-import matplotlib.pyplot as plt
-import numpy as np
-
-import archimedes as arc
-```
-
-```{code-cell} python
 def f(x):
     return np.exp(x)
 
@@ -79,7 +79,8 @@ print(f"Gauss-Legendre integral: {J_leg:.6f}")
 ```
 
 Unlike [`scipy.integrate.quad`](https://docs.scipy.org/doc/scipy/reference/generated/scipy.integrate.quad.html), this does not support adaptive integration with an error tolerance, nor does it support infinite or semi-infinite intervals.
-However, it does support symbolic evaluation (including limits) and vector-valued integrands:
+
+However, it does support symbolic evaluation (including limits):
 
 ```{code-cell} python
 # Differentiating the integral with respect to the limits of integration
@@ -99,6 +100,8 @@ print(f"Analytical dJ/da: {-np.exp(a):.6f}, dJ/db: {np.exp(b):.6f}")
 print(f"Computed dJ/da:   {dJ_da:.6f}, dJ/db: {dJ_db:.6f}")
 ```
 
+and vector-values integrands:
+
 ```{code-cell} python
 # Vector-valued integrands
 def f(x):
@@ -112,9 +115,9 @@ print("Analytical integral: [1, 1]")
 print(f"Computed integral:   {J_vec}")
 ```
 
-Composing these lets you easily compute derivatives "under the integral sign" using the Leibnitz rule:
+Combining these, you can easily compute derivatives "under the integral sign" using the Leibnitz rule:
 
-```{code-cell}[python]
+```{code-cell} python
 # https://en.wikipedia.org/wiki/Leibniz_integral_rule#Example_2:_Variable_limits
 
 
@@ -140,38 +143,37 @@ dg_ex = -np.cosh(np.cos(x) ** 2) * np.sin(x) - np.cosh(np.sin(x) ** 2) * np.cos(
 print(f"Error: {np.linalg.norm(dg - dg_ex)}")
 ```
 
-```python
-fig, ax = plt.subplots(1, 1, figsize=(7, 3))
+```{code-cell} python
+:tags: [remove-output]
+
+fig, ax = plt.subplots(1, 1, figsize=(7, 2))
 ax.plot(x, dg, label="Computed")
-ax.plot(x, dg_ex, '--', label="Exact")
+ax.plot(x, dg_ex, "--", label="Exact")
 ax.legend()
 ax.grid()
 ax.set_xlabel("$x$")
 ax.set_ylabel("$g(x)$")
-plt.show()
 ```
 
 ```{code-cell} python
 :tags: [remove-cell]
-for theme in ("light", "dark"):
-    arc.set_theme(theme)
-    fig, ax = plt.subplots(1, 1, figsize=(7, 3))
+
+for theme in {"light", "dark"}:
+    arc.theme.set_theme(theme)
+    fig, ax = plt.subplots(1, 1, figsize=(7, 2))
     ax.plot(x, dg, label="Computed")
     ax.plot(x, dg_ex, "--", label="Exact")
     ax.legend()
     ax.grid()
     ax.set_xlabel("$x$")
-    ax.set_ylabel("$g'(x)$")
-    plt.savefig(f"_static/leibniz_{theme}.png")
+    ax.set_ylabel("$g(x)$")
+    plt.savefig(plot_dir / f"quadrature_0_{theme}.png")
+    plt.close()
 ```
 
-```{image} _static/leibniz_light.png
-:class: only-light
-```
+<!-- TODO: composite and tensor rules -->
 
-```{image} _static/leibniz_dark.png
-:class: only-dark
-```
+## Gaussian quadrature
 
 The power of Gaussian quadrature lies in carefully chosen nodes and weights which give highly accurate approximations of integrals of polynomials (and hence arbitrary smooth functions) with relatively few sample points.
 For instance, that 3e-6 error in the complicated cosh derivative-of-integral above used only _five_ sample points on the $(0, 2\pi)$ domain.
