@@ -27,6 +27,7 @@ from ._basis import (
     CubicHermiteBasis,
     FourierBasis,
     LagrangeBasis,
+    MonomialBasis,
     OrthogonalPolynomialBasis,
     PiecewiseBasis,
     ProductParameters,
@@ -454,6 +455,35 @@ class FunctionSpace:
             :class:`FourierBasis`).
         """
         basis = FourierBasis(n_basis, kind=kind, density=density)
+        return cls(basis, UnitInterval.Parameters(a=a, b=b), quad_rule=quad_rule)
+
+    @classmethod
+    def monomial(
+        cls,
+        n_basis: int,
+        a: float = -1.0,
+        b: float = 1.0,
+        quad_rule: Quadrature | None = None,
+    ) -> FunctionSpace:
+        """Global monomial (power series) space on ``[a, b]``.
+
+        Sugar for ``FunctionSpace(MonomialBasis(n_basis),
+        UnitInterval.Parameters(a=a, b=b), quad_rule=quad_rule)``. See
+        :class:`MonomialBasis` for the reference-mapping convention and
+        conditioning; prefer :meth:`legendre`/:meth:`chebyshev` for
+        higher degree or numerically sensitive work.
+
+        Parameters
+        ----------
+        n_basis : int
+            Number of basis functions (monomial degrees ``0`` through
+            ``n_basis - 1``).
+        a, b : float, optional
+            Bounds of the target interval. Default ``-1``, ``1``.
+        quad_rule : QuadratureRule, optional
+            Forwarded to the underlying ``FunctionSpace`` constructor.
+        """
+        basis = MonomialBasis(n_basis)
         return cls(basis, UnitInterval.Parameters(a=a, b=b), quad_rule=quad_rule)
 
     @classmethod
