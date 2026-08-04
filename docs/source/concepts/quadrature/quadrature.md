@@ -173,12 +173,12 @@ for theme in {"light", "dark"}:
 
 <!-- TODO: composite and tensor rules -->
 
-## Gaussian quadrature
+## The `quadrature` Module
 
 The power of Gaussian quadrature lies in carefully chosen nodes and weights which give highly accurate approximations of integrals of polynomials (and hence arbitrary smooth functions) with relatively few sample points.
-For instance, that 3e-6 error in the complicated cosh derivative-of-integral above used only _five_ sample points on the $(0, 2\pi)$ domain.
+For instance, the 3e-6 error in the complicated cosh derivative-of-integral above used only _five_ sample points on the $(0, 2\pi)$ domain.
 
-The nodes are the roots of classical orthogonal polynomials associated with the weight function (i.e. Legendre polynomials for $w(x) = 1$ on a finite interval), and the weights are derived from Lagrange interpolation of the nodal data.
+The nodes are the roots of classical orthogonal polynomials associated with the weight function (i.e. Legendre polynomials for $w(x) = 1$ on a finite interval), and the weights are derived from Lagrange interpolation of the nodal data (see section "Quadrature and Orthogonal Polynomials" below).
 
 Since the nodes and weights on the reference domain can be statically computed, under the hood we use SciPy's [`roots_legendre/jacobi/laguerre/hermite`](https://docs.scipy.org/doc/scipy/reference/special.html#orthogonal-polynomials) functions to do the actual math.
 
@@ -339,87 +339,124 @@ I can't be the only one who ever got tripped up by this.
 
 Instead, in Archimedes you explicitly choose between probabilists' and physicists' Hermite families with the `kind = 'phys' | 'prob'` keyword arg, as seen above.
 
-## Function Approximation
 
-Gaussian quadrature is useful in its own right, but a major reason for introducing these abstractions here is as a first step towards the goal of a function approximation module.
-I know, I have some open "first steps" in [other domains](../../2025/spatial.md) in other application areas to keep up with as well, but bear with me.
+## Quadrature and orthogonal polynomials
 
-"Function approximation" is a broad term, which can in principle include things like deep neural networks, but in this context I mostly mean linear basis function expansions:
+The weight functions, reference domains, and node distributions can seem to be somewhat obscure at first.
+These arise from a deep connection to _classical orthogonal polynomials_, and understanding why helps select the right family for an application.
+
+### Integration by interpolation
+
+The foundational idea of this kind of quadrature is that you approximate the data $f_i \equiv f(x_i)$ with a polynomial, and then integrate that polynomial exactly.
+[Lagrange polynomials](https://en.wikipedia.org/wiki/Lagrange_polynomial) give you a minimum-degree polynomial that exactly interpolates a given set of data; in general $n$ data points can be exactly interpolated by an $n-1$-degree Lagrange polynomial.
+
+In other words, if the function $f$ happens to be an $n-1$-degree polynomial, you can integrate it exactly on any set of $n$ nodes by constructing a Lagrange interpolating polynomial and integrating it analytically.
+The weights are the combination of the weight function $w(x)$ evaluated at the nodes, and the (linear, pre-computable) contribution of the Lagrange polynomial from that node to the integral.
+
+Of course, if $f$ was a polynomial we could just integrate it analytically anyway, but smooth functions can be accurately approximated with polynomials (and non-smooth functions with piecewise-polynomials), so the exactness of the polynomial degree roughly gives us the accuracy of the method for arbitrary functions.
+
+The genius of Gaussian quadrature is to choose the node positions carefully to get much higher accuracy.
+For the Gauss-Legendre method, by adding $n$ additional degrees of freedom to the algebraic problem, we boost the accuracy from $n-1$ to $2n - 1$.
+
+Suppose $f(x)$ is a polynomial of degree $\leq 2n - 1$, and we will be interpolating at roots $x_i$.
+We can construct a polynomial $q_n(x) \equiv \prod_{i=1}^n (x - x_i)$ and do [polynomial long division](https://en.wikipedia.org/wiki/Polynomial_long_division) to decompose into the node polynomial $q_n(x)$, a quotient $p(x)$, and the remainder $r(x)$ (degrees $n$, $\leq n-1$, and $\leq n-1$, respectively):
 
 $$
-f(x) \approx \sum_{i=1}^n c_i \phi_i(x),
+f(x) = q_n(x) p(x) + r(x).
 $$
 
-where $\{c_i\}_{i=1}^n$ are coefficients and $\{\phi_i\}_{i=1}^n$ are the basis functions.
+We don't know what $p(x)$ and $r(x)$ are here; they're arbitrary polynomials used to derive the conditions on the selection of roots.
 
-Some of the more common basis expansions include:
+If we apply the quadrature rule $\sum_{i=1}^n w_i f(x_i)$ to this, by construction $q_n(x_i) = 0$, so
 
-- Monomials
-- Lagrange interpolating polynomials
-- Orthogonal polynomials (spectral approximation)
-- B-splines
-- Piecewise polynomials and lookup tables
-- Polynomial chaos expansions
-- Karhunen-Loeve decomposition
-- Radial basis functions
+$$
+\sum_{i=1}^n w_i f(x_i) = \sum_{i=1}^n w_i r(x_i)
+$$
 
-The fact that all of these are linear in coefficients means that in principle they should be able to be unified under a set of operations including evaluation, mass and stiffness matrix calculation, projection, interpolation, __*quadrature*__ etc.
+If the weights are chosen as above, then since $r(x)$ has degree $\leq n - 1$ this integral is exact over $r$, so 
 
-The design for this is still a work in progress, but the vision is something that takes inspiration from both the [Unified Form Language](https://docs.fenicsproject.org/ufl/main/manual/introduction.html) of FEniCS/Firedrake and the first-class-function models of spectral approximation libraries like [ApproxFun.jl](https://juliaapproximation.github.io/ApproxFun.jl/stable/) and its spiritual ancestor [chebfun](https://www.chebfun.org/).
+$$
+\sum_{i=1}^n w_i f(x_i) = \int_a^b w(x) \, r(x) \, dx.
+$$
 
-If it works the way I'm envisioning, it would open up exciting possibilities in Archimedes like:
+In order for this to *also* equal the weighted integral of $f(x)$, the additional contribution from $q_n(x) p(x)$ has to vanish for *any* polynomial $p(x)$ with degree $\leq n - 1$:
 
-- Custom 1D FEM models
-- Uncertainty quantification with polynomial chaos expansions
-- Gray-box system identification
-- Collocated optimal control discretizations
-- Spectral methods for PDE solves
+$$
+\int_a^b w(x) \, q_n(x) \, p(x) \, dx = 0.
+$$
 
-And of course, all of these would compose with the existing Archimedes capabilities in autodiff, [C code generation](../../../tutorials/codegen/codegen00.md), and [hierarchical modeling](../../../tutorials/hierarchical/hierarchical00.md).
+This is exactly the defining property of [orthogonal polynomials](https://en.wikipedia.org/wiki/Orthogonal_polynomials).
 
-A rough sketch of what this might look like is:
+### Orthogonal polynomials
 
-```python
-class Basis(Protocol):
-    domain: tuple
+Don't go read that Wikipedia page; it's full of terms like "Lebesgue–Stieltjes integrals".
+The important thing for Gaussian quadrature is that given a weight function and a domain, you can derive a family of polynomials such that the $n$-th polynomial is orthogonal to all $n-1$ polynomials in that family with respect to that weight, exactly the property Gauss identifies for optimizing accuracy of the quadrature rule:
 
-    def __call__(self, i: int, x, deriv: int = 0):
-        """Evaluate phi[i] at x"""
-        ...   # -> (len(x),)
+$$
+\int_a^b w(x) \, q_i(x) \, q_j(x) \, dx = 0, \qquad i \neq j
+$$
 
-class BasisExpansion(Protocol):
-    n_basis: int
-    basis: Basis
+Since any $n-1$-degree polynomial can be represented by a linear combination of $q_i(x)$, $i = 0, 1, \dots, n-1$, the quotient term from polynomial division is guaranteed to vanish.
 
-    def basis_eval(self, x, deriv: int = 0):
-        """Evaluate all the basis functions at x"""
-        ...   # -> (len(x), n_basis)
+The upshot is that **if we choose the quadrature nodes to be the roots of the appropriate orthogonal polynomial, then we get optimal quadrature accuracy**.
+The "appropriate" polynomial depends on the weight function and the domain, commonly:
 
-@arc.struct
-class Function:
-    coefficients: np.ndarray
-    basis: BasisExpansion = arc.field(static=True)
+| Weight $w(x)$ | Domain | Orthogonal polynomials | Quadrature scheme |
+|---|---|---|---|
+| $1$ | $[-1,1]$ | [Legendre](https://en.wikipedia.org/wiki/Legendre_polynomials) | [Gauss–Legendre](https://en.wikipedia.org/wiki/Gauss%E2%80%93Legendre_quadrature) |
+| $(1-x)^\alpha(1+x)^\beta$ | $[-1,1]$ | [Jacobi](https://en.wikipedia.org/wiki/Jacobi_polynomials) | [Gauss-Jacobi](https://en.wikipedia.org/wiki/Gauss%E2%80%93Jacobi_quadrature) |
+| $e^{-x^2}$ | $(-\infty,\infty)$ | [Hermite](https://en.wikipedia.org/wiki/Hermite_polynomials) | [Gauss–Hermite](https://en.wikipedia.org/wiki/Gauss%E2%80%93Hermite_quadrature) |
+| $e^{-x}$ | $[0,\infty)$ | [Laguerre](https://en.wikipedia.org/wiki/Laguerre_polynomials) | [Gauss–Laguerre](https://en.wikipedia.org/wiki/Gauss%E2%80%93Laguerre_quadrature) |
 
-    def __call__(self, x):
-        """Interpolate the function approximation at x"""
-        ...  # -> (len(x),)
+The domains (but not their finite-ness) can be adjusted by shifting and scaling the quadrature weights and nodes.
+
+Once the nodes $x_i$ are determined, the weights are again the combination of the weight function values $w(x_i)$ and the contribution to the final integral from the associated Lagrange polynomial.
+
+### Constrained quadrature schemes
+
+The basic Gaussian quadrature methods place $n$ nodes to be the roots of the $n$-th order orthogonal polynomial from the appropriate family.
+However, these roots don't inherently include the endpoints of the interval.
+
+Alternatively, we can derive _constrained_ quadrature families that include one or both endpoints; the tradeoff is 1-2 fewer degrees of freedom for the polynomial interpolation and corresponding loss of exactness in polynomial quadrature:
+
+- **Gauss-Legendre rules**: Do not include endpoints - exact to order $2n - 1$
+- **Gauss-Radau rules**: Include the left or right endpoint (configurable) - exact to order $2n - 2$
+- **Gauss-Lobatto rules**: Include both endpoints - exact to order $2n - 3$.
+
+```{code-cell} python
+n = 10
+leg = quad.gauss_legendre(n)
+rad_left = quad.gauss_radau(n, endpoint="left")
+rad_right = quad.gauss_radau(n, endpoint="right")
+lob = quad.gauss_lobatto(n)
+# cc = quad.clenshaw_curtis(n)
+
+zero = np.zeros_like(leg.nodes)
+
+fig, ax = plt.subplots(1, 1, figsize=(6, 4))
+ax.plot(leg.nodes, zero, "o", label="Gauss-Legendre")
+ax.plot(rad_left.nodes, zero + 1, "o", label="Gauss-Radau (left)")
+ax.plot(rad_right.nodes, zero + 2, "o", label="Gauss-Radau (right)")
+ax.plot(lob.nodes, zero + 3, "o", label="Gauss-Lobatto")
+# ax.plot(cc.nodes, zero + 4, 'o', label="Clenshaw-Curtis")
+ax.set_xlabel("Node $x_i$")
+ax.set_title(f"Quadrature nodes for n={n}")
+ax.legend()
+ax.set_ylim(-1, 6)
+ax.grid()
+ax.set_yticks([])
+plt.show()
 ```
 
-Expressing `Function` as a `@struct`-decorated class means that if you define operations like `grad(f: Function) -> Function` to return the derivative in the same basis, and construct `dx` so that it does symbolic quadrature over the domain, then you should be able to naturally express a weak form for finite element analysis in functional form:
 
-```python
-# Bilinear form for nonlinear Poisson equation
-def a(u, v, x):
-    return k(x) * grad(u) * grad(v) * dx
-```
+These can be useful for different applications; Gauss-Radau gives useful stability properties for implicit ODE solvers, both Gauss-Radau and Gauss-Lobatto are commonly used in pseudospectral optimal control methods, and Gauss-Lobatto is widely used for high-order spectral element methods.
 
-"Assembling" the finite element problem is then a matter of evaluating the residual over the test basis and letting Archimedes/CasADi handle the sparse autodiff for Jacobians - no manual scatter, element bookkeeping, hand-derived tangents, etc.
+The schemes themselves are derived similarly to the Gauss-Legendre case, but fixing one of the roots in the polynomial division, e.g. $q_n(x) = (x - a) q_{n-1}(x)$ for Radau.
+This amounts to a different weight in the orthogonality requirement and therefore a different member of the orthogonal polynomial family.
+For Gauss-Radau with an endpoint at $x = a$ and original weight $w(x) = 1$, the orthogonality condition becomes:
 
-You could do something similar for all of the other algorithm classes above, bringing the code much closer to how you'd write the math.
+$$
+\int_a^b (x - a) \, q_i(x) \, q_j(x) \, dx = 0, \qquad i \neq j
+$$
 
-As I said, it needs some design work, but today's release of a `QuadratureRule` based on the `Measure` abstraction is the first step towards this kind of unified function approximation infrastructure.
-
-## For More
-
-- Check out the API docs for [quadrature](#archimedes.quadrature) to see the details
-- [Subscribe](https://jaredcallaham.substack.com/embed) to the newsletter for updates and announcements
+That is, the nodes must be placed at the roots of the polynomials that are orthogonal with respect to this inner product with weight $(x - a)$.
