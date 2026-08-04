@@ -1,15 +1,16 @@
 """Basis family: the ``Basis`` interface and every concrete or composite
 implementation.
 
-- ``Basis``, ``BasisMatrix`` -- the abstract interface (``_base.py``); a
-  basis only evaluates, with no notion of a target domain or coefficients.
-- Concrete basis implementations: ``OrthogonalPolynomialBasis``, ``LagrangeBasis``,
-  ``CubicHermiteBasis``, ``FourierBasis``, ``MonomialBasis``, ``PiecewiseBasis``.
+- :class:`Basis`, :class:`BasisMatrix` -- the abstract interface; a basis
+  only evaluates, with no notion of a target domain or coefficients.
+- Concrete basis implementations: :class:`OrthogonalPolynomialBasis`,
+  :class:`LagrangeBasis`, :class:`CubicHermiteBasis`, :class:`FourierBasis`,
+  :class:`MonomialBasis`, :class:`PiecewiseBasis`.
 - Composition primitives, each building a new ``Basis`` out of existing
-  ones: ``ConstrainedBasis`` recombines *one* basis's functions by a fixed
-  matrix, ``ConcatBasis`` stacks functions from *several* bases side by
-  side, and ``TensorBasis`` combines one basis per dimension into a
-  multivariate basis (with ``ProductParameters`` carrying the
+  ones: :class:`ConstrainedBasis` recombines *one* basis's functions by a
+  fixed matrix, :class:`ConcatBasis` stacks functions from *several* bases
+  side by side, and :class:`TensorBasis` combines one basis per dimension
+  into a multivariate basis (with :class:`ProductParameters` carrying the
   per-dimension target domains).
 """
 

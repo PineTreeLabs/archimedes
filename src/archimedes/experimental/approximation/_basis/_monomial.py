@@ -20,14 +20,11 @@ class MonomialBasis(Basis):
     The basis functions are :math:`\{1, t, t^2, \ldots, t^{n-1}\}`, the
     ordinary power basis evaluated at :math:`t`, the point ``x`` affinely
     mapped from the target interval :math:`[a, b]` onto the reference
-    interval :math:`[-1, 1]` -- the same remapping
-    :class:`OrthogonalPolynomialBasis` and :class:`FourierBasis` use to
-    place their families on an arbitrary target interval. Here it exists
-    purely to keep the basis numerically well-behaved, playing the same
-    role as the ``domain``/``window`` arguments of
-    ``numpy.polynomial.Polynomial``. One consequence: ``coefficients`` in
-    this basis are defined relative to :math:`[-1, 1]`, not literal Taylor
-    coefficients of ``x`` about a fixed point.
+    interval :math:`[-1, 1]` -- the same role played by the
+    ``domain``/``window`` arguments of ``numpy.polynomial.Polynomial``.
+    One consequence: ``coefficients`` in this basis are defined relative
+    to :math:`[-1, 1]`, not literal Taylor coefficients of ``x`` about a
+    fixed point.
 
     Parameters
     ----------

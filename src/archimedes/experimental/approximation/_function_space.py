@@ -316,12 +316,12 @@ class FunctionSpace:
         density: bool = False,
         quad_rule: Quadrature | None = None,
     ) -> FunctionSpace:
-        """Global Chebyshev polynomial space on ``[a, b]``.
+        r"""Global Chebyshev polynomial space on ``[a, b]``.
 
         Chebyshev polynomials are the special case of
         :class:`~archimedes.measure.JacobiMeasure` with
-        :math:`\\alpha = \\beta = -1/2` (first kind, the default) or
-        :math:`\\alpha = \\beta = 1/2` (``second_kind=True``); see
+        :math:`\alpha = \beta = -1/2` (first kind, the default) or
+        :math:`\alpha = \beta = 1/2` (``second_kind=True``); see
         :class:`~archimedes.measure.JacobiMeasure`.
         """
         exponent = 0.5 if second_kind else -0.5
@@ -649,8 +649,8 @@ class FunctionSpace:
         numerically identical. So value comparison would be both
         undecidable and prone to false rejection.
 
-        This means a caller can add two ``Function``s whose domains differ
-        *numerically* -- e.g. ``(a=0, b=1)`` and ``(a=0, b=2)`` -- without
+        This means a caller can add two ``Function`` objects whose domains
+        differ *numerically* -- e.g. ``(a=0, b=1)`` and ``(a=0, b=2)`` -- without
         an error. **Callers are responsible for ensuring the domains agree
         numerically**; only the structure is enforced here.
         """
@@ -808,13 +808,13 @@ class FunctionSpace:
         return matrix
 
     def _diff_matrix(self, deriv=1, space: FunctionSpace | None = None) -> np.ndarray:
-        """Matrix mapping this space's coefficients to those of the
+        r"""Matrix mapping this space's coefficients to those of the
         ``deriv``-th derivative.
 
         .. math::
-            D = M^{-1} \\, \\Phi_t^\\top W \\, \\Phi^{(k)},
+            D = M^{-1} \, \Phi_t^\top W \, \Phi^{(k)},
 
-        the Galerkin projection of :math:`\\phi_i^{(k)}` onto the target
+        the Galerkin projection of :math:`\phi_i^{(k)}` onto the target
         space, with :math:`M` and the quadrature taken from that target.
         This is exact whenever the target space contains the derivative,
         which it does by construction for both defaults below.
@@ -877,6 +877,16 @@ class FunctionSpace:
 
         This, together with :meth:`basis_matrix`, is what an assembly like
         :meth:`project` is built from.
+
+        Parameters
+        ----------
+        quad_rule : QuadratureRule, optional
+            Quadrature rule to use instead of ``self.quad_rule``.
+
+        Returns
+        -------
+        nodes, weights : ndarray
+            Nodes and weights on this space's target domain.
         """
         rule = self._resolve_rule(quad_rule)
         domain_kwargs = self._domain_kwargs()
@@ -911,6 +921,11 @@ class FunctionSpace:
             plain order otherwise. Default 0.
         quad_rule : QuadratureRule, optional
             Quadrature rule to use instead of ``self.quad_rule``.
+
+        Returns
+        -------
+        BasisMatrix
+            The design matrix, bundled with its nodes and weights.
         """
         rule = self._resolve_rule(quad_rule)
         matrix = self.basis._evaluate_at_nodes(
@@ -920,7 +935,7 @@ class FunctionSpace:
         return BasisMatrix(matrix, weights, nodes)
 
     def _evaluate(self, coefficients: np.ndarray, x, deriv: int = 0, side: str = RIGHT):
-        """Evaluate :math:`\\sum_i c_i \\, \\phi_i(x)` (or its ``deriv``-th
+        r"""Evaluate :math:`\sum_i c_i \, \phi_i(x)` (or its ``deriv``-th
         derivative) at ``x``, for coefficients ``c = coefficients``.
 
         Parameters
@@ -957,13 +972,13 @@ class FunctionSpace:
         c2: np.ndarray,
         quad_rule: Quadrature | None = None,
     ):
-        """Inner product :math:`\\langle f, g \\rangle = \\int f(x) \\, g(x)
-        \\, w(x) \\, dx` for ``f``, ``g`` in this space with coefficients
+        r"""Inner product :math:`\langle f, g \rangle = \int f(x) \, g(x)
+        \, w(x) \, dx` for ``f``, ``g`` in this space with coefficients
         ``c1``, ``c2``, approximated via ``quad_rule`` (default
         ``self.quad_rule``).
 
-        Unlike a product of two ``Function``s (deliberately unsupported --
-        see :class:`Function`), an inner product returns a scalar rather
+        Unlike a product of two ``Function`` objects (deliberately unsupported
+        -- see :class:`Function`), an inner product returns a scalar rather
         than another element of the space, so there's no aliasing/closure
         question to resolve: it's computed by evaluating both functions at
         the quadrature nodes and integrating the pointwise product, which
@@ -973,8 +988,8 @@ class FunctionSpace:
         directly without forming that full ``(n_basis, n_basis)`` matrix.
 
         For vector-valued coefficients (shape ``(n_basis, m)``) the
-        integrand is contracted over components, :math:`\\langle f, g
-        \\rangle = \\int f \\cdot g \\, w \\, dx`, so the result is a
+        integrand is contracted over components, :math:`\langle f, g
+        \rangle = \int f \cdot g \, w \, dx`, so the result is a
         scalar in that case too and :meth:`Function.norm` is the
         :math:`L^2` norm of the whole vector-valued function rather than
         an array of per-component norms. Both coefficient arrays must have
@@ -1013,9 +1028,9 @@ class FunctionSpace:
         projection: the residual ``f - Phi @ c`` is made orthogonal to
         ``test_space`` rather than to this space. ``test_space`` must have
         the same ``n_basis`` as this space (so ``M`` is square) and must
-        denote the same physical domain (checked structurally only, as in
-        :meth:`_is_compatible_with`, since domains may be traced). The
-        result is still returned **in this (trial) space** -- ``test_space``
+        denote the same physical domain (checked structurally only, since
+        domains may be traced). The result is still returned **in this
+        (trial) space** -- ``test_space``
         only supplies the orthogonality condition used to solve for ``c``,
         not how ``c`` is interpreted, since ``c`` are always coefficients of
         *this* space's basis functions.
@@ -1043,6 +1058,15 @@ class FunctionSpace:
             The projected function, in this (trial) space, with
             coefficients of shape ``(n_basis,)`` or ``(n_basis, m)`` to
             match ``f``.
+
+        Examples
+        --------
+        >>> import numpy as np
+        >>> from archimedes.experimental.approximation import FunctionSpace
+        >>> space = FunctionSpace.legendre(n_basis=8)
+        >>> f = space.project(lambda x: np.exp(x))
+        >>> np.round(f(np.array([-0.5, 0.0, 0.5])), 4)
+        array([0.6065, 1.    , 1.6487])
         """
         from ._function import Function  # avoid a circular import
 

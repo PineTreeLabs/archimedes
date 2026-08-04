@@ -107,9 +107,8 @@ class PiecewiseBasis(Basis):
     linear *assembly* map, a plain right-multiplication on the broken
     basis's design matrix, so everything built on ``Basis``
     (mass/stiffness matrices, projection, inner products) works through it
-    unchanged; see :meth:`_build_assembly` for the construction and
-    :class:`~archimedes.experimental.approximation.CubicHermiteBasis` for
-    the kind of basis this generalizes to.
+    unchanged. :class:`CubicHermiteBasis` is the kind of element basis a
+    ``q=1`` continuity generalizes to.
 
     **Element ownership at a breakpoint.** This basis can be two-valued at its
     interior breakpoints (always for the derivatives of :math:`C^0` functions,
@@ -138,9 +137,9 @@ class PiecewiseBasis(Basis):
         ``continuity=q`` every element's basis must expose endpoint DOFs of
         every order ``0`` through ``q`` via ``boundary_dofs`` (e.g. a
         :class:`LagrangeBasis` whose nodes include both endpoints, for
-        ``q=0``; a :class:`~archimedes.experimental.approximation.CubicHermiteBasis`
-        for ``q=1``). Always stored (and compared/hashed) as a per-element
-        tuple, regardless of which form was passed in.
+        ``q=0``; a :class:`CubicHermiteBasis` for ``q=1``). Always stored
+        (and compared/hashed) as a per-element tuple, regardless of which
+        form was passed in.
     breakpoints : array_like
         Element boundaries on the reference domain, shape ``(k + 1,)`` for
         ``k`` elements. Must be strictly increasing and span ``[-1, 1]``
@@ -486,10 +485,15 @@ class PiecewiseBasis(Basis):
         return broken @ self._assembly
 
     def evaluate(self, x, deriv: int = 0, a=None, b=None, side: str = RIGHT):
-        """Evaluate at arbitrary points, resolving breakpoints by ``side``.
+        r"""Evaluate at arbitrary points, resolving breakpoints by ``side``.
 
         Parameters
         ----------
+        x, deriv : array_like, int, optional
+            As for :meth:`Basis.evaluate`.
+        a, b : float, optional
+            Target-domain endpoints; default the reference domain
+            ``[-1, 1]``.
         side : {"right", "left"}, optional
             Which one-sided limit to take at a point lying exactly on an
             interior breakpoint, where this basis is two-valued. ``"right"``
@@ -563,9 +567,9 @@ class PiecewiseBasis(Basis):
     def evaluate_expansion(
         self, coefficients, x, deriv: int = 0, a=None, b=None, side: str = RIGHT
     ):
-        """Evaluate the coefficient expansion :math:`\\sum_i c_i \\,
-        \\phi_i(x)` (or its ``deriv``-th derivative), for coefficients
-        ``c`` = ``coefficients``.
+        r"""Evaluate the coefficient expansion :math:`\sum_i c_i \,
+        \phi_i(x)` (or its ``deriv``-th derivative), for coefficients ``c``
+        = ``coefficients``.
 
         Equivalent to ``evaluate(x, deriv) @ coefficients``, but cheaper
         when every element shares one basis (the common case): the cost is
@@ -578,6 +582,10 @@ class PiecewiseBasis(Basis):
 
         Parameters
         ----------
+        coefficients, x, deriv : array_like, array_like, int, optional
+            As for :meth:`evaluate_expansion <Basis.evaluate_expansion>`.
+        a, b : float, optional
+            Target-domain endpoints; see :meth:`evaluate`.
         side : {"right", "left"}, optional
             Which one-sided limit to take at a point lying exactly on an
             interior breakpoint, where this basis is two-valued -- see

@@ -76,44 +76,39 @@ def _differentiation_matrix(nodes: np.ndarray, weights: np.ndarray) -> np.ndarra
 
 @dataclasses.dataclass(frozen=True)
 class LagrangeBasis(Basis):
-    """Lagrange cardinal polynomials :math:`\\{\\ell_0, \\ldots, \\ell_{n-1}\\}`
-    for a fixed set of nodes: :math:`\\ell_i(x_j) = \\delta_{ij}`.
+    r"""Lagrange cardinal polynomials :math:`\{\ell_0, \ldots, \ell_{n-1}\}`
+    for a fixed set of nodes: :math:`\ell_i(x_j) = \delta_{ij}`.
 
     Evaluated via the (first, "true") barycentric formula
 
     .. math::
-        \\ell_i(x) = \\frac{w_i / (x - x_i)}{\\sum_j w_j / (x - x_j)},
-        \\qquad w_i = \\frac{1}{\\prod_{j \\neq i} (x_i - x_j)}
+        \ell_i(x) = \frac{w_i / (x - x_i)}{\sum_j w_j / (x - x_j)},
+        \qquad w_i = \frac{1}{\prod_{j \neq i} (x_i - x_j)}
 
     with the usual special-case handling at :math:`x = x_k` (where
-    :math:`\\ell_i(x_k) = \\delta_{ik}` directly, avoiding 0/0).
+    :math:`\ell_i(x_k) = \delta_{ik}` directly, avoiding 0/0).
 
     .. warning::
         That special case is selected by a runtime comparison, so it is a
         branch point for automatic differentiation. Differentiating with
         respect to a *domain parameter* (``a``/``b``, which move the nodes)
         at a point that coincides *exactly* with a node returns the
-        derivative of the constant :math:`\\delta_{ik}` branch, i.e. zero,
+        derivative of the constant :math:`\delta_{ik}` branch, i.e. zero,
         rather than the true value -- the underlying function is smooth
         there, but this formula is not. Off-node points, and derivatives
         with respect to ``x``, are unaffected.
 
-    Derivatives of every order are supported. Rather than differentiating
-    the barycentric quotient (which reintroduces a 0/0 case at each node
-    for each order), note that :math:`\\ell_j^{(k)}` is itself a polynomial
-    of degree :math:`\\leq n - 1` and so is *exactly* represented in this
-    same basis:
+    Derivatives of every order are supported and exact: :math:`\ell_j^{(k)}`
+    is itself a polynomial of degree :math:`\leq n - 1` and so is
+    represented exactly in this same basis,
 
     .. math::
-        \\ell_j^{(k)}(x) = \\sum_i \\ell_j^{(k)}(x_i) \\, \\ell_i(x)
-                        = \\sum_i D^k_{ij} \\, \\ell_i(x),
+        \ell_j^{(k)}(x) = \sum_i D^k_{ij} \, \ell_i(x),
 
-    where :math:`D_{ij} = \\ell_j'(x_i)` is the classical differentiation
-    matrix. In matrix form :math:`\\Phi^{(k)} = \\Phi \\, D^k`, so every
-    derivative order reduces to the ``deriv=0`` evaluation above followed
-    by a matrix product. At a node :math:`\\Phi` is a unit vector, so this
-    returns the corresponding row of :math:`D^k` exactly -- the special
-    case is subsumed rather than handled separately.
+    where :math:`D_{ij} = \ell_j'(x_i)` is the classical differentiation
+    matrix -- so every derivative order reduces to the ``deriv=0``
+    evaluation above followed by a matrix product, :math:`\Phi^{(k)} =
+    \Phi \, D^k`, with no repeated 0/0 handling.
 
     Parameters
     ----------
@@ -124,23 +119,22 @@ class LagrangeBasis(Basis):
         ``reference_nodes[i]``, once mapped to the target domain), but not
         the basis itself.
     node_family : callable, optional
-        ``n -> nodes``, used to pick the node set whenever an operation
-        needs a *differently sized* basis of the same kind --
-        :meth:`_product_basis` and :meth:`_derivative_basis`. It is not
-        applied to ``reference_nodes``, which are taken as given.
+        ``n -> nodes``, used internally to pick the node set whenever a
+        *differently sized* basis of the same kind is needed. Not applied
+        to ``reference_nodes``, which are taken as given.
 
-        Defaults to Gauss-Lobatto, which is the conventional nodal set
-        (Chebyshev points of the second kind and the spectral-element
-        method's standard GLL) and which keeps :meth:`boundary_dofs`
-        populated so the result can still be tiled with :math:`C^0` continuity.
+        Defaults to Gauss-Lobatto, the conventional nodal set (Chebyshev
+        points of the second kind and the spectral-element method's
+        standard GLL), which keeps :meth:`boundary_dofs` populated so the
+        result can still be tiled with :math:`C^0` continuity.
 
-        Any ``n`` distinct nodes span the same :math:`P_{n-1}`, so the choice
-        affects only conditioning and which degrees of freedom are nodal.
-        Supply one to keep a method's node family intact where that matters, e.g.
-        ``lambda n: gauss_radau(n, endpoint="left").nodes`` for a
-        Radau-based pseudospectral scheme. Note that a family with no endpoint
-        node leaves ``boundary_dofs`` empty, so the derived basis cannot be tiled with
-        :math:`C^0` continuity.
+        Any ``n`` distinct nodes span the same :math:`P_{n-1}`, so the
+        choice affects only conditioning and which degrees of freedom are
+        nodal. Supply one to keep a derived basis's node family intact
+        where that matters, e.g. ``lambda n: gauss_radau(n,
+        endpoint="left").nodes`` for a Radau-based pseudospectral scheme.
+        A family with no endpoint node leaves :meth:`boundary_dofs` empty,
+        so the derived basis cannot be tiled with :math:`C^0` continuity.
     """
 
     reference_nodes: np.ndarray
@@ -205,16 +199,14 @@ class LagrangeBasis(Basis):
     def gauss_radau(cls, n: int, endpoint: str = "left") -> "LagrangeBasis":
         """``n`` Gauss-Radau nodes, fixing ``endpoint`` (``"left"`` or
         ``"right"``); see :func:`archimedes.quadrature.gauss_radau`.
-
-        Dispatches to one of two named module-level functions rather than
-        parametrizing a single one with a closure or ``functools.partial``
-        over ``endpoint``: two independently-constructed instances must
-        compare equal to be usable together (:meth:`_product_basis`, basis
-        equality), which requires the *same* ``node_family`` object each
-        time -- a fresh ``lambda`` per call never satisfies that, and
-        neither does ``functools.partial``, which (perhaps surprisingly)
-        has no value-based ``__eq__`` of its own either.
         """
+        # Dispatches to one of two named module-level functions rather than
+        # parametrizing a single one with a closure or `functools.partial`
+        # over `endpoint`: two independently-constructed instances must
+        # compare equal to be usable together (see `_product_basis`, basis
+        # equality), which requires the *same* `node_family` object each
+        # time -- a fresh lambda per call never satisfies that, and neither
+        # does `functools.partial`, which has no value-based `__eq__` either.
         if endpoint == "left":
             return cls(
                 reference_nodes=_gauss_radau_left_nodes(n),

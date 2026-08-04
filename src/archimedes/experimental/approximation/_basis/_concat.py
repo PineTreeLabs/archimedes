@@ -19,10 +19,9 @@ __all__ = ["ConcatBasis"]
 class ConcatBasis(Basis):
     r"""A basis whose functions are the concatenation of several pieces'.
 
-    Where :class:`~archimedes.experimental.approximation.ConstrainedBasis`
-    recombines *one* basis's functions by a matrix (a change of basis),
-    this stacks functions from *several*, possibly unrelated, bases side
-    by side:
+    Where :class:`ConstrainedBasis` recombines *one* basis's functions by
+    a matrix (a change of basis), this stacks functions from *several*,
+    possibly unrelated, bases side by side:
 
     .. math::
         \Phi(x) = \big[\, \Phi_1(x) \;\; \Phi_2(x) \;\; \cdots \,\big]

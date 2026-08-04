@@ -16,15 +16,27 @@ __all__ = ["CubicHermiteBasis"]
 
 @dataclasses.dataclass(frozen=True)
 class CubicHermiteBasis(Basis):
-    r"""Cubic Hermite shape functions
-    
-    The cubic Hermite basis functions are :math:`\{\phi_{00}, \phi_{10},
-    \phi_{01}, \phi_{11}\}`: value *and* derivative degrees of freedom at
-    each of the two element endpoints.
+    r"""Cubic Hermite shape functions: value *and* derivative degrees of
+    freedom at each of the two element endpoints.
 
-    **Construction.** The reference functions on :math:`t \in [-1, 1]` are
-    built from the classical cubic Hermite basis on :math:`\tau \in [0, 1]`
-    (:math:`\tau = (t+1)/2`),
+    The basis functions are :math:`\{\phi_{00}, \phi_{10}, \phi_{01},
+    \phi_{11}\}`, where :math:`\phi_{i0}` is the value-type function at
+    endpoint :math:`i` and :math:`\phi_{i1}` the derivative-type one, so a
+    ``Function`` on this basis has coefficients ``[u(a), u'(a), u(b),
+    u'(b)]``. Used as an element of a :class:`PiecewiseBasis` with
+    ``continuity=1``, this gives a globally :math:`C^1` piecewise-cubic
+    space.
+
+    Derivatives leave this family: for a piecewise cubic Hermite
+    ``Function`` ``f``, ``f.derivative()`` is a piecewise *quadratic*
+    function in a :class:`LagrangeBasis` (Gauss-Lobatto nodes), since there
+    is no smaller Hermite space for the derivative to live in.
+
+    Notes
+    -----
+    The reference functions on :math:`t \in [-1, 1]` are built from the
+    classical cubic Hermite basis on :math:`\tau \in [0, 1]` (:math:`\tau =
+    (t+1)/2`),
 
     .. math::
         H_{00}(\tau) = 2\tau^3 - 3\tau^2 + 1, \quad
@@ -33,16 +45,15 @@ class CubicHermiteBasis(Basis):
         H_{11}(\tau) = \tau^3 - \tau^2,
 
     via :math:`\phi_{00} = H_{00}(\tau)`, :math:`\phi_{01} = H_{01}(\tau)`
-    (value-type, columns 0 and 2) and :math:`\phi_{10} = 2 H_{10}(\tau)`,
-    :math:`\phi_{11} = 2 H_{11}(\tau)` (derivative-type, columns 1 and 3).
-    The factor of 2 cancels the internal :math:`d\tau/dt = 1/2`, so
-    :math:`d\phi_{10}/dt = 1` exactly at the node it belongs to.
+    and :math:`\phi_{10} = 2 H_{10}(\tau)`, :math:`\phi_{11} = 2
+    H_{11}(\tau)`. The factor of 2 cancels the internal :math:`d\tau/dt =
+    1/2`, so :math:`d\phi_{10}/dt = 1` exactly at the node it belongs to.
 
-    **Domain mapping.** For a target element :math:`[a, b]` with
-    ``scale = (b-a)/2`` (:class:`~archimedes.measure.UnitInterval`), each
-    basis function's *intrinsic* derivative order (``[0, 1, 0, 1]`` here)
-    determines an *extra* power of ``scale`` on top of the usual
-    output-derivative chain-rule factor:
+    For a target element :math:`[a, b]` with ``scale = (b-a)/2``
+    (:class:`~archimedes.measure.UnitInterval`), each basis function's
+    *intrinsic* derivative order (``[0, 1, 0, 1]`` here) determines an
+    *extra* power of ``scale`` on top of the usual output-derivative
+    chain-rule factor:
 
     .. math::
         \phi_i^{(k)}(x) = \mathrm{scale}^{\,m_i - k} \, \phi_i^{(k)}(t(x)),
@@ -54,11 +65,6 @@ class CubicHermiteBasis(Basis):
     c_1 \cdot \mathrm{scale} \cdot d\phi_{10}/dt \cdot dt/dx = c_1 \cdot
     d\phi_{10}/dt`, which is :math:`c_1` at the owning node since
     :math:`d\phi_{10}/dt = 1` there by construction.
-
-    **Derivatives leave this family.** For a :class:`Function` `f` constructed
-    with a piecewise cubic Hermite basis, `f.derivative()` is a piecewise
-    *quadratic* function in a :class:`LagrangeBasis` (using Gauss-Lobatto nodes),
-    since there is no smaller Hermite space for the derivative to live in.
     """
 
     @property

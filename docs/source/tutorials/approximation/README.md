@@ -6,7 +6,7 @@
 - ~~Fourier~~
 - ~~Monomials~~
 - Bernstein polynomials
-- RBF
+- ~~RBF~~ (deferred - should live in interpolation, not function approximation)
 - B-splines
 - ~~PCHIP~~ (deferred - this is an interpolation function that produces a standard cubic Hermite polynomial)
 - Karhunen-Loeve

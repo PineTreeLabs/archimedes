@@ -146,13 +146,13 @@ def _row_kron(mats: list) -> np.ndarray:
 
 @dataclasses.dataclass(frozen=True)
 class TensorBasis(Basis):
-    """Tensor product of univariate bases, one per dimension.
+    r"""Tensor product of univariate bases, one per dimension.
 
     The basis functions are all products of one factor from each dimension,
 
     .. math::
-        \\Phi_{(i_1, \\ldots, i_d)}(x) = \\phi^{(1)}_{i_1}(x_1) \\cdots
-            \\phi^{(d)}_{i_d}(x_d),
+        \Phi_{(i_1, \ldots, i_d)}(x) = \phi^{(1)}_{i_1}(x_1) \cdots
+            \phi^{(d)}_{i_d}(x_d),
 
     so ``n_basis`` is the product of the factors' sizes and a ``Function``
     on this basis spans the full ``(n_1, ..., n_d)`` coefficient array.
@@ -165,8 +165,8 @@ class TensorBasis(Basis):
 
     **Derivatives are multi-indices.** In more than one dimension "the
     derivative" is ambiguous, so ``deriv`` is a tuple giving the order in
-    each variable: ``(1, 0)`` is :math:`\\partial_x`, ``(1, 1)`` is
-    :math:`\\partial_x \\partial_y`. The scalar ``0`` is accepted as shorthand
+    each variable: ``(1, 0)`` is :math:`\partial_x`, ``(1, 1)`` is
+    :math:`\partial_x \partial_y`. The scalar ``0`` is accepted as shorthand
     for no derivative at all; any other integer is rejected.
 
     **Factors must be univariate.** Tensor products are associative, so

@@ -23,29 +23,35 @@ def _pointwise(u, v):
 
 @tree.struct
 class Function:
-    """A specific element of a :class:`FunctionSpace`:
+    r"""A specific element of a :class:`FunctionSpace`:
 
     .. math::
-        f(x) = \\sum_{i=1}^n c_i \\, \\phi_i(x)
+        f(x) = \sum_{i=1}^n c_i \, \phi_i(x)
 
     Only evaluation and the operations that are exact and stay in the same
     space are supported: addition and scalar multiplication with another
     ``Function`` on the same ``space``. A general product of two
-    ``Function``s is not yet supported, since the product of two finite basis
-    expansions isn't generally representable in the same finite space.
+    ``Function`` objects is not directly supported (see :meth:`multiply`),
+    since the product of two finite basis expansions isn't generally
+    representable in the same finite space.
 
-    ``Function`` is a struct with two fields: ``coefficients`` (the expansion
-    coefficients) and ``space`` (the :class:`FunctionSpace` that defines the
-    basis and domain). Since ``FunctionSpace`` is also a struct, the entire
-    Function can be symbolically traced, flattened, used in optimization problems, etc.
+    Parameters
+    ----------
+    coefficients : ndarray
+        Expansion coefficients, shape ``(n_basis,)`` for a scalar-valued
+        function or ``(n_basis, m)`` for one mapping to an ``m``-vector
+        (e.g. a trajectory ``[x(t), v(t)]``). Vector-valuedness lives
+        entirely here: a ``Basis`` evaluates to ``(npts, n_basis)``
+        regardless, so evaluating a ``Function`` gives ``(npts,)`` or
+        ``(npts, m)`` to match.
+    space : FunctionSpace
+        The space this function belongs to, defining its basis and domain.
 
-    **Vector-valued functions.** ``coefficients`` may have shape
-    ``(n_basis,)`` for a scalar-valued function or ``(n_basis, m)`` for one
-    mapping a scalar to an ``m``-vector -- a trajectory ``[x(t), v(t)]``,
-    say. Vector-valuedness lives entirely in the coefficients: a ``Basis``
-    evaluates to ``(npts, n_basis)`` regardless, so the ``space`` is
-    unchanged and the vector space :math:`V^m` is implied by the trailing
-    axis. Evaluating gives ``(npts,)`` or ``(npts, m)`` correspondingly.
+    Notes
+    -----
+    Since ``FunctionSpace`` is also a ``@struct``, a ``Function`` can be
+    symbolically traced, flattened, and used in optimization problems like
+    any other pytree.
     """
 
     coefficients: np.ndarray
@@ -54,17 +60,24 @@ class Function:
     def __call__(self, x, deriv: int = 0, side: str = RIGHT):
         """Evaluate this function (or its ``deriv``-th derivative) at ``x``.
 
-        Returns shape ``(npts,)`` or ``(npts, m)``, matching
-        ``coefficients``.
+        Parameters
+        ----------
+        x : array_like
+            Evaluation points, shape ``(npts,)``.
+        deriv : int, optional
+            Derivative order; a multi-index (one order per dimension) for a
+            multivariate space, a plain order otherwise. Default 0.
+        side : {"right", "left"}, optional
+            Which one-sided limit to take where this function is
+            two-valued -- e.g. at a breakpoint of a piecewise space.
+            Irrelevant where the basis is smooth, since the two limits then
+            coincide. A multivariate space takes one entry per dimension,
+            with a bare string broadcasting. Default ``"right"``.
 
-        ``side="left"``/``"right"`` selects which one-sided limit to take at
-        a point where this function is two-valued -- on a breakpoint of a
-        piecewise space, giving the values a discontinuous-Galerkin flux or
-        a gradient-jump error indicator is built from. It is accepted for
-        every space and irrelevant where the basis is smooth, since the two
-        limits then coincide. A :class:`TensorBasis` takes one entry per
-        dimension, with a bare string broadcasting. See
-        :meth:`Basis.evaluate`.
+        Returns
+        -------
+        ndarray
+            Shape ``(npts,)`` or ``(npts, m)``, matching ``coefficients``.
         """
         return self.space._evaluate(self.coefficients, x, deriv=deriv, side=side)
 
@@ -74,7 +87,7 @@ class Function:
         return Function(self.coefficients + other.coefficients, self.space)
 
     def __mul__(self, other) -> Function:
-        """Scalar multiple, or the pointwise product of two ``Function``s.
+        """Scalar multiple, or the pointwise product of two ``Function`` objects.
 
         A scalar multiple stays in the same space. A ``Function`` product
         does not -- see :meth:`multiply`.
@@ -86,7 +99,7 @@ class Function:
     __rmul__ = __mul__
 
     def multiply(self, other: Function, space: FunctionSpace | None = None) -> Function:
-        """Pointwise product :math:`(fg)(x) = f(x) \\, g(x)`.
+        r"""Pointwise product :math:`(fg)(x) = f(x) \, g(x)`.
 
         The product of two basis expansions does not lie in either operand's
         space, so the result is returned in a *larger* one, which for
@@ -103,8 +116,8 @@ class Function:
         Parameters
         ----------
         other : Function
-            The other factor. Must be on a compatible space; see
-            :meth:`FunctionSpace._product_space`.
+            The other factor. Must be on a compatible space (see
+            :class:`FunctionSpace`).
         space : FunctionSpace, optional
             Result space, overriding the automatic one. If it is too small
             to represent the product, the result is the projection of the
@@ -131,10 +144,7 @@ class Function:
 
         Exact, not an approximation: the result is returned in the smallest
         space that represents it, which for a polynomial family is *smaller*
-        than this one (differentiating lowers the degree). That mirrors
-        :meth:`multiply`, which returns the smallest space that is exact in
-        the other direction -- every closed operation here gives the
-        tightest exact space.
+        than this one (differentiating lowers the degree).
 
         Since the target is smaller, ``f + f.derivative()`` will not
         typecheck as-is; project one onto the other's space first, which is
@@ -146,7 +156,7 @@ class Function:
         deriv : int or tuple of int, optional
             Derivative order; a multi-index (one order per dimension) for a
             function of several variables, a plain order otherwise -- the
-            same convention as :meth:`__call__`. Default 1.
+            same convention as calling the function directly. Default 1.
         space : FunctionSpace, optional
             Result space, overriding the automatic one. A space too small to
             hold the derivative gives its projection rather than an error,
@@ -169,7 +179,7 @@ class Function:
         boundary: str = "left",
         space: FunctionSpace | None = None,
     ) -> Function:
-        """The ``order``-th antiderivative :math:`F^{(-\\mathrm{order})}`.
+        r"""The ``order``-th antiderivative :math:`F^{(-\mathrm{order})}`.
 
         Numerically exact, and the dual of :meth:`derivative`: the result is returned
         in the smallest space that represents it, which for a polynomial family is
@@ -179,9 +189,9 @@ class Function:
         :math:`F` (and, for ``order > 1``, its derivatives through order ``order - 1``)
         to vanish at that endpoint of the domain:
 
-            - ``"left"`` (the default) gives :math:`F(x) = \\int_a^x f(t)\\,dt`,
+            - ``"left"`` (the default) gives :math:`F(x) = \int_a^x f(t)\,dt`,
                 so :math:`F(a) = 0`
-            - ``"right"`` gives :math:`F(x) = \\int_b^x f(t)\\,dt = -\\int_x^b f(t)\\,dt`,
+            - ``"right"`` gives :math:`F(x) = \int_b^x f(t)\,dt = -\int_x^b f(t)\,dt`,
                 so :math:`F(b) = 0`
 
         The two differ by the whole-domain definite integral:
@@ -208,7 +218,7 @@ class Function:
         ------
         NotImplementedError
             If this function's space has no integral-space construction --
-            e.g. :class:`~archimedes.experimental.approximation.PiecewiseBasis`.
+            e.g. :class:`PiecewiseBasis`.
         ValueError
             If the domain has no finite endpoints to anchor at (Hermite,
             Laguerre), or if an explicit ``space`` is the wrong size.
@@ -221,7 +231,7 @@ class Function:
         )
 
     def integrate(self, a: float | None = None, b: float | None = None):
-        """Definite integral :math:`\\int_a^b f(x)\\,dx`.
+        r"""Definite integral :math:`\int_a^b f(x)\,dx`.
 
         Wherever :meth:`integral` is defined for this space, this is built directly
         on it: :math:`F(b) - F(a)`, exact to quadrature roundoff, for *any* ``a``,
@@ -265,13 +275,27 @@ class Function:
         return antideriv(np.array([hi]))[0] - antideriv(np.array([lo]))[0]
 
     def dot(self, other: Function, quad_rule: QuadratureRule | None = None):
-        """Inner product :math:`\\langle f, g \\rangle` with another
-        ``Function`` on the same ``space``. Unlike ``__mul__``, this is safe
-        for any pair of same-space ``Function``s -- the result is a
-        scalar, not another element of the space.
+        r"""Inner product :math:`\langle f, g \rangle` with another
+        ``Function`` on the same ``space``.
 
-        For vector-valued coefficients the integrand is contracted over
-        components, so the result is a scalar.
+        Unlike ``__mul__``, this is well-defined for any pair of same-space
+        ``Function`` objects: the result is a scalar, not another element of
+        the space, so there is no larger result space to resolve.
+
+        Parameters
+        ----------
+        other : Function
+            The other operand, on the same space as this function.
+        quad_rule : QuadratureRule, optional
+            Quadrature rule to approximate the integral with. Default
+            ``self.space.quad_rule``.
+
+        Returns
+        -------
+        float
+            The inner product. For vector-valued coefficients the
+            integrand is contracted over components, so the result is
+            always a scalar.
         """
         if not self.space._is_compatible_with(other.space):
             raise ValueError(
@@ -282,5 +306,5 @@ class Function:
         )
 
     def norm(self, quad_rule: QuadratureRule | None = None):
-        """:math:`\\lVert f \\rVert = \\sqrt{\\langle f, f \\rangle}`."""
+        r""":math:`\lVert f \rVert = \sqrt{\langle f, f \rangle}`; see :meth:`dot`."""
         return np.sqrt(self.dot(self, quad_rule))

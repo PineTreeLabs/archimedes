@@ -32,28 +32,30 @@ class BasisMatrix:
     r"""A basis evaluated at a fixed set of quadrature nodes, bundled with
     the matching weights so the two can never be supplied out of sync.
 
-    ``Phi[n, i]`` is the ``deriv``-th derivative of basis function ``i`` at
-    node ``n`` -- see :meth:`FunctionSpace.basis_matrix`, which builds one.
-    ``Phi`` maps coefficients to sampled values, :math:`\Phi c = \phi \cdot c`.
-
-    ``Phi.T`` is the adjoint of ``Phi`` under the Euclidean inner product on
-    coefficients and the weighted one on sampled values:
-    :math:`\langle \Phi c, r\rangle_w = \langle c, \Phi^\top r\rangle`, so
-    :math:`\Phi^\top r = \phi^\top (w \odot r)`. That makes the Galerkin
-    projection equation read almost like the math it's approximating:
-    ``M = phi.T @ phi`` is the Gram matrix :math:`\Phi^\top\Phi`
-    (the mass matrix), and ``phi.T @ f(x)`` is the load vector
-    :math:`\Phi^\top f` -- see :meth:`FunctionSpace.project`.
+    ``matrix[n, i]`` is the ``deriv``-th derivative of basis function ``i``
+    at node ``n``; see :meth:`FunctionSpace.basis_matrix`, which builds one.
 
     Parameters
     ----------
     matrix : ndarray
-        The design matrix ``Phi``, shape ``(npts, n_basis)``.
+        The design matrix :math:`\Phi`, shape ``(npts, n_basis)``. Maps
+        coefficients to sampled values, :math:`\Phi c = \phi \cdot c`.
     weights : ndarray
         Quadrature weights matching ``matrix``'s node axis, shape
         ``(npts,)``.
     nodes : ndarray
         Points ``matrix``'s rows were evaluated at, shape ``(npts,)``.
+
+    Notes
+    -----
+    ``.T`` gives the adjoint of :math:`\Phi` under the Euclidean inner
+    product on coefficients and the weighted inner product on sampled
+    values: :math:`\langle \Phi c, r\rangle_w = \langle c, \Phi^\top
+    r\rangle`, so :math:`\Phi^\top r = \phi^\top (w \odot r)`. This makes a
+    Galerkin projection read almost like the math it approximates:
+    ``phi.T @ phi`` is the Gram (mass) matrix :math:`\Phi^\top\Phi`, and
+    ``phi.T @ f(x)`` is the load vector :math:`\Phi^\top f` -- see
+    :meth:`FunctionSpace.project`.
     """
 
     matrix: np.ndarray
@@ -116,17 +118,16 @@ def _check_side(side: str) -> str:
 
 
 class Basis(metaclass=abc.ABCMeta):
-    """A finite family of basis functions :math:`\\{\\phi_i\\}_{i=1}^n`.
+    r"""A finite family of basis functions :math:`\{\phi_i\}_{i=1}^n`.
 
     Concrete subclasses implement one basis family each (Legendre, Lagrange,
-    ...). Unlike :class:`archimedes.measure.Measure`, which represents an
-    infinite family with no notion of size, a ``Basis`` always has a fixed
-    ``n_basis``.
+    ...), always with a fixed ``n_basis``.
 
     ``Basis`` only evaluates -- it has no notion of a coefficient vector or
     a fixed target domain. See :class:`FunctionSpace`, which combines a
-    ``Basis`` with a domain and quadrature-based operations, and :class:`Function`,
-    which further combines a ``FunctionSpace`` with coefficients.
+    ``Basis`` with a domain and quadrature-based operations, and
+    :class:`Function`, which further combines a ``FunctionSpace`` with
+    coefficients.
     """
 
     ndim: int = 1
@@ -316,7 +317,7 @@ class Basis(metaclass=abc.ABCMeta):
         The result is usually, but not necessarily, in the the *same family*
         at a lower order. A family whose degrees of freedom are not all the
         same *kind* of quantity (e.g.
-        :class:`~archimedes.experimental.approximation.CubicHermiteBasis`,
+        :class:`CubicHermiteBasis`,
         whose coefficients are a mix of values and physical derivatives) may
         have no derivative-space construction *of its own kind*: the
         derivative of a cubic Hermite element is a plain polynomial with no
@@ -353,10 +354,10 @@ class Basis(metaclass=abc.ABCMeta):
         -----
         Not every family has one, even though a derivative basis is more
         often definable: a family whose degrees of freedom mix different
-        *kinds* of quantity (e.g. :class:`~archimedes.experimental.approximation.CubicHermiteBasis`,
+        *kinds* of quantity (e.g. :class:`CubicHermiteBasis`,
         value and physical-derivative DOFs) has no larger member of its own
         kind to grow into, unlike a plain polynomial family, which always
-        does. :class:`~archimedes.experimental.approximation.PiecewiseBasis`
+        does. :class:`PiecewiseBasis`
         raises for a different reason: an exact piecewise antiderivative
         needs a running constant carried across elements, which is a
         different (not yet implemented) construction from anything here.
@@ -386,7 +387,7 @@ class Basis(metaclass=abc.ABCMeta):
         *per-column* power of ``scale`` rather than one factor for the whole
         matrix. A family whose coefficients are not all the same *kind* of
         quantity --
-        :class:`~archimedes.experimental.approximation.CubicHermiteBasis`
+        :class:`CubicHermiteBasis`
         is the first example, whose odd-indexed coefficients are physical
         derivatives rather than values -- overrides this so that
         :meth:`evaluate` can apply ``scale ** (dof_order - deriv)`` per column.
@@ -421,21 +422,32 @@ class Basis(metaclass=abc.ABCMeta):
         return 0.0
 
     def boundary_dofs(self, order: int = 0) -> tuple[int | None, int | None]:
-        """Indices of the degrees of freedom that *are* the ``order``-th
-        derivative at the left and right ends of the domain, or ``None``
-        where there is no such DOF.
+        r"""Indices of the degrees of freedom that *are* the ``order``-th
+        derivative at the left and right ends of the domain.
 
+        Parameters
+        ----------
+        order : int, optional
+            Derivative order to look up. Default 0 (the endpoint value).
+
+        Returns
+        -------
+        left, right : int or None
+            Index into this basis's functions, or ``None`` where there is
+            no degree of freedom of that order at that end.
+
+        Notes
+        -----
         Only meaningful for nodal families: a Lagrange basis whose nodes
-        include both endpoints has :math:`\\ell_i(x_{\\mathrm{left}}) =
-        \\delta_{i,\\mathrm{left}}`, so coefficient ``left`` is exactly the
+        include both endpoints has :math:`\ell_i(x_{\mathrm{left}}) =
+        \delta_{i,\mathrm{left}}`, so coefficient ``left`` is exactly the
         endpoint value (``order=0``). A modal family (e.g.
         :class:`OrthogonalPolynomialBasis`) has no such DOF -- its endpoint
         value is a combination of every coefficient -- and neither does a
         nodal basis whose nodes are all interior (Gauss-Legendre points).
         ``order=1`` asks instead for the DOF that *is* the physical first
         derivative at that endpoint -- meaningful only for a family with
-        derivative-type degrees of freedom, e.g.
-        :class:`~archimedes.experimental.approximation.CubicHermiteBasis`.
+        derivative-type degrees of freedom, e.g. :class:`CubicHermiteBasis`.
 
         Used by :class:`PiecewiseBasis` to impose continuity by identifying
         adjacent elements' endpoint DOFs, one ``order`` at a time up to its

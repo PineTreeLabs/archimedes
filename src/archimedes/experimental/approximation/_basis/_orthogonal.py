@@ -15,46 +15,28 @@ __all__ = ["OrthogonalPolynomialBasis"]
 
 @dataclasses.dataclass(frozen=True)
 class OrthogonalPolynomialBasis(Basis):
-    """Orthonormal polynomials :math:`\\{p_0, p_1, \\ldots, p_{n-1}\\}` for
+    r"""Orthonormal polynomials :math:`\{p_0, p_1, \ldots, p_{n-1}\}` for
     ``measure``, built entirely from ``measure.recurrence_coeffs``.
 
     The monic polynomials orthogonal w.r.t. any :class:`~archimedes.measure.Measure`
     satisfy the three-term recurrence
 
     .. math::
-        \\pi_{k+1}(x) = (x - \\alpha_k) \\, \\pi_k(x) - \\beta_k \\, \\pi_{k-1}(x)
+        \pi_{k+1}(x) = (x - \alpha_k) \, \pi_k(x) - \beta_k \, \pi_{k-1}(x)
 
-    Differentiating this recurrence ``deriv`` times (the :math:`\\alpha_k`,
-    :math:`\\beta_k` are constants in :math:`x`) gives a recurrence for
-    :math:`\\pi_k^{(m)}` for every :math:`m \\leq` ``deriv`` simultaneously:
-
-    .. math::
-        \\pi_{k+1}^{(m)}(x) = m \\, \\pi_k^{(m-1)}(x) + (x - \\alpha_k) \\,
-            \\pi_k^{(m)}(x) - \\beta_k \\, \\pi_{k-1}^{(m)}(x)
-
-    and the squared norm :math:`\\int \\pi_k^2 \\, w \\, dx = \\beta_0 \\beta_1
-    \\cdots \\beta_k` (with :math:`\\beta_0` = the total mass) is a cumulative
-    product of the same coefficients. All of this holds for *any* classical
-    orthogonal polynomial family.
+    which holds for *any* classical orthogonal polynomial family, and gives
+    a squared norm :math:`\int \pi_k^2 \, w \, dx = \beta_0 \beta_1 \cdots
+    \beta_k` (with :math:`\beta_0` = the total mass) as a cumulative product
+    of the same coefficients.
 
     Basis functions are the resulting *orthonormal* polynomials
-    :math:`p_k = \\pi_k / \\sqrt{\\beta_0 \\cdots \\beta_k}`. This is one of
-    only two normalizations derivable from ``(alpha, beta)`` alone (the
-    other being the monic polynomials themselves); "classical" normalizations
-    like ``scipy.special.eval_legendre``'s (:math:`P_n(1) = 1`) are
-    family-specific conventions with no generic definition. Orthonormal is
-    preferred over monic here because monic polynomials shrink rapidly with
-    degree (on ``[-1, 1]``, degree-30 monic Legendre is O(1e-8)), which is a
-    real conditioning problem at higher degree; orthonormal polynomials stay
-    O(1) by construction.
-
-    Target-domain evaluation maps ``measure.recurrence_coeffs``' *reference*
-    coefficients via the same ``(scale, shift) = measure.affine_params(...)``
-    used by ``archimedes.quadrature``: :math:`\\alpha' = \\mathrm{scale}
-    \\cdot \\alpha + \\mathrm{shift}`, :math:`\\beta' = \\mathrm{scale}^2 \\cdot
-    \\beta` except :math:`\\beta_0' = \\mathrm{measure.mass}(\\ldots)`
-    (the total mass on the target domain/measure) -- so the resulting basis
-    is orthonormal on the *target* domain, not just the reference one.
+    :math:`p_k = \pi_k / \sqrt{\beta_0 \cdots \beta_k}`, preferred over the
+    monic ones because monic polynomials shrink rapidly with degree (on
+    :math:`[-1, 1]`, degree-30 monic Legendre is :math:`O(10^{-8})`), a real
+    conditioning problem at higher degree, whereas orthonormal polynomials
+    stay :math:`O(1)` by construction. Note this differs from "classical"
+    normalizations such as ``scipy.special.eval_legendre``'s
+    (:math:`P_n(1) = 1`), which are family-specific conventions.
 
     Parameters
     ----------
@@ -67,7 +49,25 @@ class OrthogonalPolynomialBasis(Basis):
         If ``True``, normalize against the *probability* density
         ``measure.weight / measure.mass(...)`` instead of the raw weight --
         i.e. use ``beta_0' = 1`` in place of ``beta_0' = mass(...)`` in the
-        norm below. See :attr:`Basis.density`. Default ``False``.
+        norm above. See :attr:`Basis.density`. Default ``False``.
+
+    Notes
+    -----
+    Differentiating the recurrence ``deriv`` times (the :math:`\alpha_k`,
+    :math:`\beta_k` are constants in :math:`x`) gives a recurrence for
+    :math:`\pi_k^{(m)}` for every :math:`m \leq` ``deriv`` simultaneously:
+
+    .. math::
+        \pi_{k+1}^{(m)}(x) = m \, \pi_k^{(m-1)}(x) + (x - \alpha_k) \,
+            \pi_k^{(m)}(x) - \beta_k \, \pi_{k-1}^{(m)}(x)
+
+    Target-domain evaluation maps ``measure.recurrence_coeffs``' *reference*
+    coefficients via the same ``(scale, shift) = measure.affine_params(...)``
+    used by ``archimedes.quadrature``: :math:`\alpha' = \mathrm{scale}
+    \cdot \alpha + \mathrm{shift}`, :math:`\beta' = \mathrm{scale}^2 \cdot
+    \beta` except :math:`\beta_0' = \mathrm{measure.mass}(\ldots)` (the
+    total mass on the target domain/measure) -- so the resulting basis is
+    orthonormal on the *target* domain, not just the reference one.
     """
 
     measure: Measure
@@ -99,10 +99,10 @@ class OrthogonalPolynomialBasis(Basis):
         return 0.0 if self.density else 0.5
 
     def default_quadrature(self):
-        """Gauss rule of ``n_basis`` points for this basis's own measure.
+        r"""Gauss rule of ``n_basis`` points for this basis's own measure.
 
         A rule of :math:`n` Gauss points is exact to degree :math:`2n - 1`,
-        which covers the degree-:math:`2(n_\\mathrm{basis} - 1)` mass-matrix
+        which covers the degree-:math:`2(n_\mathrm{basis} - 1)` mass-matrix
         integrand (and the lower-degree stiffness one).
         """
         from archimedes.quadrature import golub_welsch_rule
@@ -136,12 +136,12 @@ class OrthogonalPolynomialBasis(Basis):
         )
 
     def _derivative_basis(self, deriv=1):
-        """Same measure and normalization, ``n_basis - deriv`` functions.
+        r"""Same measure and normalization, ``n_basis - deriv`` functions.
 
         The measure is unchanged even for families whose classical
         derivative identity shifts it (Jacobi's
-        :math:`\\frac{d}{dx} P_n^{(\\alpha,\\beta)} \\propto
-        P_{n-1}^{(\\alpha+1,\\beta+1)}`). That identity says the derivative
+        :math:`\frac{d}{dx} P_n^{(\alpha,\beta)} \propto
+        P_{n-1}^{(\alpha+1,\beta+1)}`). That identity says the derivative
         is a *single term* in the shifted family -- a sparsity statement --
         but the span here is all of :math:`P_{n-1}` regardless of which
         weight makes the basis orthogonal, so the derivative is exactly
