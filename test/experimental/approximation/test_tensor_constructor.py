@@ -7,7 +7,7 @@ import numpy as np
 import pytest
 
 from archimedes.experimental.approximation import FunctionSpace
-from archimedes.experimental.approximation._tensor_basis import (
+from archimedes.experimental.approximation._basis._tensor import (
     ProductParameters,
     TensorBasis,
 )

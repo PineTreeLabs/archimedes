@@ -10,7 +10,7 @@ import numpy as np
 from archimedes import tree
 from archimedes.measure import Measure, ReferenceDomain
 
-from ._basis import RIGHT, Basis, _check_side
+from ._base import RIGHT, Basis, _check_side
 
 __all__ = ["ProductParameters", "TensorBasis"]
 

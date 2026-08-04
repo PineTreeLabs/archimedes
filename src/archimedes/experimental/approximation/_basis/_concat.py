@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
-from ._basis import RIGHT, Basis, _check_side
+from ._base import RIGHT, Basis, _check_side
 
 if TYPE_CHECKING:
     from archimedes.quadrature import Quadrature

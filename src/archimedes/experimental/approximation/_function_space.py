@@ -20,13 +20,18 @@ from archimedes.measure import (
 )
 from archimedes.quadrature import Quadrature
 
-from ._basis import RIGHT, Basis, BasisMatrix
-from ._fourier import FourierBasis
-from ._hermite import CubicHermiteBasis
-from ._lagrange import LagrangeBasis
-from ._orthogonal import OrthogonalPolynomialBasis
-from ._piecewise import PiecewiseBasis
-from ._tensor_basis import ProductParameters, TensorBasis
+from ._basis import (
+    RIGHT,
+    Basis,
+    BasisMatrix,
+    CubicHermiteBasis,
+    FourierBasis,
+    LagrangeBasis,
+    OrthogonalPolynomialBasis,
+    PiecewiseBasis,
+    ProductParameters,
+    TensorBasis,
+)
 
 if TYPE_CHECKING:
     from ._function import Function

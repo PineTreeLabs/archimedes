@@ -10,7 +10,7 @@ import numpy as np
 from archimedes._core._array_impl import SymbolicArray, _unwrap_sym_array
 from archimedes.measure import UnitInterval
 
-from ._basis import RIGHT, Basis, _check_side
+from ._base import RIGHT, Basis, _check_side
 
 __all__ = ["PiecewiseBasis"]
 

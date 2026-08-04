@@ -22,16 +22,21 @@ vertex + bubble functions). Composing the two covers the common custom-basis
 recipes without a dedicated class per recipe.
 """
 
-from ._basis import Basis, BasisMatrix
-from ._concat import ConcatBasis
-from ._constrained import ConstrainedBasis
-from ._fourier import FourierBasis
-from ._function import Function, FunctionSpace
-from ._hermite import CubicHermiteBasis
-from ._lagrange import LagrangeBasis
-from ._orthogonal import OrthogonalPolynomialBasis
-from ._piecewise import PiecewiseBasis
-from ._tensor_basis import ProductParameters, TensorBasis
+from ._basis import (
+    Basis,
+    BasisMatrix,
+    ConcatBasis,
+    ConstrainedBasis,
+    CubicHermiteBasis,
+    FourierBasis,
+    LagrangeBasis,
+    OrthogonalPolynomialBasis,
+    PiecewiseBasis,
+    ProductParameters,
+    TensorBasis,
+)
+from ._function import Function
+from ._function_space import FunctionSpace
 
 __all__ = [
     "Basis",

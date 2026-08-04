@@ -9,7 +9,7 @@ import numpy as np
 
 from archimedes.measure import UnitInterval
 
-from ._basis import RIGHT, Basis, _check_side
+from ._base import RIGHT, Basis, _check_side
 
 __all__ = ["LagrangeBasis"]
 

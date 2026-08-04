@@ -9,7 +9,7 @@ import numpy as np
 
 from archimedes.measure import LegendreMeasure, UnitInterval
 
-from ._basis import RIGHT, Basis, _check_side
+from ._base import RIGHT, Basis, _check_side
 
 __all__ = ["FourierBasis"]
 
@@ -170,8 +170,7 @@ class FourierBasis(Basis):
         return FourierBasis(n_basis, kind=kind, density=self.density)
 
     def _derivative_basis(self, deriv=1):
-        """Cycles by ``deriv mod 2``.
-        """
+        """Cycles by ``deriv mod 2``."""
         if deriv < 0:
             raise ValueError(f"deriv must be >= 0, got {deriv}")
         if self.kind == "full" or deriv % 2 == 0:
