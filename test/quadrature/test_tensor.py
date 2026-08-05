@@ -33,7 +33,7 @@ def _gl(n):
 
 
 def _gh(n):
-    return gauss_hermite(n, kind="prob")
+    return gauss_hermite(n)
 
 
 # -- structure --
@@ -225,11 +225,11 @@ def test_all_parameter_forms_agree():
     as_params = rule.scaled_points(
         dims=[
             UnitInterval.Parameters(a=0.0, b=2.0),
-            RealLine.Parameters(mean=1.0, std=0.5),
+            RealLine.Parameters(loc=1.0, scale=0.5),
         ]
     )
     as_dicts = rule.scaled_points(
-        dims=[{"a": 0.0, "b": 2.0}, {"mean": 1.0, "std": 0.5}]
+        dims=[{"a": 0.0, "b": 2.0}, {"loc": 1.0, "scale": 0.5}]
     )
     positional = rule.scaled_points([(0.0, 2.0), (1.0, 0.5)])
     np.testing.assert_allclose(as_params, as_tuples)

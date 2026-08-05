@@ -187,7 +187,7 @@ class FunctionSpace:
         Target-domain parameters, validated and typed per ``basis`` -- an
         instance of ``basis.Parameters`` (e.g.
         ``UnitInterval.Parameters(a=..., b=...)`` for a basis on an
-        interval, ``RealLine.Parameters(mean=..., std=...)`` for a
+        interval, ``RealLine.Parameters(loc=..., scale=...)`` for a
         Hermite-derived one). A pytree leaf, so it may be traced.
     quad_rule : QuadratureRule, optional
         The space's natural quadrature rule, used unconditionally wherever
@@ -360,9 +360,9 @@ class FunctionSpace:
     def hermite(
         cls,
         n_basis: int,
-        mean: float = 0.0,
-        std: float = 1.0,
-        kind: Literal["phys", "prob"] = "phys",
+        loc: float = 0.0,
+        scale: float = 1.0,
+        kind: Literal["phys", "prob"] = "prob",
         density: bool = False,
         quad_rule: Quadrature | None = None,
     ) -> FunctionSpace:
@@ -370,12 +370,12 @@ class FunctionSpace:
 
         ``kind`` selects which classical Hermite convention:
 
-        - ``"phys"`` (default): the *physicists'* convention, reference
-          weight :math:`e^{-x^2}`
-          (:class:`~archimedes.measure.PhysicistsHermiteMeasure`).
-        - ``"prob"``: the *probabilists'* convention, reference weight
-          :math:`e^{-x^2/2}` (:class:`~archimedes.measure.ProbabilistsHermiteMeasure`),
-          the *un-normalized* standard normal density.
+        - ``"prob"`` (default): the *probabilists'* convention, reference
+          weight :math:`e^{-x^2/2}`
+          (:class:`~archimedes.measure.ProbabilistsHermiteMeasure`), the
+          *un-normalized* standard normal density.
+        - ``"phys"``: the *physicists'* convention, reference weight
+          :math:`e^{-x^2}` (:class:`~archimedes.measure.PhysicistsHermiteMeasure`).
 
         Neither weight integrates to 1 on its own for either ``kind``; for normalized
         (e.g. probability density models, polynomial chaos expansions), set
@@ -385,11 +385,11 @@ class FunctionSpace:
         ----------
         n_basis : int
             Number of basis functions.
-        mean, std : float, optional
+        loc, scale : float, optional
             Location/scale of the target domain; see
             :class:`~archimedes.measure.RealLine`. Default ``0``, ``1``.
         kind : {"phys", "prob"}, optional
-            Classical Hermite convention, as above. Default ``"phys"``.
+            Classical Hermite convention, as above. Default ``"prob"``.
         density : bool, optional
             Normalize against the probability density rather than the raw
             weight; see :attr:`Basis.density`. Default ``False``.
@@ -411,7 +411,7 @@ class FunctionSpace:
             cls,
             measure,
             n_basis,
-            RealLine.Parameters(mean=mean, std=std),
+            RealLine.Parameters(loc=loc, scale=scale),
             density,
             quad_rule,
         )

@@ -16,7 +16,7 @@ from archimedes.quadrature import gauss_legendre, tensor_quad
 
 def test_matches_manual_tensor_basis_construction():
     space_1 = FunctionSpace.legendre(4, a=-1.0, b=1.0)
-    space_2 = FunctionSpace.hermite(3, mean=0.0, std=2.0, kind="prob")
+    space_2 = FunctionSpace.hermite(3, loc=0.0, scale=2.0, kind="prob")
 
     sugar = FunctionSpace.tensor(space_1, space_2)
     manual = FunctionSpace(
@@ -69,8 +69,8 @@ def test_quad_rule_forwarded():
 
 
 def test_project_matches_manual_construction_for_a_separable_function():
-    space_1 = FunctionSpace.hermite(4, mean=0.0, std=1.0, kind="prob", density=True)
-    space_2 = FunctionSpace.hermite(4, mean=0.0, std=2.0, kind="prob", density=True)
+    space_1 = FunctionSpace.hermite(4, loc=0.0, scale=1.0, kind="prob", density=True)
+    space_2 = FunctionSpace.hermite(4, loc=0.0, scale=2.0, kind="prob", density=True)
 
     sugar = FunctionSpace.tensor(space_1, space_2)
     manual = FunctionSpace(

@@ -87,7 +87,7 @@ class OrthogonalPolynomialBasis(Basis):
     def Parameters(self) -> type:  # noqa: N802
         """Delegates to the measure's ``ReferenceDomain`` -- ``a``/``b`` for
         a :class:`~archimedes.measure.UnitInterval` (Legendre/Jacobi),
-        ``mean``/``std`` for :class:`~archimedes.measure.RealLine`
+        ``loc``/``scale`` for :class:`~archimedes.measure.RealLine`
         (Hermite), ``rate``/``start`` for
         :class:`~archimedes.measure.HalfLine` (Laguerre)."""
         return type(self.measure.domain).Parameters

@@ -52,19 +52,19 @@ def test_jacobi_forwards_alpha_beta_and_domain():
     assert sugar.n_basis == 5
 
 
-def test_hermite_defaults_to_physicists_measure():
-    sugar = FunctionSpace.hermite(4, mean=1.0, std=2.0)
-    assert isinstance(sugar.basis.measure, PhysicistsHermiteMeasure)
-    assert sugar.domain == RealLine.Parameters(mean=1.0, std=2.0)
-
-
-def test_hermite_kind_phys_is_explicit_default():
-    assert FunctionSpace.hermite(4, kind="phys") == FunctionSpace.hermite(4)
-
-
-def test_hermite_kind_prob_uses_probabilists_measure():
-    sugar = FunctionSpace.hermite(4, kind="prob")
+def test_hermite_defaults_to_probabilists_measure():
+    sugar = FunctionSpace.hermite(4, loc=1.0, scale=2.0)
     assert isinstance(sugar.basis.measure, ProbabilistsHermiteMeasure)
+    assert sugar.domain == RealLine.Parameters(loc=1.0, scale=2.0)
+
+
+def test_hermite_kind_prob_is_explicit_default():
+    assert FunctionSpace.hermite(4, kind="prob") == FunctionSpace.hermite(4)
+
+
+def test_hermite_kind_phys_uses_physicists_measure():
+    sugar = FunctionSpace.hermite(4, kind="phys")
+    assert isinstance(sugar.basis.measure, PhysicistsHermiteMeasure)
 
 
 def test_hermite_rejects_unknown_kind():

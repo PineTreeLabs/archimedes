@@ -271,7 +271,7 @@ class QuadratureRule:
         - Legendre/Jacobi: ``(a, b)`` bounds of the target interval.
         - Laguerre: ``rate`` (and optional ``start``) of the target
           exponential weight.
-        - Hermite: ``mean``, ``std`` of the target Gaussian-shaped weight.
+        - Hermite: ``loc``, ``scale`` of the target Gaussian-shaped weight.
 
         See the measure's ``affine_params`` docstring for details. Symbolic
         if any parameter is symbolic; the underlying nodes are static.

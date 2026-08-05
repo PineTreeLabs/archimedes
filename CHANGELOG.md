@@ -6,6 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 In particular, the API is still evolving and may change between minor versions, although we'll aim to document such changes here.
 
 ## [Unreleased]
+- Add support for `scipy.special.erf/erfinv` as dispatch-supported ufuncs
 - Add support for Gaussian quadrature in `archimedes.quadrature`
 - Added `Measure` classes in `archimedes.measure`, including discretized Stieltjes procedure
 - Added `archimedes.experimental.approximation`: `Basis`/`FunctionSpace`/`Function` for linear basis expansions, with orthogonal polynomial, Lagrange, piecewise (C⁻¹/C⁰), and tensor-product (multivariate) bases

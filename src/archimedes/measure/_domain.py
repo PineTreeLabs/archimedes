@@ -23,7 +23,7 @@ class ReferenceDomain(metaclass=abc.ABCMeta):
 
     Concrete subclasses fix a reference support and define the
     family-specific parameters that map it onto a target domain --
-    ``a``/``b`` bounds for :class:`UnitInterval`, ``mean``/``std`` for
+    ``a``/``b`` bounds for :class:`UnitInterval`, ``loc``/``scale`` for
     :class:`RealLine`, ``rate``/``start`` for :class:`HalfLine`.
 
     Instances carry no state; they exist so that a ``Measure`` or a
@@ -204,24 +204,22 @@ class RealLine(ReferenceDomain):
     class Parameters(ReferenceDomain.Parameters):
         """Location/scale of the target domain; see ``affine_params``."""
 
-        mean: float = 0.0
-        std: float = 1.0
+        loc: float = 0.0
+        scale: float = 1.0
 
         def __post_init__(self):
-            if isinstance(self.std, float) and self.std <= 0:
-                raise ValueError(f"std must be positive, got {self.std}")
+            if isinstance(self.scale, float) and self.scale <= 0:
+                raise ValueError(f"scale must be positive, got {self.scale}")
 
     @property
     def support(self) -> tuple[float, float]:
         """Support :math:`(-\\infty, \\infty)`."""
         return (-np.inf, np.inf)
 
-    def affine_params(self, mean=None, std=None) -> tuple[float, float]:
-        """Location-scale map :math:`x = \\mathrm{mean} + \\mathrm{std}
-        \\cdot t`, so :math:`\\mathrm{scale} = \\mathrm{std}` and
-        :math:`\\mathrm{shift} = \\mathrm{mean}`.
+    def affine_params(self, loc=None, scale=None) -> tuple[float, float]:
+        """Location-scale map :math:`x = \\mathrm{loc} + \\mathrm{scale} \\cdot t`.
 
-        Note that the meaning of ``std`` depends on the *weight* paired
+        Note that the meaning of ``scale`` depends on the *weight* paired
         with this domain, not on the domain itself: for the physicists'
         Hermite weight :math:`e^{-t^2}` it is :math:`\\sqrt{2}` times the
         standard deviation of the corresponding Gaussian density, while
@@ -230,9 +228,9 @@ class RealLine(ReferenceDomain):
 
         Parameters
         ----------
-        mean : float, optional
+        loc : float, optional
             Location of the target domain. Default 0.
-        std : float, optional
+        scale : float, optional
             Scale of the target domain. Default 1.
 
         Returns
@@ -243,12 +241,12 @@ class RealLine(ReferenceDomain):
         Raises
         ------
         ValueError
-            If ``std`` is not positive.
+            If ``scale`` is not positive.
         """
         kwargs = {}
-        if mean is not None:
-            kwargs["mean"] = mean
-        if std is not None:
-            kwargs["std"] = std
+        if loc is not None:
+            kwargs["loc"] = loc
+        if scale is not None:
+            kwargs["scale"] = scale
         params = self.Parameters(**kwargs)
-        return params.std, params.mean
+        return params.scale, params.loc

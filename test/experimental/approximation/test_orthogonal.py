@@ -88,14 +88,14 @@ def test_density_orthonormal_against_probability_measure():
     # With density=True, integrating phi_i * phi_j against density-normalized
     # (mass-1) quadrature weights should give the identity, same as the
     # raw-weight case gives for density=False.
-    mean, std = 1.5, 2.0
+    loc, scale = 1.5, 2.0
     basis = OrthogonalPolynomialBasis(
         ProbabilistsHermiteMeasure(), n_basis=5, density=True
     )
     rule = gauss_hermite(15, kind="prob")
-    x = rule.scaled_points(mean, std)
-    w = rule.scaled_weights(mean, std, density=True)
-    phi = basis.evaluate(x, mean=mean, std=std)
+    x = rule.scaled_points(loc, scale)
+    w = rule.scaled_weights(loc, scale, density=True)
+    phi = basis.evaluate(x, loc=loc, scale=scale)
     M = phi.T @ (w[:, None] * phi)
     np.testing.assert_allclose(M, np.eye(5), atol=1e-8)
 
@@ -104,15 +104,15 @@ def test_density_rescales_by_sqrt_mass_relative_to_raw():
     # Only norm[0] (beta_0) differs between the two conventions -- 1 instead
     # of measure.mass(...) -- so phi_density = phi_raw * sqrt(mass) exactly,
     # for every degree.
-    mean, std = 0.0, 3.0
+    loc, scale = 0.0, 3.0
     raw = OrthogonalPolynomialBasis(ProbabilistsHermiteMeasure(), n_basis=4)
     density = OrthogonalPolynomialBasis(
         ProbabilistsHermiteMeasure(), n_basis=4, density=True
     )
     x = np.linspace(-5, 5, 11)
-    phi_raw = raw.evaluate(x, mean=mean, std=std)
-    phi_density = density.evaluate(x, mean=mean, std=std)
-    mass = ProbabilistsHermiteMeasure().mass(mean=mean, std=std)
+    phi_raw = raw.evaluate(x, loc=loc, scale=scale)
+    phi_density = density.evaluate(x, loc=loc, scale=scale)
+    mass = ProbabilistsHermiteMeasure().mass(loc=loc, scale=scale)
     np.testing.assert_allclose(phi_density, phi_raw * np.sqrt(mass), atol=1e-10)
 
 

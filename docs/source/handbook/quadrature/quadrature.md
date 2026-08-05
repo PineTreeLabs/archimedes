@@ -222,8 +222,8 @@ Available options are:
 | Gauss-Lobatto | `gauss_lobatto(n)` | $1$ | $[-1, 1]$ | Fixes both endpoints |
 | Clenshaw-Curtis | `clenshaw_curtis(n)` | $1$ | $[-1, 1]$ | Chebyshev-Lobatto nodes |
 | Gauss-Jacobi | `gauss_jacobi(n, alpha, beta)` | $(1-x)^\alpha(1+x)^\beta$ | $[-1, 1]$ | Legendre/Chebyshev are special cases |
+| Gauss-Hermite (probabilists') | `gauss_hermite(n, kind="prob")` |$e^{-x^2/2}$ | $(-\infty, \infty)$ | Default `kind` |
 | Gauss-Hermite (physicists') | `gauss_hermite(n, kind="phys")` | $e^{-x^2}$ | $(-\infty, \infty)$ |   |
-| Gauss-Hermite (probabilists') | `gauss_hermite(n, kind="prob")` |$e^{-x^2/2}$ | $(-\infty, \infty)$ |   |
 | Gauss-Laguerre | `gauss_laguerre(n)` | $e^{-x}$ | $[0, \infty)$ |   |
 
 <!-- TODO: Add "decision rules" -->
@@ -247,7 +247,7 @@ quad_rule.sum(fp, **kwparams)
 ```
 
 The `**kwparams` define the domain and weight transformation.
-For instance, `quad_rule.integrate(f, a=a, b=b)` for Gauss-Legendre (or Radau, Lobatto, Jacobi, or Clenshaw-Curtis) will transform the domain to $(a, b)$, while `quad_rule.integrate(f, mean=mu, std=sigma)` for Gauss-Hermite on an infinite domain will shift/scale the Gaussian weight function.
+For instance, `quad_rule.integrate(f, a=a, b=b)` for Gauss-Legendre (or Radau, Lobatto, Jacobi, or Clenshaw-Curtis) will transform the domain to $(a, b)$, while `quad_rule.integrate(f, loc=mu, scale=sigma)` for Gauss-Hermite on an infinite domain will shift/scale the Gaussian weight function.
 
 ```python
 n = 6
@@ -346,8 +346,8 @@ def f(x):
 mu = 2.0
 sigma = 1.5
 
-quad_rule = arc.quadrature.gauss_hermite(n=20, kind="prob")
-J = quad_rule.integrate(f, mean=mu, std=sigma, density=True)
+quad_rule = arc.quadrature.gauss_hermite(n=20)  # kind="prob" is the default
+J = quad_rule.integrate(f, loc=mu, scale=sigma, density=True)
 
 print(f"Exact value: {mu**2 + sigma**2:.6f}")
 print(f"Quadrature value: {J:.6f}")
@@ -358,9 +358,11 @@ This avoids needing to remember to manually divide out the sum of the weights to
 A related difference in Archimedes is doing away with the NumPy/SciPy convention of naming the physicists' Hermite polynomials (weight function $e^{-x^2}$) plain `Hermite` and the probabilists' Hermite polynomials (weight function $e^{-x^2/2}$) `HermiteNorm` - even though it's not "normalized" in the probability density sense.
 I can't be the only one who ever got tripped up by this.
 
-Instead, in Archimedes you explicitly choose between probabilists' and physicists' Hermite families with the `kind = 'phys' | 'prob'` keyword arg, as seen above.
+Instead, in Archimedes you explicitly choose between probabilists' and physicists' Hermite families with the `kind = 'prob' | 'phys'` keyword arg, as seen above; `"prob"` is the default, since its weight is (up to normalization) the standard normal density, making `loc`/`scale` behave like an ordinary mean/standard deviation.
 
-<!-- TODO: Add comment about "std" in kind="phys" -->
+One subtlety to be aware of: the numeric meaning of `scale` depends on `kind`, since it's paired with the domain rather than the weight.
+For `kind="prob"`, `scale` is exactly the standard deviation of the corresponding Gaussian.
+For `kind="phys"`, whose weight is $e^{-x^2}$ rather than $e^{-x^2/2}$, `scale` is $\sqrt{2}$ times that standard deviation.
 
 ### Clenshaw-Curtis
 

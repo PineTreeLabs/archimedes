@@ -94,17 +94,17 @@ def test_hermite_measure():
 
     assert measure.affine_params() == (1.0, 0.0)
 
-    scale, shift = measure.affine_params(mean=1.0, std=2.0)
+    scale, shift = measure.affine_params(loc=1.0, scale=2.0)
     assert np.isclose(scale, 2.0)
     assert np.isclose(shift, 1.0)
 
-    # std defaults to 1.0 when only mean is given
-    scale, shift = measure.affine_params(mean=1.0)
+    # scale defaults to 1.0 when only loc is given
+    scale, shift = measure.affine_params(loc=1.0)
     assert np.isclose(scale, 1.0)
     assert np.isclose(shift, 1.0)
 
     with pytest.raises(ValueError):
-        measure.affine_params(std=-1.0)
+        measure.affine_params(scale=-1.0)
 
 
 # -- ReferenceDomain.Parameters structs --
@@ -165,16 +165,16 @@ def test_laguerre_parameters_defaults_and_validation():
 @pytest.mark.parametrize("domain_cls", [RealLine])
 def test_hermite_parameters_defaults_and_validation(domain_cls):
     identity = domain_cls.Parameters()
-    assert identity.mean == 0.0
-    assert identity.std == 1.0
+    assert identity.loc == 0.0
+    assert identity.scale == 1.0
 
-    params = domain_cls.Parameters(mean=1.0, std=2.0)
+    params = domain_cls.Parameters(loc=1.0, scale=2.0)
     assert tree.is_struct(params)
     flat, _ = tree.flatten(params)
     assert flat == [1.0, 2.0]
 
     with pytest.raises(ValueError):
-        domain_cls.Parameters(std=-1.0)
+        domain_cls.Parameters(scale=-1.0)
 
 
 def test_measure_mass_reference_domain():
@@ -190,9 +190,9 @@ def test_measure_mass_mapped_domain():
     # Legendre: mapping [-1, 1] (mass 2) onto [0, 4] (width 4) scales mass by 2
     assert LegendreMeasure().mass(0.0, 4.0) == 4.0
 
-    # Hermite (prob.): mass scales by std, matching the affine Jacobian
+    # Hermite (prob.): mass scales by scale, matching the affine Jacobian
     measure = ProbabilistsHermiteMeasure()
-    assert np.isclose(measure.mass(mean=1.0, std=2.0), 2.0 * measure.reference_mass)
+    assert np.isclose(measure.mass(loc=1.0, scale=2.0), 2.0 * measure.reference_mass)
 
     # mass() is exactly what scaled_weights(density=True) divides by
     measure = LaguerreMeasure()
@@ -204,7 +204,7 @@ def test_hermite_and_hermitenorm_share_a_domain_parameters_type():
     # These were separate types before the domain refactor. They're now one:
     # both measures live on the same location-scaled RealLine and had
     # byte-identical affine_params. Only the *weight* differs (and hence the
-    # interpretation of `std` relative to it -- see the measure docstrings),
+    # interpretation of `scale` relative to it -- see the measure docstrings),
     # which is a Measure concern, not a domain one.
     assert (
         PhysicistsHermiteMeasure().domain.Parameters
@@ -293,17 +293,17 @@ def test_hermite_norm_measure():
 
     assert measure.affine_params() == (1.0, 0.0)
 
-    scale, shift = measure.affine_params(mean=1.0, std=2.0)
+    scale, shift = measure.affine_params(loc=1.0, scale=2.0)
     assert np.isclose(scale, 2.0)
     assert np.isclose(shift, 1.0)
 
-    # std defaults to 1.0 when only mean is given
-    scale, shift = measure.affine_params(mean=1.0)
+    # scale defaults to 1.0 when only loc is given
+    scale, shift = measure.affine_params(loc=1.0)
     assert np.isclose(scale, 1.0)
     assert np.isclose(shift, 1.0)
 
     with pytest.raises(ValueError):
-        measure.affine_params(std=-1.0)
+        measure.affine_params(scale=-1.0)
 
 
 # -- stieltjes_recurrence (discretized Stieltjes fallback) --

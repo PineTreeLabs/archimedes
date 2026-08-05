@@ -367,8 +367,8 @@ def tensor_quad(*rules: QuadratureRule) -> TensorQuadratureRule:
 
         # Two Gaussian inputs and one uniformly-bounded one
         rule = tensor_quad(
-            gauss_hermite(4, kind="prob"),
-            gauss_hermite(4, kind="prob"),
+            gauss_hermite(4),
+            gauss_hermite(4),
             gauss_legendre(4),
         )
 

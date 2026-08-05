@@ -318,22 +318,22 @@ def test_gauss_hermite():
     n = 5
     rule = gauss_hermite(n)
     assert len(rule) == n
-    assert isinstance(rule.measure, PhysicistsHermiteMeasure)
+    assert isinstance(rule.measure, ProbabilistsHermiteMeasure)
 
     # Exact for polynomials up to degree 2n - 1 = 9
-    assert np.isclose(rule.integrate(lambda x: np.ones_like(x)), np.sqrt(np.pi))
-    assert np.isclose(rule.integrate(lambda x: x**2), np.sqrt(np.pi) / 2)
+    assert np.isclose(rule.integrate(lambda x: np.ones_like(x)), np.sqrt(2 * np.pi))
+    assert np.isclose(rule.integrate(lambda x: x**2), np.sqrt(2 * np.pi))
     assert np.isclose(rule.integrate(lambda x: x**3), 0.0, atol=1e-10)
 
 
-def test_gauss_hermite_prob():
+def test_gauss_hermite_phys():
     n = 5
-    rule = gauss_hermite(n, kind="prob")
+    rule = gauss_hermite(n, kind="phys")
     assert len(rule) == n
-    assert isinstance(rule.measure, ProbabilistsHermiteMeasure)
+    assert isinstance(rule.measure, PhysicistsHermiteMeasure)
 
-    assert np.isclose(rule.integrate(lambda x: np.ones_like(x)), np.sqrt(2 * np.pi))
-    assert np.isclose(rule.integrate(lambda x: x**2), np.sqrt(2 * np.pi))
+    assert np.isclose(rule.integrate(lambda x: np.ones_like(x)), np.sqrt(np.pi))
+    assert np.isclose(rule.integrate(lambda x: x**2), np.sqrt(np.pi) / 2)
 
 
 def test_gauss_hermite_invalid_kind():
@@ -425,16 +425,16 @@ def test_gauss_hermite_exact_moments():
     assert np.isclose(rule.integrate(lambda x: x**3), 0.0, atol=1e-10)
 
 
-def test_gauss_hermite_mean_std_scaling():
+def test_gauss_hermite_loc_scale_scaling():
     n = 5
     x, w = roots_hermite(n)
     rule = QuadratureRule(
         x, w, name="gauss_hermite_5", measure=PhysicistsHermiteMeasure()
     )
 
-    mean, std = 1.0, 2.0
-    integral = rule.integrate(lambda x: np.ones_like(x), mean=mean, std=std)
-    assert np.isclose(integral, std * np.sqrt(np.pi))
+    loc, scale = 1.0, 2.0
+    integral = rule.integrate(lambda x: np.ones_like(x), loc=loc, scale=scale)
+    assert np.isclose(integral, scale * np.sqrt(np.pi))
 
 
 def test_gauss_hermitenorm_exact_moments():
@@ -450,7 +450,7 @@ def test_gauss_hermitenorm_exact_moments():
 
 
 def test_gauss_hermitenorm_matches_gaussian_expectation():
-    # Unlike PhysicistsHermiteMeasure, mean/std here are exactly the mean and standard
+    # Unlike PhysicistsHermiteMeasure, loc/scale here are exactly the mean and standard
     # deviation of a Gaussian density -- no sqrt(2) correction needed.
     n = 6
     x, w = roots_hermitenorm(n)
@@ -458,15 +458,15 @@ def test_gauss_hermitenorm_matches_gaussian_expectation():
         x, w, name="gauss_hermitenorm_6", measure=ProbabilistsHermiteMeasure()
     )
 
-    mean, std = 2.0, 3.0
-    norm = std * np.sqrt(2 * np.pi)  # normalizes the weight to a proper PDF
+    loc, scale = 2.0, 3.0
+    norm = scale * np.sqrt(2 * np.pi)  # normalizes the weight to a proper PDF
 
     def expectation(f):
-        return rule.integrate(f, mean=mean, std=std) / norm
+        return rule.integrate(f, loc=loc, scale=scale) / norm
 
     assert np.isclose(expectation(lambda x: np.ones_like(x)), 1.0)
-    assert np.isclose(expectation(lambda x: x), mean)
-    assert np.isclose(expectation(lambda x: x**2), mean**2 + std**2)
+    assert np.isclose(expectation(lambda x: x), loc)
+    assert np.isclose(expectation(lambda x: x**2), loc**2 + scale**2)
 
 
 # -- density=True normalization --
@@ -489,28 +489,28 @@ def test_scaled_weights_density_default_false():
 
 def test_integrate_density_matches_gaussian_expectation():
     n = 6
-    rule = gauss_hermite(n, kind="prob")
-    mean, std = 2.0, 3.0
+    rule = gauss_hermite(n)
+    loc, scale = 2.0, 3.0
 
     assert np.isclose(
-        rule.integrate(lambda x: np.ones_like(x), mean=mean, std=std, density=True),
+        rule.integrate(lambda x: np.ones_like(x), loc=loc, scale=scale, density=True),
         1.0,
     )
     assert np.isclose(
-        rule.integrate(lambda x: x, mean=mean, std=std, density=True), mean
+        rule.integrate(lambda x: x, loc=loc, scale=scale, density=True), loc
     )
     assert np.isclose(
-        rule.integrate(lambda x: x**2, mean=mean, std=std, density=True),
-        mean**2 + std**2,
+        rule.integrate(lambda x: x**2, loc=loc, scale=scale, density=True),
+        loc**2 + scale**2,
     )
 
 
 def test_sum_density_forwarded():
     n = 6
-    rule = gauss_hermite(n, kind="prob")
-    mean, std = 2.0, 3.0
+    rule = gauss_hermite(n)
+    loc, scale = 2.0, 3.0
     values = np.ones_like(rule.nodes)
-    assert np.isclose(rule.sum(values, mean=mean, std=std, density=True), 1.0)
+    assert np.isclose(rule.sum(values, loc=loc, scale=scale, density=True), 1.0)
 
 
 @pytest.mark.parametrize(
@@ -519,8 +519,8 @@ def test_sum_density_forwarded():
         (lambda: gauss_legendre(5), {"a": -2.0, "b": 5.0}),
         (lambda: gauss_jacobi(5, 1.0, 2.0), {}),
         (lambda: gauss_laguerre(5), {"rate": 2.0, "start": 1.0}),
-        (lambda: gauss_hermite(5, kind="phys"), {"mean": 1.0, "std": 2.0}),
-        (lambda: gauss_hermite(5, kind="prob"), {"mean": 1.0, "std": 2.0}),
+        (lambda: gauss_hermite(5, kind="phys"), {"loc": 1.0, "scale": 2.0}),
+        (lambda: gauss_hermite(5, kind="prob"), {"loc": 1.0, "scale": 2.0}),
     ],
 )
 def test_density_weights_sum_to_one_all_families(rule_factory, params):
@@ -671,15 +671,15 @@ def test_compile_symbolic_rate():
     assert np.isclose(float(result), 0.5)
 
 
-def test_compile_symbolic_mean_std():
+def test_compile_symbolic_loc_scale():
     x, w = roots_hermitenorm(5)
     rule = QuadratureRule(
         x, w, name="gauss_hermitenorm_5", measure=ProbabilistsHermiteMeasure()
     )
 
     @arc.compile
-    def quad(mean, std):
-        return rule.sum(np.ones_like(rule.nodes), mean=mean, std=std)
+    def quad(loc, scale):
+        return rule.sum(np.ones_like(rule.nodes), loc=loc, scale=scale)
 
     result = quad(1.0, 2.0)
     assert np.isclose(float(result), 2.0 * np.sqrt(2 * np.pi))

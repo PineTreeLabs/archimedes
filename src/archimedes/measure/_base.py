@@ -94,7 +94,7 @@ class Measure(metaclass=abc.ABCMeta):
         Quadrature weights pick up the same ``scale`` as a Jacobian factor,
         since :math:`dx = \\mathrm{scale} \\cdot dt`. The meaning of the
         arguments is domain-specific -- ``a``/``b`` for
-        :class:`UnitInterval`, ``mean``/``std`` for :class:`RealLine`,
+        :class:`UnitInterval`, ``loc``/``scale`` for :class:`RealLine`,
         ``rate``/``start`` for :class:`HalfLine` -- see the corresponding
         ``ReferenceDomain`` subclass.
         """

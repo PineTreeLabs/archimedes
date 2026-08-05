@@ -17,7 +17,7 @@ from ._quadrature_rule import QuadratureRule
 __all__ = ["gauss_hermite"]
 
 
-def gauss_hermite(n: int, kind: Literal["phys", "prob"] = "phys") -> QuadratureRule:
+def gauss_hermite(n: int, kind: Literal["phys", "prob"] = "prob") -> QuadratureRule:
     """Gauss-Hermite quadrature rule with ``n`` nodes.
 
     Nodes are the roots of the degree-``n`` Hermite polynomial. The rule is
@@ -29,12 +29,12 @@ def gauss_hermite(n: int, kind: Literal["phys", "prob"] = "phys") -> QuadratureR
     n : int
         Number of quadrature nodes.
     kind : {"phys", "prob"}, optional
-        Which classical Hermite convention to use. ``"phys"`` (default) is
-        the *physicists'* convention, with reference weight
-        :math:`e^{-x^2}` (:class:`PhysicistsHermiteMeasure`). ``"prob"`` is the
-        *probabilists'* convention, with reference weight
+        Which classical Hermite convention to use. ``"prob"`` (default) is
+        the *probabilists'* convention, with reference weight
         :math:`e^{-x^2/2}` (:class:`ProbabilistsHermiteMeasure`) -- up to
-        normalization, the standard normal density. Neither weight
+        normalization, the standard normal density. ``"phys"`` is the
+        *physicists'* convention, with reference weight
+        :math:`e^{-x^2}` (:class:`PhysicistsHermiteMeasure`). Neither weight
         integrates to 1 on its own; pass ``density=True`` to
         ``QuadratureRule.integrate``/``sum``/``scaled_weights`` for weights
         that do.

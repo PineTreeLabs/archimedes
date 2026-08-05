@@ -43,7 +43,7 @@ def test_domain_must_match_basis_parameters_type(quad_rule):
     with pytest.raises(TypeError):
         FunctionSpace(basis, domain=(-1.0, 1.0), quad_rule=quad_rule)
     with pytest.raises(TypeError):
-        # Wrong domain type -- RealLine's Parameters takes mean/std, not
+        # Wrong domain type -- RealLine's Parameters takes loc/scale, not
         # a/b, so it isn't a UnitInterval.Parameters.
         FunctionSpace(basis, domain=RealLine.Parameters(), quad_rule=quad_rule)
 
@@ -353,7 +353,7 @@ def hermite_space():
     basis = OrthogonalPolynomialBasis(
         ProbabilistsHermiteMeasure(), n_basis=4, density=True
     )
-    return FunctionSpace(basis, domain=basis.Parameters(mean=0.0, std=2.0))
+    return FunctionSpace(basis, domain=basis.Parameters(loc=0.0, scale=2.0))
 
 
 def test_density_mass_matrix_is_identity(hermite_space):
@@ -365,13 +365,15 @@ def test_density_mass_matrix_is_identity(hermite_space):
 
 
 def test_density_project_gives_mean_and_variance_directly(hermite_space):
-    # For X ~ N(0, std^2): E[X^2] = std^2, Var(X^2) = 2 * std^4. With
+    # For X ~ N(0, scale^2): E[X^2] = scale^2, Var(X^2) = 2 * scale^4. With
     # density=True, project's c_0 and sum(c[k>=1]^2) recover these directly
     # -- no rescaling by the measure's mass, unlike a density=False basis.
-    std = hermite_space.domain.std
+    scale = hermite_space.domain.scale
     fn = hermite_space.project(lambda x: x**2)
-    np.testing.assert_allclose(fn.coefficients[0], std**2, atol=1e-6)
-    np.testing.assert_allclose(np.sum(fn.coefficients[1:] ** 2), 2 * std**4, atol=1e-6)
+    np.testing.assert_allclose(fn.coefficients[0], scale**2, atol=1e-6)
+    np.testing.assert_allclose(
+        np.sum(fn.coefficients[1:] ** 2), 2 * scale**4, atol=1e-6
+    )
 
 
 def test_density_false_project_does_not_give_moments_directly(hermite_space):
@@ -380,6 +382,6 @@ def test_density_false_project_does_not_give_moments_directly(hermite_space):
     # of sqrt(mass) -- confirming the two conventions really do differ.
     raw_basis = OrthogonalPolynomialBasis(ProbabilistsHermiteMeasure(), n_basis=4)
     raw_space = FunctionSpace(raw_basis, domain=hermite_space.domain)
-    std = hermite_space.domain.std
+    scale = hermite_space.domain.scale
     fn = raw_space.project(lambda x: x**2)
-    assert abs(fn.coefficients[0] - std**2) > 1e-3
+    assert abs(fn.coefficients[0] - scale**2) > 1e-3
