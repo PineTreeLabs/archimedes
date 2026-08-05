@@ -33,9 +33,10 @@ plot_dir.mkdir(exist_ok=True)
 
 _Quadrature_ is the name given to a set of algorithms that perform approximate numerical integration of arbitrary functions.
 
-<!-- TODO: Why you need quadrature, and why odeint is different -->
+This is a foundational ingredient of a number of higher-level algorithms, including PDE solving, trajectory optimization, and uncertainty quantification.
+It's also a different kind of method from time-stepping ODE solvers ([`odeint`](#archimedes.odeint), for example).  Typical ODE solvers are _local_, approximating the solution over short interval at a time, whereas quadrature is _global_, approximating the integrand with an analytically-integrable function on the entire domain at once.
 
-The [`quadrature`](#archimedes.quadrature) module includes support for Gaussian quadrature implementations that are compatible with Archimedes' symbolic tracing, autodiff, and code generation.
+The [`quadrature`](#archimedes.quadrature) module includes support for (mostly) Gaussian quadrature implementations that are compatible with Archimedes' symbolic tracing, autodiff, and code generation.
 
 This page gives an introduction to numerical quadrature in Archimedes, including the relationship between Gaussian quadrature rules and classical orthogonal polynomials, and how this relationship translates into the concepts of [`Measure`](#archimedes.measure.Measure) and [`QuadratureRule`](#archimedes.quadrature.QuadratureRule).
 
@@ -81,20 +82,88 @@ print(f"Exact integral:          {J_ex:.6f}")
 print(f"Gauss-Legendre integral: {J_leg:.6f}")
 ```
 
-<!-- TODO: plot convergence against np.trapz -->
+```{code-cell} python
+:tags: [remove-cell]
+# Regression check on the absolute error
+assert abs(J_leg - J_ex) < 1e-3
+```
 
-<!-- TODO: Traceable integrand and crossref with gotchas -->
+Suitably constructed quadrature rules typically converge to an exact result much more quickly than, for instance, uniform trapezoidal integration:
 
-## Why a Separate Quadrature Implementation
+```{code-cell} python
+:tags: [hide-cell, remove-output]
+n_quad = np.arange(2, 16)
+J_quad = np.array([arc.quadrature.quadint(f, a, b, n=n) for n in n_quad])
+e_quad = abs(J_quad - J_ex)
 
-<!-- TODO: Why not just use NumPy/SciPy? Emphasize static/symbolic split -->
+n_trapz = np.arange(2, 1000, 10)
 
+def trapz(n):
+    x = np.linspace(a, b, n, endpoint=True)
+    return np.trapezoid(f(x), x)
 
-Unlike [`scipy.integrate.quad`](https://docs.scipy.org/doc/scipy/reference/generated/scipy.integrate.quad.html), this does not support adaptive integration with an error tolerance, nor does it support infinite or semi-infinite intervals.
+J_trapz = np.array([trapz(n) for n in n_trapz])
+e_trapz = abs(J_trapz - J_ex)
 
-<!-- TODO: note on why infinite isn't supported (see docstring) -->
+fig, ax = plt.subplots(1, 1, figsize=(7, 3))
+ax.plot(n_quad, e_quad, '.-', label="Gauss-Legendre")
+ax.plot(n_trapz, e_trapz, '.-', label="Trapezoidal")
+ax.set_yscale('log')
+ax.set_xscale('log')
+ax.legend()
+ax.grid()
+ax.set_xlabel("Number of points (function evaluations)")
+ax.set_ylabel("Approximation error")
+plt.show()
+```
 
-However, it does support symbolic evaluation (including limits):
+```{code-cell} python
+:tags: [remove-cell]
+
+for theme in {"light", "dark"}:
+    arc.set_theme(theme)
+    fig, ax = plt.subplots(1, 1, figsize=(6, 4))
+    ax.plot(n_quad, e_quad, '.-', label="Gauss-Legendre")
+    ax.plot(n_trapz, e_trapz, '.-', label="Trapezoidal")
+    ax.set_yscale('log')
+    ax.set_xscale('log')
+    ax.legend()
+    ax.grid()
+    ax.set_xlabel("Number of points (function evaluations)")
+    ax.set_ylabel("Approximation error")
+    plt.savefig(plot_dir / f"quadrature_0_{theme}.png")
+    plt.close()
+```
+
+```{image} _plots/quadrature_0_light.png
+:class: only-light
+```
+
+```{image} _plots/quadrature_0_dark.png
+:class: only-dark
+```
+
+Internally, the integrand evaluation is vectorized; Archimedes-traceable pure functions constructed with NumPy should generally be fine (see [Gotchas](../../gotchas.md) for more details).
+
+Note that unlike [`scipy.integrate.quad`](https://docs.scipy.org/doc/scipy/reference/generated/scipy.integrate.quad.html), this high-level `quadint` function does not support adaptive integration with an error tolerance, nor does it support infinite or semi-infinite intervals.
+It is possible to define integrals over infinite or semi-infinite domains using weighted quadrature rules like [`gauss_laguerre`](#archimedes.quadrature.gauss_laguerre) or [`gauss_hermite`](#archimedes.quadrature.gauss_hermite), but not through `quadint` specifically.
+
+## Another Quadrature Implementation?
+
+NumPy and SciPy already implement the numerical building blocks for Gaussian-style quadrature, and SciPy's [`scipy.integrate.quad`](https://docs.scipy.org/doc/scipy/reference/generated/scipy.integrate.quad.html) and relatives is a good choice for evaluating a single integral.
+
+However, for integrals that need to be evaluated inside of simulation or optimization loops, or for any applications that need to support [codegen](../../tutorials/codegen/codegen00.md), Archimedes takes advantage of a fundamental split in the quadrature construction.
+Specifically, on a fixed reference domain (e.g. $[-1, 1]$ for Legendre-based rules), **the Gaussian quadrature nodes and weights are static, precomputable data, while the integrand data is symbolic.**
+In fact, internally Archimedes reuses SciPy implementations of node/weight calculations wherever possible.
+
+In other words, the more expensive computation of the _rule_ data can be done once, offline, making the online integral evaluation a simple weighted sum, the equivalent of `np.dot(w, f(x))`, the cost of which is almost always dominated purely by the integrand evaluation `f(x)`.
+Domains other than the reference domain can be used with an affine transformation of the nodes and weights, a simple operation for symbolic tracing.
+This makes it possible for quadrature integrals to compose with the rest of the Archimedes infrastructure, including autodiff, codegen, and hierarchical data structures.
+
+This "traced summation" model precludes adaptive quadrature, because adaptive rules need variable-length vectors for the nodes and weights, which are not supported in Archimedes/CasADi.
+You could construct a maximum-order-limited adaptive scheme by precomputing nodes and weights for all `n < n_max` and using [control flow primitives](../../control-flow.md), but this isn't implemented out of the box since it's not a common use case.
+
+However, Archimedes quadrature does support symbolic evaluation (including limits):
 
 ```{code-cell} python
 # Differentiating the integral with respect to the limits of integration
@@ -158,8 +227,7 @@ print(f"Error: {np.linalg.norm(dg - dg_ex)}")
 ```
 
 ```{code-cell} python
-:tags: [remove-output]
-
+:tags: [hide-cell, remove-output]
 fig, ax = plt.subplots(1, 1, figsize=(7, 2))
 ax.plot(x, dg, label="Computed")
 ax.plot(x, dg_ex, "--", label="Exact")
@@ -167,6 +235,7 @@ ax.legend()
 ax.grid()
 ax.set_xlabel("$x$")
 ax.set_ylabel("$g(x)$")
+plt.show()
 ```
 
 ```{code-cell} python
@@ -181,8 +250,16 @@ for theme in {"light", "dark"}:
     ax.grid()
     ax.set_xlabel("$x$")
     ax.set_ylabel("$g(x)$")
-    plt.savefig(plot_dir / f"quadrature_0_{theme}.png")
+    plt.savefig(plot_dir / f"quadrature_1_{theme}.png")
     plt.close()
+```
+
+```{image} _plots/quadrature_1_light.png
+:class: only-light
+```
+
+```{image} _plots/quadrature_1_dark.png
+:class: only-dark
 ```
 
 ## The `quadrature` Module
@@ -190,7 +267,7 @@ for theme in {"light", "dark"}:
 The power of Gaussian quadrature lies in carefully chosen nodes and weights which give highly accurate approximations of integrals of polynomials (and hence arbitrary smooth functions) with relatively few sample points.
 For instance, the complicated cosh derivative-of-integral above used only _five_ sample points.
 
-The nodes are the roots of classical orthogonal polynomials associated with the weight function (i.e. Legendre polynomials for $w(x) = 1$ on a finite interval), and the weights are derived from Lagrange interpolation of the nodal data (see section "Quadrature and Orthogonal Polynomials" below).
+The nodes are the roots of classical orthogonal polynomials associated with the weight function (i.e. Legendre polynomials for $w(x) = 1$ on a finite interval), and the weights are derived from Lagrange interpolation of the nodal data (see the appendix [Quadrature and Orthogonal Polynomials](#appendix-quadrature-and-orthogonal-polynomials) below).
 
 Since the nodes and weights on the reference domain can be statically computed, under the hood we use SciPy's [`roots_legendre/jacobi/laguerre/hermite`](https://docs.scipy.org/doc/scipy/reference/special.html#orthogonal-polynomials) functions to do the actual math.
 
@@ -200,19 +277,66 @@ There are two abstractions that keep track of the weight function, reference dom
 The first is [`Measure`](#archimedes.measure.Measure), which combines a weight function with a reference interval to define families of orthogonal polynomials.
 The second is [`QuadratureRule`](#archimedes.quadrature.QuadratureRule), which stores the nodes, weights, and associated `Measure`, and which is responsible for domain transformations and performing the weighted sum.
 
-<!-- TODO: Expand on Measure, QuadratureRule, or at least a graphic -->
+#### `Measure`
 
-<!-- TODO: Forward ref for "exotic custom quadrature rules" -->
-If you're not constructing exotic custom quadrature rules, you shouldn't need to interact with either of these classes directly.
-Instead, there are two high-level interfaces:
+The [`Measure`](#archimedes.measure.Measure) class defines an orthogonality measure $d\mu(x) = w(x) ~ dx$ and an associated domain $\mathcal{D}$.
+This $w(x)$ is the weight function in the quadrature rule, and the quadrature nodes for this rule are the roots of the polynomials that are orthogonal with respect to this measure (see [appendix](#appendix-quadrature-and-orthogonal-polynomials)).
+
+The `Measure` interface is roughly:
+
+```python
+class Measure:
+    domain: ReferenceDomain  # UnitInterval | HalfLine | RealLine
+
+    # Domain of support D = [a, b]
+    @property
+    def support(self) -> tuple[float, float]: ...
+
+    # Weight function w(x)
+    @abc.abstractmethod
+    def weight(self, x: np.ndarray) -> np.ndarray: ...
+```
+
+This might seem obscure, but it is fundamental for designing numerical schemes that aren't on finite intervals, or for functions with singularities.
+
+Measures are also a useful practical concept for working with probability distributions; in this context a properly-normalized weight function $w(x)$ _is_ the probability distribution function and the weighted integral is the mean value of $f(x)$ over that distribution (this is the core of polynomial chaos expansions, for instance).
+
+#### `QuadratureRule`
+
+[`QuadratureRule`](#archimedes.quadrature.QuadratureRule) is a single class (not a base class or interface) that combines a `Measure` with associated nodes, weights, and (if a composite/piecewise rule) breakpoints and elements.
+This is a higher level from `Measure` because there are different rules that can be constructed on a single `Measure`.
+For instance, Gauss-Lobatto and Gauss-Legendre rules both use a uniform measure but different nodes/weights; same for [composite](#composite-rules) (tiled) quadrature rules.
+
+The key parts of `QuadratureRule` are:
+
+```python
+@arc.struct
+class QuadratureRule:
+    nodes: np.ndarray
+    weights: np.ndarray
+    measure: Measure
+    breakpoints: np.ndarray | None = None  # element boundaries, if composite
+    elements: np.ndarray | None = None  # owning element per node, if composite
+
+    # Approximate the weighted integral of ``f``
+    def integrate(self, f, *params, axis=-1, args=None, density=False) -> np.ndarray: ...
+
+    # Quadrature applied to values already sampled at the nodes
+    def sum(self, values, *params, axis=-1, density=False) -> np.ndarray: ...
+```
+
+#### Higher-level interface
+
+If you're not constructing exotic custom quadrature rules, you shouldn't need to interact with either of these classes directly (if you _are_ constructing exotic custom quadrature rules, [see below](#custom-rules)).
+
+Most applications can work with the two high-level interfaces:
 
 1. The [`quadint`](#archimedes.quadrature.quadint) function demonstrated earlier, which takes a callable function and does Gauss-Legendre quadrature on an unweighted finite interval
 2. Convenience constructors for common `QuadratureRule`s like Gauss-Radau, Clenshaw-Curtis, Gauss-Hermite, etc.
 
-We've already seen #1 in action.
-In fact, #1 is just a very thin wrapper around #2 for anyone (for example, me) who cannot keep straight the contributions of all of the French geniuses with L-names (Legendre? Lagrange? Laguerre?).
+We've already seen #1 in action; in fact, #1 is just a very thin wrapper around #2 for anyone.
 
-These constructors use snake-case versions of the conventional names of the rules, e.g. Clenshaw-Curtis becomes `clenshaw_curtis`, and produce a `QuadratureRule` instance.
+The convenience constructors use snake-case versions of the conventional names of the rules, e.g. Clenshaw-Curtis becomes `clenshaw_curtis`, and produce a `QuadratureRule` instance.
 Available options are:
 
 | Classical name | Python function | Weight function $w(x)$ | Reference interval | Notes |
@@ -221,13 +345,14 @@ Available options are:
 | Gauss-Radau | `gauss_radau(n, endpoint="left"\|"right")` | $1$ | $[-1, 1]$ | Fixes one endpoint |
 | Gauss-Lobatto | `gauss_lobatto(n)` | $1$ | $[-1, 1]$ | Fixes both endpoints |
 | Clenshaw-Curtis | `clenshaw_curtis(n)` | $1$ | $[-1, 1]$ | Chebyshev-Lobatto nodes |
+| Trapezoidal | `trapezoidal(n)` | $1$ | $[-1, 1]$ | Use periodic version for Fourier basis |
 | Gauss-Jacobi | `gauss_jacobi(n, alpha, beta)` | $(1-x)^\alpha(1+x)^\beta$ | $[-1, 1]$ | Legendre/Chebyshev are special cases |
 | Gauss-Hermite (probabilists') | `gauss_hermite(n, kind="prob")` |$e^{-x^2/2}$ | $(-\infty, \infty)$ | Default `kind` |
 | Gauss-Hermite (physicists') | `gauss_hermite(n, kind="phys")` | $e^{-x^2}$ | $(-\infty, \infty)$ |   |
 | Gauss-Laguerre | `gauss_laguerre(n)` | $e^{-x}$ | $[0, \infty)$ |   |
 
-<!-- TODO: Add "decision rules" -->
-<!-- TODO: Add periodic_trapezoidal -->
+The trapezoidal rule is slightly different from the others: it is exact for trigonometric polynomials $\cos(k \pi t)$, $\sin(k \pi t)$ for $1 \leq k \leq n-1$ on $t \in [-1, 1)$ (periodic).
+If `periodic=False` then it reduces to the usual trapezoidal rule, which is not a Gaussian rule in the sense we have been discussing.
 
 Once you have the `QuadratureRule` object, you can inspect the nodes and weights if you like, or just use its quadrature methods:
 
@@ -247,87 +372,7 @@ quad_rule.sum(fp, **kwparams)
 ```
 
 The `**kwparams` define the domain and weight transformation.
-For instance, `quad_rule.integrate(f, a=a, b=b)` for Gauss-Legendre (or Radau, Lobatto, Jacobi, or Clenshaw-Curtis) will transform the domain to $(a, b)$, while `quad_rule.integrate(f, loc=mu, scale=sigma)` for Gauss-Hermite on an infinite domain will shift/scale the Gaussian weight function.
-
-```python
-n = 6
-leg = arc.quadrature.gauss_legendre(n)
-rad_left = arc.quadrature.gauss_radau(n, endpoint="left")
-rad_right = arc.quadrature.gauss_radau(n, endpoint="right")
-lob = arc.quadrature.gauss_lobatto(n)
-cc = arc.quadrature.clenshaw_curtis(n)
-
-zero = np.zeros_like(leg.nodes)
-
-fig, ax = plt.subplots(1, 1, figsize=(6, 4))
-ax.plot(leg.nodes, zero, 'o', label="Gauss-Legendre")
-ax.plot(rad_left.nodes, zero + 1, 'o', label="Gauss-Radau (left)")
-ax.plot(rad_right.nodes, zero + 2, 'o', label="Gauss-Radau (right)")
-ax.plot(lob.nodes, zero + 3, 'o', label="Gauss-Lobatto")
-ax.plot(cc.nodes, zero + 4, 'o', label="Clenshaw-Curtis")
-ax.set_xlabel("Node $x_i$")
-ax.set_title(f"Quadrature nodes for n={n}")
-ax.legend()
-ax.set_ylim(-1, 8)
-ax.grid()
-ax.set_yticks([])
-plt.show()
-```
-
-```{code-cell} python
-:tags: [remove-cell]
-n = 6
-leg = arc.quadrature.gauss_legendre(n)
-rad_left = arc.quadrature.gauss_radau(n, endpoint="left")
-rad_right = arc.quadrature.gauss_radau(n, endpoint="right")
-lob = arc.quadrature.gauss_lobatto(n)
-cc = arc.quadrature.clenshaw_curtis(n)
-
-zero = np.zeros_like(leg.nodes)
-
-for theme in ("light", "dark"):
-    arc.set_theme(theme)
-    fig, ax = plt.subplots(1, 1, figsize=(6, 4))
-    ax.plot(leg.nodes, zero, "o", label="Gauss-Legendre")
-    ax.plot(rad_left.nodes, zero + 1, "o", label="Gauss-Radau (left)")
-    ax.plot(rad_right.nodes, zero + 2, "o", label="Gauss-Radau (right)")
-    ax.plot(lob.nodes, zero + 3, "o", label="Gauss-Lobatto")
-    ax.plot(cc.nodes, zero + 4, "o", label="Clenshaw-Curtis")
-    ax.set_xlabel("Node $x_i$")
-    ax.set_title(f"Quadrature nodes for n={n}")
-    ax.legend()
-    ax.set_ylim(-1, 8)
-    ax.grid()
-    ax.set_yticks([])
-    plt.savefig(f"_static/nodes_{theme}.png")
-```
-
-```{image} _static/nodes_light.png
-:class: only-light
-```
-
-```{image} _static/nodes_dark.png
-:class: only-dark
-```
-
-```{code-cell} python
-# Same example as above, but using Clenshaw-Curtis quadrature
-
-
-def f(x):
-    return np.exp(x)
-
-
-a, b = -3, 3  # Integration limits
-J_ex = np.exp(b) - np.exp(a)  # Exact integral: e^b - e^a
-
-# 20-point Clenshaw-Curtis quadrature rule
-quad_rule = arc.quadrature.clenshaw_curtis(n=20)
-J_cc = quad_rule.integrate(f, a, b)
-
-print(f"Exact integral:          {J_ex:.6f}")
-print(f"Clenshaw-Curtis integral:  {J_cc:.6f}")
-```
+For instance, `quad_rule.integrate(f, a=a, b=b)` for Gauss-Legendre (or Radau, Lobatto, Jacobi, Clenshaw-Curtis, or trapezoidal) will transform the domain to $(a, b)$, while `quad_rule.integrate(f, loc=mu, scale=sigma)` for Gauss-Hermite on an infinite domain will shift/scale the Gaussian weight function.
 
 One distinct feature of the Archimedes quadrature interface is that you can optionally pass a `density=True` keyword arg to directly interpret the weight functions as probability densities.
 That is, the quadrature result approximates an expectation under the corresponding probability density:
@@ -355,8 +400,7 @@ print(f"Quadrature value: {J:.6f}")
 
 This avoids needing to remember to manually divide out the sum of the weights to normalize an expectation integral.
 
-A related difference in Archimedes is doing away with the NumPy/SciPy convention of naming the physicists' Hermite polynomials (weight function $e^{-x^2}$) plain `Hermite` and the probabilists' Hermite polynomials (weight function $e^{-x^2/2}$) `HermiteNorm` - even though it's not "normalized" in the probability density sense.
-I can't be the only one who ever got tripped up by this.
+A related difference in Archimedes is doing away with the tradition of naming the physicists' Hermite polynomials (weight function $e^{-x^2}$) plain `Hermite` and the probabilists' Hermite polynomials (weight function $e^{-x^2/2}$) `HermiteNorm` - even though it's not "normalized" in the probability density sense.
 
 Instead, in Archimedes you explicitly choose between probabilists' and physicists' Hermite families with the `kind = 'prob' | 'phys'` keyword arg, as seen above; `"prob"` is the default, since its weight is (up to normalization) the standard normal density, making `loc`/`scale` behave like an ordinary mean/standard deviation.
 
@@ -366,26 +410,197 @@ For `kind="phys"`, whose weight is $e^{-x^2}$ rather than $e^{-x^2/2}$, `scale` 
 
 ### Clenshaw-Curtis
 
-<!-- TODO: Explain Gauss-Lobatto vs Clenshaw-Curtis, when you might want either -->
+Like the periodic `trapezoidal` rule, Clenshaw-Curtis quadrature is another outlier in this group.
+It is not a Gaussian quadrature rule associated with a measure with nodes derived from the roots of classical orthogonal polynomials.
+Instead, the Clenshaw-Curtis nodes are the *extrema* of the Chebyshev polynomials.
+
+Like Gauss-Lobatto, the Clenshaw-Curtis nodes *include* the endpoints, but there are a couple of key practical differences that determine which is a better fit.
+
+* Theoretically, Gauss-Lobatto has roughly twice the polynomial order of accuracy (although [in practice the gap is much smaller](CITE TREFETHEN))
+* The Clenshaw-Curtis nodes and weights can be cheaply and accurately computed for much larger $n$, making it more suitable for applications like large-scale PDE models (e.g. direct numerical simulation of fluid dynamics with pseudospectral methods)
+* The Chebyshev-Lobatto nodes are _nested across doubling_ $n$, meaning that the nodes for `clenshaw_curtis(n)` are all also present in the set of nodes for `clenshaw_curtis(2*n)`
+
+If these aren't relevant for your application, in general Gauss-Lobatto is preferable for its accuracy.
 
 ### Composite Rules
 
-<!-- TODO: Write this -->
+Quadrature rules with uniform weight $w(x) \equiv 1$ can be "tiled" into a _composite_ rule.
+Mathematically, a composite rule interpolates the data onto a *piecewise polynomial* that is then integrated exactly with a piecewise quadrature rule.
+
+For example, to construct a quadrature rule for a uniform 10-element domain with third-order Gauss-Legendre quadrature in each element:
+
+```{code-cell} python
+nel = 10
+p = 3
+breakpoints = np.linspace(-1, 1, nel+1, endpoint=True)
+rule = arc.quadrature.composite_quad(
+    arc.quadrature.gauss_legendre(n=p+1),
+    breakpoints=breakpoints
+)
+```
+
+```{code-cell} python
+:tags: [hide-cell, remove-output]
+fig, ax = plt.subplots(1, 1, figsize=(7, 2))
+ax.plot(rule.nodes, 0 * rule.nodes, '.')
+ax.set_yticks([])
+ax.set_xticks(breakpoints)
+ax.grid()
+ax.set_xlabel("Reference domain $t$")
+plt.show()
+```
+
+```{code-cell} python
+:tags: [remove-cell]
+
+for theme in ("light", "dark"):
+    arc.set_theme(theme)
+    fig, ax = plt.subplots(1, 1, figsize=(7, 2))
+    ax.plot(rule.nodes, 0 * rule.nodes, '.')
+    ax.set_yticks([])
+    ax.set_xticks(breakpoints)
+    ax.grid()
+    ax.set_xlabel("Reference domain $t$")
+    plt.savefig(f"_plots/quadrature_2_{theme}.png")
+```
+
+```{image} _plots/quadrature_2_light.png
+:class: only-light
+```
+
+```{image} _plots/quadrature_2_dark.png
+:class: only-dark
+```
+
+The composite rule does not need to use a uniform degree, nor even a uniform rule.
+For example, here we add endpoints using left/right Radau rules, and locally refine two interior elements:
+
+```{code-cell} python
+el_rules = [arc.quadrature.gauss_legendre(p+1) for _ in range(nel)]
+el_rules[0] = arc.quadrature.gauss_radau(p+1, "left")
+el_rules[-1] = arc.quadrature.gauss_radau(p+1, "right")
+el_rules[nel//2-1] = arc.quadrature.gauss_legendre(4*(p+1))
+el_rules[nel//2] = arc.quadrature.gauss_legendre(4*(p+1))
+
+rule = arc.quadrature.composite_quad(el_rules, breakpoints=breakpoints)
+```
+
+```{code-cell} python
+:tags: [hide-cell, remove-output]
+fig, ax = plt.subplots(1, 1, figsize=(7, 2))
+ax.plot(rule.nodes, 0 * rule.nodes, '.')
+ax.set_yticks([])
+ax.set_xticks(breakpoints)
+ax.grid()
+ax.set_xlabel("Reference domain $t$")
+plt.show()
+```
+
+```{code-cell} python
+:tags: [remove-cell]
+
+for theme in ("light", "dark"):
+    arc.set_theme(theme)
+    fig, ax = plt.subplots(1, 1, figsize=(7, 2))
+    ax.plot(rule.nodes, 0 * rule.nodes, '.')
+    ax.set_yticks([])
+    ax.set_xticks(breakpoints)
+    ax.grid()
+    ax.set_xlabel("Reference domain $t$")
+    plt.savefig(f"_plots/quadrature_3_{theme}.png")
+```
+
+```{image} _plots/quadrature_3_light.png
+:class: only-light
+```
+
+```{image} _plots/quadrature_3_dark.png
+:class: only-dark
+```
 
 ### Tensor Rules
 
-<!-- TODO: Write this -->
+A multidimensional product rule can also be constructed via a _tensor product_ of scalar quadrature rules.
 
-### Custom Rules
+For instance, to construct a tenth-order 2D Gauss-Legendre rule:
 
-<!-- Golub-Welsch extension -->
+```{code-cell} python
+p = 10
+dim_rules = [arc.quadrature.gauss_lobatto(p+1) for _ in range(2)]
+rule = arc.quadrature.tensor_quad(*dim_rules)
+```
+
+```{code-cell} python
+:tags: [hide-cell, remove-output]
+fig, ax = plt.subplots(1, 1, figsize=(4, 4))
+ax.scatter(rule.nodes[:, 0], rule.nodes[:, 1], s=2)
+ax.set_xlim([-1, 1])
+ax.set_ylim([-1, 1])
+plt.show()
+````
+
+```{code-cell} python
+:tags: [remove-cell]
+
+for theme in ("light", "dark"):
+    arc.set_theme(theme)
+    fig, ax = plt.subplots(1, 1, figsize=(4, 4))
+    ax.scatter(rule.nodes[:, 0], rule.nodes[:, 1], s=2)
+    ax.set_xlim([-1, 1])
+    ax.set_ylim([-1, 1])
+    plt.savefig(f"_plots/quadrature_4_{theme}.png")
+```
+
+```{image} _plots/quadrature_4_light.png
+:class: only-light
+```
+
+```{image} _plots/quadrature_4_dark.png
+:class: only-dark
+```
+
+Composite quadrature rules can themselves be expanded with tensor products; copying the non-uniform rule from above:
+
+```{code-block} python
+p = 3
+nel = 10
+breakpoints = np.linspace(-1, 1, nel+1, endpoint=True)
+dim_rules = [
+    arc.quadrature.composite_quad(
+        arc.quadrature.gauss_legendre(p+1),
+        breakpoints=breakpoints
+    )
+    for _ in range(2)
+]
+rule = arc.quadrature.tensor_quad(*dim_rules)
+```
+
+```{code-cell} python
+:tags: [remove-cell]
+
+for theme in ("light", "dark"):
+    arc.set_theme(theme)
+    fig, ax = plt.subplots(1, 1, figsize=(4, 4))
+    ax.scatter(rule.nodes[:, 0], rule.nodes[:, 1], s=2)
+    ax.set_xlim([-1, 1])
+    ax.set_ylim([-1, 1])
+    plt.savefig(f"_plots/quadrature_5_{theme}.png")
+```
+
+```{image} _plots/quadrature_5_light.png
+:class: only-light
+```
+
+```{image} _plots/quadrature_5_dark.png
+:class: only-dark
+```
 
 ## Appendix: Quadrature and Orthogonal Polynomials
 
-<!-- TODO: Callout that this is optional "of interest" material... or move to its own page? -->
-
 The weight functions, reference domains, and node distributions can seem to be somewhat obscure at first.
 These arise from a deep connection to _classical orthogonal polynomials_, and understanding why helps select the right family for an application.
+
+This appendix is fully optional background reading, but may help to explain this interesting connection and why it links together measures, orthogonal polynomials, and optimal quadrature rules - and the implication for numerical schemes like finite elements, pseudospectral methods, etc. that depend on these concepts.
 
 ### Integration by interpolation
 
@@ -431,7 +646,6 @@ This is exactly the defining property of [orthogonal polynomials](https://en.wik
 
 ### Orthogonal polynomials
 
-Don't go read that Wikipedia page; it's full of terms like "Lebesgue–Stieltjes integrals".
 The important thing for Gaussian quadrature is that given a weight function and a domain, you can derive a family of polynomials such that the $n$-th polynomial is orthogonal to all $n-1$ polynomials in that family with respect to that weight, exactly the property Gauss identifies for optimizing accuracy of the quadrature rule:
 
 $$
@@ -443,7 +657,6 @@ Since any $n-1$-degree polynomial can be represented by a linear combination of 
 The upshot is that **if we choose the quadrature nodes to be the roots of the appropriate orthogonal polynomial, then we get optimal quadrature accuracy**.
 The "appropriate" polynomial depends on the weight function and the domain, commonly:
 
-<!-- TODO: Add Wiener-Askey correspondence -->
 | Weight $w(x)$ | Domain | Orthogonal polynomials | Quadrature scheme |
 |---|---|---|---|
 | $1$ | $[-1,1]$ | [Legendre](https://en.wikipedia.org/wiki/Legendre_polynomials) | [Gauss–Legendre](https://en.wikipedia.org/wiki/Gauss%E2%80%93Legendre_quadrature) |
@@ -467,12 +680,12 @@ Alternatively, we can derive _constrained_ quadrature families that include one 
 - **Gauss-Lobatto rules**: Include both endpoints - exact to order $2n - 3$.
 
 ```{code-cell} python
+:tags: [hide-cell, remove-output]
 n = 10
 leg = arc.quadrature.gauss_legendre(n)
 rad_left = arc.quadrature.gauss_radau(n, endpoint="left")
 rad_right = arc.quadrature.gauss_radau(n, endpoint="right")
 lob = arc.quadrature.gauss_lobatto(n)
-# cc = arc.quadrature.clenshaw_curtis(n)
 
 zero = np.zeros_like(leg.nodes)
 
@@ -481,7 +694,6 @@ ax.plot(leg.nodes, zero, "o", label="Gauss-Legendre")
 ax.plot(rad_left.nodes, zero + 1, "o", label="Gauss-Radau (left)")
 ax.plot(rad_right.nodes, zero + 2, "o", label="Gauss-Radau (right)")
 ax.plot(lob.nodes, zero + 3, "o", label="Gauss-Lobatto")
-# ax.plot(cc.nodes, zero + 4, 'o', label="Clenshaw-Curtis")
 ax.set_xlabel("Node $x_i$")
 ax.set_title(f"Quadrature nodes for n={n}")
 ax.legend()
@@ -489,6 +701,41 @@ ax.set_ylim(-1, 6)
 ax.grid()
 ax.set_yticks([])
 plt.show()
+```
+
+
+```{code-cell} python
+:tags: [remove-cell]
+n = 10
+leg = arc.quadrature.gauss_legendre(n)
+rad_left = arc.quadrature.gauss_radau(n, endpoint="left")
+rad_right = arc.quadrature.gauss_radau(n, endpoint="right")
+lob = arc.quadrature.gauss_lobatto(n)
+
+zero = np.zeros_like(leg.nodes)
+
+for theme in ("light", "dark"):
+    arc.set_theme(theme)
+    fig, ax = plt.subplots(1, 1, figsize=(6, 4))
+    ax.plot(leg.nodes, zero, "o", label="Gauss-Legendre")
+    ax.plot(rad_left.nodes, zero + 1, "o", label="Gauss-Radau (left)")
+    ax.plot(rad_right.nodes, zero + 2, "o", label="Gauss-Radau (right)")
+    ax.plot(lob.nodes, zero + 3, "o", label="Gauss-Lobatto")
+    ax.set_xlabel("Node $x_i$")
+    ax.set_title(f"Quadrature nodes for n={n}")
+    ax.legend()
+    ax.set_ylim(-1, 6)
+    ax.grid()
+    ax.set_yticks([])
+    plt.savefig(f"_plots/nodes_{theme}.png")
+```
+
+```{image} _plots/nodes_light.png
+:class: only-light
+```
+
+```{image} _plots/nodes_dark.png
+:class: only-dark
 ```
 
 
@@ -503,3 +750,7 @@ $$
 $$
 
 That is, the nodes must be placed at the roots of the polynomials that are orthogonal with respect to this inner product with weight $(x - a)$.
+
+### Custom Rules
+
+<!-- TODO: discretized Stieljes & Golub-Welsch extension -->
