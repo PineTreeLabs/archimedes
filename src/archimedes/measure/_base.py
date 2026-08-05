@@ -16,6 +16,7 @@ import abc
 import numpy as np
 
 from ._domain import ReferenceDomain
+from ._stieltjes import stieltjes_recurrence
 
 __all__ = ["Measure"]
 
@@ -134,7 +135,6 @@ class Measure(metaclass=abc.ABCMeta):
         scale, _ = self.affine_params(*args, **kwargs)
         return scale * self.reference_mass
 
-    @abc.abstractmethod
     def recurrence_coeffs(self, n: int) -> tuple[np.ndarray, np.ndarray]:
         """Monic three-term recurrence coefficients, each shape ``(n,)``.
 
@@ -156,10 +156,28 @@ class Measure(metaclass=abc.ABCMeta):
         scale * alpha + shift``, ``beta' = scale**2 * beta`` with
         ``beta'[0] = mass(...)``), which callers can apply themselves.
 
+        The default implementation falls back to a discretized Stieltjes
+        procedure (:func:`~archimedes.measure.stieltjes_recurrence`), which
+        numerically integrates the required moments via
+        ``scipy.integrate.quad`` instead of a closed form -- so any
+        ``weight``/``domain`` pair yields a valid orthogonal polynomial
+        family and Gauss quadrature rule (via
+        :func:`~archimedes.quadrature.golub_welsch_rule`) with no further
+        work. It is accurate to near machine precision for smooth, bounded
+        weights through about :math:`n \\sim 15`, degrading (silently, for
+        smooth weights) beyond that -- see
+        :func:`~archimedes.measure.stieltjes_recurrence` for the full
+        accuracy envelope. Classical families override this method with a
+        closed-form recursion for speed and much better high-degree
+        accuracy; see :class:`~archimedes.measure.JacobiMeasure` for the
+        pattern.
+
         Parameters
         ----------
         n : int
             Number of coefficients to compute, i.e. degrees ``0, ..., n-1``.
             Must be ``>= 1``; not validated here.
         """
-        raise NotImplementedError
+        alpha, beta = stieltjes_recurrence(self.weight, self.support, n)
+        beta[0] = self.reference_mass
+        return alpha, beta

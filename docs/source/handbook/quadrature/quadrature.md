@@ -362,6 +362,10 @@ Instead, in Archimedes you explicitly choose between probabilists' and physicist
 
 <!-- TODO: Add comment about "std" in kind="phys" -->
 
+### Clenshaw-Curtis
+
+<!-- TODO: Explain Gauss-Lobatto vs Clenshaw-Curtis, when you might want either -->
+
 ### Composite Rules
 
 <!-- TODO: Write this -->
@@ -376,7 +380,7 @@ Instead, in Archimedes you explicitly choose between probabilists' and physicist
 
 ## Appendix: Quadrature and Orthogonal Polynomials
 
-<!-- TODO: Callout that this is optional "of interest" material -->
+<!-- TODO: Callout that this is optional "of interest" material... or move to its own page? -->
 
 The weight functions, reference domains, and node distributions can seem to be somewhat obscure at first.
 These arise from a deep connection to _classical orthogonal polynomials_, and understanding why helps select the right family for an application.

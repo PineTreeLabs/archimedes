@@ -6,8 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 In particular, the API is still evolving and may change between minor versions, although we'll aim to document such changes here.
 
 ## [Unreleased]
-- Add support for Gaussian quadrature in `archimedes.quadrature`, including tensor-product rules over several dimensions (`tensor`), each dimension carrying its own `Measure`
-- Added `Measure` classes in `archimedes.measure` (currently only used for quadrature weights)
+- Add support for Gaussian quadrature in `archimedes.quadrature`
+- Added `Measure` classes in `archimedes.measure`, including discretized Stieltjes procedure
 - Added `archimedes.experimental.approximation`: `Basis`/`FunctionSpace`/`Function` for linear basis expansions, with orthogonal polynomial, Lagrange, piecewise (C⁻¹/C⁰), and tensor-product (multivariate) bases
 - **Fix incorrect matrix norms**: `np.linalg.norm(A, ord=...)` for 2-D `A` returned CasADi's *entrywise* norms instead of NumPy's *induced operator* norms, silently giving wrong values for `ord=1` and `ord=inf` (`ord=None`/`'fro'` were correct). `ord=1` and `ord=inf` now match NumPy; `ord=2` (spectral norm) raises `NotImplementedError` pending a symbolic SVD, where it previously returned the Frobenius norm
 - **Fix `np.roll(a, shift)` silently changing shape**: with `axis=None` and 2-D `a`, the result was returned flattened instead of restored to `a.shape`

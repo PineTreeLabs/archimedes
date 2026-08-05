@@ -2,6 +2,7 @@ import math
 
 import numpy as np
 import pytest
+from scipy.integrate import quad
 from scipy.special import (
     roots_hermite,
     roots_hermitenorm,
@@ -14,8 +15,10 @@ from archimedes.measure import (
     JacobiMeasure,
     LaguerreMeasure,
     LegendreMeasure,
+    Measure,
     PhysicistsHermiteMeasure,
     ProbabilistsHermiteMeasure,
+    RealLine,
 )
 from archimedes.quadrature import golub_welsch, golub_welsch_rule
 
@@ -130,3 +133,37 @@ def test_golub_welsch_rule_custom_name():
 def test_golub_welsch_rule_invalid_n():
     with pytest.raises(ValueError):
         golub_welsch_rule(LegendreMeasure(), 0)
+
+
+# -- discretized Stieltjes fallback (no closed form) --
+
+
+class _QuarticMeasure(Measure):
+    """A weight with no closed-form recursion -- relies entirely on
+    Measure's default (discretized Stieltjes) recurrence_coeffs."""
+
+    domain = RealLine()
+
+    def weight(self, x):
+        return np.exp(-(x**4))
+
+    @property
+    def reference_mass(self):
+        return 1.812804954110954  # quad(weight, -inf, inf)
+
+
+@pytest.mark.parametrize("n", [5, 10])
+def test_golub_welsch_rule_custom_measure_exact_even_moments(n):
+    rule = golub_welsch_rule(_QuarticMeasure(), n)
+    for deg in range(0, 2 * n, 2):
+        expected, _ = quad(lambda x, deg=deg: x**deg * np.exp(-(x**4)), -np.inf, np.inf)
+        assert np.isclose(
+            rule.integrate(lambda x, deg=deg: x**deg), expected, atol=1e-8
+        )
+
+
+@pytest.mark.parametrize("n", [5, 10])
+def test_golub_welsch_rule_custom_measure_odd_moments_vanish(n):
+    rule = golub_welsch_rule(_QuarticMeasure(), n)
+    for deg in range(1, 2 * n, 2):
+        assert np.isclose(rule.integrate(lambda x, deg=deg: x**deg), 0.0, atol=1e-8)

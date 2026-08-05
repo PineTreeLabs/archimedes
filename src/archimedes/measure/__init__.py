@@ -12,6 +12,7 @@ from ._hermite import PhysicistsHermiteMeasure, ProbabilistsHermiteMeasure
 from ._jacobi import JacobiMeasure
 from ._laguerre import LaguerreMeasure
 from ._legendre import LegendreMeasure
+from ._stieltjes import stieltjes_recurrence
 
 __all__ = [
     "Measure",
@@ -24,4 +25,5 @@ __all__ = [
     "JacobiMeasure",
     "LaguerreMeasure",
     "LegendreMeasure",
+    "stieltjes_recurrence",
 ]

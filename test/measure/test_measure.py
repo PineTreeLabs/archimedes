@@ -1,5 +1,6 @@
 import numpy as np
 import pytest
+from scipy.integrate import quad
 from scipy.special import beta as beta_fn
 
 from archimedes import tree
@@ -8,10 +9,12 @@ from archimedes.measure import (
     JacobiMeasure,
     LaguerreMeasure,
     LegendreMeasure,
+    Measure,
     PhysicistsHermiteMeasure,
     ProbabilistsHermiteMeasure,
     RealLine,
     UnitInterval,
+    stieltjes_recurrence,
 )
 
 # -- Measure implementations --
@@ -301,6 +304,84 @@ def test_hermite_norm_measure():
 
     with pytest.raises(ValueError):
         measure.affine_params(std=-1.0)
+
+
+# -- stieltjes_recurrence (discretized Stieltjes fallback) --
+
+
+@pytest.mark.parametrize(
+    "measure",
+    [LegendreMeasure(), LaguerreMeasure(), PhysicistsHermiteMeasure()],
+)
+@pytest.mark.parametrize("n", [1, 2, 3, 5, 8, 10])
+def test_stieltjes_recurrence_matches_closed_form(measure, n):
+    alpha, beta = stieltjes_recurrence(measure.weight, measure.support, n)
+    expected_alpha, expected_beta = measure.recurrence_coeffs(n)
+    np.testing.assert_allclose(alpha, expected_alpha, atol=1e-8)
+    np.testing.assert_allclose(beta, expected_beta, atol=1e-8)
+
+
+@pytest.mark.parametrize("n", [1, 2, 3, 5])
+def test_stieltjes_recurrence_matches_jacobi(n):
+    # Endpoint-singular weight, so accuracy degrades sooner than the
+    # smooth/bounded families above -- stay well clear of that regime.
+    measure = JacobiMeasure(alpha=1.5, beta=0.5)
+    alpha, beta = stieltjes_recurrence(measure.weight, measure.support, n)
+    expected_alpha, expected_beta = measure.recurrence_coeffs(n)
+    np.testing.assert_allclose(alpha, expected_alpha, atol=1e-6)
+    np.testing.assert_allclose(beta, expected_beta, atol=1e-6)
+
+
+def test_stieltjes_recurrence_shape_and_zeroth_moment():
+    measure = LegendreMeasure()
+    n = 6
+    alpha, beta = stieltjes_recurrence(measure.weight, measure.support, n)
+    assert alpha.shape == (n,)
+    assert beta.shape == (n,)
+
+    # The standalone function's beta[0] is its own quadrature estimate of
+    # the zeroth moment, not (necessarily) an exact reference_mass.
+    expected, _ = quad(measure.weight, *measure.support)
+    assert np.isclose(beta[0], expected)
+
+
+# -- Measure.recurrence_coeffs default (Stieltjes fallback wiring) --
+
+
+class _StieltjesLegendre(Measure):
+    """Minimal custom Measure: no recurrence_coeffs override, so it relies
+    entirely on the base class's discretized Stieltjes fallback."""
+
+    domain = UnitInterval()
+
+    def weight(self, x):
+        return np.ones_like(x)
+
+    @property
+    def reference_mass(self):
+        return 2.0
+
+
+def test_measure_default_recurrence_coeffs_matches_legendre():
+    measure = _StieltjesLegendre()
+    alpha, beta = measure.recurrence_coeffs(8)
+    expected_alpha, expected_beta = LegendreMeasure().recurrence_coeffs(8)
+    np.testing.assert_allclose(alpha, expected_alpha, atol=1e-8)
+    np.testing.assert_allclose(beta, expected_beta, atol=1e-8)
+
+
+def test_measure_default_recurrence_coeffs_uses_reference_mass():
+    # beta[0] comes from reference_mass, not the internal quadrature
+    # estimate of the zeroth moment -- exact here since reference_mass is
+    # exact, even though the estimate would only be approximate.
+    measure = _StieltjesLegendre()
+    _, beta = measure.recurrence_coeffs(5)
+    assert beta[0] == 2.0
+
+
+def test_measure_is_not_directly_instantiable():
+    with pytest.raises(TypeError):
+        Measure()
 
 
 # -- equality / hashing --
