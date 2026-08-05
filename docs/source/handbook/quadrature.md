@@ -17,8 +17,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 import archimedes as arc
-
-np.random.seed(0)
 ```
 
 ```{code-cell} python
@@ -44,26 +42,26 @@ This page gives an introduction to numerical quadrature in Archimedes, including
 
 Gaussian quadrature approximates a weighted integral with a discrete sum over (generally non-uniform) nodes and weights:
 
-$$
+```{math}
 \int_a^b f(x) \, w(x) \, dx \approx \sum_{i=1}^n w_i f(x_i),
-$$
+```
 
 where $f(x)$ is the function to be integrated, $w(x)$ is a weight function, and $\{x_i\}, \{w_i\}$ are the nodes and weights, which are uniquely determined by the family and order of the quadrature rule.
 
 The most common quadrature family, [Gauss-Legendre quadrature](https://en.wikipedia.org/wiki/Gauss%E2%80%93Legendre_quadrature) uses a domain of $[-1, 1]$, with uniform weight $w(x) = 1$:
 
-$$
+```{math}
 \int_{-1}^{1} f(x) \, dx \approx \sum_{i=1}^n w_i f(x_i),
-$$
+```
 
 which can be shifted to an arbitrary (finite) domain $[a, b]$ by rescaling the Gauss-Legendre nodes and weights by:
 
-$$
+```{math}
 \begin{aligned}
 x_i &\leftarrow \frac{b-a}{2} x_i + \frac{a+b}{2} \\
 w_i &\leftarrow \frac{b-a}{2} w_i
 \end{aligned}
-$$
+```
 
 Definite integrals on finite domains can be calculated using Gauss-Legendre quadrature with the [`quadint`](#archimedes.quadrature.quadint) function:
 
@@ -377,9 +375,9 @@ For instance, `quad_rule.integrate(f, a=a, b=b)` for Gauss-Legendre (or Radau, L
 One distinct feature of the Archimedes quadrature interface is that you can optionally pass a `density=True` keyword arg to directly interpret the weight functions as probability densities.
 That is, the quadrature result approximates an expectation under the corresponding probability density:
 
-$$
+```{math}
 \int_{\mathcal{D}} f(x) \, \rho(x) \, dx, \qquad \rho(x) =  \frac{1}{\int_{\mathcal{D}} w(x') \, dx'} w(x)
-$$
+```
 
 For example, we can compute the expectation of $x^2$ over a normal distribution with mean $\mu$ and variance $\sigma^2$ using the probabilists' Gauss-Hermite quadrature:
 
@@ -618,29 +616,29 @@ For the Gauss-Legendre method, by adding $n$ additional degrees of freedom to th
 Suppose $f(x)$ is a polynomial of degree $\leq 2n - 1$, and we will be interpolating at roots $x_i$.
 We can construct a polynomial $q_n(x) \equiv \prod_{i=1}^n (x - x_i)$ and do [polynomial long division](https://en.wikipedia.org/wiki/Polynomial_long_division) to decompose into the node polynomial $q_n(x)$, a quotient $p(x)$, and the remainder $r(x)$ (degrees $n$, $\leq n-1$, and $\leq n-1$, respectively):
 
-$$
+```{math}
 f(x) = q_n(x) p(x) + r(x).
-$$
+```
 
 We don't know what $p(x)$ and $r(x)$ are here; they're arbitrary polynomials used to derive the conditions on the selection of roots.
 
 If we apply the quadrature rule $\sum_{i=1}^n w_i f(x_i)$ to this, by construction $q_n(x_i) = 0$, so
 
-$$
+```{math}
 \sum_{i=1}^n w_i f(x_i) = \sum_{i=1}^n w_i r(x_i)
-$$
+```
 
 If the weights are chosen as above, then since $r(x)$ has degree $\leq n - 1$ this integral is exact over $r$, so 
 
-$$
+```{math}
 \sum_{i=1}^n w_i f(x_i) = \int_a^b w(x) \, r(x) \, dx.
-$$
+```
 
 In order for this to *also* equal the weighted integral of $f(x)$, the additional contribution from $q_n(x) p(x)$ has to vanish for *any* polynomial $p(x)$ with degree $\leq n - 1$:
 
-$$
+```{math}
 \int_a^b w(x) \, q_n(x) \, p(x) \, dx = 0.
-$$
+```
 
 This is exactly the defining property of [orthogonal polynomials](https://en.wikipedia.org/wiki/Orthogonal_polynomials).
 
@@ -648,9 +646,9 @@ This is exactly the defining property of [orthogonal polynomials](https://en.wik
 
 The important thing for Gaussian quadrature is that given a weight function and a domain, you can derive a family of polynomials such that the $n$-th polynomial is orthogonal to all $n-1$ polynomials in that family with respect to that weight, exactly the property Gauss identifies for optimizing accuracy of the quadrature rule:
 
-$$
+```{math}
 \int_a^b w(x) \, q_i(x) \, q_j(x) \, dx = 0, \qquad i \neq j
-$$
+```
 
 Since any $n-1$-degree polynomial can be represented by a linear combination of $q_i(x)$, $i = 0, 1, \dots, n-1$, the quotient term from polynomial division is guaranteed to vanish.
 
@@ -727,14 +725,14 @@ for theme in ("light", "dark"):
     ax.set_ylim(-1, 6)
     ax.grid()
     ax.set_yticks([])
-    plt.savefig(f"_plots/nodes_{theme}.png")
+    plt.savefig(f"_plots/quadrature_6_{theme}.png")
 ```
 
-```{image} _plots/nodes_light.png
+```{image} _plots/quadrature_6_light.png
 :class: only-light
 ```
 
-```{image} _plots/nodes_dark.png
+```{image} _plots/quadrature_6_dark.png
 :class: only-dark
 ```
 
@@ -745,9 +743,9 @@ The schemes themselves are derived similarly to the Gauss-Legendre case, but fix
 This amounts to a different weight in the orthogonality requirement and therefore a different member of the orthogonal polynomial family.
 For Gauss-Radau with an endpoint at $x = a$ and original weight $w(x) = 1$, the orthogonality condition becomes:
 
-$$
+```{math}
 \int_a^b (x - a) \, q_i(x) \, q_j(x) \, dx = 0, \qquad i \neq j
-$$
+```
 
 That is, the nodes must be placed at the roots of the polynomials that are orthogonal with respect to this inner product with weight $(x - a)$.
 

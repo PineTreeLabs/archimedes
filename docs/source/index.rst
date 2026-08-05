@@ -118,7 +118,7 @@ Documentation
 
    gotchas
    reference/index
-   handbook/quadrature/quadrature
+   handbook/quadrature
 
 .. toctree::
    :maxdepth: 1
