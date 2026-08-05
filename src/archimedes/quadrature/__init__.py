@@ -1,6 +1,7 @@
 """Numerical quadrature methods for approximating integrals."""
 
 from ._gauss_hermite import gauss_hermite
+from ._gauss_jacobi import gauss_jacobi
 from ._gauss_laguerre import gauss_laguerre
 from ._gauss_legendre import (
     clenshaw_curtis,
@@ -27,6 +28,7 @@ __all__ = [
     "gauss_lobatto",
     "clenshaw_curtis",
     "gauss_hermite",
+    "gauss_jacobi",
     "gauss_laguerre",
     "golub_welsch",
     "golub_welsch_rule",

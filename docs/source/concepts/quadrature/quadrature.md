@@ -32,6 +32,9 @@ plot_dir.mkdir(exist_ok=True)
 # Quadrature
 
 _Quadrature_ is the name given to a set of algorithms that perform approximate numerical integration of arbitrary functions.
+
+<!-- TODO: Why you need quadrature, and why odeint is different -->
+
 The [`quadrature`](#archimedes.quadrature) module includes support for Gaussian quadrature implementations that are compatible with Archimedes' symbolic tracing, autodiff, and code generation.
 
 This page gives an introduction to numerical quadrature in Archimedes, including the relationship between Gaussian quadrature rules and classical orthogonal polynomials, and how this relationship translates into the concepts of [`Measure`](#archimedes.measure.Measure) and [`QuadratureRule`](#archimedes.quadrature.QuadratureRule).
@@ -78,7 +81,11 @@ print(f"Exact integral:          {J_ex:.6f}")
 print(f"Gauss-Legendre integral: {J_leg:.6f}")
 ```
 
+<!-- TODO: plot convergence against np.trapz -->
+
 Unlike [`scipy.integrate.quad`](https://docs.scipy.org/doc/scipy/reference/generated/scipy.integrate.quad.html), this does not support adaptive integration with an error tolerance, nor does it support infinite or semi-infinite intervals.
+
+<!-- TODO: note on why infinite isn't supported (see docstring) -->
 
 However, it does support symbolic evaluation (including limits):
 
@@ -100,7 +107,7 @@ print(f"Analytical dJ/da: {-np.exp(a):.6f}, dJ/db: {np.exp(b):.6f}")
 print(f"Computed dJ/da:   {dJ_da:.6f}, dJ/db: {dJ_db:.6f}")
 ```
 
-and vector-values integrands:
+and vector-valued integrands:
 
 ```{code-cell} python
 # Vector-valued integrands
@@ -115,7 +122,7 @@ print("Analytical integral: [1, 1]")
 print(f"Computed integral:   {J_vec}")
 ```
 
-Combining these, you can easily compute derivatives "under the integral sign" using the Leibnitz rule:
+Combining these, you can easily compute derivatives "under the integral sign" using the Leibniz rule:
 
 ```{code-cell} python
 # https://en.wikipedia.org/wiki/Leibniz_integral_rule#Example_2:_Variable_limits
@@ -171,21 +178,26 @@ for theme in {"light", "dark"}:
     plt.close()
 ```
 
-<!-- TODO: composite and tensor rules -->
-
 ## The `quadrature` Module
 
 The power of Gaussian quadrature lies in carefully chosen nodes and weights which give highly accurate approximations of integrals of polynomials (and hence arbitrary smooth functions) with relatively few sample points.
-For instance, the 3e-6 error in the complicated cosh derivative-of-integral above used only _five_ sample points on the $(0, 2\pi)$ domain.
+For instance, the complicated cosh derivative-of-integral above used only _five_ sample points.
 
 The nodes are the roots of classical orthogonal polynomials associated with the weight function (i.e. Legendre polynomials for $w(x) = 1$ on a finite interval), and the weights are derived from Lagrange interpolation of the nodal data (see section "Quadrature and Orthogonal Polynomials" below).
 
 Since the nodes and weights on the reference domain can be statically computed, under the hood we use SciPy's [`roots_legendre/jacobi/laguerre/hermite`](https://docs.scipy.org/doc/scipy/reference/special.html#orthogonal-polynomials) functions to do the actual math.
 
-There are two internal abstractions that keep track of the weight function, reference domain, and reference nodes/weights.
+<!-- TODO: Emphasize static/symbolic split -->
+
+### Module Basics
+
+There are two abstractions that keep track of the weight function, reference domain, and reference nodes/weights.
 The first is [`Measure`](#archimedes.measure.Measure), which combines a weight function with a reference interval to define families of orthogonal polynomials.
 The second is [`QuadratureRule`](#archimedes.quadrature.QuadratureRule), which stores the nodes, weights, and associated `Measure`, and which is responsible for domain transformations and performing the weighted sum.
 
+<!-- TODO: Expand on Measure, QuadratureRule, or at least a graphic -->
+
+<!-- TODO: Forward ref for "exotic custom quadrature rules" -->
 If you're not constructing exotic custom quadrature rules, you shouldn't need to interact with either of these classes directly.
 Instead, there are two high-level interfaces:
 
@@ -204,6 +216,7 @@ Available options are:
 | Gauss-Radau | `gauss_radau(n, endpoint="left"\|"right")` | $1$ | $[-1, 1]$ | Fixes one endpoint |
 | Gauss-Lobatto | `gauss_lobatto(n)` | $1$ | $[-1, 1]$ | Fixes both endpoints |
 | Clenshaw-Curtis | `clenshaw_curtis(n)` | $1$ | $[-1, 1]$ | Chebyshev-Lobatto nodes |
+| Gauss-Jacobi | `gauss_jacobi(n, alpha, beta)` | $(1-x)^\alpha(1+x)^\beta$ | $[-1, 1]$ | Legendre/Chebyshev are special cases |
 | Gauss-Hermite (physicists') | `gauss_hermite(n, kind="phys")` | $e^{-x^2}$ | $(-\infty, \infty)$ |   |
 | Gauss-Hermite (probabilists') | `gauss_hermite(n, kind="prob")` |$e^{-x^2/2}$ | $(-\infty, \infty)$ |   |
 | Gauss-Laguerre | `gauss_laguerre(n)` | $e^{-x}$ | $[0, \infty)$ |   |
@@ -220,7 +233,7 @@ The equivalence between the two is literally:
 quad_rule.integrate(f, **kwparams)
 
 # is the same as this:
-xp = quad_rule.weights
+xp = quad_rule.nodes
 fp = f(xp)
 quad_rule.sum(fp, **kwparams)
 ```
@@ -339,8 +352,23 @@ I can't be the only one who ever got tripped up by this.
 
 Instead, in Archimedes you explicitly choose between probabilists' and physicists' Hermite families with the `kind = 'phys' | 'prob'` keyword arg, as seen above.
 
+<!-- TODO: Add comment about "std" in kind="phys" -->
 
-## Quadrature and orthogonal polynomials
+### Composite Rules
+
+<!-- TODO: Write this -->
+
+### Tensor Rules
+
+<!-- TODO: Write this -->
+
+### Custom Rules
+
+<!-- Golub-Welsch extension -->
+
+## Appendix: Quadrature and Orthogonal Polynomials
+
+<!-- TODO: Callout that this is optional "of interest" material -->
 
 The weight functions, reference domains, and node distributions can seem to be somewhat obscure at first.
 These arise from a deep connection to _classical orthogonal polynomials_, and understanding why helps select the right family for an application.
@@ -401,6 +429,7 @@ Since any $n-1$-degree polynomial can be represented by a linear combination of 
 The upshot is that **if we choose the quadrature nodes to be the roots of the appropriate orthogonal polynomial, then we get optimal quadrature accuracy**.
 The "appropriate" polynomial depends on the weight function and the domain, commonly:
 
+<!-- TODO: Add Wiener-Askey correspondence -->
 | Weight $w(x)$ | Domain | Orthogonal polynomials | Quadrature scheme |
 |---|---|---|---|
 | $1$ | $[-1,1]$ | [Legendre](https://en.wikipedia.org/wiki/Legendre_polynomials) | [Gauss–Legendre](https://en.wikipedia.org/wiki/Gauss%E2%80%93Legendre_quadrature) |
@@ -425,11 +454,11 @@ Alternatively, we can derive _constrained_ quadrature families that include one 
 
 ```{code-cell} python
 n = 10
-leg = quad.gauss_legendre(n)
-rad_left = quad.gauss_radau(n, endpoint="left")
-rad_right = quad.gauss_radau(n, endpoint="right")
-lob = quad.gauss_lobatto(n)
-# cc = quad.clenshaw_curtis(n)
+leg = arc.quadrature.gauss_legendre(n)
+rad_left = arc.quadrature.gauss_radau(n, endpoint="left")
+rad_right = arc.quadrature.gauss_radau(n, endpoint="right")
+lob = arc.quadrature.gauss_lobatto(n)
+# cc = arc.quadrature.clenshaw_curtis(n)
 
 zero = np.zeros_like(leg.nodes)
 

@@ -4,7 +4,13 @@ import math
 import numpy as np
 import pytest
 from scipy.special import beta as beta_fn
-from scipy.special import roots_hermite, roots_hermitenorm, roots_jacobi, roots_laguerre
+from scipy.special import (
+    comb,
+    roots_hermite,
+    roots_hermitenorm,
+    roots_jacobi,
+    roots_laguerre,
+)
 
 import archimedes as arc
 from archimedes.measure import (
@@ -19,6 +25,7 @@ from archimedes.quadrature import (
     clenshaw_curtis,
     composite_quad,
     gauss_hermite,
+    gauss_jacobi,
     gauss_laguerre,
     gauss_legendre,
     gauss_lobatto,
@@ -345,6 +352,34 @@ def test_gauss_laguerre():
         assert np.isclose(rule.integrate(lambda x, k=k: x**k), math.factorial(k))
 
 
+def test_gauss_jacobi():
+    n, alpha, beta = 5, 1.5, 0.5
+    rule = gauss_jacobi(n, alpha, beta)
+    assert len(rule) == n
+    assert isinstance(rule.measure, JacobiMeasure)
+    assert rule.measure.alpha == alpha
+    assert rule.measure.beta == beta
+
+    # Exact for polynomials up to degree 2n - 1, weighted by
+    # (1-x)^alpha (1+x)^beta. Substituting x = 2t - 1 reduces the moment
+    # to a sum of Beta functions, giving a closed form to check against.
+    def jacobi_moment(k):
+        return 2 ** (alpha + beta + 1) * sum(
+            comb(k, j) * (-1) ** (k - j) * 2**j * beta_fn(j + beta + 1, alpha + 1)
+            for j in range(k + 1)
+        )
+
+    for k in range(2 * n):
+        assert np.isclose(rule.integrate(lambda x, k=k: x**k), jacobi_moment(k))
+
+
+def test_gauss_jacobi_invalid_params():
+    with pytest.raises(ValueError):
+        gauss_jacobi(5, -1.0, 0.5)
+    with pytest.raises(ValueError):
+        gauss_jacobi(5, 0.5, -1.0)
+
+
 def test_gauss_jacobi_exact_moment():
     n, alpha, beta = 5, 1.0, 2.0
     x, w = roots_jacobi(n, alpha, beta)
@@ -482,14 +517,7 @@ def test_sum_density_forwarded():
     "rule_factory,params",
     [
         (lambda: gauss_legendre(5), {"a": -2.0, "b": 5.0}),
-        (
-            lambda: QuadratureRule(
-                *roots_jacobi(5, 1.0, 2.0),
-                name="gauss_jacobi_5",
-                measure=JacobiMeasure(alpha=1.0, beta=2.0),
-            ),
-            {},
-        ),
+        (lambda: gauss_jacobi(5, 1.0, 2.0), {}),
         (lambda: gauss_laguerre(5), {"rate": 2.0, "start": 1.0}),
         (lambda: gauss_hermite(5, kind="phys"), {"mean": 1.0, "std": 2.0}),
         (lambda: gauss_hermite(5, kind="prob"), {"mean": 1.0, "std": 2.0}),
@@ -530,11 +558,7 @@ def test_composite_scaled_domain():
 
 
 def test_composite_requires_uniform_weight():
-    jacobi_rule = QuadratureRule(
-        *roots_jacobi(5, 1.0, 2.0),
-        name="gauss_jacobi_5",
-        measure=JacobiMeasure(alpha=1.0, beta=2.0),
-    )
+    jacobi_rule = gauss_jacobi(5, 1.0, 2.0)
     with pytest.raises(ValueError):
         composite_quad(jacobi_rule, [-1.0, 0.0, 1.0])
 
