@@ -39,7 +39,7 @@ The [`quadrature`](#archimedes.quadrature) module includes support for Gaussian 
 
 This page gives an introduction to numerical quadrature in Archimedes, including the relationship between Gaussian quadrature rules and classical orthogonal polynomials, and how this relationship translates into the concepts of [`Measure`](#archimedes.measure.Measure) and [`QuadratureRule`](#archimedes.quadrature.QuadratureRule).
 
-## Quickstart
+## Quadrature Quickstart
 
 Gaussian quadrature approximates a weighted integral with a discrete sum over (generally non-uniform) nodes and weights:
 
@@ -82,6 +82,13 @@ print(f"Gauss-Legendre integral: {J_leg:.6f}")
 ```
 
 <!-- TODO: plot convergence against np.trapz -->
+
+<!-- TODO: Traceable integrand and crossref with gotchas -->
+
+## Why a Separate Quadrature Implementation
+
+<!-- TODO: Why not just use NumPy/SciPy? Emphasize static/symbolic split -->
+
 
 Unlike [`scipy.integrate.quad`](https://docs.scipy.org/doc/scipy/reference/generated/scipy.integrate.quad.html), this does not support adaptive integration with an error tolerance, nor does it support infinite or semi-infinite intervals.
 
@@ -166,7 +173,7 @@ ax.set_ylabel("$g(x)$")
 :tags: [remove-cell]
 
 for theme in {"light", "dark"}:
-    arc.theme.set_theme(theme)
+    arc.set_theme(theme)
     fig, ax = plt.subplots(1, 1, figsize=(7, 2))
     ax.plot(x, dg, label="Computed")
     ax.plot(x, dg_ex, "--", label="Exact")
@@ -186,8 +193,6 @@ For instance, the complicated cosh derivative-of-integral above used only _five_
 The nodes are the roots of classical orthogonal polynomials associated with the weight function (i.e. Legendre polynomials for $w(x) = 1$ on a finite interval), and the weights are derived from Lagrange interpolation of the nodal data (see section "Quadrature and Orthogonal Polynomials" below).
 
 Since the nodes and weights on the reference domain can be statically computed, under the hood we use SciPy's [`roots_legendre/jacobi/laguerre/hermite`](https://docs.scipy.org/doc/scipy/reference/special.html#orthogonal-polynomials) functions to do the actual math.
-
-<!-- TODO: Emphasize static/symbolic split -->
 
 ### Module Basics
 
@@ -220,6 +225,9 @@ Available options are:
 | Gauss-Hermite (physicists') | `gauss_hermite(n, kind="phys")` | $e^{-x^2}$ | $(-\infty, \infty)$ |   |
 | Gauss-Hermite (probabilists') | `gauss_hermite(n, kind="prob")` |$e^{-x^2/2}$ | $(-\infty, \infty)$ |   |
 | Gauss-Laguerre | `gauss_laguerre(n)` | $e^{-x}$ | $[0, \infty)$ |   |
+
+<!-- TODO: Add "decision rules" -->
+<!-- TODO: Add periodic_trapezoidal -->
 
 Once you have the `QuadratureRule` object, you can inspect the nodes and weights if you like, or just use its quadrature methods:
 
