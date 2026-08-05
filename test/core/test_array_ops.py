@@ -5,6 +5,7 @@ import re
 import casadi as cs
 import numpy as np
 import pytest
+import scipy.special as sp
 
 try:
     import numpy.exceptions as npex
@@ -93,6 +94,18 @@ class TestSymbolicArrayUFuncs:
         assert result.dtype == np.float64
         assert result.shape == (3,)
         assert cs.is_equal(result._sym, cs.sqrt(x._sym**2 + y._sym**2), 3)
+
+    def test_erf(self, array):
+        result = sp.erf(array)
+        assert isinstance(result, SymbolicArray)
+        assert result.dtype == np.float64
+        assert cs.is_equal(result._sym, cs.erf(array._sym), 1)
+
+    def test_erfinv(self, array):
+        result = sp.erfinv(array)
+        assert isinstance(result, SymbolicArray)
+        assert result.dtype == np.float64
+        assert cs.is_equal(result._sym, cs.erfinv(array._sym), 1)
 
     def test_angle_conversions(self):
         x = sym("x", (3,), dtype=np.float64)
