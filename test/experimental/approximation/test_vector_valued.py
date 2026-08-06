@@ -132,8 +132,10 @@ def test_project_vector_matches_per_component_projection(space):
 
 def test_project_vector_respects_quad_rule_override(space):
     # Same override path as the scalar case; just confirm it's plumbed
-    # through the vector branch too.
-    rule = gauss_legendre(12)
+    # through the vector branch too. An override rule is used exactly as
+    # given (no further domain mapping -- see `FunctionSpace._resolve_rule`),
+    # so it must already be mapped onto this space's domain.
+    rule = gauss_legendre(12, A, B)
     fn = space.project(f_vec, quad_rule=rule)
     x = np.linspace(A, B, 21)
     np.testing.assert_allclose(fn(x), f_vec(x), atol=1e-9)

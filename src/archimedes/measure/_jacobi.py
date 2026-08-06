@@ -59,6 +59,12 @@ class JacobiMeasure(Measure):
     # cannot be tiled into a composite rule -- see `Measure.uniform_weight`.
     uniform_weight = False
 
+    # Also not a dataclass field, same reasoning: `alpha`/`beta` are
+    # dimensionless shape exponents that don't interact with the affine
+    # domain map, so the closed-form recurrence stays valid under any
+    # `a`/`b` remap -- see `Measure.affine_invariant`.
+    affine_invariant = True
+
     def __post_init__(self):
         if self.alpha <= -1 or self.beta <= -1:
             raise ValueError(

@@ -16,10 +16,10 @@ from ._quadrature_rule import QuadratureRule
 
 __all__ = ["quadint"]
 
-_RULES: dict[str, Callable[[int], QuadratureRule]] = {
+_RULES: dict[str, Callable[[int, float, float], QuadratureRule]] = {
     "legendre": gauss_legendre,
-    "radau_left": lambda n: gauss_radau(n, endpoint="left"),
-    "radau_right": lambda n: gauss_radau(n, endpoint="right"),
+    "radau_left": lambda n, a, b: gauss_radau(n, endpoint="left", a=a, b=b),
+    "radau_right": lambda n, a, b: gauss_radau(n, endpoint="right", a=a, b=b),
     "lobatto": gauss_lobatto,
     "clenshaw_curtis": clenshaw_curtis,
 }
@@ -43,7 +43,7 @@ def quadint(
     `Gauss-Legendre quadrature
     <https://en.wikipedia.org/wiki/Gauss%E2%80%93Legendre_quadrature>`_).
 
-    This is a convenience wrapper around the ``rule(n).integrate(f, a, b)``
+    This is a convenience wrapper around the ``rule(n, a, b).integrate(f)``
     pattern (see :py:meth:`QuadratureRule.integrate`) for one-off integrals
     on a finite interval; for repeated evaluation of the same rule (e.g.
     inside a loop or a function decorated with :py:func:`archimedes.compile`),
@@ -90,19 +90,8 @@ def quadint(
     -----
     This function only supports finite ``[a, b]``. Unlike
     ``scipy.integrate.quad``, it does not adapt the node count or use a
-    variable transformation to reach infinite/semi-infinite intervals --
-    it is a thin wrapper around a single fixed-order rule. Gauss-Laguerre
-    and Gauss-Hermite quadrature *can* integrate over semi-infinite and
-    infinite intervals, but only the weighted integral
-    :math:`\\int f(x) e^{-x} \\, dx` or :math:`\\int f(x) e^{-x^2} \\, dx`
-    respectively -- correcting for the weight by evaluating
-    :math:`f(x) e^{x}` (or :math:`e^{x^2}`) at the nodes reintroduces the
-    overflow/cancellation problems Gauss quadrature exists to avoid, so
-    this is not done automatically. If your integrand already has the
-    appropriate decay, construct a ``QuadratureRule`` directly with an
-    :py:class:`~archimedes.measure.LaguerreMeasure`
-    or :py:class:`~archimedes.measure.PhysicistsHermiteMeasure`
-    instead of using this function.
+    variable transformation to reach infinite/semi-infinite intervals;
+    it is a thin wrapper around a single fixed-order rule.
 
     See Also
     --------
@@ -115,4 +104,4 @@ def quadint(
     if rule not in _RULES:
         raise ValueError(f"unknown rule {rule!r}; expected one of {sorted(_RULES)}")
 
-    return _RULES[rule](n).integrate(func, a, b, axis=axis, args=args)
+    return _RULES[rule](n, a, b).integrate(func, axis=axis, args=args)

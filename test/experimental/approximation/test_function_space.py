@@ -135,6 +135,28 @@ def test_project_on_non_reference_domain(quad_rule):
     np.testing.assert_allclose(fn(x), f(x), atol=1e-8)
 
 
+def test_diff_matrix_uses_mapped_rule_not_reference(quad_rule):
+    # Regression test: `_diff_matrix`/`_integral_matrix` used to read
+    # `self.quad_rule` raw, bypassing `_resolve_rule` -- on a domain that
+    # differs visibly from the reference domain, that would silently
+    # evaluate both bases at reference-domain nodes instead of the
+    # physical ones.
+    wide_space = FunctionSpace(
+        OrthogonalPolynomialBasis(LegendreMeasure(), n_basis=5),
+        domain=UnitInterval.Parameters(a=0.0, b=4.0),
+        quad_rule=quad_rule,
+    )
+    fn = wide_space.project(lambda x: x**2)
+    deriv = fn.derivative()
+    x = np.linspace(0, 4, 13)
+    np.testing.assert_allclose(deriv(x), 2 * x, atol=1e-8)
+
+
+def test_resolve_rule_default_maps_onto_domain(space, quad_rule):
+    resolved = space._resolve_rule()
+    np.testing.assert_allclose(resolved.nodes, quad_rule.map_to(a=-1.0, b=1.0).nodes)
+
+
 def test_project_with_test_space_equal_to_self_matches_default(space):
     # test_space=space should be indistinguishable from the (default)
     # standard Galerkin path -- exercises the "not None" branch of the new
@@ -236,21 +258,59 @@ def test_inner_product_accepts_quad_rule_override(space):
 # -- quadrature / basis_matrix / BasisMatrix.T --
 
 
-def test_quadrature_matches_scaled_points_weights(space, quad_rule):
+def test_quadrature_matches_mapped_rule(space, quad_rule):
     x, w = space.quadrature()
-    np.testing.assert_allclose(x, quad_rule.scaled_points(a=-1.0, b=1.0))
-    np.testing.assert_allclose(
-        w, quad_rule.scaled_weights(a=-1.0, b=1.0, density=space.basis.density)
-    )
+    mapped = quad_rule.map_to(a=-1.0, b=1.0)
+    np.testing.assert_allclose(x, mapped.nodes)
+    expected_w = mapped.weights
+    if space.basis.density:
+        expected_w = expected_w / np.sum(expected_w)
+    np.testing.assert_allclose(w, expected_w)
 
 
 def test_quadrature_accepts_quad_rule_override(space):
+    # space's domain happens to be [-1, 1], the reference domain itself, so
+    # an unmapped override coincides numerically with one mapped onto it --
+    # see test_quadrature_override_on_non_reference_domain_is_used_as_is for
+    # the case where that's not true.
     coarse = gauss_legendre(6)
     x, w = space.quadrature(quad_rule=coarse)
-    np.testing.assert_allclose(x, coarse.scaled_points(a=-1.0, b=1.0))
-    np.testing.assert_allclose(
-        w, coarse.scaled_weights(a=-1.0, b=1.0, density=space.basis.density)
+    np.testing.assert_allclose(x, coarse.nodes)
+    expected_w = coarse.weights
+    if space.basis.density:
+        expected_w = expected_w / np.sum(expected_w)
+    np.testing.assert_allclose(w, expected_w)
+
+
+def test_quadrature_override_on_non_reference_domain_is_used_as_is(quad_rule):
+    # An explicit override is used exactly as given, with no further domain
+    # mapping applied -- so on a genuinely non-reference domain, an
+    # unmapped override rule gives *reference*-domain nodes back, not nodes
+    # mapped onto the space's domain.
+    wide_space = FunctionSpace(
+        OrthogonalPolynomialBasis(LegendreMeasure(), n_basis=4),
+        domain=UnitInterval.Parameters(a=0.0, b=4.0),
+        quad_rule=quad_rule,
     )
+    coarse = gauss_legendre(6)
+    x, w = wide_space.quadrature(quad_rule=coarse)
+    np.testing.assert_allclose(x, coarse.nodes)
+    np.testing.assert_allclose(w, coarse.weights)
+
+
+def test_quadrature_override_pre_mapped_matches_default(quad_rule):
+    # The correct way to use an override on a non-identity domain: map it
+    # yourself first.
+    wide_space = FunctionSpace(
+        OrthogonalPolynomialBasis(LegendreMeasure(), n_basis=4),
+        domain=UnitInterval.Parameters(a=0.0, b=4.0),
+        quad_rule=quad_rule,
+    )
+    pre_mapped = quad_rule.map_to(a=0.0, b=4.0)
+    x, w = wide_space.quadrature(quad_rule=pre_mapped)
+    x_default, w_default = wide_space.quadrature()
+    np.testing.assert_allclose(x, x_default)
+    np.testing.assert_allclose(w, w_default)
 
 
 def test_basis_matrix_matches_direct_basis_evaluation(space):

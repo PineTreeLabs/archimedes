@@ -30,7 +30,7 @@ LEFT = "left"
 @tree.struct
 class BasisMatrix:
     r"""A basis evaluated at a fixed set of quadrature nodes.
-    
+
     The basis matrix is bundled with the matching quadrature weights to
     provide proper weighted inner product semantics for matrix multiplication.
 
@@ -245,11 +245,10 @@ class Basis(metaclass=abc.ABCMeta):
     def _evaluate_at_nodes(self, rule, deriv=0, **domain_kwargs) -> np.ndarray:
         """Design matrix at a quadrature rule's nodes.
 
-        Equivalent to ``evaluate(rule.scaled_points(...), deriv)``, which is
-        the default implementation, but lets a family use the *provenance*
-        a rule carries and coordinates do not: which sub-element each node
-        came from (see
-        :attr:`~archimedes.quadrature.Quadrature.elements`).
+        Equivalent to ``evaluate(rule.nodes, deriv)``, which is the default
+        implementation, but lets a family use the *provenance* a rule
+        carries and coordinates do not: which sub-element each node came
+        from (see :attr:`~archimedes.quadrature.Quadrature.elements`).
 
         Only :class:`PiecewiseBasis` needs this, and only because it is
         discontinuous at its breakpoints: a rule may legitimately place
@@ -258,15 +257,17 @@ class Basis(metaclass=abc.ABCMeta):
         is single-valued everywhere, so the default is exact for them.
 
         Used by :class:`FunctionSpace` wherever it integrates (``basis_matrix``,
-        ``project``, and their private counterparts). Evaluation at
-        *user-supplied* points
-        goes through :meth:`evaluate`/:meth:`evaluate_expansion` instead,
-        which have no provenance to draw on and resolve breakpoints by the
-        documented ``side`` convention.
+        ``project``, and their private counterparts), which pass an already
+        domain-mapped ``rule`` (see ``FunctionSpace._resolve_rule``) --
+        ``rule.nodes`` is read as-is, with no further mapping here.
+        ``domain_kwargs`` is still needed for this basis's *own*
+        (independent) coefficient/breakpoint remap. Evaluation at
+        *user-supplied* points goes through
+        :meth:`evaluate`/:meth:`evaluate_expansion` instead, which have no
+        provenance to draw on and resolve breakpoints by the documented
+        ``side`` convention.
         """
-        return self.evaluate(
-            rule.scaled_points(**domain_kwargs), deriv=deriv, **domain_kwargs
-        )
+        return self.evaluate(rule.nodes, deriv=deriv, **domain_kwargs)
 
     def _product_basis(self, other: "Basis") -> "Basis":
         """A basis large enough to represent products from this basis and

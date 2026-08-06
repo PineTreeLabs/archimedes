@@ -156,13 +156,16 @@ def test_derivative_of_a_c0_space_integrates_exactly():
 
 def test_falls_back_to_coordinates_without_recorded_ownership():
     # A rule with no element structure has no provenance to use; the result
-    # must still match plain coordinate evaluation.
+    # must still match plain coordinate evaluation. `_evaluate_at_nodes`
+    # expects an already-mapped rule (as `FunctionSpace._resolve_rule`
+    # provides), consistent with the `a`/`b` domain kwargs used for the
+    # basis's own remap -- see `FunctionSpace._resolve_rule`.
     basis = _basis(-1)
-    rule = gauss_legendre(8)
+    rule = gauss_legendre(8).map_to(A, B)
     assert rule.elements is None
     np.testing.assert_allclose(
         basis._evaluate_at_nodes(rule, a=A, b=B),
-        basis.evaluate(rule.scaled_points(a=A, b=B), a=A, b=B),
+        basis.evaluate(rule.nodes, a=A, b=B),
     )
 
 

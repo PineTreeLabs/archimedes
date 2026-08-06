@@ -54,6 +54,15 @@ class ReferenceDomain(metaclass=abc.ABCMeta):
         raise NotImplementedError
 
     @abc.abstractmethod
+    def resolve_params(self, *args, **kwargs) -> ReferenceDomain.Parameters:
+        """Build (and validate) this domain's ``Parameters``.
+
+        Called with no arguments, must return the ``Parameters`` for the
+        reference domain itself.
+        """
+        raise NotImplementedError
+
+    @abc.abstractmethod
     def affine_params(self, *args, **kwargs) -> tuple[float, float]:
         """Return ``(scale, shift)`` mapping the reference domain onto the
         requested target instance.
@@ -64,8 +73,8 @@ class ReferenceDomain(metaclass=abc.ABCMeta):
         factor, since :math:`dx = \\mathrm{scale} \\cdot dt`.
 
         Called with no arguments, must return the identity ``(1.0, 0.0)``,
-        i.e. the reference domain itself. Also validates the arguments by
-        constructing a ``self.Parameters(...)`` instance internally.
+        i.e. the reference domain itself. Validates the arguments via
+        :meth:`resolve_params`.
         """
         raise NotImplementedError
 
@@ -103,6 +112,10 @@ class UnitInterval(ReferenceDomain):
         """Support :math:`[-1, 1]`."""
         return (-1.0, 1.0)
 
+    def resolve_params(self, a=None, b=None) -> UnitInterval.Parameters:
+        """Build this domain's ``Parameters``, defaulting to a=-1.0, b=1.0"""
+        return self.Parameters(a, b)
+
     def affine_params(self, a=None, b=None) -> tuple[float, float]:
         """Map the reference interval :math:`[-1, 1]` onto :math:`[a, b]`.
 
@@ -131,7 +144,7 @@ class UnitInterval(ReferenceDomain):
         ValueError
             If only one of ``a``, ``b`` is given, or if they aren't finite.
         """
-        params = self.Parameters(a, b)
+        params = self.resolve_params(a, b)
         if params.a is None and params.b is None:
             return 1.0, 0.0
         # `Parameters.__post_init__` has already rejected the one-sided case,
@@ -162,6 +175,15 @@ class HalfLine(ReferenceDomain):
         """Support :math:`[0, \\infty)`."""
         return (0.0, np.inf)
 
+    def resolve_params(self, rate=None, start=None) -> HalfLine.Parameters:
+        """Build this domain's ``Parameters``, defaulting to start=0.0, rate=1.0"""
+        kwargs = {}
+        if rate is not None:
+            kwargs["rate"] = rate
+        if start is not None:
+            kwargs["start"] = start
+        return self.Parameters(**kwargs)
+
     def affine_params(self, rate=None, start=None) -> tuple[float, float]:
         """Map :math:`[0, \\infty)` onto :math:`[\\mathrm{start}, \\infty)`
         with the given rate.
@@ -187,12 +209,7 @@ class HalfLine(ReferenceDomain):
         ValueError
             If ``rate`` is not positive.
         """
-        kwargs = {}
-        if rate is not None:
-            kwargs["rate"] = rate
-        if start is not None:
-            kwargs["start"] = start
-        params = self.Parameters(**kwargs)
+        params = self.resolve_params(rate, start)
         return 1.0 / params.rate, params.start
 
 
@@ -215,6 +232,15 @@ class RealLine(ReferenceDomain):
     def support(self) -> tuple[float, float]:
         """Support :math:`(-\\infty, \\infty)`."""
         return (-np.inf, np.inf)
+
+    def resolve_params(self, loc=None, scale=None) -> RealLine.Parameters:
+        """Build this domain's ``Parameters``, defaulting to loc=1.0, scale=1.0"""
+        kwargs = {}
+        if loc is not None:
+            kwargs["loc"] = loc
+        if scale is not None:
+            kwargs["scale"] = scale
+        return self.Parameters(**kwargs)
 
     def affine_params(self, loc=None, scale=None) -> tuple[float, float]:
         """Location-scale map :math:`x = \\mathrm{loc} + \\mathrm{scale} \\cdot t`.
@@ -243,10 +269,5 @@ class RealLine(ReferenceDomain):
         ValueError
             If ``scale`` is not positive.
         """
-        kwargs = {}
-        if loc is not None:
-            kwargs["loc"] = loc
-        if scale is not None:
-            kwargs["scale"] = scale
-        params = self.Parameters(**kwargs)
+        params = self.resolve_params(loc, scale)
         return params.scale, params.loc

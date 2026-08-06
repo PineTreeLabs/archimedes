@@ -63,10 +63,10 @@ class TensorQuadratureRule:
     """Cartesian product of one-dimensional quadrature rules.
 
     Implements the :class:`~archimedes.quadrature.Quadrature` interface with
-    ``ndim > 1``: :meth:`scaled_points` returns an ``(n, ndim)`` array (one
-    row per node, one column per dimension) rather than the ``(n,)`` of a
-    one-dimensional rule, while :meth:`scaled_weights` stays ``(n,)`` since
-    each node still carries a single scalar weight.
+    ``ndim > 1``: :attr:`nodes` is an ``(n, ndim)`` array (one row per node,
+    one column per dimension) rather than the ``(n,)`` of a one-dimensional
+    rule, while :attr:`weights` stays ``(n,)`` since each node still carries
+    a single scalar weight.
 
     Exactness follows dimension by dimension. If rule ``k`` is exact through
     degree :math:`p_k` in its own variable, the product is exact for any
@@ -106,26 +106,59 @@ class TensorQuadratureRule:
     # -- derived node/weight arrays --
     #
     # Cached rather than stored as fields so that `rules` stays the single
-    # source of truth for the generated __eq__/__hash__
+    # source of truth for the generated __eq__/__hash__. `_reference_*` are
+    # built from each dimension's `reference` payload (never affected by
+    # `map_to`); the public `nodes`/`weights` apply each dimension's
+    # currently-set mapping (see `QuadratureRule.map_to`) on top.
 
     @functools.cached_property
-    def nodes(self) -> np.ndarray:
+    def _reference_nodes(self) -> np.ndarray:
         """Reference nodes, shape ``(n, ndim)``.
 
         Ordered with the *first* dimension varying slowest (C order, i.e.
         ``np.meshgrid(..., indexing="ij")``).
         """
-        grids = np.meshgrid(*[rule.nodes for rule in self.rules], indexing="ij")
+        grids = np.meshgrid(
+            *[rule.reference.nodes for rule in self.rules], indexing="ij"
+        )
         return np.stack([g.ravel() for g in grids], axis=-1)
 
     @functools.cached_property
-    def weights(self) -> np.ndarray:
+    def _reference_weights(self) -> np.ndarray:
         """Reference weights, shape ``(n,)``: the product of the
-        per-dimension weights, in the same order as :attr:`nodes`."""
-        w = self.rules[0].weights
+        per-dimension reference weights, in the same order as
+        :attr:`_reference_nodes`."""
+        w = self.rules[0].reference.weights
         for rule in self.rules[1:]:
-            w = np.outer(w, rule.weights).ravel()
+            w = np.outer(w, rule.reference.weights).ravel()
         return w
+
+    @functools.cached_property
+    def nodes(self) -> np.ndarray:
+        """Nodes on the target domain, shape ``(n, ndim)``.
+
+        Ordered with the *first* dimension varying slowest (C order, i.e.
+        ``np.meshgrid(..., indexing="ij")``).
+        """
+        columns = []
+        for i, rule in enumerate(self.rules):
+            scale, shift = rule._affine_params()
+            columns.append(scale * self._reference_nodes[:, i] + shift)
+        return np.stack(columns, axis=-1)  # type: ignore[no-any-return]
+
+    @functools.cached_property
+    def weights(self) -> np.ndarray:
+        """Weights including the Jacobian of the target domain, shape ``(n,)``.
+
+        The Jacobian of a product of affine maps is the product of their
+        scales, so this is :math:`\\bigl(\\prod_k \\mathrm{scale}_k\\bigr)`
+        times the reference weights.
+        """
+        factor: Any = 1.0
+        for rule in self.rules:
+            scale, _ = rule._affine_params()
+            factor = factor * scale
+        return factor * self._reference_weights  # type: ignore[no-any-return]
 
     # -- Quadrature interface --
 
@@ -147,8 +180,7 @@ class TensorQuadratureRule:
 
         Mirrors :attr:`nodes`: column ``d`` indexes dimension ``d``'s
         elements, and is all-zero for a dimension whose rule is not
-        composite. See :attr:`~archimedes.quadrature.Quadrature.elements`
-        for why this is recorded rather than recovered from coordinates.
+        composite.
         """
         if all(rule.elements is None for rule in self.rules):
             return None
@@ -164,10 +196,6 @@ class TensorQuadratureRule:
     def breakpoints(self) -> tuple[np.ndarray | None, ...]:
         """Per-dimension element boundaries, one entry per dimension, each
         ``None`` unless that dimension's rule is composite.
-
-        Always a tuple of length ``ndim`` (never a bare ``None``), so
-        consumers checking alignment against a piecewise basis can zip it
-        against the basis's own per-dimension breakpoints.
         """
         return tuple(rule.breakpoints for rule in self.rules)
 
@@ -183,11 +211,9 @@ class TensorQuadratureRule:
     def _dims(self, params: tuple, kwparams: dict) -> tuple:
         """Resolve the per-dimension parameter specs from the call.
 
-        Mirrors :meth:`QuadratureRule.scaled_points`' free-form signature,
-        except that a tensor rule takes a *single* sequence of per-dimension
-        parameters (positionally or as ``dims=``) rather than one measure's
-        arguments spread out -- the per-dimension arguments would otherwise
-        be ambiguous, and their names collide across dimensions.
+        Mirrors :meth:`QuadratureRule.map_to`'s free-form signature, except
+        that a tensor rule takes a *single* sequence of per-dimension
+        parameters (positionally or as ``dims=``).
         """
         if kwparams:
             if params or set(kwparams) != {"dims"}:
@@ -217,12 +243,11 @@ class TensorQuadratureRule:
             )
         return dims
 
-    def scaled_points(self, *params: Any, **kwparams: Any) -> np.ndarray:
-        """Nodes mapped onto the target domain, shape ``(n, ndim)``.
+    def map_to(self, *params: Any, **kwparams: Any) -> "TensorQuadratureRule":
+        """A new tensor rule with every dimension mapped onto its target domain.
 
-        Each dimension is mapped by its own measure's ``affine_params``,
-        applied to the corresponding column. Symbolic if any parameter is
-        symbolic; the underlying reference nodes are always static.
+        See :meth:`QuadratureRule.map_to`. Each dimension is delegated to
+        independently.
 
         Parameters
         ----------
@@ -232,8 +257,8 @@ class TensorQuadratureRule:
             accepted by its measure: ``None`` for the reference domain, a
             ``ReferenceDomain.Parameters`` struct, a tuple of positional
             arguments (``(a, b)`` for an interval), or a dict of keyword
-            arguments. Omitted entirely, every dimension uses its reference
-            domain.
+            arguments. Omitted entirely, every dimension is mapped onto its
+            reference domain.
 
         Raises
         ------
@@ -244,56 +269,24 @@ class TensorQuadratureRule:
             If ``dims`` does not have exactly ``ndim`` entries.
         """
         dims = self._dims(params, kwparams)
-        columns = []
-        for i, (rule, spec) in enumerate(zip(self.rules, dims)):
-            args, kwargs = _dim_args(spec)
-            scale, shift = rule.measure.affine_params(*args, **kwargs)
-            columns.append(scale * self.nodes[:, i] + shift)
-        return np.stack(columns, axis=-1)  # type: ignore[no-any-return]
-
-    def scaled_weights(
-        self, *params: Any, density: bool = False, **kwparams: Any
-    ) -> np.ndarray:
-        """Weights including the Jacobian of the map onto the target box,
-        shape ``(n,)``.
-
-        The Jacobian of a product of affine maps is the product of their
-        scales, so this is :math:`\\bigl(\\prod_k \\mathrm{scale}_k\\bigr)`
-        times the reference weights.
-
-        Parameters
-        ----------
-        dims : sequence, optional
-            Per-dimension domain parameters; see :meth:`scaled_points`.
-        density : bool, optional
-            If ``True``, divide by the total mass of the mapped product
-            measure -- the product of the per-dimension masses -- so the
-            weights sum to 1. For a Wiener-Askey correspondence this makes
-            them the quadrature weights of the joint *probability* density
-            of independent inputs. Default ``False``.
-        """
-        dims = self._dims(params, kwparams)
-        factor: Any = 1.0
-        for rule, spec in zip(self.rules, dims):
-            args, kwargs = _dim_args(spec)
-            scale, _ = rule.measure.affine_params(*args, **kwargs)
-            factor = factor * scale
-            if density:
-                factor = factor / rule.measure.mass(*args, **kwargs)
-        return factor * self.weights  # type: ignore[no-any-return]
+        mapped = tuple(
+            rule.map_to(*args, **kwargs)
+            for rule, spec in zip(self.rules, dims)
+            for args, kwargs in [_dim_args(spec)]
+        )
+        return dataclasses.replace(self, rules=mapped)
 
     # -- integration --
 
     def integrate(
         self,
         f: Callable[..., np.ndarray],
-        *params: Any,
+        *,
         axis: int = 0,
         args: Sequence[Any] | None = None,
         density: bool = False,
-        **kwparams: Any,
     ) -> np.ndarray:
-        """Approximate the weighted integral of ``f`` over the target box.
+        """Approximate the weighted integral of ``f`` over the target domain.
 
         Parameters
         ----------
@@ -303,8 +296,6 @@ class TensorQuadratureRule:
             and must index its own arguments out of the columns (e.g.
             ``lambda x: g(x[:, 0], x[:, 1])``). This is the same convention
             as ``FunctionSpace.project``.
-        *params, **kwparams
-            Per-dimension domain parameters; see :meth:`scaled_points`.
         axis : int, optional
             Axis of ``f``'s output holding the nodes. Default 0, matching
             the nodes-first ``(n, ndim)`` input (unlike the one-dimensional
@@ -312,7 +303,7 @@ class TensorQuadratureRule:
         args : tuple, optional
             Extra arguments passed to ``f`` after the node array.
         density : bool, optional
-            Normalize by the total mass; see :meth:`scaled_weights`.
+            Normalize by the total mass; see :meth:`sum`.
 
         Returns
         -------
@@ -322,16 +313,15 @@ class TensorQuadratureRule:
         """
         if args is None:
             args = ()
-        fp = f(self.scaled_points(*params, **kwparams), *args)
-        return self.sum(fp, *params, axis=axis, density=density, **kwparams)
+        fp = f(self.nodes, *args)
+        return self.sum(fp, axis=axis, density=density)
 
     def sum(
         self,
         values: np.ndarray,
-        *params: Any,
+        *,
         axis: int = 0,
         density: bool = False,
-        **kwparams: Any,
     ) -> np.ndarray:
         """Quadrature applied to values already sampled at the nodes.
 
@@ -341,12 +331,15 @@ class TensorQuadratureRule:
             Sampled values with the nodes along ``axis``: shape ``(n,)`` for
             a scalar integrand or ``(n, m)`` for a vector-valued one under
             the default ``axis=0``.
-        *params, **kwparams
-            Per-dimension domain parameters; see :meth:`scaled_points`.
         axis : int, optional
             Axis holding the nodes. Default 0.
         density : bool, optional
-            Normalize by the total mass; see :meth:`scaled_weights`.
+            If ``True``, normalize the weights so they sum to 1 --
+            equivalently divide by the total mass of the mapped product
+            measure, the product of the per-dimension masses. For a
+            Wiener-Askey correspondence this makes them the quadrature
+            weights of the joint *probability* density of independent
+            inputs. Default ``False``.
 
         Raises
         ------
@@ -354,7 +347,9 @@ class TensorQuadratureRule:
             If ``values`` has more than 2 dimensions, or if
             ``values.shape[axis]`` does not match the number of nodes.
         """
-        w = self.scaled_weights(*params, density=density, **kwparams)
+        w = self.weights
+        if density:
+            w = w / np.sum(w)
         return _weighted_sum(w, values, axis, len(self))
 
 

@@ -17,7 +17,12 @@ from ._quadrature_rule import QuadratureRule
 __all__ = ["gauss_hermite"]
 
 
-def gauss_hermite(n: int, kind: Literal["phys", "prob"] = "prob") -> QuadratureRule:
+def gauss_hermite(
+    n: int,
+    kind: Literal["phys", "prob"] = "prob",
+    loc: float | None = None,
+    scale: float | None = None,
+) -> QuadratureRule:
     """Gauss-Hermite quadrature rule with ``n`` nodes.
 
     Nodes are the roots of the degree-``n`` Hermite polynomial. The rule is
@@ -36,14 +41,17 @@ def gauss_hermite(n: int, kind: Literal["phys", "prob"] = "prob") -> QuadratureR
         *physicists'* convention, with reference weight
         :math:`e^{-x^2}` (:class:`PhysicistsHermiteMeasure`). Neither weight
         integrates to 1 on its own; pass ``density=True`` to
-        ``QuadratureRule.integrate``/``sum``/``scaled_weights`` for weights
-        that do.
+        ``QuadratureRule.integrate``/``sum`` for weights that do.
+    loc, scale : float, optional
+        Location/scale of the target Gaussian-shaped weight. Default
+        ``loc=0``, ``scale=1``.
 
     Returns
     -------
     rule : QuadratureRule
         Gauss-Hermite rule with ``n`` nodes on :math:`(-\\infty, \\infty)`,
-        exact to degree :math:`2n - 1`.
+        exact to degree :math:`2n - 1`, mapped by ``loc``/``scale`` if
+        given.
 
     Raises
     ------
@@ -59,4 +67,7 @@ def gauss_hermite(n: int, kind: Literal["phys", "prob"] = "prob") -> QuadratureR
         measure = PhysicistsHermiteMeasure()
     else:
         raise ValueError(f"kind must be 'phys' or 'prob', got {kind!r}")
-    return QuadratureRule(x, w, measure=measure, name="gauss_hermite")
+    rule = QuadratureRule.from_arrays(x, w, measure=measure, name="gauss_hermite")
+    if loc is not None or scale is not None:
+        rule = rule.map_to(loc=loc, scale=scale)
+    return rule

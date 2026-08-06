@@ -22,6 +22,7 @@ class PhysicistsHermiteMeasure(Measure):
     :math:`\\int_{-\\infty}^\\infty e^{-x^2} \\, dx = \\sqrt{\\pi}`.
     """
 
+    affine_invariant = True
     domain = RealLine()
 
     def weight(self, x: np.ndarray) -> np.ndarray:
@@ -61,6 +62,7 @@ class ProbabilistsHermiteMeasure(Measure):
     :math:`\\int_{-\\infty}^\\infty e^{-x^2/2} \\, dx = \\sqrt{2\\pi}`.
     """
 
+    affine_invariant = True
     domain = RealLine()
 
     def weight(self, x: np.ndarray) -> np.ndarray:

@@ -23,6 +23,7 @@ from archimedes.measure import (
 def test_legendre_measure():
     measure = LegendreMeasure()
     assert measure.uniform_weight is True
+    assert measure.affine_invariant is True
     assert measure.support == (-1.0, 1.0)
     np.testing.assert_array_equal(measure.weight(np.array([-0.5, 0.5])), [1.0, 1.0])
     assert measure.reference_mass == 2.0
@@ -46,6 +47,7 @@ def test_jacobi_measure_invalid_parameters(alpha, beta):
 def test_jacobi_measure_weight_and_shared_affine_params():
     measure = JacobiMeasure(alpha=1.0, beta=2.0)
     assert measure.uniform_weight is False
+    assert measure.affine_invariant is True
     assert measure.support == (-1.0, 1.0)
 
     x = np.array([0.0, 0.5])
@@ -62,6 +64,7 @@ def test_jacobi_measure_weight_and_shared_affine_params():
 def test_laguerre_measure():
     measure = LaguerreMeasure()
     assert measure.uniform_weight is False
+    assert measure.affine_invariant is True
     assert measure.support == (0.0, np.inf)
     np.testing.assert_allclose(
         measure.weight(np.array([0.0, 1.0])), [1.0, np.exp(-1.0)]
@@ -86,6 +89,7 @@ def test_laguerre_measure():
 def test_hermite_measure():
     measure = PhysicistsHermiteMeasure()
     assert measure.uniform_weight is False
+    assert measure.affine_invariant is True
     assert measure.support == (-np.inf, np.inf)
     np.testing.assert_allclose(
         measure.weight(np.array([0.0, 1.0])), [1.0, np.exp(-1.0)]
@@ -175,6 +179,33 @@ def test_hermite_parameters_defaults_and_validation(domain_cls):
 
     with pytest.raises(ValueError):
         domain_cls.Parameters(scale=-1.0)
+
+
+def test_unit_interval_resolve_params_matches_affine_params():
+    domain = UnitInterval()
+    assert domain.resolve_params() == UnitInterval.Parameters(None, None)
+    assert domain.resolve_params(0.0, 2.0) == UnitInterval.Parameters(0.0, 2.0)
+    assert domain.affine_params(0.0, 2.0) == LegendreMeasure().affine_params(0.0, 2.0)
+
+
+def test_half_line_resolve_params_matches_affine_params():
+    domain = HalfLine()
+    assert domain.resolve_params() == HalfLine.Parameters(rate=1.0, start=0.0)
+    assert domain.resolve_params(rate=2.0) == HalfLine.Parameters(rate=2.0, start=0.0)
+    assert domain.resolve_params(start=1.0) == HalfLine.Parameters(rate=1.0, start=1.0)
+    scale, shift = domain.affine_params(rate=2.0, start=1.0)
+    params = domain.resolve_params(rate=2.0, start=1.0)
+    assert (scale, shift) == (1.0 / params.rate, params.start)
+
+
+def test_real_line_resolve_params_matches_affine_params():
+    domain = RealLine()
+    assert domain.resolve_params() == RealLine.Parameters(loc=0.0, scale=1.0)
+    assert domain.resolve_params(loc=1.0) == RealLine.Parameters(loc=1.0, scale=1.0)
+    assert domain.resolve_params(scale=2.0) == RealLine.Parameters(loc=0.0, scale=2.0)
+    scale, shift = domain.affine_params(loc=1.0, scale=2.0)
+    params = domain.resolve_params(loc=1.0, scale=2.0)
+    assert (scale, shift) == (params.scale, params.loc)
 
 
 def test_measure_mass_reference_domain():
@@ -285,6 +316,7 @@ def test_hermite_norm_recurrence_coeffs():
 def test_hermite_norm_measure():
     measure = ProbabilistsHermiteMeasure()
     assert measure.uniform_weight is False
+    assert measure.affine_invariant is True
     assert measure.support == (-np.inf, np.inf)
     np.testing.assert_allclose(
         measure.weight(np.array([0.0, 1.0])), [1.0, np.exp(-0.5)]
@@ -362,6 +394,13 @@ class _StieltjesLegendre(Measure):
     @property
     def reference_mass(self):
         return 2.0
+
+
+def test_stieltjes_fallback_measure_defaults_affine_invariant_false():
+    # A custom Measure relying on the generic Stieltjes-based
+    # recurrence_coeffs fallback hasn't proven itself affine-closed, so
+    # `affine_invariant` must default False rather than inheriting `True`.
+    assert _StieltjesLegendre().affine_invariant is False
 
 
 def test_measure_default_recurrence_coeffs_matches_legendre():

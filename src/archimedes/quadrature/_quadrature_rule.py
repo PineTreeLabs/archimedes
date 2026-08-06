@@ -16,14 +16,16 @@ fixed set of nodes and weights on its reference domain.
 from __future__ import annotations
 
 import dataclasses
-from typing import Any, Callable, Protocol, Sequence
+from typing import Any, Callable, Protocol, Sequence, cast
 
 import numpy as np
 
-from archimedes.measure import Measure
+from archimedes import tree
+from archimedes.measure import Measure, ReferenceDomain
 
 __all__ = [
     "Quadrature",
+    "QuadratureReferenceData",
     "QuadratureRule",
     "composite_quad",
 ]
@@ -60,11 +62,8 @@ class Quadrature(Protocol):
         ``breakpoints`` is.
 
         This is *provenance* that coordinates cannot recover. A composite
-        rule places nodes on its element boundaries -- a Lobatto sub-rule
-        puts one there from each side, so the boundary appears twice in
-        ``nodes`` -- and a basis that is discontinuous there needs to know
-        which element each copy belongs to. Locating by coordinate instead
-        assigns both copies to the same element and silently mis-integrates.
+        rule places nodes on its element boundaries and a basis that is
+        discontinuous there needs to know which element each copy belongs to.
         """
 
     @property
@@ -75,16 +74,19 @@ class Quadrature(Protocol):
     def __len__(self) -> int:
         """Total number of quadrature nodes."""
 
-    def scaled_points(self, *params: Any, **kwparams: Any) -> np.ndarray:
-        """Nodes mapped onto the target domain, shape ``(n,)`` for a
-        one-dimensional rule or ``(n, ndim)`` otherwise. The meaning of
-        ``params``/``kwparams`` is specific to the implementation."""
+    @property
+    def nodes(self) -> np.ndarray:
+        """Nodes on the currently-mapped target domain (see ``map_to``),
+        shape ``(n,)`` for a one-dimensional rule or ``(n, ndim)``
+        otherwise."""
 
-    def scaled_weights(
-        self, *params: Any, density: bool = False, **kwparams: Any
-    ) -> np.ndarray:
-        """Weights including the Jacobian of the map onto the target domain,
-        shape ``(n,)``. Normalized to unit total mass if ``density``."""
+    @property
+    def weights(self) -> np.ndarray:
+        """Weights including the Jacobian of the currently-mapped target
+        domain (see ``map_to``), shape ``(n,)``."""
+
+    def map_to(self, *params: Any, **kwparams: Any) -> Quadrature:
+        """A new rule mapped onto the target domain."""
 
 
 def _weighted_sum(
@@ -113,23 +115,52 @@ def _breakpoints_equal(a: np.ndarray | None, b: np.ndarray | None) -> bool:
     return np.array_equal(a, b)
 
 
-# Note: dataclass, not struct, because all the data is static
+def _check_affine_invariant(measure: Measure, params: tuple, kwparams: dict) -> None:
+    """Raise if `params`/`kwparams` describe a non-reference-domain mapping
+    and `measure.affine_invariant` is False.
+
+    Syntactic (were *any* arguments given), not semantic (is the resulting
+    map the identity) -- deliberately, so this stays correct under symbolic
+    tracing, where `scale == 1.0` isn't a decidable Python bool. A bare
+    reference-domain call is always allowed.
+    """
+    if (params or kwparams) and not measure.affine_invariant:
+        raise ValueError(
+            f"{type(measure).__name__}.affine_invariant is False: its "
+            f"recurrence_coeffs relies on the generic Stieltjes-based "
+            f"fallback, so mapping a rule built for it onto a different "
+            f"domain is not verified to give the same rule you'd get by "
+            f"building on the target domain directly. Call with no "
+            f"arguments for the reference domain, or set "
+            f"`affine_invariant = True` on a subclass whose closed-form "
+            f"recurrence you have verified is affine-invariant."
+        )
+
+
+def _params_equal(
+    a: "ReferenceDomain.Parameters | None", b: "ReferenceDomain.Parameters | None"
+) -> bool:
+    """Compare two domain ``Parameters`` (or ``None``), the same way
+    :class:`QuadratureReferenceData`'s ``__eq__`` compares arrays --
+    ``np.array_equal``, not ``==``, since fields can hold symbolic values."""
+    if a is None or b is None:
+        return a is None and b is None
+    if type(a) is not type(b):
+        return False
+    return all(
+        np.array_equal(getattr(a, f.name), getattr(b, f.name))
+        for f in tree.fields(cast(Any, a))
+    )
+
+
 @dataclasses.dataclass(frozen=True)
-class QuadratureRule:
-    """Fixed-node Gauss quadrature rule on a reference domain.
+class QuadratureReferenceData:
+    """Reference-domain payload of a :class:`QuadratureRule` nodes/weights
 
-    Approximates the weighted integral
-
-    .. math::
-        \\int_\\mathcal{D} f(x) \\, w(x) \\, dx \\approx \\sum_{i=1}^n w_i f(x_i)
-
-    where :math:`w` and :math:`\\mathcal{D}` are the weight function and reference
-    domain of ``measure``, and ``nodes``/``weights`` are the :math:`x_i`/:math:`w_i`
-    above.
-
-    Nodes and weights are always static (NumPy) arrays. Mapping onto a
-    target domain/measure is an affine transform of the reference nodes,
-    whose parameters are specific to ``measure`` -- see ``scaled_points``.
+    Validated once at construction; a rule's ``map_to`` reuses the same
+    instance unchanged across every mapping, so this validation never
+    re-runs just because the mapping changes. Never itself symbolic, so
+    this stays a plain dataclass rather than a :func:`~archimedes.tree.struct`.
 
     Parameters
     ----------
@@ -138,8 +169,6 @@ class QuadratureRule:
         ``measure.support``.
     weights : array_like
         Quadrature weights :math:`w_i`, shape ``(n,)``.
-    name : str
-        Name identifying the rule.
     measure : Measure
         Weight function and reference domain the rule is defined on.
     breakpoints : array_like, optional
@@ -161,15 +190,13 @@ class QuadratureRule:
         ``breakpoints`` and ``elements`` are not both given or both omitted.
     """
 
-    nodes: np.ndarray  # shape (n,), on `measure.support`
-    weights: np.ndarray  # shape (n,)
-    name: str  # name for the rule
+    nodes: np.ndarray
+    weights: np.ndarray
     measure: Measure
-    breakpoints: np.ndarray | None = None  # element boundaries, if composite
-    elements: np.ndarray | None = None  # owning element per node, if composite
+    breakpoints: np.ndarray | None = None
+    elements: np.ndarray | None = None
 
     def __post_init__(self):
-        # Static data, safe to unconditionally convert to NumPy arrays
         object.__setattr__(self, "nodes", np.asarray(self.nodes, dtype=float))
         object.__setattr__(self, "weights", np.asarray(self.weights, dtype=float))
         if self.breakpoints is not None:
@@ -204,8 +231,104 @@ class QuadratureRule:
                     f"[{self.elements.min()}, {self.elements.max()}]"
                 )
 
+    def __eq__(self, other: object) -> bool:
+        """Compare by value, elementwise on ``nodes``/``weights``.
+
+        Defined explicitly because the ``@dataclass``-generated ``__eq__``
+        would compare the array fields with ``==``, yielding an array and
+        raising "truth value of an array is ambiguous" for any rule with
+        more than one node. (``@dataclass`` leaves an explicitly-defined
+        ``__eq__`` alone.)
+        """
+        if not isinstance(other, QuadratureReferenceData):
+            return NotImplemented
+        return (
+            self.measure == other.measure
+            and np.array_equal(self.nodes, other.nodes)
+            and np.array_equal(self.weights, other.weights)
+            and _breakpoints_equal(self.breakpoints, other.breakpoints)
+            and _breakpoints_equal(self.elements, other.elements)
+        )
+
+    def __hash__(self) -> int:
+        # Cheap, consistent with __eq__: equal instances agree on all of these.
+        return hash((type(self), self.measure, len(self.nodes)))
+
+
+@tree.struct
+class QuadratureRule:
+    """Fixed-node Gauss quadrature rule, optionally mapped onto a target
+    domain.
+
+    Approximates the weighted integral
+
+    .. math::
+        \\int_\\mathcal{D} f(x) \\, w(x) \\, dx \\approx \\sum_{i=1}^n w_i f(x_i)
+
+    where :math:`w` and :math:`\\mathcal{D}` are the weight function and reference
+    domain of ``measure``, and ``nodes``/``weights`` are the :math:`x_i`/:math:`w_i`
+    above.
+
+    ``reference`` holds the rule's static, always-reference-domain payload
+    (nodes, weights, measure, breakpoints, elements) and never changes;
+    ``nodes``/``weights`` are properties that apply whatever mapping
+    ``params`` currently holds (see ``map_to``).
+
+    Parameters
+    ----------
+    reference : QuadratureReferenceData
+        The rule's static, always-reference-domain data. Use
+        :meth:`from_arrays` for the more convenient raw-array constructor.
+    name : str
+        Name identifying the rule.
+    params : ReferenceDomain.Parameters, optional
+        The currently-set mapping onto a target domain, as set by
+        :meth:`map_to`. ``None`` (the default) means the reference domain.
+    """
+
+    reference: QuadratureReferenceData = tree.field(static=True)  # type: ignore[assignment]
+    name: str = tree.field(static=True)  # type: ignore[assignment]
+    params: ReferenceDomain.Parameters | None = None
+
+    @classmethod
+    def from_arrays(
+        cls,
+        nodes: np.ndarray,
+        weights: np.ndarray,
+        *,
+        name: str,
+        measure: Measure,
+        breakpoints: np.ndarray | None = None,
+        elements: np.ndarray | None = None,
+    ) -> "QuadratureRule":
+        """Build a rule from raw nodes/weights on the reference domain."""
+        return cls(
+            QuadratureReferenceData(nodes, weights, measure, breakpoints, elements),
+            name,
+        )
+
+    # -- forwarding to the reference payload --
+
+    @property
+    def measure(self) -> Measure:
+        """Weight function and reference domain the rule is defined on."""
+        return self.reference.measure
+
+    @property
+    def breakpoints(self) -> np.ndarray | None:
+        """Element boundaries, on the reference domain.
+        
+        *Always* reference domain, not affected by ``map_to``.
+        """
+        return self.reference.breakpoints
+
+    @property
+    def elements(self) -> np.ndarray | None:
+        """Owning element per node."""
+        return self.reference.elements
+
     def __len__(self) -> int:
-        return len(self.nodes)
+        return len(self.reference.nodes)
 
     @property
     def ndim(self) -> int:
@@ -223,28 +346,18 @@ class QuadratureRule:
         return (self.measure,)
 
     def __eq__(self, other: object) -> bool:
-        """Compare by value, elementwise on ``nodes``/``weights``.
-
-        Defined explicitly because the ``@dataclass``-generated ``__eq__``
-        would compare the array fields with ``==``, yielding an array and
-        raising "truth value of an array is ambiguous" for any rule with
-        more than one node. (``@dataclass`` leaves an explicitly-defined
-        ``__eq__`` alone.)
-        """
+        """Compare by value: same reference payload, name, and mapping."""
         if not isinstance(other, QuadratureRule):
             return NotImplemented
         return (
-            self.name == other.name
-            and self.measure == other.measure
-            and np.array_equal(self.nodes, other.nodes)
-            and np.array_equal(self.weights, other.weights)
-            and _breakpoints_equal(self.breakpoints, other.breakpoints)
-            and _breakpoints_equal(self.elements, other.elements)
+            self.reference == other.reference
+            and self.name == other.name
+            and _params_equal(self.params, other.params)
         )
 
     def __hash__(self) -> int:
         # Cheap, consistent with __eq__: equal rules agree on all of these.
-        return hash((type(self), self.name, self.measure, len(self)))
+        return hash((type(self), self.name, self.reference))
 
     def __repr__(self) -> str:
         return (
@@ -254,17 +367,19 @@ class QuadratureRule:
 
     # -- domain mapping --
 
-    def scaled_points(self, *params, **kwparams):
-        """Nodes mapped by ``measure``'s affine parameters.
+    def map_to(self, *params, **kwparams) -> "QuadratureRule":
+        """A new rule mapped onto the target domain.
 
-        Given ``(scale, shift) = measure.affine_params(*params, **kwparams)``,
-        the mapped nodes are
+        Given ``target = measure.domain.resolve_params(*params, **kwparams)``
+        and ``(scale, shift) = measure.affine_params`` for those same
+        arguments, ``nodes``/``weights`` on the returned rule become
 
         .. math::
-            x_i = \\mathrm{scale} \\cdot t_i + \\mathrm{shift}
+            x_i = \\mathrm{scale} \\cdot t_i + \\mathrm{shift}, \\qquad
+            \\tilde{w}_i = \\mathrm{scale} \\cdot w_i
 
-        for reference node :math:`t_i`. Called with no arguments, returns
-        the reference ``nodes`` unchanged.
+        for reference node/weight :math:`t_i`/:math:`w_i`. Called with no
+        arguments, maps onto the reference domain (the identity).
 
         The meaning of ``params``/``kwparams`` is specific to ``measure``:
 
@@ -273,68 +388,77 @@ class QuadratureRule:
           exponential weight.
         - Hermite: ``loc``, ``scale`` of the target Gaussian-shaped weight.
 
-        See the measure's ``affine_params`` docstring for details. Symbolic
-        if any parameter is symbolic; the underlying nodes are static.
+        See the measure's ``affine_params`` docstring for details.
+
+        Never composes with a prior ``map_to``; each call resolves fresh
+        from ``(*params, **kwparams)`` against the reference domain, so
+        ``rule.map_to(0, 1).map_to(2, 3)`` is exactly ``rule.map_to(2, 3)``,
+        not a further mapping of ``[0, 1]``.
+
+        Raises
+        ------
+        ValueError
+            If called with any argument and ``measure.affine_invariant`` is
+            ``False``; see ``Measure.affine_invariant``.
         """
-        scale, shift = self.measure.affine_params(*params, **kwparams)
-        return scale * self.nodes + shift
+        _check_affine_invariant(self.measure, params, kwparams)
+        if not (params or kwparams):
+            # `None` is the one canonical "identity" representation for
+            # `params` -- not, say, `UnitInterval.Parameters(None, None)`,
+            # which `resolve_params()` would otherwise return here and
+            # which `_affine_params` couldn't cheaply distinguish from a
+            # genuine (if degenerate) mapping without inspecting field
+            # values, which isn't safe under symbolic tracing.
+            return dataclasses.replace(self, params=None)
+        new_params = self.measure.domain.resolve_params(*params, **kwparams)
+        return dataclasses.replace(self, params=new_params)
 
-    def scaled_weights(self, *params, density: bool = False, **kwparams):
-        """Weights including the Jacobian factor for the target
-        domain/measure.
+    def _affine_params(self) -> tuple[float, float]:
+        """``(scale, shift)`` for the currently-set domain."""
+        if self.params is None:
+            return 1.0, 0.0
+        kwargs = {
+            f.name: getattr(self.params, f.name)
+            for f in tree.fields(cast(Any, self.params))
+        }
+        _check_affine_invariant(self.measure, (), kwargs)
+        return self.measure.affine_params(**kwargs)
 
-        .. math::
-            \\tilde{w}_i = \\mathrm{scale} \\cdot w_i
+    @property
+    def nodes(self) -> np.ndarray:
+        """Nodes on the target domain."""
+        scale, shift = self._affine_params()
+        return scale * self.reference.nodes + shift
 
-        where :math:`\\mathrm{scale}` is the same affine scale used by
-        ``scaled_points``. See ``scaled_points`` for the meaning of
-        ``params``/``kwparams``.
-
-        Parameters
-        ----------
-        density : bool, optional
-            If ``True``, additionally divide by the target measure's total
-            mass (``measure.mass(*params, **kwparams)``), so the returned
-            weights sum to 1 -- i.e. they act as quadrature weights for the
-            *normalized* density rather than the raw weight function.
-            Default ``False``.
-        """
-        scale, _ = self.measure.affine_params(*params, **kwparams)
-        w = scale * self.weights
-        if density:
-            w = w / self.measure.mass(*params, **kwparams)
-        return w
+    @property
+    def weights(self) -> np.ndarray:
+        """Weights including the Jacobian of the domain mapping."""
+        scale, _ = self._affine_params()
+        return scale * self.reference.weights
 
     # -- integration --
 
     def integrate(
         self,
         f: Callable[..., np.ndarray],
-        *params,
+        *,
         axis: int = -1,
         args: Sequence[Any] | None = None,
         density: bool = False,
-        **kwparams,
     ) -> np.ndarray:
-        """Approximate the weighted integral of ``f``.
+        """Approximate the weighted integral of ``f`` over the domain.
 
         .. math::
             \\int f(x) \\, w(x) \\, dx \\approx \\sum_{i=1}^n \\tilde{w}_i
                 f(x_i)
 
-        where :math:`x_i` = ``scaled_points(*params, **kwparams)`` and
-        :math:`\\tilde{w}_i` = ``scaled_weights(*params, **kwparams)``.
+        where :math:`x_i` = ``nodes`` and :math:`\\tilde{w}_i` =
+        ``weights``; see ``map_to`` to set the target domain first.
 
         Parameters
         ----------
         f : callable
-            Integrand, called once as ``f(x, *args)`` on the full node
-            array. Must be vectorized, returning values with the nodes
-            along ``axis``. If any of ``params``/``kwparams`` is symbolic, ``f``
-            must be symbolically traceable.
-        *params, **kwparams
-            Target domain/measure parameters; see ``scaled_points`` for
-            their meaning.
+            Integrand, called once as ``f(x, *args)`` on the full node array.
         axis : int, optional
             Axis holding the nodes in the output of ``f``. Default -1.
         args : tuple, optional
@@ -343,8 +467,8 @@ class QuadratureRule:
             If ``True``, normalize by the target measure's total mass, so
             the result approximates :math:`\\int f(x) \\, w(x) \\, dx /
             \\int w(x) \\, dx` -- e.g. an expectation under the
-            corresponding probability density. See ``scaled_weights``.
-            Default ``False``.
+            corresponding probability density. See ``sum``. Default
+            ``False``.
 
         Returns
         -------
@@ -354,23 +478,23 @@ class QuadratureRule:
         """
         if args is None:
             args = ()
-        fp = f(self.scaled_points(*params, **kwparams), *args)
-        return self.sum(fp, *params, axis=axis, density=density, **kwparams)
+        fp = f(self.nodes, *args)
+        return self.sum(fp, axis=axis, density=density)
 
     def sum(
         self,
         values: np.ndarray,
-        *params,
+        *,
         axis: int = -1,
         density: bool = False,
-        **kwparams,
     ) -> np.ndarray:
         """Quadrature applied to values already sampled at the nodes.
 
         .. math::
             \\sum_{i=1}^n \\tilde{w}_i \\, \\mathrm{values}_i
 
-        where :math:`\\tilde{w}_i` = ``scaled_weights(*params, **kwparams)``.
+        where :math:`\\tilde{w}_i` = ``weights`` (see ``map_to`` to set the
+        target domain first).
 
         Parameters
         ----------
@@ -378,16 +502,15 @@ class QuadratureRule:
             Sampled values, with the quadrature nodes along ``axis``.
             Shape (n,) for scalar integrands or (m, n) for vector-valued
             integrands under the default ``axis=-1``.
-        *params, **kwparams
-            Target domain/measure parameters, forwarded to
-            ``measure.affine_params``; see ``scaled_points`` for their meaning.
         axis : int, optional
             Axis holding the nodes. Default -1 (nodes last), matching the
             natural output of a vectorized ``f``. Use ``axis=0`` for
             nodes-first data.
         density : bool, optional
-            Forwarded to ``scaled_weights``; see its docstring. Default
-            ``False``.
+            If ``True``, normalize the weights so they sum to 1 --
+            equivalently divide by the target measure's total mass, since
+            an ``n>=1``-point Gauss rule is exact for the constant
+            integrand. Default ``False``.
 
         Returns
         -------
@@ -403,7 +526,9 @@ class QuadratureRule:
             ``values.shape[axis]`` does not match the number of quadrature
             nodes.
         """
-        w = self.scaled_weights(*params, density=density, **kwparams)
+        w = self.weights
+        if density:
+            w = w / np.sum(w)
         return _weighted_sum(w, values, axis, len(self))
 
 
@@ -417,8 +542,8 @@ def composite_quad(
     nodes and weights. The result is itself a ``QuadratureRule`` on the same
     reference domain -- its nodes are just clustered at the element
     boundaries rather than spread uniformly -- so it can be mapped onto a
-    target domain/measure via ``scaled_points``/``scaled_weights``/``integrate``
-    exactly like any other rule of ``base.measure``. This works because
+    target domain/measure via ``map_to``/``integrate`` exactly like any
+    other rule of ``base.measure``. This works because
     ``measure.affine_params`` maps affinely, and affine maps commute with
     subdivision: rescaling the whole composite pattern onto ``[a, b]`` is
     the same as building the elements directly on the rescaled sub-intervals
@@ -508,8 +633,9 @@ def composite_quad(
     weights = []
     elements = []
     for e, (rule, t0, t1) in enumerate(zip(rules, breakpoints[:-1], breakpoints[1:])):
-        nodes.append(rule.scaled_points(t0, t1))
-        weights.append(rule.scaled_weights(t0, t1))
+        mapped = rule.map_to(t0, t1)
+        nodes.append(mapped.nodes)
+        weights.append(mapped.weights)
         # A node on an element boundary belongs to the element it was
         # generated for, which its coordinate alone cannot say.
         elements.append(np.full(len(rule), e, dtype=int))
@@ -517,7 +643,7 @@ def composite_quad(
     names = {rule.name for rule in rules}
     name = names.pop() if len(names) == 1 else "composite"
 
-    return QuadratureRule(
+    return QuadratureRule.from_arrays(
         np.concatenate(nodes),
         np.concatenate(weights),
         measure=measure,

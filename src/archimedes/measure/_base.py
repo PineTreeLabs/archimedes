@@ -60,6 +60,13 @@ class Measure(metaclass=abc.ABCMeta):
     rule across sub-elements when there's no interior discontinuity in the
     weight to worry about."""
 
+    affine_invariant: bool = False
+    """True if this measure's weight is provably the same *shape*, just
+    relocated/rescaled, under ``affine_params``'s reparametrization.
+    False (the default) for anything relying on the generic Stieltjes-based
+    ``recurrence_coeffs`` fallback, since it is not guaranteed that an arbitrary
+    weight family stays affine-closed."""
+
     domain: ReferenceDomain
     """The reference domain this measure's weight is supported on. Set as a
     class attribute by each concrete subclass; carries the ``support``,

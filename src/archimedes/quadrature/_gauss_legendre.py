@@ -16,7 +16,9 @@ from archimedes.measure import LegendreMeasure
 from ._quadrature_rule import QuadratureRule
 
 
-def gauss_legendre(n: int) -> QuadratureRule:
+def gauss_legendre(
+    n: int, a: float | None = None, b: float | None = None
+) -> QuadratureRule:
     """Gauss-Legendre quadrature rule with ``n`` nodes.
 
     Nodes are the roots of the degree-``n`` Legendre polynomial
@@ -28,19 +30,29 @@ def gauss_legendre(n: int) -> QuadratureRule:
     ----------
     n : int
         Number of quadrature nodes.
+    a, b : float, optional
+        Bounds of the target interval, forwarded to
+        :meth:`~archimedes.quadrature.QuadratureRule.map_to`. Must both be
+        given, or neither (the default, giving the reference interval
+        :math:`[-1, 1]`).
 
     Returns
     -------
     rule : QuadratureRule
         Gauss-Legendre rule with ``n`` nodes on :math:`[-1, 1]`, exact to
-        degree :math:`2n - 1`.
+        degree :math:`2n - 1`, mapped onto :math:`[a, b]` if given.
     """
     x, w = roots_legendre(n)
     measure = LegendreMeasure()
-    return QuadratureRule(x, w, measure=measure, name="gauss_legendre")
+    rule = QuadratureRule.from_arrays(x, w, measure=measure, name="gauss_legendre")
+    if a is not None or b is not None:
+        rule = rule.map_to(a, b)
+    return rule
 
 
-def gauss_radau(n: int, endpoint: str = "left") -> QuadratureRule:
+def gauss_radau(
+    n: int, endpoint: str = "left", a: float | None = None, b: float | None = None
+) -> QuadratureRule:
     """Gauss-Radau quadrature rule including exactly one endpoint.
 
     Radau rules fix one endpoint of :math:`[-1, 1]` as a node and choose
@@ -61,12 +73,17 @@ def gauss_radau(n: int, endpoint: str = "left") -> QuadratureRule:
           convention).
         - ``"right"`` includes :math:`+1` (Radau IIA, the IRK/DAE
           convention).
+    a, b : float, optional
+        Bounds of the target interval, forwarded to
+        :meth:`~archimedes.quadrature.QuadratureRule.map_to`. Must both be
+        given, or neither (the default, giving the reference interval
+        :math:`[-1, 1]`).
 
     Returns
     -------
     rule : QuadratureRule
         Gauss-Radau rule with ``n`` nodes on :math:`[-1, 1]`, exact to
-        degree :math:`2n - 2`.
+        degree :math:`2n - 2`, mapped onto :math:`[a, b]` if given.
 
     Raises
     ------
@@ -87,10 +104,17 @@ def gauss_radau(n: int, endpoint: str = "left") -> QuadratureRule:
         x, w = -x[::-1], w[::-1]
     elif endpoint != "left":
         raise ValueError(f"endpoint must be 'left' or 'right', got {endpoint!r}")
-    return QuadratureRule(x, w, measure=measure, name=f"gauss_radau_{endpoint}")
+    rule = QuadratureRule.from_arrays(
+        x, w, measure=measure, name=f"gauss_radau_{endpoint}"
+    )
+    if a is not None or b is not None:
+        rule = rule.map_to(a, b)
+    return rule
 
 
-def gauss_lobatto(n: int) -> QuadratureRule:
+def gauss_lobatto(
+    n: int, a: float | None = None, b: float | None = None
+) -> QuadratureRule:
     """Gauss-Lobatto quadrature rule including both endpoints.
 
     Lobatto rules fix both endpoints :math:`\\pm 1` as nodes and choose the
@@ -104,12 +128,17 @@ def gauss_lobatto(n: int) -> QuadratureRule:
     ----------
     n : int
         Number of quadrature nodes, including both endpoints.
+    a, b : float, optional
+        Bounds of the target interval, forwarded to
+        :meth:`~archimedes.quadrature.QuadratureRule.map_to`. Must both be
+        given, or neither (the default, giving the reference interval
+        :math:`[-1, 1]`).
 
     Returns
     -------
     rule : QuadratureRule
         Gauss-Lobatto rule with ``n`` nodes on :math:`[-1, 1]`, exact to
-        degree :math:`2n - 3`.
+        degree :math:`2n - 3`, mapped onto :math:`[a, b]` if given.
 
     Raises
     ------
@@ -127,10 +156,15 @@ def gauss_lobatto(n: int) -> QuadratureRule:
         x = np.concatenate([[-1.0], x, [1.0]])
         end_w = 2.0 / (n * (n - 1))
         w = np.concatenate([[end_w], w, [end_w]])
-    return QuadratureRule(x, w, measure=measure, name="gauss_lobatto")
+    rule = QuadratureRule.from_arrays(x, w, measure=measure, name="gauss_lobatto")
+    if a is not None or b is not None:
+        rule = rule.map_to(a, b)
+    return rule
 
 
-def clenshaw_curtis(n: int) -> QuadratureRule:
+def clenshaw_curtis(
+    n: int, a: float | None = None, b: float | None = None
+) -> QuadratureRule:
     """Clenshaw-Curtis quadrature rule with ``n`` nodes.
 
     Nodes are the extrema of the degree-:math:`(n-1)` Chebyshev polynomial
@@ -159,12 +193,15 @@ def clenshaw_curtis(n: int) -> QuadratureRule:
     ----------
     n : int
         Number of quadrature nodes.
+    a, b : float, optional
+        Bounds of the target interval. Must both be given, or neither. Defaults to
+        :math:`[-1, 1]`.
 
     Returns
     -------
     rule : QuadratureRule
         Clenshaw-Curtis rule with ``n`` nodes on :math:`[-1, 1]`, exact to
-        degree :math:`n - 1`.
+        degree :math:`n - 1`, mapped onto :math:`[a, b]` if given.
 
     Raises
     ------
@@ -181,12 +218,15 @@ def clenshaw_curtis(n: int) -> QuadratureRule:
     if n < 2:
         raise ValueError("Clenshaw-Curtis requires n >= 2")
     if n == 2:
-        return QuadratureRule(
+        rule = QuadratureRule.from_arrays(
             np.array([-1.0, 1.0]),
             np.array([1.0, 1.0]),
             measure=measure,
             name="clenshaw_curtis",
         )
+        if a is not None or b is not None:
+            rule = rule.map_to(a, b)
+        return rule
 
     # `d`, Waldvogel's node/weight count, is one less than here: nodes are
     # x_k = cos(k*pi/d), k = 0, ..., d (d + 1 = n nodes total). Ported from
@@ -211,4 +251,9 @@ def clenshaw_curtis(n: int) -> QuadratureRule:
     x = np.cos(np.pi * k / d)
 
     # Descending (x[0] = 1) to ascending, matching the other rules' node order
-    return QuadratureRule(x[::-1], w[::-1], measure=measure, name="clenshaw_curtis")
+    rule = QuadratureRule.from_arrays(
+        x[::-1], w[::-1], measure=measure, name="clenshaw_curtis"
+    )
+    if a is not None or b is not None:
+        rule = rule.map_to(a, b)
+    return rule

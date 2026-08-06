@@ -79,4 +79,4 @@ def trapezoidal(n: int, periodic: bool = False) -> QuadratureRule:
         w[0] *= 0.5
         w[-1] *= 0.5
         name = "trapezoidal"
-    return QuadratureRule(x, w, measure=measure, name=name)
+    return QuadratureRule.from_arrays(x, w, measure=measure, name=name)

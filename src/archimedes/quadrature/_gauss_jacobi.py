@@ -11,7 +11,13 @@ from ._quadrature_rule import QuadratureRule
 __all__ = ["gauss_jacobi"]
 
 
-def gauss_jacobi(n: int, alpha: float, beta: float) -> QuadratureRule:
+def gauss_jacobi(
+    n: int,
+    alpha: float,
+    beta: float,
+    a: float | None = None,
+    b: float | None = None,
+) -> QuadratureRule:
     r"""Gauss-Jacobi quadrature rule with ``n`` nodes.
 
     Nodes are the roots of the degree-``n`` Jacobi polynomial
@@ -30,12 +36,15 @@ def gauss_jacobi(n: int, alpha: float, beta: float) -> QuadratureRule:
         Number of quadrature nodes.
     alpha, beta : float
         Exponents of the weight function. Must be :math:`> -1`.
+    a, b : float, optional
+        Bounds of the target interval. Must both be given, or neither. Defaults to
+        :math:`[-1, 1]`.
 
     Returns
     -------
     rule : QuadratureRule
         Gauss-Jacobi rule with ``n`` nodes on :math:`[-1, 1]`, exact to
-        degree :math:`2n - 1`.
+        degree :math:`2n - 1`, mapped onto :math:`[a, b]` if given.
 
     Raises
     ------
@@ -48,4 +57,7 @@ def gauss_jacobi(n: int, alpha: float, beta: float) -> QuadratureRule:
     """
     measure = JacobiMeasure(alpha=alpha, beta=beta)
     x, w = roots_jacobi(n, alpha, beta)
-    return QuadratureRule(x, w, measure=measure, name="gauss_jacobi")
+    rule = QuadratureRule.from_arrays(x, w, measure=measure, name="gauss_jacobi")
+    if a is not None or b is not None:
+        rule = rule.map_to(a, b)
+    return rule

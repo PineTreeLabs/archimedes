@@ -124,8 +124,6 @@ This is known as _Petrov-Galerkin projection_, and the condition is that for any
 \langle \psi_j, \hat{f} - f \rangle_\mathcal{W} = 0.
 ```
 
-<!-- TODO: Explain when/why you'd use this -->
-
 ### From Continuous to Discrete
 
 <!-- TODO -->

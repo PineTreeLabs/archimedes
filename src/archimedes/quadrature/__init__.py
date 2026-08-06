@@ -13,6 +13,7 @@ from ._golub_welsch import golub_welsch, golub_welsch_rule
 from ._integral import quadint
 from ._quadrature_rule import (
     Quadrature,
+    QuadratureReferenceData,
     QuadratureRule,
     composite_quad,
 )
@@ -21,6 +22,7 @@ from ._trapezoidal import trapezoidal
 
 __all__ = [
     "Quadrature",
+    "QuadratureReferenceData",
     "QuadratureRule",
     "TensorQuadratureRule",
     "gauss_legendre",

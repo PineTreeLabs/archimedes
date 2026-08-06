@@ -45,8 +45,6 @@ def test_shapes_and_counts():
     assert len(rule) == 24
     assert rule.nodes.shape == (24, 3)
     assert rule.weights.shape == (24,)
-    assert rule.scaled_points().shape == (24, 3)
-    assert rule.scaled_weights().shape == (24,)
 
 
 def test_node_ordering_is_first_dimension_slowest():
@@ -123,7 +121,8 @@ def test_exact_for_tensor_product_polynomials(px, py):
     # n-point Gauss is exact through degree 2n - 1 in its own variable.
     rule = tensor_quad(_gl(3), _gl(3))
     a, b = (0.0, 2.0), (-1.0, 1.5)
-    value = rule.integrate(lambda x: x[:, 0] ** px * x[:, 1] ** py, dims=[a, b])
+    mapped = rule.map_to(dims=[a, b])
+    value = mapped.integrate(lambda x: x[:, 0] ** px * x[:, 1] ** py)
     expected = ((a[1] ** (px + 1) - a[0] ** (px + 1)) / (px + 1)) * (
         (b[1] ** (py + 1) - b[0] ** (py + 1)) / (py + 1)
     )
@@ -135,9 +134,8 @@ def test_exact_beyond_the_total_degree_space():
     # could not integrate; the tensor rule handles it because the degree in
     # *each* variable is only 3 <= 2*2 - 1.
     rule = tensor_quad(_gl(2), _gl(2))
-    value = rule.integrate(
-        lambda x: x[:, 0] ** 3 * x[:, 1] ** 3, dims=[(0.0, 1.0), (0.0, 1.0)]
-    )
+    mapped = rule.map_to(dims=[(0.0, 1.0), (0.0, 1.0)])
+    value = mapped.integrate(lambda x: x[:, 0] ** 3 * x[:, 1] ** 3)
     assert value == pytest.approx(1.0 / 16.0)
 
 
@@ -145,18 +143,16 @@ def test_mixed_measures_give_gaussian_moments():
     # xi ~ N(0, 2) on axis 0, u ~ U(0, 1) on axis 1.
     # E[xi^2 * u] = var * mean(u) = 4 * 0.5
     rule = tensor_quad(_gh(4), _gl(4))
-    value = rule.integrate(
-        lambda x: x[:, 0] ** 2 * x[:, 1],
-        dims=[(0.0, 2.0), (0.0, 1.0)],
-        density=True,
-    )
+    mapped = rule.map_to(dims=[(0.0, 2.0), (0.0, 1.0)])
+    value = mapped.integrate(lambda x: x[:, 0] ** 2 * x[:, 1], density=True)
     assert value == pytest.approx(2.0)
 
 
 def test_density_weights_sum_to_one():
     rule = tensor_quad(_gh(4), _gl(4), _gh(3))
-    w = rule.scaled_weights(dims=[(0.0, 2.0), (-1.0, 3.0), (1.0, 0.5)], density=True)
-    assert w.sum() == pytest.approx(1.0)
+    mapped = rule.map_to(dims=[(0.0, 2.0), (-1.0, 3.0), (1.0, 0.5)])
+    result = mapped.sum(np.ones(len(mapped)), density=True)
+    assert result == pytest.approx(1.0)
 
 
 def test_four_dimensional_gaussian_moments():
@@ -167,7 +163,8 @@ def test_four_dimensional_gaussian_moments():
     sigmas = [1.0, 2.0, 0.5, 3.0]
     rule = tensor_quad(*[_gh(3) for _ in sigmas])
     dims = [(0.0, s) for s in sigmas]
-    mean_sq = rule.integrate(lambda x: np.sum(x**2, axis=1), dims=dims, density=True)
+    mapped = rule.map_to(dims=dims)
+    mean_sq = mapped.integrate(lambda x: np.sum(x**2, axis=1), density=True)
     assert mean_sq == pytest.approx(sum(s**2 for s in sigmas))
 
 
@@ -179,9 +176,8 @@ def test_composite_per_dimension():
     assert len(rule) == (3 * 2) * 3
     np.testing.assert_allclose(rule.breakpoints[0], breaks)
     assert rule.breakpoints[1] is None
-    value = rule.integrate(
-        lambda x: x[:, 0] ** 3 * x[:, 1] ** 2, dims=[(0.0, 2.0), (0.0, 1.0)]
-    )
+    mapped = rule.map_to(dims=[(0.0, 2.0), (0.0, 1.0)])
+    value = mapped.integrate(lambda x: x[:, 0] ** 3 * x[:, 1] ** 2)
     assert value == pytest.approx(4.0 / 3.0)
 
 
@@ -221,17 +217,17 @@ def test_elements_zero_fills_non_composite_dimensions():
 
 def test_all_parameter_forms_agree():
     rule = tensor_quad(_gl(3), _gh(3))
-    as_tuples = rule.scaled_points(dims=[(0.0, 2.0), (1.0, 0.5)])
-    as_params = rule.scaled_points(
+    as_tuples = rule.map_to(dims=[(0.0, 2.0), (1.0, 0.5)]).nodes
+    as_params = rule.map_to(
         dims=[
             UnitInterval.Parameters(a=0.0, b=2.0),
             RealLine.Parameters(loc=1.0, scale=0.5),
         ]
-    )
-    as_dicts = rule.scaled_points(
+    ).nodes
+    as_dicts = rule.map_to(
         dims=[{"a": 0.0, "b": 2.0}, {"loc": 1.0, "scale": 0.5}]
-    )
-    positional = rule.scaled_points([(0.0, 2.0), (1.0, 0.5)])
+    ).nodes
+    positional = rule.map_to([(0.0, 2.0), (1.0, 0.5)]).nodes
     np.testing.assert_allclose(as_params, as_tuples)
     np.testing.assert_allclose(as_dicts, as_tuples)
     np.testing.assert_allclose(positional, as_tuples)
@@ -239,10 +235,10 @@ def test_all_parameter_forms_agree():
 
 def test_omitted_parameters_give_the_reference_domain():
     rule = tensor_quad(_gl(3), _gl(4))
-    np.testing.assert_allclose(rule.scaled_points(), rule.nodes)
-    np.testing.assert_allclose(rule.scaled_weights(), rule.weights)
+    np.testing.assert_allclose(rule.map_to().nodes, rule.nodes)
+    np.testing.assert_allclose(rule.map_to().weights, rule.weights)
     # An explicit None per dimension is the same thing.
-    np.testing.assert_allclose(rule.scaled_points(dims=[None, None]), rule.nodes)
+    np.testing.assert_allclose(rule.map_to(dims=[None, None]).nodes, rule.nodes)
 
 
 # -- integrate / sum --
@@ -251,27 +247,28 @@ def test_omitted_parameters_give_the_reference_domain():
 def test_integrate_matches_sum_at_the_nodes():
     rule = tensor_quad(_gl(3), _gl(3))
     dims = [(0.0, 2.0), (0.0, 1.0)]
+    mapped = rule.map_to(dims=dims)
 
     def f(x):
         return np.exp(x[:, 0]) * x[:, 1] ** 2
 
-    x = rule.scaled_points(dims=dims)
-    assert rule.integrate(f, dims=dims) == pytest.approx(rule.sum(f(x), dims=dims))
+    x = mapped.nodes
+    assert mapped.integrate(f) == pytest.approx(mapped.sum(f(x)))
 
 
 def test_integrate_passes_extra_args():
     rule = tensor_quad(_gl(2), _gl(2))
     dims = [(0.0, 1.0), (0.0, 1.0)]
-    value = rule.integrate(lambda x, k: k * x[:, 0] * x[:, 1], dims=dims, args=(6.0,))
+    mapped = rule.map_to(dims=dims)
+    value = mapped.integrate(lambda x, k: k * x[:, 0] * x[:, 1], args=(6.0,))
     assert value == pytest.approx(6.0 * 0.25)
 
 
 def test_vector_valued_integrand():
     rule = tensor_quad(_gl(3), _gl(3))
     dims = [(0.0, 2.0), (0.0, 1.0)]
-    value = rule.integrate(
-        lambda x: np.stack([x[:, 0], x[:, 1] ** 2], axis=-1), dims=dims
-    )
+    mapped = rule.map_to(dims=dims)
+    value = mapped.integrate(lambda x: np.stack([x[:, 0], x[:, 1] ** 2], axis=-1))
     # int_0^2 int_0^1 x dy dx = 2 ; int_0^2 int_0^1 y^2 dy dx = 2/3
     np.testing.assert_allclose(value, [2.0, 2.0 / 3.0])
 
@@ -279,9 +276,10 @@ def test_vector_valued_integrand():
 def test_vector_valued_integrand_nodes_last():
     rule = tensor_quad(_gl(3), _gl(3))
     dims = [(0.0, 2.0), (0.0, 1.0)]
-    x = rule.scaled_points(dims=dims)
+    mapped = rule.map_to(dims=dims)
+    x = mapped.nodes
     values = np.stack([x[:, 0], x[:, 1] ** 2], axis=0)  # (2, n)
-    np.testing.assert_allclose(rule.sum(values, dims=dims, axis=-1), [2.0, 2.0 / 3.0])
+    np.testing.assert_allclose(mapped.sum(values, axis=-1), [2.0, 2.0 / 3.0])
 
 
 def test_sum_rejects_wrong_shapes():
@@ -300,9 +298,9 @@ def test_traces_and_differentiates_through_domain_parameters():
 
     @arc.compile
     def area_moment(p):
-        dims = [(0.0, p[0]), (0.0, p[1])]
-        x = rule.scaled_points(dims=dims)
-        w = rule.scaled_weights(dims=dims)
+        mapped = rule.map_to(dims=[(0.0, p[0]), (0.0, p[1])])
+        x = mapped.nodes
+        w = mapped.weights
         return np.dot(w, x[:, 0] * x[:, 1])
 
     p = np.array([2.0, 3.0])
@@ -318,10 +316,9 @@ def test_traces_with_density():
 
     @arc.compile
     def second_moment(s):
-        dims = [(0.0, s[0]), (0.0, s[1])]
-        x = rule.scaled_points(dims=dims)
-        w = rule.scaled_weights(dims=dims, density=True)
-        return np.dot(w, x[:, 0] ** 2 + x[:, 1] ** 2)
+        mapped = rule.map_to(dims=[(0.0, s[0]), (0.0, s[1])])
+        values = mapped.nodes[:, 0] ** 2 + mapped.nodes[:, 1] ** 2
+        return mapped.sum(values, density=True)
 
     s = np.array([2.0, 3.0])
     assert second_moment(s) == pytest.approx(4.0 + 9.0)
@@ -343,32 +340,32 @@ def test_rejects_non_quadrature_rules():
 def test_rejects_wrong_number_of_dimensions():
     rule = tensor_quad(_gl(3), _gl(3))
     with pytest.raises(ValueError, match="expected 2 per-dimension parameters"):
-        rule.scaled_points(dims=[(0.0, 1.0)])
+        rule.map_to(dims=[(0.0, 1.0)])
 
 
 def test_rejects_mixing_positional_and_keyword_parameters():
     rule = tensor_quad(_gl(3), _gl(3))
     with pytest.raises(TypeError, match="a single sequence"):
-        rule.scaled_points([(0.0, 1.0), (0.0, 1.0)], dims=[None, None])
+        rule.map_to([(0.0, 1.0), (0.0, 1.0)], dims=[None, None])
 
 
 def test_rejects_unknown_keyword():
     rule = tensor_quad(_gl(3), _gl(3))
     with pytest.raises(TypeError, match="a single sequence"):
-        rule.scaled_points(a=0.0, b=1.0)
+        rule.map_to(a=0.0, b=1.0)
 
 
 def test_rejects_spread_out_positional_parameters():
-    # The 1-D `scaled_points(a, b)` spelling is ambiguous across dimensions.
+    # The 1-D `map_to(a, b)` spelling is ambiguous across dimensions.
     rule = tensor_quad(_gl(3), _gl(3))
     with pytest.raises(TypeError, match="not 2 positional arguments"):
-        rule.scaled_points((0.0, 1.0), (0.0, 1.0))
+        rule.map_to((0.0, 1.0), (0.0, 1.0))
 
 
 def test_rejects_unrecognized_parameter_spec():
     rule = tensor_quad(_gl(3), _gl(3))
     with pytest.raises(TypeError, match="per-dimension parameters must be"):
-        rule.scaled_points(dims=[3.0, None])
+        rule.map_to(dims=[3.0, None])
 
 
 def test_constructor_accepts_an_explicit_tuple():

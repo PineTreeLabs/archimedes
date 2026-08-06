@@ -110,18 +110,9 @@ class _DimensionView:
         elements = self._rule.elements
         return None if elements is None else elements[:, self._dim]
 
-    def scaled_points(self, **domain_kwargs):
-        return self._rule.scaled_points(dims=self._rule_dims(**domain_kwargs))[
-            :, self._dim
-        ]
-
-    def _rule_dims(self, **domain_kwargs):
-        """This dimension's parameters in the slot the tensor rule expects,
-        with the others left at their reference domains -- only column
-        ``self._dim`` of the result is ever read."""
-        dims: list = [None] * self._rule.ndim
-        dims[self._dim] = domain_kwargs
-        return dims
+    @property
+    def nodes(self):
+        return self._rule.nodes[:, self._dim]
 
 
 def _row_kron(mats: list) -> np.ndarray:
@@ -356,8 +347,7 @@ class TensorBasis(Basis):
         ----------
         x : array_like
             Evaluation points, shape ``(npts, ndim)`` -- one row per point,
-            one column per dimension, matching
-            :meth:`TensorQuadratureRule.scaled_points`.
+            one column per dimension, matching :attr:`TensorQuadratureRule.nodes`.
         deriv : tuple of int, optional
             Multi-index of derivative orders, one per dimension. The scalar
             ``0`` (the default) means no derivative.

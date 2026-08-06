@@ -128,7 +128,9 @@ def test_orthonormal_on_reference_domain(kind, n_basis, density):
     basis = FourierBasis(n_basis, kind=kind, density=density)
     rule = basis.default_quadrature()
     phi = basis.evaluate(rule.nodes)
-    w = rule.scaled_weights(density=density)
+    w = rule.weights
+    if density:
+        w = w / np.sum(w)
     M = phi.T @ (w[:, None] * phi)
     np.testing.assert_allclose(M, np.eye(n_basis), atol=1e-10)
 
@@ -137,9 +139,9 @@ def test_orthonormal_on_reference_domain(kind, n_basis, density):
 def test_orthonormal_on_mapped_domain(kind, n_basis):
     a, b = 2.0, 7.0
     basis = FourierBasis(n_basis, kind=kind)
-    rule = basis.default_quadrature()
-    x = rule.scaled_points(a, b)
-    w = rule.scaled_weights(a, b)
+    rule = basis.default_quadrature().map_to(a, b)
+    x = rule.nodes
+    w = rule.weights
     phi = basis.evaluate(x, a=a, b=b)
     M = phi.T @ (w[:, None] * phi)
     np.testing.assert_allclose(M, np.eye(n_basis), atol=1e-10)
@@ -148,9 +150,9 @@ def test_orthonormal_on_mapped_domain(kind, n_basis):
 def test_density_orthonormal_against_probability_measure():
     a, b = -3.0, 4.0
     basis = FourierBasis(5, kind="full", density=True)
-    rule = basis.default_quadrature()
-    x = rule.scaled_points(a, b)
-    w = rule.scaled_weights(a, b, density=True)
+    rule = basis.default_quadrature().map_to(a, b)
+    x = rule.nodes
+    w = rule.weights / np.sum(rule.weights)
     phi = basis.evaluate(x, a=a, b=b)
     M = phi.T @ (w[:, None] * phi)
     np.testing.assert_allclose(M, np.eye(5), atol=1e-10)

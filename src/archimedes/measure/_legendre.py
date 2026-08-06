@@ -18,6 +18,7 @@ class LegendreMeasure(Measure):
     """
 
     uniform_weight = True
+    affine_invariant = True
     domain = UnitInterval()
 
     def weight(self, x: np.ndarray) -> np.ndarray:

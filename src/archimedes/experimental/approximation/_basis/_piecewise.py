@@ -542,7 +542,7 @@ class PiecewiseBasis(Basis):
         makes the resulting masks static -- one fewer runtime comparison in
         the traced graph, and one fewer branch point for autodiff.
         """
-        x = rule.scaled_points(a=a, b=b)
+        x = rule.nodes
         if rule.elements is None:
             # No element structure to draw on (a plain, non-composite rule).
             # `FunctionSpace` rejects such a rule for this basis, so this is

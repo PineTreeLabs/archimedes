@@ -21,6 +21,7 @@ class LaguerreMeasure(Measure):
     \\Gamma(k+1)`.
     """
 
+    affine_invariant = True
     domain = HalfLine()
 
     def weight(self, x: np.ndarray) -> np.ndarray:

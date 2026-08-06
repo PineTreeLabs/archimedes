@@ -88,7 +88,7 @@ def golub_welsch_rule(
         raise ValueError(f"n must be >= 1, got {n}")
     alpha, beta = measure.recurrence_coeffs(n)
     nodes, weights = golub_welsch(alpha, beta)
-    return QuadratureRule(
+    return QuadratureRule.from_arrays(
         nodes,
         weights,
         measure=measure,

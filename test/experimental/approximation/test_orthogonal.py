@@ -73,9 +73,9 @@ def test_orthonormal_on_reference_domain():
 def test_orthonormal_on_mapped_domain():
     a, b = 2.0, 7.0
     basis = OrthogonalPolynomialBasis(LegendreMeasure(), n_basis=6)
-    rule = gauss_legendre(15)
-    x = rule.scaled_points(a, b)
-    w = rule.scaled_weights(a, b)
+    rule = gauss_legendre(15).map_to(a, b)
+    x = rule.nodes
+    w = rule.weights
     phi = basis.evaluate(x, a=a, b=b)
     M = phi.T @ (w[:, None] * phi)
     np.testing.assert_allclose(M, np.eye(6), atol=1e-10)
@@ -92,9 +92,9 @@ def test_density_orthonormal_against_probability_measure():
     basis = OrthogonalPolynomialBasis(
         ProbabilistsHermiteMeasure(), n_basis=5, density=True
     )
-    rule = gauss_hermite(15, kind="prob")
-    x = rule.scaled_points(loc, scale)
-    w = rule.scaled_weights(loc, scale, density=True)
+    rule = gauss_hermite(15, kind="prob").map_to(loc, scale)
+    x = rule.nodes
+    w = rule.weights / np.sum(rule.weights)
     phi = basis.evaluate(x, loc=loc, scale=scale)
     M = phi.T @ (w[:, None] * phi)
     np.testing.assert_allclose(M, np.eye(5), atol=1e-8)

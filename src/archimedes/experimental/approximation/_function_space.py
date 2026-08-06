@@ -226,7 +226,7 @@ class FunctionSpace:
 
         - **Dimension.** A rule of the wrong ``ndim`` presents points of the
           wrong shape.
-        - **Weight.** ``scaled_weights`` applies the *rule's* weight
+        - **Weight.** The rule's ``weights`` apply its *own* measure
           implicitly, so a rule built on a different measure computes a
           different inner product than the basis is orthogonal under.
         - **Alignment.** Where the basis is not smooth, the rule's
@@ -782,7 +782,7 @@ class FunctionSpace:
         current = self
         for _ in range(order):
             step_target = current._integral_space(1)
-            rule = step_target.quad_rule
+            rule = step_target._resolve_rule()
             step_target._check_quad_rule_size(rule)
             # (current.n_basis, step_target.n_basis): D @ F recovers the
             # derivative of F's coefficients in this (smaller) space.
@@ -841,7 +841,7 @@ class FunctionSpace:
             Shape ``(space.n_basis, self.n_basis)``.
         """
         target = self if space is None else space
-        rule = target.quad_rule
+        rule = target._resolve_rule()
         target._check_quad_rule_size(rule)
         phi = target.basis_matrix(quad_rule=rule)  # (npts, n_target)
         dphi = self.basis_matrix(deriv=deriv, quad_rule=rule)  # (npts, n_basis)
@@ -855,7 +855,13 @@ class FunctionSpace:
         return self.basis.evaluate(x, deriv=deriv, **self._domain_kwargs())
 
     def _resolve_rule(self, quad_rule: Quadrature | None = None) -> Quadrature:
-        return quad_rule if quad_rule is not None else self.quad_rule
+        """The rule to use for this call: an explicit override, used
+        exactly as given (no further domain mapping -- see
+        :attr:`quad_rule`'s docstring), or the space's own default rule
+        mapped onto ``self.domain`` via ``QuadratureRule.map_to``."""
+        if quad_rule is not None:
+            return quad_rule
+        return self.quad_rule.map_to(**self._domain_kwargs())
 
     def _check_quad_rule_size(self, rule: Quadrature) -> None:
         # phi is (npts, n_basis), so phi.T @ diag(w) @ phi has rank at most
@@ -889,13 +895,14 @@ class FunctionSpace:
             Nodes and weights on this space's target domain.
         """
         rule = self._resolve_rule(quad_rule)
-        domain_kwargs = self._domain_kwargs()
         # `density=self.basis.density` keeps the quadrature weights consistent
         # with the basis's own normalization (see `Basis.density`): a basis
         # orthonormal w.r.t. a probability measure needs weights that
         # integrate that same probability measure, not the raw weight.
-        weights = rule.scaled_weights(**domain_kwargs, density=self.basis.density)
-        return rule.scaled_points(**domain_kwargs), weights
+        weights = rule.weights
+        if self.basis.density:
+            weights = weights / np.sum(weights)
+        return rule.nodes, weights
 
     def basis_matrix(
         self, deriv: int = 0, quad_rule: Quadrature | None = None
@@ -1003,7 +1010,7 @@ class FunctionSpace:
             # `ndim` is a static (trace-time) property, so this branches on
             # shape rather than on a value and is safe under `@arc.compile`.
             integrand = np.sum(integrand, axis=-1)
-        return rule.sum(integrand, **self._domain_kwargs(), density=self.basis.density)
+        return rule.sum(integrand, density=self.basis.density)
 
     def project(
         self,

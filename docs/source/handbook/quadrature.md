@@ -290,6 +290,10 @@ The `Measure` interface is roughly:
 class Measure:
     domain: ReferenceDomain  # UnitInterval | HalfLine | RealLine
 
+    # True if closed-form recurrence_coeffs is verified affine-invariant --
+    # see "Custom Rules" below
+    affine_invariant: bool = False
+
     # Domain of support D = [a, b]
     @property
     def support(self) -> tuple[float, float]: ...
@@ -314,17 +318,26 @@ The key parts of `QuadratureRule` are:
 ```python
 @arc.struct
 class QuadratureRule:
-    nodes: np.ndarray
-    weights: np.ndarray
-    measure: Measure
-    breakpoints: np.ndarray | None = None  # element boundaries, if composite
-    elements: np.ndarray | None = None  # owning element per node, if composite
+    reference: QuadratureReferenceData  # static nodes/weights/measure/breakpoints/elements
+    name: str
+    params: ReferenceDomain.Parameters | None = None  # the currently-set mapping
 
-    # Approximate the weighted integral of ``f``
-    def integrate(self, f, *params, axis=-1, args=None, density=False) -> np.ndarray: ...
+    # Nodes/weights on the currently-mapped domain (the reference domain if
+    # `map_to` was never called) -- symbolic if the mapping is
+    @property
+    def nodes(self) -> np.ndarray: ...
+    @property
+    def weights(self) -> np.ndarray: ...
+
+    # A new rule mapped onto the target domain; never composes with a prior
+    # `map_to` -- always resolves fresh against the reference domain
+    def map_to(self, *params, **kwparams) -> "QuadratureRule": ...
+
+    # Approximate the weighted integral of ``f`` over the current mapping
+    def integrate(self, f, *, axis=-1, args=None, density=False) -> np.ndarray: ...
 
     # Quadrature applied to values already sampled at the nodes
-    def sum(self, values, *params, axis=-1, density=False) -> np.ndarray: ...
+    def sum(self, values, *, axis=-1, density=False) -> np.ndarray: ...
 ```
 
 #### Higher-level interface
@@ -343,15 +356,17 @@ Available options are:
 
 | Classical name | Python function | Weight function $w(x)$ | Reference interval | Notes |
 |---|---|---|---|---|
-| Gauss-Legendre | `gauss_legendre(n)` | $1$ | $[-1, 1]$ | Neither endpoint included |
-| Gauss-Radau | `gauss_radau(n, endpoint="left"\|"right")` | $1$ | $[-1, 1]$ | Fixes one endpoint |
-| Gauss-Lobatto | `gauss_lobatto(n)` | $1$ | $[-1, 1]$ | Fixes both endpoints |
-| Clenshaw-Curtis | `clenshaw_curtis(n)` | $1$ | $[-1, 1]$ | Chebyshev-Lobatto nodes |
+| Gauss-Legendre | `gauss_legendre(n, a=None, b=None)` | $1$ | $[-1, 1]$ | Neither endpoint included |
+| Gauss-Radau | `gauss_radau(n, endpoint="left"\|"right", a=None, b=None)` | $1$ | $[-1, 1]$ | Fixes one endpoint |
+| Gauss-Lobatto | `gauss_lobatto(n, a=None, b=None)` | $1$ | $[-1, 1]$ | Fixes both endpoints |
+| Clenshaw-Curtis | `clenshaw_curtis(n, a=None, b=None)` | $1$ | $[-1, 1]$ | Chebyshev-Lobatto nodes |
 | Trapezoidal | `trapezoidal(n, periodic=False)` | $1$ | $[-1, 1]$ | Pass `periodic=True` for a Fourier basis |
-| Gauss-Jacobi | `gauss_jacobi(n, alpha, beta)` | $(1-x)^\alpha(1+x)^\beta$ | $[-1, 1]$ | Legendre/Chebyshev are special cases |
-| Gauss-Hermite (probabilists') | `gauss_hermite(n, kind="prob")` |$e^{-x^2/2}$ | $(-\infty, \infty)$ | Default `kind` |
-| Gauss-Hermite (physicists') | `gauss_hermite(n, kind="phys")` | $e^{-x^2}$ | $(-\infty, \infty)$ |   |
-| Gauss-Laguerre | `gauss_laguerre(n)` | $e^{-x}$ | $[0, \infty)$ |   |
+| Gauss-Jacobi | `gauss_jacobi(n, alpha, beta, a=None, b=None)` | $(1-x)^\alpha(1+x)^\beta$ | $[-1, 1]$ | Legendre/Chebyshev are special cases |
+| Gauss-Hermite (probabilists') | `gauss_hermite(n, kind="prob", loc=None, scale=None)` |$e^{-x^2/2}$ | $(-\infty, \infty)$ | Default `kind` |
+| Gauss-Hermite (physicists') | `gauss_hermite(n, kind="phys", loc=None, scale=None)` | $e^{-x^2}$ | $(-\infty, \infty)$ |   |
+| Gauss-Laguerre | `gauss_laguerre(n, rate=None, start=None)` | $e^{-x}$ | $[0, \infty)$ |   |
+
+The `a`/`b`/`rate`/`start`/`loc`/`scale` keyword args are sugar for calling `.map_to(...)` on the freshly-built reference rule -- `gauss_legendre(n, a, b)` is exactly `gauss_legendre(n).map_to(a, b)`.
 
 The trapezoidal rule is slightly different from the others, and comes in two forms selected by the `periodic` keyword.
 With the default `periodic=False`, it's the usual trapezoidal rule on the closed interval $[-1, 1]$, which is not a Gaussian rule in the sense we have been discussing.
@@ -359,25 +374,25 @@ With `periodic=True`, nodes are instead placed on the **half-open** interval $[-
 
 Once you have the `QuadratureRule` object, you can inspect the nodes and weights if you like, or just use its quadrature methods:
 
-- `QuadratureRule.integrate(f, **kwparams)` integrates the function `f(x)` on the domain specified by `**kwparams`
-- `QuadratureRule.sum(fp, **kwparams)` does the same thing but with pre-computed function data on the nodes
+- `QuadratureRule.map_to(**kwparams)` returns a new rule with its nodes/weights mapped onto a target domain -- `**kwparams` define the domain and weight transformation, e.g. `rule.map_to(a=a, b=b)` for Gauss-Legendre (or Radau, Lobatto, Jacobi, Clenshaw-Curtis, or trapezoidal) transforms the domain to $(a, b)$, while `rule.map_to(loc=mu, scale=sigma)` for Gauss-Hermite on an infinite domain shifts/scales the Gaussian weight function. Called with no arguments, or never called at all, a rule stays on its reference domain.
+- `QuadratureRule.integrate(f)` integrates `f(x)` over whatever domain the rule is currently mapped onto
+- `QuadratureRule.sum(fp)` does the same thing but with pre-computed function data on the nodes
 
 The equivalence between the two is literally:
 
 ```python
 # This:
-quad_rule.integrate(f, **kwparams)
+quad_rule.integrate(f)
 
 # is the same as this:
 xp = quad_rule.nodes
 fp = f(xp)
-quad_rule.sum(fp, **kwparams)
+quad_rule.sum(fp)
 ```
 
-The `**kwparams` define the domain and weight transformation.
-For instance, `quad_rule.integrate(f, a=a, b=b)` for Gauss-Legendre (or Radau, Lobatto, Jacobi, Clenshaw-Curtis, or trapezoidal) will transform the domain to $(a, b)$, while `quad_rule.integrate(f, loc=mu, scale=sigma)` for Gauss-Hermite on an infinite domain will shift/scale the Gaussian weight function.
+For a one-off integral on a specific domain, the ergonomic pattern is to pass the domain kwargs to the constructor directly rather than mapping a separate rule -- `gauss_legendre(n, a, b).integrate(f)` -- which also gets you named-argument IDE discoverability that a generic `**kwparams` can't.
 
-One distinct feature of the Archimedes quadrature interface is that you can optionally pass a `density=True` keyword arg to directly interpret the weight functions as probability densities.
+One distinct feature of the Archimedes quadrature interface is that you can optionally pass a `density=True` keyword arg (to `integrate`/`sum`) to directly interpret the weight functions as probability densities.
 That is, the quadrature result approximates an expectation under the corresponding probability density:
 
 ```{math}
@@ -394,8 +409,9 @@ def f(x):
 mu = 2.0
 sigma = 1.5
 
-quad_rule = arc.quadrature.gauss_hermite(n=20)  # kind="prob" is the default
-J = quad_rule.integrate(f, loc=mu, scale=sigma, density=True)
+# kind="prob" is the default
+quad_rule = arc.quadrature.gauss_hermite(n=20, loc=mu, scale=sigma)
+J = quad_rule.integrate(f, density=True)
 
 print(f"Exact value: {mu**2 + sigma**2:.6f}")
 print(f"Quadrature value: {J:.6f}")

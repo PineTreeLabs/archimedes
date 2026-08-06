@@ -10,6 +10,7 @@ from scipy.special import (
     roots_hermitenorm,
     roots_jacobi,
     roots_laguerre,
+    roots_legendre,
 )
 
 import archimedes as arc
@@ -21,6 +22,7 @@ from archimedes.measure import (
     ProbabilistsHermiteMeasure,
 )
 from archimedes.quadrature import (
+    QuadratureReferenceData,
     QuadratureRule,
     clenshaw_curtis,
     composite_quad,
@@ -42,7 +44,7 @@ def test_len_and_shape_validation():
     assert len(rule) == 5
 
     with pytest.raises(ValueError):
-        QuadratureRule(
+        QuadratureRule.from_arrays(
             nodes=np.array([1.0, 2.0]),
             weights=np.array([1.0]),
             name="bad",
@@ -50,20 +52,30 @@ def test_len_and_shape_validation():
         )
 
 
-def test_scaled_points_weights_identity():
+def test_map_to_no_args_is_identity():
     rule = gauss_legendre(5)
-    np.testing.assert_array_equal(rule.scaled_points(), rule.nodes)
-    np.testing.assert_array_equal(rule.scaled_weights(), rule.weights)
+    np.testing.assert_array_equal(rule.map_to().nodes, rule.nodes)
+    np.testing.assert_array_equal(rule.map_to().weights, rule.weights)
 
 
-def test_scaled_points_weights_interval():
+def test_map_to_interval():
     rule = gauss_legendre(5)
     a, b = -2.0, 5.0
-    x = rule.scaled_points(a, b)
-    w = rule.scaled_weights(a, b)
-    assert x[0] > a
-    assert x[-1] < b
-    assert np.isclose(np.sum(w), b - a)
+    mapped = rule.map_to(a, b)
+    assert mapped.nodes[0] > a
+    assert mapped.nodes[-1] < b
+    assert np.isclose(np.sum(mapped.weights), b - a)
+
+
+def test_map_to_does_not_compose():
+    rule = gauss_legendre(5)
+    composed = rule.map_to(0.0, 1.0).map_to(2.0, 3.0)
+    direct = rule.map_to(2.0, 3.0)
+    np.testing.assert_allclose(composed.nodes, direct.nodes)
+    np.testing.assert_allclose(composed.weights, direct.weights)
+    # Resets all the way back to the reference domain, not just one level.
+    reset = rule.map_to(0.0, 1.0).map_to()
+    np.testing.assert_allclose(reset.nodes, rule.nodes)
 
 
 def test_dot_matches_integrate():
@@ -88,7 +100,7 @@ def test_integrate_args_with_scaled_domain():
 
     rule = gauss_legendre(5)
     a, b = -2.0, 5.0
-    result = rule.integrate(f, a, b, args=(2,))
+    result = rule.map_to(a, b).integrate(f, args=(2,))
     expected = (b**3 - a**3) / 3
     assert np.isclose(result, expected)
 
@@ -132,9 +144,18 @@ def test_gauss_legendre():
 def test_gauss_legendre_scaled_domain():
     rule = gauss_legendre(5)
     a, b = -2.0, 5.0
-    integral = rule.integrate(lambda x: x**2, a, b)
+    integral = rule.map_to(a, b).integrate(lambda x: x**2)
     expected = (b**3 - a**3) / 3
     assert np.isclose(integral, expected)
+
+
+def test_gauss_legendre_a_b_matches_map_to():
+    a, b = -2.0, 5.0
+    assert gauss_legendre(5, a, b) == gauss_legendre(5).map_to(a, b)
+
+
+def test_gauss_legendre_no_domain_args_is_unmapped():
+    assert gauss_legendre(5, a=None, b=None) == gauss_legendre(5)
 
 
 @pytest.mark.parametrize("endpoint,fixed_node", [("left", -1.0), ("right", 1.0)])
@@ -147,6 +168,11 @@ def test_gauss_radau(endpoint, fixed_node):
 
     # Exact for polynomials up to degree 2n - 2 = 8
     assert np.isclose(rule.integrate(lambda x: x**8), 2 / 9)
+
+
+def test_gauss_radau_a_b_matches_map_to():
+    a, b = -2.0, 5.0
+    assert gauss_radau(5, a=a, b=b) == gauss_radau(5).map_to(a, b)
 
 
 def test_gauss_radau_edge_cases():
@@ -170,6 +196,11 @@ def test_gauss_lobatto():
 
     # Exact for polynomials up to degree 2n - 3 = 7
     assert np.isclose(rule.integrate(lambda x: x**6), 2 / 7)
+
+
+def test_gauss_lobatto_a_b_matches_map_to():
+    a, b = -2.0, 5.0
+    assert gauss_lobatto(5, a=a, b=b) == gauss_lobatto(5).map_to(a, b)
 
 
 def test_gauss_lobatto_edge_cases():
@@ -245,9 +276,16 @@ def test_clenshaw_curtis_shares_legendre_measure():
     assert isinstance(rule.measure, LegendreMeasure)
 
     a, b = -2.0, 5.0
-    integral = rule.integrate(lambda x: x**2, a, b)
+    integral = rule.map_to(a, b).integrate(lambda x: x**2)
     expected = (b**3 - a**3) / 3
     assert np.isclose(integral, expected)
+
+
+def test_clenshaw_curtis_a_b_matches_map_to():
+    a, b = -2.0, 5.0
+    assert clenshaw_curtis(5, a=a, b=b) == clenshaw_curtis(5).map_to(a, b)
+    # Also cover the n == 2 special-cased branch.
+    assert clenshaw_curtis(2, a=a, b=b) == clenshaw_curtis(2).map_to(a, b)
 
 
 def test_clenshaw_curtis_composite_quad():
@@ -305,7 +343,7 @@ def test_trapezoidal_periodic_shares_legendre_measure():
     assert isinstance(rule.measure, LegendreMeasure)
 
     a, b = -2.0, 5.0
-    integral = rule.integrate(lambda x: np.ones_like(x), a, b)
+    integral = rule.map_to(a, b).integrate(lambda x: np.ones_like(x))
     assert np.isclose(integral, b - a)
 
 
@@ -355,7 +393,7 @@ def test_trapezoidal_shares_legendre_measure():
     assert isinstance(rule.measure, LegendreMeasure)
 
     a, b = -2.0, 5.0
-    integral = rule.integrate(lambda x: np.ones_like(x), a, b)
+    integral = rule.map_to(a, b).integrate(lambda x: np.ones_like(x))
     assert np.isclose(integral, b - a)
 
 
@@ -443,7 +481,7 @@ def test_gauss_jacobi_invalid_params():
 def test_gauss_jacobi_exact_moment():
     n, alpha, beta = 5, 1.0, 2.0
     x, w = roots_jacobi(n, alpha, beta)
-    rule = QuadratureRule(
+    rule = QuadratureRule.from_arrays(
         x, w, name="gauss_jacobi_5", measure=JacobiMeasure(alpha=alpha, beta=beta)
     )
 
@@ -452,10 +490,17 @@ def test_gauss_jacobi_exact_moment():
     assert np.isclose(rule.integrate(lambda x: np.ones_like(x)), expected)
 
 
+def test_gauss_jacobi_a_b_matches_map_to():
+    a, b = -2.0, 5.0
+    assert gauss_jacobi(5, 1.0, 2.0, a=a, b=b) == gauss_jacobi(5, 1.0, 2.0).map_to(a, b)
+
+
 def test_gauss_laguerre_exact_moments():
     n = 5
     x, w = roots_laguerre(n)
-    rule = QuadratureRule(x, w, name="gauss_laguerre_5", measure=LaguerreMeasure())
+    rule = QuadratureRule.from_arrays(
+        x, w, name="gauss_laguerre_5", measure=LaguerreMeasure()
+    )
 
     # Exact for polynomials up to degree 2n - 1
     for k in range(2 * n):
@@ -466,17 +511,26 @@ def test_gauss_laguerre_exact_moments():
 def test_gauss_laguerre_rate_scaling():
     n = 5
     x, w = roots_laguerre(n)
-    rule = QuadratureRule(x, w, name="gauss_laguerre_5", measure=LaguerreMeasure())
+    rule = QuadratureRule.from_arrays(
+        x, w, name="gauss_laguerre_5", measure=LaguerreMeasure()
+    )
 
     rate = 2.0
-    integral = rule.integrate(lambda x: np.ones_like(x), rate=rate)
+    integral = rule.map_to(rate=rate).integrate(lambda x: np.ones_like(x))
     assert np.isclose(integral, 1 / rate)
+
+
+def test_gauss_laguerre_rate_start_matches_map_to():
+    rate, start = 2.0, 1.0
+    assert gauss_laguerre(5, rate=rate, start=start) == gauss_laguerre(5).map_to(
+        rate=rate, start=start
+    )
 
 
 def test_gauss_hermite_exact_moments():
     n = 5
     x, w = roots_hermite(n)
-    rule = QuadratureRule(
+    rule = QuadratureRule.from_arrays(
         x, w, name="gauss_hermite_5", measure=PhysicistsHermiteMeasure()
     )
 
@@ -488,19 +542,26 @@ def test_gauss_hermite_exact_moments():
 def test_gauss_hermite_loc_scale_scaling():
     n = 5
     x, w = roots_hermite(n)
-    rule = QuadratureRule(
+    rule = QuadratureRule.from_arrays(
         x, w, name="gauss_hermite_5", measure=PhysicistsHermiteMeasure()
     )
 
     loc, scale = 1.0, 2.0
-    integral = rule.integrate(lambda x: np.ones_like(x), loc=loc, scale=scale)
+    integral = rule.map_to(loc=loc, scale=scale).integrate(lambda x: np.ones_like(x))
     assert np.isclose(integral, scale * np.sqrt(np.pi))
+
+
+def test_gauss_hermite_loc_scale_matches_map_to():
+    loc, scale = 1.0, 2.0
+    assert gauss_hermite(5, loc=loc, scale=scale) == gauss_hermite(5).map_to(
+        loc=loc, scale=scale
+    )
 
 
 def test_gauss_hermitenorm_exact_moments():
     n = 5
     x, w = roots_hermitenorm(n)
-    rule = QuadratureRule(
+    rule = QuadratureRule.from_arrays(
         x, w, name="gauss_hermitenorm_5", measure=ProbabilistsHermiteMeasure()
     )
 
@@ -514,15 +575,16 @@ def test_gauss_hermitenorm_matches_gaussian_expectation():
     # deviation of a Gaussian density -- no sqrt(2) correction needed.
     n = 6
     x, w = roots_hermitenorm(n)
-    rule = QuadratureRule(
+    rule = QuadratureRule.from_arrays(
         x, w, name="gauss_hermitenorm_6", measure=ProbabilistsHermiteMeasure()
     )
 
     loc, scale = 2.0, 3.0
     norm = scale * np.sqrt(2 * np.pi)  # normalizes the weight to a proper PDF
+    mapped = rule.map_to(loc=loc, scale=scale)
 
     def expectation(f):
-        return rule.integrate(f, loc=loc, scale=scale) / norm
+        return mapped.integrate(f) / norm
 
     assert np.isclose(expectation(lambda x: np.ones_like(x)), 1.0)
     assert np.isclose(expectation(lambda x: x), loc)
@@ -532,35 +594,35 @@ def test_gauss_hermitenorm_matches_gaussian_expectation():
 # -- density=True normalization --
 
 
-def test_scaled_weights_density_sums_to_one():
+def test_sum_density_sums_to_one():
     rule = gauss_legendre(5)
     a, b = -2.0, 5.0
-    w = rule.scaled_weights(a, b, density=True)
-    assert np.isclose(np.sum(w), 1.0)
-    np.testing.assert_allclose(w, rule.scaled_weights(a, b) / (b - a))
+    mapped = rule.map_to(a, b)
+    w_density = mapped.sum(np.ones(len(mapped)), density=True)
+    assert np.isclose(w_density, 1.0)
+    w_plain = mapped.sum(np.ones(len(mapped)))
+    assert np.isclose(w_density, w_plain / (b - a))
 
 
-def test_scaled_weights_density_default_false():
-    rule = gauss_legendre(5)
-    np.testing.assert_array_equal(
-        rule.scaled_weights(-2.0, 5.0), rule.scaled_weights(-2.0, 5.0, density=False)
-    )
+def test_sum_density_default_false():
+    rule = gauss_legendre(5).map_to(-2.0, 5.0)
+    values = np.ones(len(rule))
+    np.testing.assert_array_equal(rule.sum(values), rule.sum(values, density=False))
 
 
 def test_integrate_density_matches_gaussian_expectation():
     n = 6
     rule = gauss_hermite(n)
     loc, scale = 2.0, 3.0
+    mapped = rule.map_to(loc=loc, scale=scale)
 
     assert np.isclose(
-        rule.integrate(lambda x: np.ones_like(x), loc=loc, scale=scale, density=True),
+        mapped.integrate(lambda x: np.ones_like(x), density=True),
         1.0,
     )
+    assert np.isclose(mapped.integrate(lambda x: x, density=True), loc)
     assert np.isclose(
-        rule.integrate(lambda x: x, loc=loc, scale=scale, density=True), loc
-    )
-    assert np.isclose(
-        rule.integrate(lambda x: x**2, loc=loc, scale=scale, density=True),
+        mapped.integrate(lambda x: x**2, density=True),
         loc**2 + scale**2,
     )
 
@@ -569,8 +631,9 @@ def test_sum_density_forwarded():
     n = 6
     rule = gauss_hermite(n)
     loc, scale = 2.0, 3.0
-    values = np.ones_like(rule.nodes)
-    assert np.isclose(rule.sum(values, loc=loc, scale=scale, density=True), 1.0)
+    mapped = rule.map_to(loc=loc, scale=scale)
+    values = np.ones_like(mapped.nodes)
+    assert np.isclose(mapped.sum(values, density=True), 1.0)
 
 
 @pytest.mark.parametrize(
@@ -584,9 +647,9 @@ def test_sum_density_forwarded():
     ],
 )
 def test_density_weights_sum_to_one_all_families(rule_factory, params):
-    rule = rule_factory()
-    w = rule.scaled_weights(**params, density=True)
-    assert np.isclose(np.sum(w), 1.0)
+    mapped = rule_factory().map_to(**params)
+    result = mapped.sum(np.ones(len(mapped)), density=True)
+    assert np.isclose(result, 1.0)
 
 
 # -- composite rules --
@@ -612,7 +675,7 @@ def test_composite_scaled_domain():
     # it maps onto an arbitrary target interval like any other Legendre rule.
     rule = composite_quad(gauss_legendre(3), [-1.0, 0.0, 1.0])
     a, b = -2.0, 5.0
-    integral = rule.integrate(lambda x: x**2, a, b)
+    integral = rule.map_to(a, b).integrate(lambda x: x**2)
     expected = (b**3 - a**3) / 3
     assert np.isclose(integral, expected)
 
@@ -622,7 +685,7 @@ def test_composite_requires_uniform_weight():
     with pytest.raises(ValueError):
         composite_quad(jacobi_rule, [-1.0, 0.0, 1.0])
 
-    laguerre_rule = QuadratureRule(
+    laguerre_rule = QuadratureRule.from_arrays(
         *roots_laguerre(5), name="gauss_laguerre_5", measure=LaguerreMeasure()
     )
     with pytest.raises(ValueError):
@@ -685,7 +748,7 @@ def test_composite_rejects_wrong_rule_count():
 
 
 def test_composite_rejects_mismatched_measures():
-    laguerre_rule = QuadratureRule(
+    laguerre_rule = QuadratureRule.from_arrays(
         *roots_laguerre(3), name="gauss_laguerre_3", measure=LaguerreMeasure()
     )
     with pytest.raises(ValueError, match="same measure"):
@@ -713,7 +776,22 @@ def test_compile_symbolic_interval():
 
     @arc.compile
     def quad(a, b):
-        return rule.integrate(lambda x: x**2, a, b)
+        return rule.map_to(a, b).integrate(lambda x: x**2)
+
+    result = quad(0.0, 2.0)
+    assert np.isclose(float(result), 8 / 3)
+
+
+def test_map_to_symbolic_interval():
+    # Direct regression test that a `map_to`'d rule's `params` field
+    # correctly holds and propagates a symbolic value through the
+    # @tree.struct/tracing machinery.
+    rule = gauss_legendre(5)
+
+    @arc.compile
+    def quad(a, b):
+        mapped = rule.map_to(a, b)
+        return mapped.integrate(lambda x: x**2)
 
     result = quad(0.0, 2.0)
     assert np.isclose(float(result), 8 / 3)
@@ -721,11 +799,13 @@ def test_compile_symbolic_interval():
 
 def test_compile_symbolic_rate():
     x, w = roots_laguerre(5)
-    rule = QuadratureRule(x, w, name="gauss_laguerre_5", measure=LaguerreMeasure())
+    rule = QuadratureRule.from_arrays(
+        x, w, name="gauss_laguerre_5", measure=LaguerreMeasure()
+    )
 
     @arc.compile
     def quad(rate):
-        return rule.sum(np.ones_like(rule.nodes), rate=rate)
+        return rule.map_to(rate=rate).sum(np.ones_like(rule.nodes))
 
     result = quad(2.0)
     assert np.isclose(float(result), 0.5)
@@ -733,13 +813,13 @@ def test_compile_symbolic_rate():
 
 def test_compile_symbolic_loc_scale():
     x, w = roots_hermitenorm(5)
-    rule = QuadratureRule(
+    rule = QuadratureRule.from_arrays(
         x, w, name="gauss_hermitenorm_5", measure=ProbabilistsHermiteMeasure()
     )
 
     @arc.compile
     def quad(loc, scale):
-        return rule.sum(np.ones_like(rule.nodes), loc=loc, scale=scale)
+        return rule.map_to(loc=loc, scale=scale).sum(np.ones_like(rule.nodes))
 
     result = quad(1.0, 2.0)
     assert np.isclose(float(result), 2.0 * np.sqrt(2 * np.pi))
@@ -753,7 +833,7 @@ def test_compile_vector_integrand():
         def f(x):
             return np.stack([x, x**2])
 
-        return rule.integrate(f, a, b, axis=-1)
+        return rule.map_to(a, b).integrate(f, axis=-1)
 
     result = np.asarray(quad(-1.0, 1.0))
     np.testing.assert_allclose(result, [0.0, 2 / 3], atol=1e-10)
@@ -825,6 +905,14 @@ def test_quadrature_rule_equality_is_elementwise():
     assert gauss_legendre(5) != gauss_lobatto(5)
 
 
+def test_quadrature_rule_equality_distinguishes_mapping():
+    rule = gauss_legendre(5)
+    mapped = rule.map_to(0.0, 1.0)
+    assert rule != mapped
+    assert mapped == rule.map_to(0.0, 1.0)
+    assert mapped != rule.map_to(0.0, 2.0)
+
+
 def test_quadrature_rule_is_hashable():
     assert hash(gauss_legendre(5)) == hash(gauss_legendre(5))
     assert len({gauss_legendre(5), gauss_legendre(5), gauss_legendre(6)}) == 2
@@ -833,6 +921,80 @@ def test_quadrature_rule_is_hashable():
 def test_quadrature_rule_equality_against_other_types_is_not_implemented():
     assert gauss_legendre(5).__eq__(object()) is NotImplemented
     assert gauss_legendre(5) != object()
+
+
+def test_quadrature_reference_data_equality_against_other_types_is_not_implemented():
+    ref = gauss_legendre(5).reference
+    assert ref.__eq__(object()) is NotImplemented
+    assert ref != object()
+
+
+def test_quadrature_rule_ndim_and_measures():
+    rule = gauss_legendre(5)
+    assert rule.ndim == 1
+    assert rule.measures == (rule.measure,)
+
+
+def test_params_equal_rejects_mismatched_types():
+    from archimedes.measure import RealLine, UnitInterval
+
+    a = UnitInterval.Parameters(a=0.0, b=1.0)
+    b = RealLine.Parameters(loc=0.0, scale=1.0)
+    interval_rule = gauss_legendre(5).replace(params=a)
+    # Same reference payload as `interval_rule` but a mismatched-domain
+    # `params` bypassing `map_to` -- exercises the type-mismatch guard in
+    # `_params_equal` directly, since `interval_rule`'s own `.replace` can't
+    # otherwise produce a `RealLine.Parameters` to compare against.
+    mismatched = interval_rule.replace(params=b)
+    assert interval_rule != mismatched
+
+
+def test_from_arrays_matches_direct_construction():
+    x, w = roots_laguerre(4)
+    from_arrays = QuadratureRule.from_arrays(
+        x, w, name="gauss_laguerre_4", measure=LaguerreMeasure()
+    )
+    direct = QuadratureRule(
+        QuadratureReferenceData(x, w, LaguerreMeasure()), "gauss_laguerre_4"
+    )
+    assert from_arrays == direct
+
+
+# -- Measure.affine_invariant enforcement --
+
+
+class _StieltjesLegendre(LegendreMeasure):
+    """A Legendre-alike that hasn't opted into `affine_invariant`, to
+    exercise the enforcement path independent of any real Stieltjes-fallback
+    measure (see `test/measure/test_measure.py` for that one)."""
+
+    affine_invariant = False
+
+
+def test_map_to_no_args_skips_affine_invariant_check():
+    rule = QuadratureRule.from_arrays(
+        *roots_legendre(5), name="test", measure=_StieltjesLegendre()
+    )
+    # No arguments -> always allowed, regardless of affine_invariant.
+    assert rule.map_to() == rule.map_to()
+    with pytest.raises(ValueError, match="affine_invariant"):
+        rule.map_to(0.0, 1.0)
+
+
+def test_scaled_read_raises_for_non_affine_invariant_measure_with_bypassed_params():
+    # Enforcement lives at read time (`nodes`/`weights`), not only at
+    # `map_to`-call time, so bypassing `map_to` via `.replace(params=...)`
+    # directly is still caught.
+    from archimedes.measure import UnitInterval
+
+    rule = QuadratureRule.from_arrays(
+        *roots_legendre(5), name="test", measure=_StieltjesLegendre()
+    )
+    bypassed = rule.replace(params=UnitInterval.Parameters(a=0.0, b=1.0))
+    with pytest.raises(ValueError, match="affine_invariant"):
+        bypassed.nodes
+    with pytest.raises(ValueError, match="affine_invariant"):
+        bypassed.weights
 
 
 class TestCompositeBreakpoints:
@@ -894,7 +1056,10 @@ class TestCompositeElements:
     def test_equality_distinguishes_elements(self):
         bp = np.array([-1.0, 0.0, 1.0])
         rule = composite_quad(gauss_legendre(2), bp)
-        shuffled = dataclasses.replace(rule, elements=rule.elements[::-1])
+        shuffled_reference = dataclasses.replace(
+            rule.reference, elements=rule.elements[::-1]
+        )
+        shuffled = dataclasses.replace(rule, reference=shuffled_reference)
         assert rule != shuffled
 
     @pytest.mark.parametrize(
@@ -917,7 +1082,7 @@ class TestCompositeElements:
     )
     def test_breakpoints_and_elements_must_be_consistent(self, kwargs, match):
         with pytest.raises(ValueError, match=match):
-            QuadratureRule(
+            QuadratureRule.from_arrays(
                 nodes=np.zeros(2),
                 weights=np.zeros(2),
                 name="test",
