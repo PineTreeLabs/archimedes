@@ -9,6 +9,7 @@ In particular, the API is still evolving and may change between minor versions, 
 - Add support for `scipy.special.erf/erfinv` as dispatch-supported ufuncs
 - Add support for Gaussian quadrature in `archimedes.quadrature`
 - Added `Measure` classes in `archimedes.measure`, including discretized Stieltjes procedure
+- `Measure.reference_mass` now defaults to numerically integrating `weight` over `support` (cached via `functools.cached_property`), so a custom `Measure` subclass needs only `weight` and `domain` to get a working Gauss quadrature rule
 - Added `archimedes.experimental.approximation`: `Basis`/`FunctionSpace`/`Function` for linear basis expansions, with orthogonal polynomial, Lagrange, piecewise (C⁻¹/C⁰), and tensor-product (multivariate) bases
 - **Fix incorrect matrix norms**: `np.linalg.norm(A, ord=...)` for 2-D `A` returned CasADi's *entrywise* norms instead of NumPy's *induced operator* norms, silently giving wrong values for `ord=1` and `ord=inf` (`ord=None`/`'fro'` were correct). `ord=1` and `ord=inf` now match NumPy; `ord=2` (spectral norm) raises `NotImplementedError` pending a symbolic SVD, where it previously returned the Frobenius norm
 - **Fix `np.roll(a, shift)` silently changing shape**: with `axis=None` and 2-D `a`, the result was returned flattened instead of restored to `a.shape`

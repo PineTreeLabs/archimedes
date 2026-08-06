@@ -350,7 +350,9 @@ def test_stieltjes_recurrence_shape_and_zeroth_moment():
 
 class _StieltjesLegendre(Measure):
     """Minimal custom Measure: no recurrence_coeffs override, so it relies
-    entirely on the base class's discretized Stieltjes fallback."""
+    entirely on the base class's discretized Stieltjes fallback. Overrides
+    ``reference_mass`` (exactly, unlike the base class's quadrature-based
+    default) to isolate that fallback from the one under test below."""
 
     domain = UnitInterval()
 
@@ -382,6 +384,51 @@ def test_measure_default_recurrence_coeffs_uses_reference_mass():
 def test_measure_is_not_directly_instantiable():
     with pytest.raises(TypeError):
         Measure()
+
+
+# -- Measure.reference_mass default (quadrature, cached) --
+
+
+class _CountingLegendre(Measure):
+    """Minimal custom Measure: neither ``reference_mass`` nor
+    ``recurrence_coeffs`` is overridden, so both fall back to their
+    quadrature-based defaults. Counts ``weight`` calls to probe caching."""
+
+    domain = UnitInterval()
+
+    def __init__(self):
+        self.weight_calls = 0
+
+    def weight(self, x):
+        self.weight_calls += 1
+        return np.ones_like(x)
+
+
+def test_measure_default_reference_mass_matches_closed_form():
+    measure = _CountingLegendre()
+    assert np.isclose(measure.reference_mass, LegendreMeasure().reference_mass)
+
+
+def test_measure_default_reference_mass_is_cached():
+    measure = _CountingLegendre()
+    assert measure.weight_calls == 0
+
+    assert measure.reference_mass == measure.reference_mass
+    calls_after_two_accesses = measure.weight_calls
+    assert calls_after_two_accesses > 0
+
+    measure.reference_mass
+    assert measure.weight_calls == calls_after_two_accesses
+
+
+def test_measure_fully_automatic_recurrence_coeffs_matches_legendre():
+    # Only weight + domain defined -- reference_mass and recurrence_coeffs
+    # both fall back to their quadrature-based defaults, end to end.
+    measure = _CountingLegendre()
+    alpha, beta = measure.recurrence_coeffs(8)
+    expected_alpha, expected_beta = LegendreMeasure().recurrence_coeffs(8)
+    np.testing.assert_allclose(alpha, expected_alpha, atol=1e-8)
+    np.testing.assert_allclose(beta, expected_beta, atol=1e-8)
 
 
 # -- equality / hashing --

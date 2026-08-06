@@ -139,17 +139,14 @@ def test_golub_welsch_rule_invalid_n():
 
 
 class _QuarticMeasure(Measure):
-    """A weight with no closed-form recursion -- relies entirely on
-    Measure's default (discretized Stieltjes) recurrence_coeffs."""
+    """A weight with no closed-form recursion or normalization -- relies
+    entirely on Measure's defaults (discretized Stieltjes recurrence_coeffs,
+    quadrature-based reference_mass). Only weight + domain are defined."""
 
     domain = RealLine()
 
     def weight(self, x):
         return np.exp(-(x**4))
-
-    @property
-    def reference_mass(self):
-        return 1.812804954110954  # quad(weight, -inf, inf)
 
 
 @pytest.mark.parametrize("n", [5, 10])

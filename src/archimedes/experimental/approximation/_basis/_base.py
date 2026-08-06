@@ -29,8 +29,10 @@ LEFT = "left"
 
 @tree.struct
 class BasisMatrix:
-    r"""A basis evaluated at a fixed set of quadrature nodes, bundled with
-    the matching weights so the two can never be supplied out of sync.
+    r"""A basis evaluated at a fixed set of quadrature nodes.
+    
+    The basis matrix is bundled with the matching quadrature weights to
+    provide proper weighted inner product semantics for matrix multiplication.
 
     ``matrix[n, i]`` is the ``deriv``-th derivative of basis function ``i``
     at node ``n``; see :meth:`FunctionSpace.basis_matrix`, which builds one.
@@ -38,8 +40,10 @@ class BasisMatrix:
     Parameters
     ----------
     matrix : ndarray
-        The design matrix :math:`\Phi`, shape ``(npts, n_basis)``. Maps
-        coefficients to sampled values, :math:`\Phi c = \phi \cdot c`.
+        The design matrix :math:`\Phi`, shape ``(npts, n_basis)`` -- a
+        generalized Vandermonde matrix, :math:`\Phi_{ni} = \phi_i(x_n)` for
+        an arbitrary basis rather than monomials. Maps coefficients to
+        sampled values, :math:`\Phi c = \phi \cdot c`.
     weights : ndarray
         Quadrature weights matching ``matrix``'s node axis, shape
         ``(npts,)``.
@@ -487,10 +491,8 @@ class Basis(metaclass=abc.ABCMeta):
         -------
         phi : ndarray
             Basis values (or ``deriv``-th derivatives), shape
-            ``(npts, n_basis)`` -- points first, basis index last, matching
-            the "design matrix" / (generalized) Vandermonde convention used
-            by e.g. ``numpy.polynomial.legendre.legvander`` and modal/POD
-            decompositions, rather than
+            ``(npts, n_basis)`` -- points first, basis index last (see
+            :class:`BasisMatrix`), rather than
             ``archimedes.quadrature.QuadratureRule``'s points-last axis
             convention.
         """

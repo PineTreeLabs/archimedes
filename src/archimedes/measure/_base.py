@@ -12,8 +12,10 @@ distributions.
 from __future__ import annotations
 
 import abc
+import functools
 
 import numpy as np
+from scipy.integrate import quad
 
 from ._domain import ReferenceDomain
 from ._stieltjes import stieltjes_recurrence
@@ -105,8 +107,7 @@ class Measure(metaclass=abc.ABCMeta):
         """Weight function :math:`w(x)`, evaluated at ``x``."""
         raise NotImplementedError
 
-    @property
-    @abc.abstractmethod
+    @functools.cached_property
     def reference_mass(self) -> float:
         """Zeroth moment :math:`\\int_\\mathcal{D} w(t) \\, dt` of the
         *reference* weight (i.e. before any ``affine_params`` shift/scale).
@@ -118,8 +119,20 @@ class Measure(metaclass=abc.ABCMeta):
         ``shift``. This is the normalizing constant that turns the (raw)
         weight into a probability density, ``weight(x) / reference_mass``.
         See also ``mass``, which generalizes this to a mapped instance.
+
+        The default implementation numerically integrates ``weight`` over
+        ``support`` via :func:`scipy.integrate.quad`, so (together with the
+        default :meth:`recurrence_coeffs`) a custom ``Measure`` subclass
+        needs only ``weight`` and ``domain`` to be fully usable -- no
+        closed-form normalization required. This is a
+        :func:`functools.cached_property`, not a plain ``@property``: since
+        ``weight`` and ``support`` are fixed once an instance exists, the
+        result is computed at most once per instance rather than on every
+        access. Classical families override this with a closed form for
+        exactness and speed; see :class:`~archimedes.measure.JacobiMeasure`
+        for the pattern.
         """
-        raise NotImplementedError
+        return float(quad(self.weight, *self.support)[0])
 
     def mass(self, *args, **kwargs) -> float:
         """Total mass of the measure mapped by ``affine_params(*args,
@@ -147,9 +160,10 @@ class Measure(metaclass=abc.ABCMeta):
 
         with :math:`\\pi_{-1} = 0`, :math:`\\pi_0 = 1`. ``beta[0]`` plays no
         role in the recursion itself (since :math:`\\pi_{-1} = 0`) and is
-        instead defined as ``reference_mass`` -- the normalization Gauss
-        quadrature (e.g. the Golub-Welsch algorithm) needs to recover
-        quadrature weights from these coefficients.
+        instead defined as ``reference_mass`` (see there for how it's
+        obtained by default) -- the normalization Gauss quadrature (e.g. the
+        Golub-Welsch algorithm) needs to recover quadrature weights from
+        these coefficients.
 
         Only reference-instance coefficients are provided; a mapped
         instance's coefficients follow from ``affine_params`` (``alpha' =

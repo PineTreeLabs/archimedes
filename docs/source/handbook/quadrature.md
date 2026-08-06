@@ -275,6 +275,10 @@ There are two abstractions that keep track of the weight function, reference dom
 The first is [`Measure`](#archimedes.measure.Measure), which combines a weight function with a reference interval to define families of orthogonal polynomials.
 The second is [`QuadratureRule`](#archimedes.quadrature.QuadratureRule), which stores the nodes, weights, and associated `Measure`, and which is responsible for domain transformations and performing the weighted sum.
 
+## See Also
+
+- [Approximation](approximation.md) for the higher-level function approximation system that relies on quadrature for inner products
+
 #### `Measure`
 
 The [`Measure`](#archimedes.measure.Measure) class defines an orthogonality measure $d\mu(x) = w(x) ~ dx$ and an associated domain $\mathcal{D}$.
@@ -414,7 +418,7 @@ Instead, the Clenshaw-Curtis nodes are the *extrema* of the Chebyshev polynomial
 
 Like Gauss-Lobatto, the Clenshaw-Curtis nodes *include* the endpoints, but there are a couple of key practical differences that determine which is a better fit.
 
-* Theoretically, Gauss-Lobatto has roughly twice the polynomial order of accuracy (although [in practice the gap is much smaller](CITE TREFETHEN))
+* Theoretically, Gauss-Lobatto has roughly twice the polynomial order of accuracy (although [in practice the gap is much smaller](TODO: REF TREFETHEN))
 * The Clenshaw-Curtis nodes and weights can be cheaply and accurately computed for much larger $n$, making it more suitable for applications like large-scale PDE models (e.g. direct numerical simulation of fluid dynamics with pseudospectral methods)
 * The Chebyshev-Lobatto nodes are _nested across doubling_ $n$, meaning that the nodes for `clenshaw_curtis(n)` are all also present in the set of nodes for `clenshaw_curtis(2*n)`
 

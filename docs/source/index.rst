@@ -119,6 +119,7 @@ Documentation
    gotchas
    reference/index
    handbook/quadrature
+   handbook/approximation
 
 .. toctree::
    :maxdepth: 1
