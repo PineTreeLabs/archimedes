@@ -10,7 +10,7 @@ import pytest
 
 from archimedes.experimental.approximation import FourierBasis, FunctionSpace
 from archimedes.measure import UnitInterval
-from archimedes.quadrature import periodic_trapezoidal
+from archimedes.quadrature import trapezoidal
 
 
 def test_fourier_matches_manual_construction():
@@ -50,6 +50,6 @@ def test_fourier_default_domain_is_reference_interval():
 
 
 def test_fourier_quad_rule_forwarded():
-    rule = periodic_trapezoidal(11)
+    rule = trapezoidal(11, periodic=True)
     sugar = FunctionSpace.fourier(5, quad_rule=rule)
     assert sugar.quad_rule is rule

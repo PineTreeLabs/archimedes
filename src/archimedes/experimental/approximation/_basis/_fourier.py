@@ -133,9 +133,9 @@ class FourierBasis(Basis):
         integrand (products of modes up to :math:`\\mathrm{max\\_mode}`
         each).
         """
-        from archimedes.quadrature import periodic_trapezoidal
+        from archimedes.quadrature import trapezoidal
 
-        return periodic_trapezoidal(2 * self.max_mode + 1)
+        return trapezoidal(2 * self.max_mode + 1, periodic=True)
 
     def _product_basis(self, other):
         """Product-to-sum closure table (``N = self.max_mode +

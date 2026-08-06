@@ -347,14 +347,15 @@ Available options are:
 | Gauss-Radau | `gauss_radau(n, endpoint="left"\|"right")` | $1$ | $[-1, 1]$ | Fixes one endpoint |
 | Gauss-Lobatto | `gauss_lobatto(n)` | $1$ | $[-1, 1]$ | Fixes both endpoints |
 | Clenshaw-Curtis | `clenshaw_curtis(n)` | $1$ | $[-1, 1]$ | Chebyshev-Lobatto nodes |
-| Trapezoidal | `trapezoidal(n)` | $1$ | $[-1, 1]$ | Use periodic version for Fourier basis |
+| Trapezoidal | `trapezoidal(n, periodic=False)` | $1$ | $[-1, 1]$ | Pass `periodic=True` for a Fourier basis |
 | Gauss-Jacobi | `gauss_jacobi(n, alpha, beta)` | $(1-x)^\alpha(1+x)^\beta$ | $[-1, 1]$ | Legendre/Chebyshev are special cases |
 | Gauss-Hermite (probabilists') | `gauss_hermite(n, kind="prob")` |$e^{-x^2/2}$ | $(-\infty, \infty)$ | Default `kind` |
 | Gauss-Hermite (physicists') | `gauss_hermite(n, kind="phys")` | $e^{-x^2}$ | $(-\infty, \infty)$ |   |
 | Gauss-Laguerre | `gauss_laguerre(n)` | $e^{-x}$ | $[0, \infty)$ |   |
 
-The trapezoidal rule is slightly different from the others: it is exact for trigonometric polynomials $\cos(k \pi t)$, $\sin(k \pi t)$ for $1 \leq k \leq n-1$ on $t \in [-1, 1)$ (periodic).
-If `periodic=False` then it reduces to the usual trapezoidal rule, which is not a Gaussian rule in the sense we have been discussing.
+The trapezoidal rule is slightly different from the others, and comes in two forms selected by the `periodic` keyword.
+With the default `periodic=False`, it's the usual trapezoidal rule on the closed interval $[-1, 1]$, which is not a Gaussian rule in the sense we have been discussing.
+With `periodic=True`, nodes are instead placed on the **half-open** interval $[-1, 1)$ (since $-1$ and $+1$ denote the same point once the domain wraps around), and the rule is exact for trigonometric polynomials $\cos(k \pi t)$, $\sin(k \pi t)$ for $1 \leq k \leq n-1$ -- the natural choice of quadrature for a Fourier basis.
 
 Once you have the `QuadratureRule` object, you can inspect the nodes and weights if you like, or just use its quadrature methods:
 

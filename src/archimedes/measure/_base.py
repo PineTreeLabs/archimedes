@@ -109,28 +109,19 @@ class Measure(metaclass=abc.ABCMeta):
 
     @functools.cached_property
     def reference_mass(self) -> float:
-        """Zeroth moment :math:`\\int_\\mathcal{D} w(t) \\, dt` of the
-        *reference* weight (i.e. before any ``affine_params`` shift/scale).
+        """Zeroth moment :math:`\\int_\\mathcal{D} w(t) ~ dt` of the reference weight.
 
         Since ``affine_params`` only ever rescales/shifts the reference
-        domain -- the shape of the weight itself (e.g. Jacobi's ``alpha``,
-        ``beta``) is fixed per instance -- the zeroth moment of the mapped
-        weight is always ``scale * reference_mass``, with no dependence on
-        ``shift``. This is the normalizing constant that turns the (raw)
-        weight into a probability density, ``weight(x) / reference_mass``.
-        See also ``mass``, which generalizes this to a mapped instance.
+        domain, the zeroth moment of the mapped weight is always
+        ``scale * reference_mass``, with no dependence on ``shift``. This is
+        the normalizing constant that turns the (raw) weight into a probability
+        density, ``weight(x) / reference_mass``. See also ``mass``, which
+        generalizes this to a mapped instance.
 
         The default implementation numerically integrates ``weight`` over
         ``support`` via :func:`scipy.integrate.quad`, so (together with the
         default :meth:`recurrence_coeffs`) a custom ``Measure`` subclass
-        needs only ``weight`` and ``domain`` to be fully usable -- no
-        closed-form normalization required. This is a
-        :func:`functools.cached_property`, not a plain ``@property``: since
-        ``weight`` and ``support`` are fixed once an instance exists, the
-        result is computed at most once per instance rather than on every
-        access. Classical families override this with a closed form for
-        exactness and speed; see :class:`~archimedes.measure.JacobiMeasure`
-        for the pattern.
+        needs only ``weight`` and ``domain`` to be fully usable.
         """
         return float(quad(self.weight, *self.support)[0])
 
@@ -139,8 +130,7 @@ class Measure(metaclass=abc.ABCMeta):
         **kwargs)``.
 
         Equal to ``scale * reference_mass``, where ``scale`` is the affine
-        scale factor -- i.e. the Jacobian picked up by rescaling the
-        reference domain. Dividing a mapped weight by this quantity turns it
+        scale factor. Dividing a mapped weight by this quantity turns it
         into a probability density on the mapped domain. Concrete
         subclasses don't need to override this; it's fully determined by
         ``affine_params`` and ``reference_mass``.
@@ -173,18 +163,9 @@ class Measure(metaclass=abc.ABCMeta):
         The default implementation falls back to a discretized Stieltjes
         procedure (:func:`~archimedes.measure.stieltjes_recurrence`), which
         numerically integrates the required moments via
-        ``scipy.integrate.quad`` instead of a closed form -- so any
-        ``weight``/``domain`` pair yields a valid orthogonal polynomial
-        family and Gauss quadrature rule (via
-        :func:`~archimedes.quadrature.golub_welsch_rule`) with no further
-        work. It is accurate to near machine precision for smooth, bounded
-        weights through about :math:`n \\sim 15`, degrading (silently, for
-        smooth weights) beyond that -- see
-        :func:`~archimedes.measure.stieltjes_recurrence` for the full
-        accuracy envelope. Classical families override this method with a
-        closed-form recursion for speed and much better high-degree
-        accuracy; see :class:`~archimedes.measure.JacobiMeasure` for the
-        pattern.
+        ``scipy.integrate.quad`` instead of a closed form. Classical families
+        override this method with a closed-form recursion for speed and much
+        better high-degree accuracy.
 
         Parameters
         ----------

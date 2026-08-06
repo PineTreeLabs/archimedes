@@ -17,7 +17,7 @@ from ._quadrature_rule import (
     composite_quad,
 )
 from ._tensor import TensorQuadratureRule, tensor_quad
-from ._trapezoidal import periodic_trapezoidal
+from ._trapezoidal import trapezoidal
 
 __all__ = [
     "Quadrature",
@@ -35,5 +35,5 @@ __all__ = [
     "composite_quad",
     "tensor_quad",
     "quadint",
-    "periodic_trapezoidal",
+    "trapezoidal",
 ]

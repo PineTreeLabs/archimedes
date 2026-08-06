@@ -30,8 +30,8 @@ from archimedes.quadrature import (
     gauss_legendre,
     gauss_lobatto,
     gauss_radau,
-    periodic_trapezoidal,
     quadint,
+    trapezoidal,
 )
 
 # -- QuadratureRule machinery --
@@ -258,8 +258,8 @@ def test_clenshaw_curtis_composite_quad():
 
 
 @pytest.mark.parametrize("n", [1, 2, 3, 5, 8])
-def test_periodic_trapezoidal_properties(n):
-    rule = periodic_trapezoidal(n)
+def test_trapezoidal_periodic_properties(n):
+    rule = trapezoidal(n, periodic=True)
     assert len(rule) == n
     assert rule.nodes[0] == -1.0
     assert rule.nodes[-1] < 1.0  # half-open: no node at the identified +1 endpoint
@@ -270,8 +270,8 @@ def test_periodic_trapezoidal_properties(n):
 
 
 @pytest.mark.parametrize("n", [3, 5, 8])
-def test_periodic_trapezoidal_exact_for_trig_polynomials(n):
-    rule = periodic_trapezoidal(n)
+def test_trapezoidal_periodic_exact_for_trig_polynomials(n):
+    rule = trapezoidal(n, periodic=True)
     # Exact (to machine precision) for cos(k*pi*t)/sin(k*pi*t), 1 <= k <= n-1
     for k in range(n):
         expected_cos = 2.0 if k == 0 else 0.0
@@ -289,10 +289,10 @@ def test_periodic_trapezoidal_exact_for_trig_polynomials(n):
 
 
 @pytest.mark.parametrize("n", [3, 5, 8])
-def test_periodic_trapezoidal_aliases_at_nyquist(n):
+def test_trapezoidal_periodic_aliases_at_nyquist(n):
     # At k = n the sampled signal is indistinguishable from the constant, so
     # the rule silently returns the wrong (nonzero) answer instead of 0.
-    rule = periodic_trapezoidal(n)
+    rule = trapezoidal(n, periodic=True)
     result = rule.integrate(lambda x: np.cos(n * np.pi * x))
     assert not np.isclose(result, 0.0, atol=1e-6)
     # cos(n*pi*x_j) = cos(n*pi*(-1) + 2*pi*j) = cos(n*pi) = (-1)**n at every
@@ -300,8 +300,8 @@ def test_periodic_trapezoidal_aliases_at_nyquist(n):
     assert np.isclose(result, 2.0 * (-1) ** n)
 
 
-def test_periodic_trapezoidal_shares_legendre_measure():
-    rule = periodic_trapezoidal(5)
+def test_trapezoidal_periodic_shares_legendre_measure():
+    rule = trapezoidal(5, periodic=True)
     assert isinstance(rule.measure, LegendreMeasure)
 
     a, b = -2.0, 5.0
@@ -309,9 +309,69 @@ def test_periodic_trapezoidal_shares_legendre_measure():
     assert np.isclose(integral, b - a)
 
 
-def test_periodic_trapezoidal_invalid_n():
+def test_trapezoidal_periodic_invalid_n():
     with pytest.raises(ValueError):
-        periodic_trapezoidal(0)
+        trapezoidal(0, periodic=True)
+
+
+@pytest.mark.parametrize("n", [3, 5, 8])
+def test_trapezoidal_properties(n):
+    rule = trapezoidal(n)
+    assert len(rule) == n
+    assert rule.nodes[0] == -1.0
+    assert rule.nodes[-1] == 1.0  # closed interval: both endpoints are nodes
+    assert np.all(np.diff(rule.nodes) > 0)
+    assert np.all(rule.weights > 0)
+    assert np.isclose(rule.weights[0], rule.weights[-1])
+    # Interior weights are double the (half-weighted) endpoints
+    assert np.isclose(2 * rule.weights[0], rule.weights[n // 2])
+    assert np.isclose(np.sum(rule.weights), 2.0)
+
+
+def test_trapezoidal_two_nodes():
+    rule = trapezoidal(2)
+    np.testing.assert_array_equal(rule.nodes, [-1.0, 1.0])
+    np.testing.assert_array_equal(rule.weights, [1.0, 1.0])
+
+
+def test_trapezoidal_matches_nodes_of_lobatto():
+    # Same equally-spaced nodes as Lobatto for n=2 and n=3, only differing
+    # from Lobatto once n >= 4 (Lobatto's interior nodes are no longer
+    # equally spaced).
+    rule = trapezoidal(3)
+    lobatto = gauss_lobatto(3)
+    np.testing.assert_allclose(rule.nodes, lobatto.nodes)
+
+
+def test_trapezoidal_exact_for_linear():
+    rule = trapezoidal(5)
+    assert np.isclose(rule.integrate(lambda x: 3 * x + 2), 4.0)
+    # Not exact for a quadratic
+    assert not np.isclose(rule.integrate(lambda x: x**2), 2 / 3)
+
+
+def test_trapezoidal_shares_legendre_measure():
+    rule = trapezoidal(5)
+    assert isinstance(rule.measure, LegendreMeasure)
+
+    a, b = -2.0, 5.0
+    integral = rule.integrate(lambda x: np.ones_like(x), a, b)
+    assert np.isclose(integral, b - a)
+
+
+def test_trapezoidal_composite_quad():
+    # Shares LegendreMeasure's uniform reference weight, so it tiles the
+    # same way as Lobatto -- shared endpoint nodes double up per element.
+    rule = composite_quad(trapezoidal(3), [-1.0, 0.0, 1.0])
+    assert len(rule) == 6
+    assert np.isclose(rule.integrate(lambda x: 3 * x + 2), 4.0)
+
+
+def test_trapezoidal_invalid_n():
+    with pytest.raises(ValueError):
+        trapezoidal(1)
+    with pytest.raises(ValueError):
+        trapezoidal(0)
 
 
 def test_gauss_hermite():
