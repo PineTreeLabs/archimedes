@@ -37,6 +37,7 @@ Project a function onto a degree-5 Legendre space and evaluate it:
 from ._basis import (
     Basis,
     BasisMatrix,
+    BSplineBasis,
     ConcatBasis,
     ConstrainedBasis,
     CubicHermiteBasis,
@@ -54,6 +55,7 @@ from ._function_space import FunctionSpace
 __all__ = [
     "Basis",
     "BasisMatrix",
+    "BSplineBasis",
     "ConcatBasis",
     "ConstrainedBasis",
     "CubicHermiteBasis",

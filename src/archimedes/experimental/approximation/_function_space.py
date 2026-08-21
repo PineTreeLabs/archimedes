@@ -24,6 +24,7 @@ from ._basis import (
     RIGHT,
     Basis,
     BasisMatrix,
+    BSplineBasis,
     CubicHermiteBasis,
     FourierBasis,
     LagrangeBasis,
@@ -593,6 +594,66 @@ class FunctionSpace:
 
         element_basis = _resolve_element_basis(kind, order, nodes)
         basis = PiecewiseBasis(element_basis, ref_breakpoints, continuity=continuity)
+        return cls(basis, UnitInterval.Parameters(a=a, b=b), quad_rule=quad_rule)
+
+    @classmethod
+    def bspline(
+        cls,
+        degree: int,
+        breakpoints,
+        *,
+        knots: np.ndarray | None = None,
+        quad_rule: Quadrature | None = None,
+    ) -> FunctionSpace:
+        """A B-spline ``FunctionSpace`` of the given ``degree``.
+
+        Sugar over :class:`BSplineBasis` -- builds a *clamped* knot vector
+        from physical ``breakpoints`` (multiplicity ``degree + 1`` at both
+        ends, simple interior knots -- the common, Bezier-endpoint case) and
+        derives ``Parameters`` from it automatically, so neither
+        ``BSplineBasis`` nor ``UnitInterval`` need to be named directly for
+        that case. For anything else -- an open (non-clamped) knot vector,
+        non-simple interior multiplicity, ... -- pass ``knots`` directly;
+        nothing here is reachable only through this method.
+
+        Parameters
+        ----------
+        degree : int
+            Polynomial degree of each piece.
+        breakpoints : array_like
+            Element boundaries **on the physical (target) domain**, shape
+            ``(n_elements + 1,)``, strictly increasing.
+            ``breakpoints[0]``/``breakpoints[-1]`` become the two
+            ``degree + 1``-times-repeated end knots. Ignored if ``knots``
+            is given.
+        knots : array_like, optional
+            An explicit, general knot vector (physical units), overriding
+            the default clamped construction from ``breakpoints``. See
+            :class:`BSplineBasis` for what makes a knot vector valid.
+        quad_rule : QuadratureRule, optional
+            Forwarded to the underlying ``FunctionSpace`` constructor.
+            Default ``basis.default_quadrature()``.
+
+        Returns
+        -------
+        FunctionSpace
+        """
+        if knots is None:
+            bp = np.asarray(breakpoints, dtype=float)
+            if bp.ndim != 1 or len(bp) < 2:
+                raise ValueError(
+                    f"breakpoints must be 1-D with at least 2 entries, got "
+                    f"shape {bp.shape}"
+                )
+            if np.any(np.diff(bp) <= 0):
+                raise ValueError("breakpoints must be strictly increasing")
+            knots = np.concatenate(
+                [np.full(degree, bp[0]), bp, np.full(degree, bp[-1])]
+            )
+
+        basis = BSplineBasis(degree, knots)
+        a = basis.knots[degree]
+        b = basis.knots[len(basis.knots) - 1 - degree]
         return cls(basis, UnitInterval.Parameters(a=a, b=b), quad_rule=quad_rule)
 
     @classmethod

@@ -53,6 +53,13 @@ SPACE_BUILDERS = {
         OrthogonalPolynomialBasis(JacobiMeasure(1.5, 0.5), 6), domain=DOMAIN
     ),
     "nodal": lambda: FunctionSpace(_lobatto(6), domain=DOMAIN),
+    # Unlike PiecewiseBasis (see the dedicated "-- piecewise --" section
+    # below), a B-spline's knot vector is one global object with no running
+    # constant needed across elements, so `.integral()` is fully defined --
+    # this is the concrete end-to-end check that BSplineBasis.Parameters'
+    # redundant (a, b) echo (see BSplineBasis's docstring) correctly anchors
+    # FunctionSpace._integral_matrix's boundary condition.
+    "bspline": lambda: FunctionSpace.bspline(3, np.linspace(A, B, 4)),
 }
 
 

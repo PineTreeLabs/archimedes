@@ -135,6 +135,7 @@ The design of the [`approximation`](#archimedes.experimental.approximation) modu
 There are four key abstractions:
 
 - [`Basis`](#archimedes.experimental.approximation.Basis): the definition of the $\phi(x)$ functions
-- [`FunctionSpace`](#archimedes.experimental.approximation.FunctionSpace): combination of a basis with 
-- [`BasisMatrix`](#archimedes.experimental.approximation.BasisMatrix)
-- [`Function`](#archimedes.experimental.approximation.Function)
+- [`FunctionSpace`](#archimedes.experimental.approximation.FunctionSpace): combination of a basis with a domain and associated quadrature rule, together implying an inner product
+- [`BasisMatrix`](#archimedes.experimental.approximation.BasisMatrix): the generalized Vandermonde matrix associated with the basis, evaluated at the quadrature nodes: $\[V\]_{ij} = \phi_j(x_i)$
+- [`Function`](#archimedes.experimental.approximation.Function): A coefficient vector for a particular element of a function space, defining a (piecewise) continuous function in terms of a basis expansion.
+

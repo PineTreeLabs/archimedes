@@ -7,7 +7,7 @@
 - ~~Monomials~~
 - Bernstein polynomials
 - ~~RBF~~ (deferred - should live in interpolation, not function approximation)
-- B-splines
+- ~~B-splines~~
 - ~~PCHIP~~ (deferred - this is an interpolation function that produces a standard cubic Hermite polynomial)
 - Karhunen-Loeve
 - Support for POD/eigenfunction expansions/model reduction?

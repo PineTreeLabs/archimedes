@@ -231,6 +231,77 @@ def test_measure_mass_mapped_domain():
     assert np.isclose(measure.mass(rate=2.0), scale * measure.reference_mass)
 
 
+# -- Measure.__call__ --
+
+
+def test_call_with_no_params_matches_weight():
+    x = np.array([-0.5, 0.0, 0.5])
+    measure = LegendreMeasure()
+    np.testing.assert_array_equal(measure(x), measure.weight(x))
+
+
+def test_call_defaults_to_unnormalized():
+    # density=False (the default) is the *raw* weight, not divided by mass --
+    # matching QuadratureRule.integrate/sum's own density=False default,
+    # since that's what a quadrature rule built on this measure actually
+    # integrates against.
+    a, b = 0.0, 4.0
+    x = np.array([1.0, 2.0, 3.0])
+    measure = LegendreMeasure()
+    np.testing.assert_array_equal(measure(x, a, b), measure(x, a, b, density=False))
+    # Legendre's weight is uniform (1), so the raw call is just that
+    # constant, not 1/mass.
+    np.testing.assert_array_equal(measure(x, a, b), np.ones_like(x))
+
+
+def test_call_inverts_affine_params_correctly():
+    # Regression case for a bug caught in practice: naively swapping
+    # (x - scale) / shift for (x - shift) / scale is invisible whenever
+    # a == 0 makes scale == shift by coincidence, so check with a != 0.
+    a, b = -3.0, 8.5
+    measure = JacobiMeasure(alpha=1.0, beta=2.0)
+    scale, shift = measure.affine_params(a, b)
+    x = np.array([-2.0, 0.0, 5.0])
+    expected = measure.weight((x - shift) / scale)
+    np.testing.assert_allclose(measure(x, a, b), expected)
+
+
+def test_call_density_integrates_to_one():
+    a, b = -3.0, 8.5
+    measure = JacobiMeasure(alpha=1.0, beta=2.0)
+
+    def rho(x):
+        return measure(x, a, b, density=True)
+
+    result, _ = quad(rho, a, b)
+    assert np.isclose(result, 1.0)
+
+
+@pytest.mark.parametrize(
+    "measure,kwparams,bounds",
+    [
+        (LaguerreMeasure(), {"rate": 2.0, "start": 1.0}, (1.0, np.inf)),
+        (ProbabilistsHermiteMeasure(), {"loc": 1.0, "scale": 2.0}, (-np.inf, np.inf)),
+    ],
+)
+def test_call_density_integrates_to_one_infinite_domains(measure, kwparams, bounds):
+    def rho(x):
+        return measure(x, **kwparams, density=True)
+
+    result, _ = quad(rho, *bounds)
+    assert np.isclose(result, 1.0, atol=1e-6)
+
+
+def test_call_raises_for_non_affine_invariant_measure_with_args():
+    measure = _StieltjesLegendre()
+    # No arguments is always allowed, regardless of affine_invariant.
+    np.testing.assert_array_equal(
+        measure(np.array([0.0])), measure.weight(np.array([0.0]))
+    )
+    with pytest.raises(ValueError, match="affine_invariant"):
+        measure(np.array([0.0]), 0.0, 1.0)
+
+
 def test_hermite_and_hermitenorm_share_a_domain_parameters_type():
     # These were separate types before the domain refactor. They're now one:
     # both measures live on the same location-scaled RealLine and had

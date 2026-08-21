@@ -22,6 +22,7 @@ import numpy as np
 
 from archimedes import tree
 from archimedes.measure import Measure, ReferenceDomain
+from archimedes.measure._base import _check_affine_invariant
 
 __all__ = [
     "Quadrature",
@@ -113,28 +114,6 @@ def _breakpoints_equal(a: np.ndarray | None, b: np.ndarray | None) -> bool:
     if a is None or b is None:
         return a is None and b is None
     return np.array_equal(a, b)
-
-
-def _check_affine_invariant(measure: Measure, params: tuple, kwparams: dict) -> None:
-    """Raise if `params`/`kwparams` describe a non-reference-domain mapping
-    and `measure.affine_invariant` is False.
-
-    Syntactic (were *any* arguments given), not semantic (is the resulting
-    map the identity) -- deliberately, so this stays correct under symbolic
-    tracing, where `scale == 1.0` isn't a decidable Python bool. A bare
-    reference-domain call is always allowed.
-    """
-    if (params or kwparams) and not measure.affine_invariant:
-        raise ValueError(
-            f"{type(measure).__name__}.affine_invariant is False: its "
-            f"recurrence_coeffs relies on the generic Stieltjes-based "
-            f"fallback, so mapping a rule built for it onto a different "
-            f"domain is not verified to give the same rule you'd get by "
-            f"building on the target domain directly. Call with no "
-            f"arguments for the reference domain, or set "
-            f"`affine_invariant = True` on a subclass whose closed-form "
-            f"recurrence you have verified is affine-invariant."
-        )
 
 
 def _params_equal(
@@ -317,7 +296,7 @@ class QuadratureRule:
     @property
     def breakpoints(self) -> np.ndarray | None:
         """Element boundaries, on the reference domain.
-        
+
         *Always* reference domain, not affected by ``map_to``.
         """
         return self.reference.breakpoints

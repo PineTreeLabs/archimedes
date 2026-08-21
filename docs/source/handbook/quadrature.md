@@ -329,9 +329,8 @@ class QuadratureRule:
     @property
     def weights(self) -> np.ndarray: ...
 
-    # A new rule mapped onto the target domain; never composes with a prior
-    # `map_to` -- always resolves fresh against the reference domain
-    def map_to(self, *params, **kwparams) -> "QuadratureRule": ...
+    # A new rule mapped onto the target domain
+    def map_to(self, *params, **kwparams) -> QuadratureRule: ...
 
     # Approximate the weighted integral of ``f`` over the current mapping
     def integrate(self, f, *, axis=-1, args=None, density=False) -> np.ndarray: ...
@@ -390,7 +389,7 @@ fp = f(xp)
 quad_rule.sum(fp)
 ```
 
-For a one-off integral on a specific domain, the ergonomic pattern is to pass the domain kwargs to the constructor directly rather than mapping a separate rule -- `gauss_legendre(n, a, b).integrate(f)` -- which also gets you named-argument IDE discoverability that a generic `**kwparams` can't.
+For a one-off integral on a specific domain, the ergonomic pattern is to pass the domain kwargs to the constructor directly rather than mapping a separate rule, e.g. `gauss_legendre(n, a, b).integrate(f)`.
 
 One distinct feature of the Archimedes quadrature interface is that you can optionally pass a `density=True` keyword arg (to `integrate`/`sum`) to directly interpret the weight functions as probability densities.
 That is, the quadrature result approximates an expectation under the corresponding probability density:

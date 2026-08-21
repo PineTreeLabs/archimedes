@@ -5,7 +5,7 @@ implementation.
   only evaluates, with no notion of a target domain or coefficients.
 - Concrete basis implementations: :class:`OrthogonalPolynomialBasis`,
   :class:`LagrangeBasis`, :class:`CubicHermiteBasis`, :class:`FourierBasis`,
-  :class:`MonomialBasis`, :class:`PiecewiseBasis`.
+  :class:`MonomialBasis`, :class:`PiecewiseBasis`, :class:`BSplineBasis`.
 - Composition primitives, each building a new ``Basis`` out of existing
   ones: :class:`ConstrainedBasis` recombines *one* basis's functions by a
   fixed matrix, :class:`ConcatBasis` stacks functions from *several* bases
@@ -15,6 +15,7 @@ implementation.
 """
 
 from ._base import RIGHT, Basis, BasisMatrix
+from ._bspline import BSplineBasis
 from ._concat import ConcatBasis
 from ._constrained import ConstrainedBasis
 from ._fourier import FourierBasis
@@ -29,6 +30,7 @@ __all__ = [
     "RIGHT",
     "Basis",
     "BasisMatrix",
+    "BSplineBasis",
     "ConcatBasis",
     "ConstrainedBasis",
     "CubicHermiteBasis",

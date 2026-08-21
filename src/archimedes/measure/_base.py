@@ -23,6 +23,33 @@ from ._stieltjes import stieltjes_recurrence
 __all__ = ["Measure"]
 
 
+def _check_affine_invariant(measure: "Measure", params: tuple, kwparams: dict) -> None:
+    """Raise if `params`/`kwparams` describe a non-reference-domain mapping
+    and `measure.affine_invariant` is False.
+
+    Syntactic (were *any* arguments given), not semantic (is the resulting
+    map the identity) -- deliberately, so this stays correct under symbolic
+    tracing, where `scale == 1.0` isn't a decidable Python bool. A bare
+    reference-domain call is always allowed.
+
+    Shared by `Measure.__call__` and `QuadratureRule.map_to`/`scaled_points`/
+    `scaled_weights` (imported from here rather than duplicated) -- both are
+    "take a measure, apply an affine remap" operations with the same
+    affine_invariant requirement.
+    """
+    if (params or kwparams) and not measure.affine_invariant:
+        raise ValueError(
+            f"{type(measure).__name__}.affine_invariant is False: its "
+            f"recurrence_coeffs relies on the generic Stieltjes-based "
+            f"fallback, so mapping a rule built for it onto a different "
+            f"domain is not verified to give the same rule you'd get by "
+            f"building on the target domain directly. Call with no "
+            f"arguments for the reference domain, or set "
+            f"`affine_invariant = True` on a subclass whose closed-form "
+            f"recurrence you have verified is affine-invariant."
+        )
+
+
 class Measure(metaclass=abc.ABCMeta):
     """The weight and reference domain defining an orthogonal polynomial family.
 
@@ -144,6 +171,52 @@ class Measure(metaclass=abc.ABCMeta):
         """
         scale, _ = self.affine_params(*args, **kwargs)
         return scale * self.reference_mass
+
+    def __call__(
+        self, x: np.ndarray, *params, density: bool = False, **kwparams
+    ) -> np.ndarray:
+        """The weight function evaluated at physical points ``x`` on the
+        domain mapped by ``affine_params(*params, **kwparams)``.
+
+        Unlike :meth:`weight`, which only ever takes reference-domain
+        points, this maps ``x`` back onto the reference domain first --
+        :math:`w(\\mathrm{scale}^{-1} (x - \\mathrm{shift}))` for
+        ``(scale, shift) = affine_params(*params, **kwparams)`` -- so it
+        can be evaluated anywhere on the *target* domain. Called with no
+        ``params``/``kwparams``, this is exactly ``weight(x)`` (the
+        identity map).
+
+        Parameters
+        ----------
+        x : array_like
+            Physical-domain points to evaluate at.
+        *params, **kwparams
+            Target domain/measure parameters; see :meth:`affine_params`.
+        density : bool, optional
+            If ``True``, additionally divide by ``mass(*params, **kwparams)``,
+            so the result is a probability density (unit total mass) rather
+            than the raw weight -- e.g. for plotting the PDF a measure
+            corresponds to via the Wiener-Askey correspondence. This is
+            the *un*normalized weight by default, matching
+            ``QuadratureRule.integrate``/``sum``, which likewise only
+            normalize when ``density=True``: the raw weight is what a
+            quadrature rule built on this measure actually integrates
+            against, so it's the more fundamental case, e.g. for sanity-
+            checking a rule's weights against a continuous plot of the
+            same weight function.
+
+        Raises
+        ------
+        ValueError
+            If any of ``params``/``kwparams`` is given and
+            ``affine_invariant`` is ``False``; see ``affine_invariant``.
+        """
+        _check_affine_invariant(self, params, kwparams)
+        scale, shift = self.affine_params(*params, **kwparams)
+        w = self.weight((x - shift) / scale)
+        if density:
+            w = w / self.mass(*params, **kwparams)
+        return w
 
     def recurrence_coeffs(self, n: int) -> tuple[np.ndarray, np.ndarray]:
         """Monic three-term recurrence coefficients, each shape ``(n,)``.
