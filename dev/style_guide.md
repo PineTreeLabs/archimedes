@@ -1,4 +1,6 @@
+# Archimedes style guide
 
+The goal of this style guide is to provide and enforce a clear and consistent style across Archimedes written content, including code, documentation, tutorials, and blog posts.
 
 ## Naming conventions
 
@@ -28,7 +30,7 @@ def dynamics(x, u):
     return np.concatenate([v, a])
 ```
 
-This exception is scoped **project-wide**, not per file: `N802`/`N803`/`N806`/`N815`/`N816` (naming checks that would otherwise flag single-letter or mixed-case names) are disabled in `pyproject.toml` for the whole package, not toggled on a per-file basis. Don't add local `# noqa` comments or per-file `select`/`ignore` overrides for these codes — if a file needs the exception, the project-wide config already covers it.
+Prefer scoping directory-level exceptions (`N802`/`N803`/`N806`/`N815`/`N816`) using `per-file-ignores` to local `# noqa` comments or per-file `select`/`ignore` overrides for these codes.
 
 ### Monogram notation
 
@@ -41,15 +43,14 @@ Quantity_ReferenceTarget_ExpressedIn
 * **Quantity**: a single letter for the physical quantity — `p` position, `v` translational velocity, `w` angular velocity, `R` rotation matrix, `F` force, `M` moment/torque, and so on.
 * **Reference/Target**: the frame(s) involved, as single capital letters. `R_BA` is the rotation matrix that re-expresses a vector given in frame `A` into frame `B`, so that `v_B = R_BA @ v_A`.
 * **Expressed-in**: an optional trailing frame subscript when the expressed-in frame isn't the same as the reference frame, e.g. `v_WB_B` — the velocity of `B` relative to `W`, expressed in the `B` frame. When the reference and expressed-in frames are the same, the trailing subscript is dropped (`v_A` means "expressed in `A`," not "expressed in some unstated frame").
-* A descriptive middle token is fine when it disambiguates which quantity of that type you mean: `F_aero_B`, `M_prop_B`, `r_CM_B` (a force, a moment, and a position, each expressed in frame `B`) are consistent with the convention already used in `archimedes.spatial`.
+* A descriptive middle token is fine when it disambiguates which quantity of that type you mean: `F_aero_B`, `M_prop_B`, `r_CM_B` (a force, a moment, and a position, each expressed in frame `B`).
 
-Full semantics — points vs. frames vs. bodies, spatial vectors, defaults for dropping subscripts — are in the Drake link above; don't reproduce all of it here, just follow the pattern.
+Full semantics - points vs. frames vs. bodies, spatial vectors, defaults for dropping subscripts - are in the Drake link above.
 
 ### Time derivatives
 
 Use the `_dot` / `_ddot` suffix for first and second time derivatives, regardless of whether the base name is a monogram symbol or a descriptive name: `x_dot`, `q_dot`, `v_WB_dot`.
-
-Don't use `xdot` (no separator) or `x_t` (reads as "x at time t," not "the time derivative of x") — both appear in the codebase today and should be migrated to `_dot`/`_ddot` as those files are touched.
+Don't use `xdot` (no separator) or `x_t`.
 
 ## Documentation
 
