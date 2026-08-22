@@ -33,7 +33,7 @@ This page gives an overview of the infrastructure that Archimedes provides for _
 All of the methods we will consider approximate methods of the form:
 
 ```{math}
-f(x) \approx \hat{f}(x) \equiv \sum_{i=1}^n a_i \phi_i(x)
+f(x) \approx \hat{f}(x) \equiv \sum_{i=1}^n c_i \phi_i(x)
 ```
 
 With different definitions of the basis, this can encompass a fairly wide variety of numerical methods, from simple lookup tables and power series expansions to complex representations like discontinuous-Galerkin finite element methods and pseudospectral optimal control.
@@ -79,38 +79,38 @@ That inner product is the key concept; basically everything else is either a con
 For example, if we work with a basis of functions $\phi_i(x)$ that are orthogonal with respect to $w(x)$, then by definition
 
 ```{math}
-\langle \phi_i, \phi_j \rangle_\mathcal{V} = ||phi_i(x)||^2_\mathcal{V} \delta_{ij},
+\langle \phi_i, \phi_j \rangle_\mathcal{V} = \|\phi_i(x)\|^2_\mathcal{V} \delta_{ij},
 ```
 
-where $\delta_{ij}$ is the Kroenecker delta, and
+where $\delta_{ij}$ is the Kronecker delta, and
 
 ```{math}
-||phi_i(x)||^2 \equiv \int_\mathcal{D} \phi_i^2(x) ~ w(x) ~ dx.
+\|\phi_i(x)\|^2 \equiv \int_\mathcal{D} \phi_i^2(x) ~ w(x) ~ dx.
 ```
 
 In this case we can easily extract the expansion coefficients $a_i$ for any function $f(x)$:
 
 ```{math}
-a_i = \frac{\langle \phi_i, f \rangle_\mathcal{V}}{||phi_i(x)||^2}.
+c_i = \frac{\langle \phi_i, f \rangle_\mathcal{V}}{\|\phi_i(x)\|^2}.
 ```
 
 To make this example more concrete, if $\mathcal{D}$ is periodic and $\phi_i(x)$ are Fourier (sine/cosine) functions with $w(x) \equiv 1$, then this is the familiar spectral projection method taught in undergrad math methods classes.
 
 ### Galerkin Projection
 
-In general the basis functions may not be orthogonal, in which case the coefficient vector $\mathbf{a}$ for a function can be determined by _Galerkin projection_, requiring that the approximation residual not lie in the span of the basis vectors.
+In general the basis functions may not be orthogonal, in which case the coefficient vector $\mathbf{c}$ for a function can be determined by _Galerkin projection_, requiring that the approximation residual not lie in the span of the basis vectors.
 This residual-orthogonality condition is that for any "test" function $\phi_j(x)$,
 
 ```{math}
 \langle \phi_j, \hat{f} - f \rangle_\mathcal{V} = 0,
 ```
 
-where $\hat{f}(x)$ is again the basis expansion approximation $\sum_i a_i \phi_i(x)$.
+where $\hat{f}(x)$ is again the basis expansion approximation $\sum_i c_i \phi_i(x)$.
 
 This can be equivalently written as a least-squares problem:
 
 ```{math}
-\min_\mathbf{a} \bigg| \bigg| \hat{f} - f \bigg| \bigg|_\mathcal{V}^2.
+\min_\mathbf{c} \bigg| \bigg| \hat{f} - f \bigg| \bigg|_\mathcal{V}^2.
 ```
 
 Later we will see how this can be implemented with basic matrix multiplications that scale with the number of basis functions.
@@ -126,7 +126,58 @@ This is known as _Petrov-Galerkin projection_, and the condition is that for any
 
 ### From Continuous to Discrete
 
-<!-- TODO -->
+The inner product is thus a key calculation when working with basis expansions because of its role in finding an L2 projection of an arbitrary function.
+Of course, the inner product as a (possibly weighted) integral on the domain typically has no useful closed-form solution, so in practice we must resort to [numerical quadrature](quadrature.md).
+
+Gaussian quadrature approximates the integral with a weighted sum over a fixed set of $m$ nodes $\{x_i\}_{i=1}^m$ and weights $\{w_i\}_{i=1}^m$, chosen so the approximation is exact for the polynomial degrees that appear in the basis:
+
+```{math}
+\langle u, v \rangle_\mathcal{V} = \int_\mathcal{D} u(x) \, v(x) \, w(x) \, dx \approx \sum_{i=1}^m w_i \, u(x_i) \, v(x_i).
+```
+
+If we construct vectors $\mathbf{u}$ by sampling the continuous function $u(x)$ at the quadrature nodes $\mathbf{x}$, then Gaussian quadrature turns the inner product into a diagonally-weighted dot product of the two vectors $\mathbf{u}$ and $\mathbf{v}$.
+In the event that the basis is polynomial and quadrature rule is chosen to exactly integrate any polynomials that appear in the basis, the quadrature is actually a _numerically exact_ evaluation of the inner product.
+
+This lets us introduce a key construction: the basis matrix (also known as a "generalized Vandermonde matrix") $\boldsymbol{\Phi}$, constructed so that the $j$-th column is $\phi_j$ evaluated at the Gaussian quadrature nodes:
+
+```{math}
+\boldsymbol{\Phi}_{ij} = \phi_j(x_i), \qquad i = 1, \dots, m, \quad j = 1, \dots, n.
+```
+
+:::{note}
+The ordinary [Vandermonde matrix](https://en.wikipedia.org/wiki/Vandermonde_matrix) is the basis matrix for the special case of a monomial basis $\phi_j(x) = x^{j-1}$
+:::
+
+The basis matrix uses the _continuous_ basis functions sampled at the _discrete_ quadrature nodes, so it is the bridge between the whiteboard theory and the numerical implementation.
+The basis matrix and the diagonal weight matrix $\mathbf{W} = \operatorname{diag}(w_1, \dots, w_m)$ allow us to conveniently evaluate a range of operations on basis expansion representations of continuous functions.
+
+For example, the Galerkin projection condition $\langle \phi_j, \hat{f} - f \rangle_\mathcal{V} = 0$ for every $j$ can be compactly expressed as the square linear system:
+
+```{math}
+\boldsymbol{\Phi}^\top \mathbf{W} \boldsymbol{\Phi} \mathbf{c} = \boldsymbol{\Phi}^\top \mathbf{W} \mathbf{f},
+```
+
+where $f_i \equiv f(x_i)$ is again the continuous function $f$ sampled at the quadrature points and $\mathbf{c}$ is the coefficient vector.
+
+Here $\boldsymbol{\Phi}^\top \mathbf{W} \boldsymbol{\Phi}$ is the Gram (or "mass") matrix $\mathbf{M}$ consisting of inner products between two basis functions:
+
+```{math}
+M_{ij} = \langle \phi_i, \phi_j \rangle_\mathcal{V},
+```
+
+The right-hand side of the projection equation, $\boldsymbol{\Phi}^\top \mathbf{W} \mathbf{f}$, is the inner product between $f$ and each element of the basis, which (because of its appearance in linear finite element methods) is sometimes called the _load vector_ $\mathbf{b}$:
+
+```{math}
+b_j = \langle \phi_j, f \rangle_\mathcal{V}.
+```
+
+Galerkin projection is then simply the solution to the linear system
+
+```{math}
+\mathbf{M} \mathbf{c} = \mathbf{b},
+```
+
+which are exactly the normal equations for a weighted least-squares projection.
 
 ## The `approximation` Module
 
@@ -136,6 +187,41 @@ There are four key abstractions:
 
 - [`Basis`](#archimedes.experimental.approximation.Basis): the definition of the $\phi(x)$ functions
 - [`FunctionSpace`](#archimedes.experimental.approximation.FunctionSpace): combination of a basis with a domain and associated quadrature rule, together implying an inner product
-- [`BasisMatrix`](#archimedes.experimental.approximation.BasisMatrix): the generalized Vandermonde matrix associated with the basis, evaluated at the quadrature nodes: $\[V\]_{ij} = \phi_j(x_i)$
+- [`BasisMatrix`](#archimedes.experimental.approximation.BasisMatrix): the generalized Vandermonde matrix $\boldsymbol{\Phi}$ associated with the basis and quadrature rule
 - [`Function`](#archimedes.experimental.approximation.Function): A coefficient vector for a particular element of a function space, defining a (piecewise) continuous function in terms of a basis expansion.
 
+These are summarized in the following table
+
+| Math concept    | Math notation | Code equivalent | Code convention |
+| --------------- | --------------| --------------- | --------------- |
+| Basis functions | $\{ \phi_i(x) \}_{i=1}^n$ | `Basis` | `phi` |
+| Function space  | $\operatorname{span}\{\phi_1, \dots, \phi_n\}$ | `FunctionSpace` | `V` |
+| Generalized Vandermonde matrix | $\Phi_{ij} = \phi_j(x_i)$ | `BasisMatrix` | `Phi` |
+| Function | $f(x) = \sum_{i=1}^n c_i \phi_i(x)$ | `Function` | `f` |
+
+The operations in [From Continuous to Discrete](#from-continuous-to-discrete) map onto this module in two layers: matrix-level assembly primitives that directly use `BasisMatrix`, and higher-level `Function` operations that use them internally.
+
+### Assembly Primitives
+
+`BasisMatrix.T` is defined as the adjoint under the *weighted* inner product, not a plain transpose.
+This avoids the need to manually track quadrature weights $W$ so that for instance `M = Phi.T @ Phi`, computed as $\Phi^\top W \Phi$, and `b = Phi.T @ f(x)`.
+
+| Math concept | Math notation | Code |
+| --- | --- | --- |
+| Basis matrix | $[\Phi]_{ij} = \phi_j(x_i)$ | `Phi = space.basis_matrix()` |
+| Derivative basis matrix | $[\Phi']_{ij} = \phi_j'(x_i)$ | `dPhi = space.basis_matrix(deriv=1)` |
+| Mass (Gram) matrix | $M_{jk} = \langle \phi_j, \phi_k \rangle_\mathcal{V}$ | `Phi.T @ Phi` |
+| Stiffness matrix | $K_{jk} = \langle \phi_j', \phi_k' \rangle_\mathcal{V}$ | `dPhi.T @ dPhi` |
+| Load vector | $b_j = \langle \phi_j, f \rangle_\mathcal{V}$ | `Phi.T @ f(x)` |
+
+These are commonly used in PDE discretizations (e.g. spectral or finite element methods), but many function approximation applications don't require directly using these matrix-level operations at all:
+
+### `Function` Operations
+
+| Math concept | Math notation | Code |
+| --- | --- | --- |
+| Inner product | $\langle u, v \rangle_\mathcal{V} = \int_\mathcal{D} u \, v \, w \, dx$ | `f.dot(g)` |
+| Galerkin projection | $\min_\mathbf{c} \lVert \hat{f} - f \rVert_\mathcal{V}^2$ | `space.project(f)` |
+| Differentiation | $f'(x) = \sum_i c_i \phi_i'(x)$ | `f.derivative()` |
+| Antiderivative | $F(x) = \int_a^x f(t) \, dt$ | `f.integral()` |
+| Definite integral | $\int_a^b f(x) \, dx$ | `f.integrate()` |
