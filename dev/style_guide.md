@@ -11,6 +11,7 @@ To ignore case conventions for examples that use this quasi-mathematical notatio
 ## Documentation
 
 Docs and docstrings follow three layers: `numpydoc` for docstring structure, Google's developer style guide for prose, and a small set of house rules for things neither covers.
+These rules **do not apply** to long-form documentation like blog posts or tutorials.
 
 ### Docstring structure (numpydoc)
 
@@ -19,7 +20,7 @@ Follow [`numpydoc`](https://numpydoc.readthedocs.io/en/latest/format.html) conve
 * Section order: short summary, deprecation warning (if any), extended summary, `Parameters`, `Returns`, `Yields`/`Receives`, `Other Parameters`, `Raises`, `Warns`, `Warnings`, `See Also`, `Notes`, `References`, `Examples`.
 * Triple double-quotes; wrap prose at roughly 75 characters.
 * The one-line summary uses **imperative, present-tense mood**: "Compute the norm," not "Computes the norm" or "This will compute...".
-* `Parameters`/`Returns`/`Attributes` entries are noun-phrase fragments (`x : array_like` / `Input array.`), not full sentences — don't force these into active-voice commands; that's not what the convention asks for.
+* `Parameters`/`Returns`/`Attributes` entries are noun-phrase fragments (`x : array_like` / `Input array.`), not full sentences or active-voice commands.
 * Minimize LaTeX; prefer plain Python pseudocode where an equation isn't essential.
 * Terminology: "indices" (not "indexes"), "matrices" (not "matrixes").
 
@@ -27,7 +28,7 @@ Follow [`numpydoc`](https://numpydoc.readthedocs.io/en/latest/format.html) conve
 
 For narrative docs — README, `docs/source/*.md`, dev guides, and the extended-summary/`Notes` prose inside docstrings — follow the [Google developer documentation style guide](https://developers.google.com/style), with the *Chicago Manual of Style* as a tiebreaker for anything it doesn't cover. This mirrors [NumPy's own policy](https://numpy.org/doc/stable/dev/howto-docs.html).
 
-Rules pulled directly from Google's guide:
+Rules from Google's guide:
 
 * **Active voice, second person, present tense**: "The function returns a string," not "A string will be returned by the function." ([Highlights](https://developers.google.com/style/highlights))
 * **No `-ing` word as the first word of a heading** — write "Compile a function," not "Compiling functions." An `-ing` word later in a heading is fine. ([Headings and titles](https://developers.google.com/style/headings))
@@ -55,7 +56,7 @@ Neither guide above addresses these, so we add them as house rules, borrowed fro
   | facilitate | help / allow |
   | straightforwardly | directly |
 
-* **Consistent terminology**: pick one name per concept and use it everywhere (e.g. "compiled function," not "compiled function" in one doc and "symbolic function" in another).
+* **Consistent terminology**: pick one name per concept and use it everywhere.
 
 ## Security
 
