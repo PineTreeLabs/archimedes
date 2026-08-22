@@ -1,12 +1,55 @@
 
 
-## Formatting
+## Naming conventions
 
-To ignore case conventions for examples that use this quasi-mathematical notation, add the following line to the top of the file (or the first code block in a Jupyter notebook):
+Archimedes is math-heavy code, and standard Python naming rules (PEP 8, enforced here via Ruff's `N` rules) actively hurt readability for code that implements a specific equation. This section covers when to break from `snake_case` and how to name the resulting symbols consistently.
+
+### Mathematical notation exception
+
+**Use a mathematical symbol** (`M`, `F`, `R`, single/double letters, capitalized where the mathematical convention capitalizes it) when:
+
+* The code directly implements a documented equation.
+* The name corresponds to a well-known symbol (`F` for force, `I` for inertia, `M` for mass matrix).
+* Matching the paper/textbook notation makes the code easier to check against the theory.
+
+**Use a descriptive `snake_case` name** when:
+
+* The quantity has no standard symbol.
+* The code is organizational/infrastructure (config, I/O, dispatch) rather than computational.
+* The mathematical context isn't obvious from the surrounding code.
 
 ```python
-# ruff: noqa: N802, N803, N806, N815, N816
+def dynamics(x, u):
+    q, v = x[:n], x[n:]        # generalized position, velocity
+    M = compute_mass_matrix(q)
+    C = compute_coriolis(q, v)
+    tau = compute_forces(q, v, u)
+    a = np.linalg.solve(M, tau - C @ v)
+    return np.concatenate([v, a])
 ```
+
+This exception is scoped **project-wide**, not per file: `N802`/`N803`/`N806`/`N815`/`N816` (naming checks that would otherwise flag single-letter or mixed-case names) are disabled in `pyproject.toml` for the whole package, not toggled on a per-file basis. Don't add local `# noqa` comments or per-file `select`/`ignore` overrides for these codes — if a file needs the exception, the project-wide config already covers it.
+
+### Monogram notation
+
+For frame-dependent physical quantities (positions, velocities, rotations, forces), Archimedes follows the [Drake monogram notation convention](https://drake.mit.edu/doxygen_cxx/group__multibody__notation__basics.html). The general pattern is:
+
+```
+Quantity_ReferenceTarget_ExpressedIn
+```
+
+* **Quantity**: a single letter for the physical quantity — `p` position, `v` translational velocity, `w` angular velocity, `R` rotation matrix, `F` force, `M` moment/torque, and so on.
+* **Reference/Target**: the frame(s) involved, as single capital letters. `R_BA` is the rotation matrix that re-expresses a vector given in frame `A` into frame `B`, so that `v_B = R_BA @ v_A`.
+* **Expressed-in**: an optional trailing frame subscript when the expressed-in frame isn't the same as the reference frame, e.g. `v_WB_B` — the velocity of `B` relative to `W`, expressed in the `B` frame. When the reference and expressed-in frames are the same, the trailing subscript is dropped (`v_A` means "expressed in `A`," not "expressed in some unstated frame").
+* A descriptive middle token is fine when it disambiguates which quantity of that type you mean: `F_aero_B`, `M_prop_B`, `r_CM_B` (a force, a moment, and a position, each expressed in frame `B`) are consistent with the convention already used in `archimedes.spatial`.
+
+Full semantics — points vs. frames vs. bodies, spatial vectors, defaults for dropping subscripts — are in the Drake link above; don't reproduce all of it here, just follow the pattern.
+
+### Time derivatives
+
+Use the `_dot` / `_ddot` suffix for first and second time derivatives, regardless of whether the base name is a monogram symbol or a descriptive name: `x_dot`, `q_dot`, `v_WB_dot`.
+
+Don't use `xdot` (no separator) or `x_t` (reads as "x at time t," not "the time derivative of x") — both appear in the codebase today and should be migrated to `_dot`/`_ddot` as those files are touched.
 
 ## Documentation
 
