@@ -77,8 +77,8 @@ _NODE_FAMILIES = {
 }
 
 
-def _resolve_lagrange_element(n: int, nodes) -> LagrangeBasis:
-    """One order-``n`` :class:`LagrangeBasis` element for
+def _resolve_lagrange_element(n_basis: int, nodes) -> LagrangeBasis:
+    """One :class:`LagrangeBasis` element with ``n_basis`` nodes for
     :meth:`FunctionSpace.piecewise`'s ``nodes`` argument -- a node-family
     name, an explicit callable/array, or (``None``) the family default.
 
@@ -88,7 +88,7 @@ def _resolve_lagrange_element(n: int, nodes) -> LagrangeBasis:
     (not a clean ``False``), so a string check must run first.
     """
     if nodes is None:
-        return LagrangeBasis.gauss_lobatto(n)
+        return LagrangeBasis.gauss_lobatto(n_basis)
     if isinstance(nodes, str):
         if nodes not in _NODE_FAMILIES:
             raise ValueError(
@@ -96,47 +96,51 @@ def _resolve_lagrange_element(n: int, nodes) -> LagrangeBasis:
                 f"{sorted(_NODE_FAMILIES)}, a callable, or an array of "
                 f"reference nodes"
             )
-        return _NODE_FAMILIES[nodes](n)
+        return _NODE_FAMILIES[nodes](n_basis)
     if callable(nodes):
-        return LagrangeBasis(reference_nodes=nodes(n), node_family=nodes)
+        return LagrangeBasis(reference_nodes=nodes(n_basis), node_family=nodes)
     arr = np.asarray(nodes, dtype=float)
-    if len(arr) != n:
-        raise ValueError(f"nodes has {len(arr)} points but order={n}")
+    if len(arr) != n_basis:
+        raise ValueError(
+            f"nodes has {len(arr)} points but degree={n_basis - 1} needs {n_basis}"
+        )
     return LagrangeBasis(reference_nodes=arr)
 
 
-def _resolve_element_basis(kind: str, order, nodes) -> Basis | tuple[Basis, ...]:
+def _resolve_element_basis(kind: str, degree, nodes) -> Basis | tuple[Basis, ...]:
     """The (possibly per-element) local ``Basis`` for
-    :meth:`FunctionSpace.piecewise`'s ``kind``/``order``/``nodes``.
+    :meth:`FunctionSpace.piecewise`'s ``kind``/``degree``/``nodes``.
 
-    Returns a single ``Basis`` for a scalar ``order`` (the common, uniform
+    Returns a single ``Basis`` for a scalar ``degree`` (the common, uniform
     case -- letting :class:`PiecewiseBasis` tile it, which also keeps its
-    ``_uniform`` fast path), or a tuple for a per-element ``order`` tuple.
+    ``_uniform`` fast path), or a tuple for a per-element ``degree`` tuple.
     """
-    orders = order if isinstance(order, tuple) else (order,)
+    degrees = degree if isinstance(degree, tuple) else (degree,)
     if kind == "legendre":
         if nodes is not None:
             raise ValueError("nodes is only meaningful for kind='lagrange'")
-        bases = tuple(OrthogonalPolynomialBasis(LegendreMeasure(), n) for n in orders)
+        bases = tuple(
+            OrthogonalPolynomialBasis(LegendreMeasure(), d + 1) for d in degrees
+        )
     elif kind == "lagrange":
-        bases = tuple(_resolve_lagrange_element(n, nodes) for n in orders)
+        bases = tuple(_resolve_lagrange_element(d + 1, nodes) for d in degrees)
     elif kind == "hermite":
         if nodes is not None:
             raise ValueError("nodes is only meaningful for kind='lagrange'")
         hermite = CubicHermiteBasis()
-        for n in orders:
-            if n != hermite.n_basis:
+        hermite_degree = hermite.n_basis - 1
+        for d in degrees:
+            if d != hermite_degree:
                 raise ValueError(
                     f"kind='hermite' is a fixed cubic element (value + slope "
-                    f"at each end, {hermite.n_basis} DOFs); order must be "
-                    f"{hermite.n_basis}, got {n}"
+                    f"at each end); degree must be {hermite_degree}, got {d}"
                 )
-        bases = tuple(CubicHermiteBasis() for _ in orders)
+        bases = tuple(CubicHermiteBasis() for _ in degrees)
     else:
         raise ValueError(
             f"kind must be 'lagrange', 'legendre', or 'hermite', got {kind!r}"
         )
-    return bases if isinstance(order, tuple) else bases[0]
+    return bases if isinstance(degree, tuple) else bases[0]
 
 
 def _orthogonal_space(
@@ -292,12 +296,7 @@ class FunctionSpace:
         density: bool = False,
         quad_rule: Quadrature | None = None,
     ) -> FunctionSpace:
-        """Global Legendre polynomial space on ``[a, b]``.
-
-        Sugar for ``FunctionSpace(OrthogonalPolynomialBasis(LegendreMeasure(),
-        n_basis, density=density), UnitInterval.Parameters(a=a, b=b),
-        quad_rule=quad_rule)``.
-        """
+        """Global Legendre polynomial space on ``[a, b]``."""
         return _orthogonal_space(
             cls,
             LegendreMeasure(),
@@ -468,10 +467,8 @@ class FunctionSpace:
     ) -> FunctionSpace:
         """Global monomial (power series) space on ``[a, b]``.
 
-        Sugar for ``FunctionSpace(MonomialBasis(n_basis),
-        UnitInterval.Parameters(a=a, b=b), quad_rule=quad_rule)``. See
-        :class:`MonomialBasis` for the reference-mapping convention and
-        conditioning; prefer :meth:`legendre`/:meth:`chebyshev` for
+        See :class:`MonomialBasis` for the reference-mapping convention
+        and conditioning; prefer :meth:`legendre`/:meth:`chebyshev` for
         higher degree or numerically sensitive work.
 
         Parameters
@@ -511,7 +508,7 @@ class FunctionSpace:
     def piecewise(
         cls,
         kind: str,
-        order: int | tuple[int, ...],
+        degree: int | tuple[int, ...],
         breakpoints,
         *,
         nodes: str | np.ndarray | Callable[[int], np.ndarray] | None = None,
@@ -521,15 +518,12 @@ class FunctionSpace:
         """A piecewise ``FunctionSpace``: a local basis tiled across
         ``breakpoints``, on the domain those breakpoints themselves span.
 
-        Sugar over :class:`PiecewiseBasis` -- it builds the local
-        ``element_basis`` and the target-domain ``UnitInterval.Parameters``
-        for you, so neither ``LagrangeBasis``/``OrthogonalPolynomialBasis``
-        nor ``UnitInterval`` need to be named directly for the common cases
-        below. For anything else (a heterogeneous per-element family, a
+        Convenienve constructor for a :class:`PiecewiseBasis` for the common
+        cases listed below. For anything else (a heterogeneous per-element family, a
         symbolic/traced domain independent of the mesh, an explicit
         reference-domain ``quad_rule``), build a ``PiecewiseBasis`` directly
         and pass it to the general ``FunctionSpace(basis, domain)``
-        constructor -- nothing here is reachable only through this method.
+        constructor.
 
         Parameters
         ----------
@@ -543,16 +537,17 @@ class FunctionSpace:
               no boundary degrees of freedom and so only supports
               ``continuity=-1``.
             - ``"hermite"`` is :class:`CubicHermiteBasis`: value *and*
-              slope degrees of freedom at each end, fixed at ``order=4``
+              slope degrees of freedom at each end, fixed at ``degree=3``
               (a cubic). Needed for ``continuity=1`` (:math:`C^1`); also
               buildable at ``continuity=0`` or ``-1``, merging (or not)
               only the value DOF.
 
-        order : int or tuple of int
-            Number of local degrees of freedom per element. A bare ``int``
-            is shared by every element; a tuple gives one order per
-            element (p-refinement) and must have one entry per element.
-            Fixed at ``4`` for ``kind="hermite"``.
+        degree : int or tuple of int
+            Polynomial degree of each element (one less than its number of
+            local degrees of freedom). A bare ``int`` is shared by every
+            element; a tuple gives one degree per element (p-refinement)
+            and must have one entry per element. Fixed at ``3`` for
+            ``kind="hermite"``.
         breakpoints : array_like
             Element boundaries **on the physical (target) domain**, shape
             ``(n_elements + 1,)``, strictly increasing. Unlike
@@ -586,13 +581,13 @@ class FunctionSpace:
         """
         a, b, ref_breakpoints = _normalize_breakpoints(breakpoints)
         n_elements = len(ref_breakpoints) - 1
-        if isinstance(order, tuple) and len(order) != n_elements:
+        if isinstance(degree, tuple) and len(degree) != n_elements:
             raise ValueError(
-                f"order has {len(order)} entries but breakpoints describe "
+                f"degree has {len(degree)} entries but breakpoints describe "
                 f"{n_elements} elements"
             )
 
-        element_basis = _resolve_element_basis(kind, order, nodes)
+        element_basis = _resolve_element_basis(kind, degree, nodes)
         basis = PiecewiseBasis(element_basis, ref_breakpoints, continuity=continuity)
         return cls(basis, UnitInterval.Parameters(a=a, b=b), quad_rule=quad_rule)
 
@@ -600,35 +595,23 @@ class FunctionSpace:
     def bspline(
         cls,
         degree: int,
-        breakpoints,
+        knots,
         *,
-        knots: np.ndarray | None = None,
         quad_rule: Quadrature | None = None,
     ) -> FunctionSpace:
-        """A B-spline ``FunctionSpace`` of the given ``degree``.
+        """A B-spline ``FunctionSpace`` on a general, explicit knot vector.
 
-        Sugar over :class:`BSplineBasis` -- builds a *clamped* knot vector
-        from physical ``breakpoints`` (multiplicity ``degree + 1`` at both
-        ends, simple interior knots -- the common, Bezier-endpoint case) and
-        derives ``Parameters`` from it automatically, so neither
-        ``BSplineBasis`` nor ``UnitInterval`` need to be named directly for
-        that case. For anything else -- an open (non-clamped) knot vector,
-        non-simple interior multiplicity, ... -- pass ``knots`` directly;
-        nothing here is reachable only through this method.
+
+        Constructs a :class:`BSplineBasis` with ``domain`` derived automatically
+        from ``knots``. For the common case of a clamped knot vector built from
+        physical element boundaries use :meth:`clamped_bspline` instead.
 
         Parameters
         ----------
         degree : int
             Polynomial degree of each piece.
-        breakpoints : array_like
-            Element boundaries **on the physical (target) domain**, shape
-            ``(n_elements + 1,)``, strictly increasing.
-            ``breakpoints[0]``/``breakpoints[-1]`` become the two
-            ``degree + 1``-times-repeated end knots. Ignored if ``knots``
-            is given.
-        knots : array_like, optional
-            An explicit, general knot vector (physical units), overriding
-            the default clamped construction from ``breakpoints``. See
+        knots : array_like
+            Nondecreasing knot vector, physical units. See
             :class:`BSplineBasis` for what makes a knot vector valid.
         quad_rule : QuadratureRule, optional
             Forwarded to the underlying ``FunctionSpace`` constructor.
@@ -638,23 +621,56 @@ class FunctionSpace:
         -------
         FunctionSpace
         """
-        if knots is None:
-            bp = np.asarray(breakpoints, dtype=float)
-            if bp.ndim != 1 or len(bp) < 2:
-                raise ValueError(
-                    f"breakpoints must be 1-D with at least 2 entries, got "
-                    f"shape {bp.shape}"
-                )
-            if np.any(np.diff(bp) <= 0):
-                raise ValueError("breakpoints must be strictly increasing")
-            knots = np.concatenate(
-                [np.full(degree, bp[0]), bp, np.full(degree, bp[-1])]
-            )
-
         basis = BSplineBasis(degree, knots)
         a = basis.knots[degree]
         b = basis.knots[len(basis.knots) - 1 - degree]
         return cls(basis, UnitInterval.Parameters(a=a, b=b), quad_rule=quad_rule)
+
+    @classmethod
+    def clamped_bspline(
+        cls,
+        degree: int,
+        breakpoints,
+        *,
+        quad_rule: Quadrature | None = None,
+    ) -> FunctionSpace:
+        """A B-spline ``FunctionSpace`` with a *clamped* knot vector built
+        from physical element boundaries.
+
+        Builds a knot vector with multiplicity ``degree + 1`` at both ends
+        (so the first/last coefficients are exactly the endpoint values,
+        like a Bezier curve's) and simple interior knots at each breakpoint (the
+        smoothest possible interior continuity, :math:`C^{degree - 1}`).
+        This is the common case; for anything else (an open/non-clamped
+        knot vector, non-simple interior multiplicity, ...), call
+        :meth:`bspline` directly with an explicit knot vector.
+
+        Parameters
+        ----------
+        degree : int
+            Polynomial degree of each piece.
+        breakpoints : array_like
+            Element boundaries **on the physical (target) domain**, shape
+            ``(n_elements + 1,)``, strictly increasing.
+            ``breakpoints[0]``/``breakpoints[-1]`` become the two
+            ``degree + 1``-times-repeated end knots.
+        quad_rule : QuadratureRule, optional
+            Forwarded to the underlying ``FunctionSpace`` constructor.
+            Default ``basis.default_quadrature()``.
+
+        Returns
+        -------
+        FunctionSpace
+        """
+        bp = np.asarray(breakpoints, dtype=float)
+        if bp.ndim != 1 or len(bp) < 2:
+            raise ValueError(
+                f"breakpoints must be 1-D with at least 2 entries, got shape {bp.shape}"
+            )
+        if np.any(np.diff(bp) <= 0):
+            raise ValueError("breakpoints must be strictly increasing")
+        knots = np.concatenate([np.full(degree, bp[0]), bp, np.full(degree, bp[-1])])
+        return cls.bspline(degree, knots, quad_rule=quad_rule)
 
     @classmethod
     def tensor(
@@ -1169,10 +1185,9 @@ class FunctionSpace:
     def function(self, coefficients: np.ndarray | None = None) -> Function:
         """A :class:`Function` on this space with known ``coefficients``.
 
-        Sugar for ``Function(coefficients, self)`` -- the natural
-        constructor when the coefficients are already in hand (solved for
-        directly, deserialized, ...), as opposed to :meth:`project`, which
-        computes them from a target function.
+        Convenience method for ``Function(coefficients, self)``. This is the
+        natural constructor when the coefficients are already known, as opposed
+        to :meth:`project`, which computes them from a target function.
 
         Parameters
         ----------

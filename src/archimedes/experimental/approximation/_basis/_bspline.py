@@ -62,9 +62,10 @@ class BSplineBasis(Basis):
 
     See Also
     --------
-    FunctionSpace.bspline : Convenience constructor building a clamped
-        knot vector from physical breakpoints (the common case) and
-        deriving ``Parameters`` automatically.
+    FunctionSpace.bspline : Convenience constructor deriving ``Parameters``
+        automatically from an explicit knot vector.
+    FunctionSpace.clamped_bspline : Convenience constructor building a
+        clamped knot vector from physical breakpoints (the common case).
     """
 
     degree: int

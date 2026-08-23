@@ -29,7 +29,7 @@ def test_matches_manual_construction():
         PiecewiseBasis(element, np.linspace(-1.0, 1.0, 11), continuity=0),
         UnitInterval.Parameters(a=0.0, b=1.0),
     )
-    sugar = FunctionSpace.piecewise("lagrange", 3, np.linspace(0.0, 1.0, 11))
+    sugar = FunctionSpace.piecewise("lagrange", 2, np.linspace(0.0, 1.0, 11))
 
     assert sugar.n_basis == manual.n_basis
     phi_m, phi_s = manual.basis_matrix(), sugar.basis_matrix()
@@ -51,7 +51,7 @@ def test_nodes_family_matches_lagrange_classmethod(family, continuity):
     a, b = 2.0, 7.0  # off-reference domain, to exercise the affine mapping
     breakpoints = np.array([a, 4.0, b])
     sugar = FunctionSpace.piecewise(
-        "lagrange", 4, breakpoints, nodes=family, continuity=continuity
+        "lagrange", 3, breakpoints, nodes=family, continuity=continuity
     )
 
     if family == "radau_left":
@@ -81,7 +81,7 @@ def test_nodes_as_callable():
     family = LagrangeBasis.gauss_legendre
     sugar = FunctionSpace.piecewise(
         "lagrange",
-        4,
+        3,
         np.linspace(0.0, 1.0, 3),
         nodes=lambda n: family(n).reference_nodes,
         continuity=-1,  # Gauss-Legendre nodes have no endpoint DOFs
@@ -96,14 +96,14 @@ def test_nodes_as_callable():
 
 def test_nodes_as_explicit_array():
     sugar = FunctionSpace.piecewise(
-        "lagrange", 3, np.linspace(0.0, 1.0, 3), nodes=np.array([-1.0, 0.0, 1.0])
+        "lagrange", 2, np.linspace(0.0, 1.0, 3), nodes=np.array([-1.0, 0.0, 1.0])
     )
     assert sugar.n_basis == 5  # 2 elements * 3 nodes - 1 shared
 
 
 def test_legendre_kind_builds_modal_dg_space():
     sugar = FunctionSpace.piecewise(
-        "legendre", 4, np.linspace(-1.0, 1.0, 4), continuity=-1
+        "legendre", 3, np.linspace(-1.0, 1.0, 4), continuity=-1
     )
     assert isinstance(sugar.basis, PiecewiseBasis)
     assert all(
@@ -117,32 +117,32 @@ def test_legendre_kind_rejects_continuity_zero():
     # OrthogonalPolynomialBasis has no boundary DOF, so C0 assembly is
     # incoherent -- PiecewiseBasis itself rejects this; no new check needed.
     with pytest.raises(ValueError, match="continuity=0"):
-        FunctionSpace.piecewise("legendre", 4, np.linspace(-1.0, 1.0, 4), continuity=0)
+        FunctionSpace.piecewise("legendre", 3, np.linspace(-1.0, 1.0, 4), continuity=0)
 
 
 def test_legendre_kind_rejects_nodes():
     with pytest.raises(ValueError, match="nodes is only meaningful"):
         FunctionSpace.piecewise(
-            "legendre", 4, np.linspace(-1.0, 1.0, 4), nodes="lobatto", continuity=-1
+            "legendre", 3, np.linspace(-1.0, 1.0, 4), nodes="lobatto", continuity=-1
         )
 
 
 def test_unknown_kind_rejected():
     with pytest.raises(ValueError, match="kind must be"):
-        FunctionSpace.piecewise("bogus", 4, np.linspace(-1.0, 1.0, 4))
+        FunctionSpace.piecewise("bogus", 3, np.linspace(-1.0, 1.0, 4))
 
 
 def test_unknown_nodes_family_rejected():
     with pytest.raises(ValueError, match="unknown nodes family"):
         FunctionSpace.piecewise(
-            "lagrange", 4, np.linspace(0.0, 1.0, 4), nodes="bogus_family"
+            "lagrange", 3, np.linspace(0.0, 1.0, 4), nodes="bogus_family"
         )
 
 
 def test_nodes_array_length_mismatch_rejected():
-    with pytest.raises(ValueError, match="nodes has 3 points but order=4"):
+    with pytest.raises(ValueError, match="nodes has 3 points but degree=3 needs 4"):
         FunctionSpace.piecewise(
-            "lagrange", 4, np.linspace(0.0, 1.0, 3), nodes=np.array([-1.0, 0.0, 1.0])
+            "lagrange", 3, np.linspace(0.0, 1.0, 3), nodes=np.array([-1.0, 0.0, 1.0])
         )
 
 
@@ -155,7 +155,7 @@ def test_nodes_array_length_mismatch_rejected():
 )
 def test_invalid_breakpoints_rejected(breakpoints):
     with pytest.raises(ValueError):
-        FunctionSpace.piecewise("lagrange", 3, breakpoints)
+        FunctionSpace.piecewise("lagrange", 2, breakpoints)
 
 
 def test_normalize_breakpoints_pins_reference_endpoints_exactly():
@@ -167,8 +167,8 @@ def test_normalize_breakpoints_pins_reference_endpoints_exactly():
     np.testing.assert_allclose(ref, np.array([-1.0, -0.4, 1.0]))
 
 
-def test_order_as_per_element_tuple():
-    sugar = FunctionSpace.piecewise("lagrange", (2, 3, 4), np.linspace(0.0, 1.0, 4))
+def test_degree_as_per_element_tuple():
+    sugar = FunctionSpace.piecewise("lagrange", (1, 2, 3), np.linspace(0.0, 1.0, 4))
     manual = PiecewiseBasis(
         (
             LagrangeBasis.gauss_lobatto(2),
@@ -181,16 +181,16 @@ def test_order_as_per_element_tuple():
     assert sugar.n_basis == manual.n_basis
 
 
-def test_order_tuple_length_mismatch_rejected():
-    with pytest.raises(ValueError, match="order has 2 entries"):
-        FunctionSpace.piecewise("lagrange", (2, 3), np.linspace(0.0, 1.0, 4))
+def test_degree_tuple_length_mismatch_rejected():
+    with pytest.raises(ValueError, match="degree has 2 entries"):
+        FunctionSpace.piecewise("lagrange", (1, 2), np.linspace(0.0, 1.0, 4))
 
 
 def test_quad_rule_passthrough_accepts_compatible_rule():
     breakpoints = np.linspace(0.0, 1.0, 4)
     _, _, ref = _normalize_breakpoints(breakpoints)
     rule = composite_quad(gauss_legendre(5), ref)
-    sugar = FunctionSpace.piecewise("lagrange", 3, breakpoints, quad_rule=rule)
+    sugar = FunctionSpace.piecewise("lagrange", 2, breakpoints, quad_rule=rule)
     assert sugar.quad_rule is rule
 
 
@@ -200,7 +200,7 @@ def test_quad_rule_passthrough_rejects_incompatible_rule():
     # constructor path, same as it always has.
     with pytest.raises(ValueError, match="only piecewise smooth"):
         FunctionSpace.piecewise(
-            "lagrange", 3, np.linspace(0.0, 1.0, 4), quad_rule=gauss_legendre(5)
+            "lagrange", 2, np.linspace(0.0, 1.0, 4), quad_rule=gauss_legendre(5)
         )
 
 
@@ -215,27 +215,27 @@ def test_hermite_kind_matches_manual_construction(continuity):
         PiecewiseBasis(CubicHermiteBasis(), ref, continuity=continuity),
         UnitInterval.Parameters(a=0.0, b=1.0),
     )
-    sugar = FunctionSpace.piecewise("hermite", 4, breakpoints, continuity=continuity)
+    sugar = FunctionSpace.piecewise("hermite", 3, breakpoints, continuity=continuity)
     assert sugar.n_basis == manual.n_basis
     np.testing.assert_allclose(
         sugar.basis_matrix().matrix, manual.basis_matrix().matrix
     )
 
 
-def test_hermite_kind_requires_order_four():
-    with pytest.raises(ValueError, match="order must be 4"):
-        FunctionSpace.piecewise("hermite", 3, np.linspace(0.0, 1.0, 6), continuity=1)
+def test_hermite_kind_requires_degree_three():
+    with pytest.raises(ValueError, match="degree must be 3"):
+        FunctionSpace.piecewise("hermite", 2, np.linspace(0.0, 1.0, 6), continuity=1)
 
 
 def test_hermite_kind_rejects_nodes():
     with pytest.raises(ValueError, match="nodes is only meaningful"):
         FunctionSpace.piecewise(
-            "hermite", 4, np.linspace(0.0, 1.0, 6), nodes="lobatto", continuity=1
+            "hermite", 3, np.linspace(0.0, 1.0, 6), nodes="lobatto", continuity=1
         )
 
 
-def test_hermite_kind_per_element_tuple_order_validates_each_entry():
-    with pytest.raises(ValueError, match="order must be 4"):
+def test_hermite_kind_per_element_tuple_degree_validates_each_entry():
+    with pytest.raises(ValueError, match="degree must be 3"):
         FunctionSpace.piecewise(
-            "hermite", (4, 4, 3), np.linspace(0.0, 1.0, 4), continuity=1
+            "hermite", (3, 3, 2), np.linspace(0.0, 1.0, 4), continuity=1
         )

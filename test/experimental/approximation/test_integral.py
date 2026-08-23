@@ -59,7 +59,7 @@ SPACE_BUILDERS = {
     # this is the concrete end-to-end check that BSplineBasis.Parameters'
     # redundant (a, b) echo (see BSplineBasis's docstring) correctly anchors
     # FunctionSpace._integral_matrix's boundary condition.
-    "bspline": lambda: FunctionSpace.bspline(3, np.linspace(A, B, 4)),
+    "bspline": lambda: FunctionSpace.clamped_bspline(3, np.linspace(A, B, 4)),
 }
 
 

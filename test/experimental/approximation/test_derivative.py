@@ -54,7 +54,7 @@ SPACE_BUILDERS = {
     "piecewise": lambda: FunctionSpace(
         PiecewiseBasis(_lobatto(4), BREAKS, continuity=0), domain=DOMAIN
     ),
-    "bspline": lambda: FunctionSpace.bspline(3, np.linspace(A, B, 4)),
+    "bspline": lambda: FunctionSpace.clamped_bspline(3, np.linspace(A, B, 4)),
 }
 
 

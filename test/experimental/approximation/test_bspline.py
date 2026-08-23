@@ -504,8 +504,8 @@ def test_gradient_through_traced_coefficients():
 
 
 def test_tensor_composition_is_exact_on_a_nonseparable_polynomial():
-    basis_x = FunctionSpace.bspline(3, np.linspace(0.0, 2.0, 4)).basis
-    basis_y = FunctionSpace.bspline(2, np.linspace(-1.0, 1.0, 3)).basis
+    basis_x = FunctionSpace.clamped_bspline(3, np.linspace(0.0, 2.0, 4)).basis
+    basis_y = FunctionSpace.clamped_bspline(2, np.linspace(-1.0, 1.0, 3)).basis
     tensor = TensorBasis((basis_x, basis_y))
     domain = ProductParameters(
         dims=(

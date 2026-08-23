@@ -443,7 +443,7 @@ class TestModalDiscontinuous:
         # found in.
         a, b = 0.0, 2 * np.pi
         space = FunctionSpace.piecewise(
-            "legendre", 4, np.linspace(a, b, 9), continuity=-1
+            "legendre", 3, np.linspace(a, b, 9), continuity=-1
         )
 
         def f(x):
