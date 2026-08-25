@@ -371,7 +371,7 @@ class Basis(metaclass=abc.ABCMeta):
             f"{type(self).__name__} does not define an integral basis; "
             f"approximate instead by projecting the target function onto a "
             f"FunctionSpace that does (e.g. FunctionSpace.legendre) and "
-            f"calling `.integral()` on that projection"
+            f"calling `.antiderivative()` on that projection"
         )
 
     @property

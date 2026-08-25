@@ -9,7 +9,7 @@ ambiguous the way a bare "constant of integration" would.
 
 ``integrate()`` is the scalar/definite counterpart -- the
 ``scipy.interpolate.PPoly`` ``antiderivative()``/``integrate(a, b)`` split --
-built directly on ``integral()`` wherever that is defined, with a
+built directly on ``antiderivative()`` wherever that is defined, with a
 whole-domain-only fallback where it isn't.
 """
 
@@ -55,7 +55,7 @@ SPACE_BUILDERS = {
     "nodal": lambda: FunctionSpace(_lobatto(6), domain=DOMAIN),
     # Unlike PiecewiseBasis (see the dedicated "-- piecewise --" section
     # below), a B-spline's knot vector is one global object with no running
-    # constant needed across elements, so `.integral()` is fully defined --
+    # constant needed across elements, so `.antiderivative()` is fully defined --
     # this is the concrete end-to-end check that BSplineBasis.Parameters'
     # redundant (a, b) echo (see BSplineBasis's docstring) correctly anchors
     # FunctionSpace._integral_matrix's boundary condition.
@@ -95,7 +95,7 @@ def g_(x):
 
 
 def test_integral_is_exact(space):
-    antideriv = space.project(f_).integral()
+    antideriv = space.project(f_).antiderivative()
     np.testing.assert_allclose(antideriv(X), f_left(X), atol=1e-10)
 
 
@@ -104,7 +104,9 @@ def test_integral_undoes_derivative_up_to_the_dropped_constant(space):
     # shifted so it vanishes at the left endpoint (which the derivative
     # itself has no memory of).
     u = space.project(f_)
-    np.testing.assert_allclose(u.derivative().integral()(X), f_(X) - f_(A), atol=1e-9)
+    np.testing.assert_allclose(
+        u.derivative().antiderivative()(X), f_(X) - f_(A), atol=1e-9
+    )
 
 
 def test_derivative_undoes_integral():
@@ -112,14 +114,14 @@ def test_derivative_undoes_integral():
     # antiderivative recovers the original function exactly.
     space = SPACE_BUILDERS["modal"]()
     u = space.project(f_)
-    np.testing.assert_allclose(u.integral().derivative()(X), f_(X), atol=1e-9)
+    np.testing.assert_allclose(u.antiderivative().derivative()(X), f_(X), atol=1e-9)
 
 
 def test_repeated_integration_matches_a_single_call_at_higher_order():
     space = SPACE_BUILDERS["modal"]()
     u = space.project(g_)
     np.testing.assert_allclose(
-        u.integral().integral()(X), u.integral(order=2)(X), atol=1e-9
+        u.antiderivative().antiderivative()(X), u.antiderivative(order=2)(X), atol=1e-9
     )
 
 
@@ -127,7 +129,7 @@ def test_order_two_matches_the_cauchy_repeated_integral():
     # With A = 0, the standard closed form for the twice-iterated integral
     # of x**2 vanishing (with its first derivative) at the origin is x**4/12.
     space = SPACE_BUILDERS["modal"]()
-    antideriv2 = space.project(g_).integral(order=2)
+    antideriv2 = space.project(g_).antiderivative(order=2)
     np.testing.assert_allclose(antideriv2(X), X**4 / 12, atol=1e-9)
     np.testing.assert_allclose(antideriv2(np.array([A]))[0], 0.0, atol=1e-10)
     np.testing.assert_allclose(antideriv2(np.array([A]), deriv=1)[0], 0.0, atol=1e-10)
@@ -135,7 +137,7 @@ def test_order_two_matches_the_cauchy_repeated_integral():
 
 def test_order_zero_is_the_identity(space):
     u = space.project(f_)
-    same = u.integral(order=0)
+    same = u.antiderivative(order=0)
     assert same.space.n_basis == space.n_basis
     np.testing.assert_allclose(same(X), f_(X), atol=1e-10)
 
@@ -144,12 +146,12 @@ def test_order_zero_is_the_identity(space):
 
 
 def test_left_boundary_vanishes_at_a(space):
-    antideriv = space.project(f_).integral(boundary="left")
+    antideriv = space.project(f_).antiderivative(boundary="left")
     np.testing.assert_allclose(antideriv(np.array([A]))[0], 0.0, atol=1e-10)
 
 
 def test_right_boundary_vanishes_at_b(space):
-    antideriv = space.project(f_).integral(boundary="right")
+    antideriv = space.project(f_).antiderivative(boundary="right")
     np.testing.assert_allclose(antideriv(np.array([B]))[0], 0.0, atol=1e-10)
     np.testing.assert_allclose(antideriv(X), f_right(X), atol=1e-10)
 
@@ -157,14 +159,14 @@ def test_right_boundary_vanishes_at_b(space):
 def test_left_and_right_differ_by_the_whole_domain_integral(space):
     u = space.project(f_)
     total = u.integrate()
-    left = u.integral(boundary="left")
-    right = u.integral(boundary="right")
+    left = u.antiderivative(boundary="left")
+    right = u.antiderivative(boundary="right")
     np.testing.assert_allclose(right(X), left(X) - total, atol=1e-9)
 
 
 def test_invalid_boundary_rejected(space):
     with pytest.raises(ValueError, match="boundary must be"):
-        space.project(f_).integral(boundary="middle")
+        space.project(f_).antiderivative(boundary="middle")
 
 
 # -- the space is the maximal one (dual of derivative's minimal) --
@@ -208,7 +210,7 @@ def test_integral_basis_construction_does_not_require_a_finite_domain():
 def test_explicit_result_space_is_honored(space):
     u = space.project(f_)
     target = space._integral_space()
-    antideriv = u.integral(space=target)
+    antideriv = u.antiderivative(space=target)
     assert antideriv.space is target
     np.testing.assert_allclose(antideriv(X), f_left(X), atol=1e-10)
 
@@ -216,13 +218,13 @@ def test_explicit_result_space_is_honored(space):
 def test_wrong_size_explicit_space_is_rejected(space):
     u = space.project(f_)
     with pytest.raises(ValueError, match="expected"):
-        u.integral(space=space)  # same size as self, not self.n_basis + 1
+        u.antiderivative(space=space)  # same size as self, not self.n_basis + 1
 
 
 def test_wrong_size_explicit_space_is_rejected_at_order_zero(space):
     u = space.project(f_)
     with pytest.raises(ValueError, match="expected"):
-        u.integral(order=0, space=space._integral_space())
+        u.antiderivative(order=0, space=space._integral_space())
 
 
 # -- vector-valued --
@@ -232,7 +234,7 @@ def test_vector_valued_integral(space):
     def fv(x):
         return np.stack([x**2, 3 * x], axis=-1)
 
-    antideriv = space.project(fv).integral()
+    antideriv = space.project(fv).antiderivative()
     expected = np.stack([X**3 / 3 - A**3 / 3, 1.5 * X**2 - 1.5 * A**2], axis=-1)
     np.testing.assert_allclose(antideriv(X), expected, atol=1e-9)
 
@@ -251,11 +253,11 @@ def test_vector_valued_integrate(space):
 
 def test_integral_traces(space):
     u = space.project(f_)
-    expected = u.integral()(X)
+    expected = u.antiderivative()(X)
 
     @arc.compile
     def traced(c):
-        return Function(c, space).integral()(X)
+        return Function(c, space).antiderivative()(X)
 
     np.testing.assert_allclose(
         np.asarray(traced(u.coefficients)).ravel(), expected, atol=1e-9
@@ -336,7 +338,7 @@ def test_piecewise_function_integral_raises():
     with pytest.raises(
         NotImplementedError, match="running constant carried across elements"
     ):
-        space.project(f_).integral()
+        space.project(f_).antiderivative()
 
 
 # -- FourierBasis: only "sine" has an integral basis, and only at order=1 --
@@ -377,7 +379,7 @@ def test_fourier_sine_integral_dc_coefficient_is_generically_nonzero():
     # cos(k*theta(boundary)) = (-1)**k != 0 for every mode.
     space = FunctionSpace(FourierBasis(3, kind="sine"), domain=FOURIER_DOMAIN)
     u = space.project(lambda x: np.sin(np.pi * x))
-    antideriv = u.integral()
+    antideriv = u.antiderivative()
     assert abs(antideriv.coefficients[0]) > 1e-6
 
 
@@ -389,7 +391,7 @@ def test_fourier_sine_integral_matches_analytic_antiderivative(boundary):
     # at its own endpoint, not because the results are expected to differ.
     space = FunctionSpace(FourierBasis(3, kind="sine"), domain=FOURIER_DOMAIN)
     u = space.project(lambda x: np.sin(np.pi * x))
-    antideriv = u.integral(boundary=boundary)
+    antideriv = u.antiderivative(boundary=boundary)
     assert antideriv.space.basis.kind == "cosine"
 
     def expected(x):
@@ -403,11 +405,11 @@ def test_fourier_sine_integral_matches_analytic_antiderivative(boundary):
 def test_fourier_sine_integral_traces():
     space = FunctionSpace(FourierBasis(3, kind="sine"), domain=FOURIER_DOMAIN)
     u = space.project(lambda x: np.sin(np.pi * x))
-    expected = u.integral()(XF)
+    expected = u.antiderivative()(XF)
 
     @arc.compile
     def traced(c):
-        return Function(c, space).integral()(XF)
+        return Function(c, space).antiderivative()(XF)
 
     np.testing.assert_allclose(
         np.asarray(traced(u.coefficients)).ravel(), expected, atol=1e-9
@@ -418,14 +420,14 @@ def test_unbounded_domain_rejected_for_integral():
     space = FunctionSpace.hermite(6)
     u = space.project(lambda x: np.exp(-(x**2)))
     with pytest.raises(ValueError, match="finite endpoints"):
-        u.integral()
+        u.antiderivative()
 
 
 def test_unbounded_domain_rejected_for_laguerre_too():
     space = FunctionSpace.laguerre(6)
     u = space.project(lambda x: np.exp(-x))
     with pytest.raises(ValueError, match="finite endpoints"):
-        u.integral()
+        u.antiderivative()
 
 
 def test_order_zero_is_exempt_from_the_finite_domain_requirement():
@@ -433,7 +435,7 @@ def test_order_zero_is_exempt_from_the_finite_domain_requirement():
     # a space with no finite endpoint to anchor at.
     space = FunctionSpace.hermite(6)
     u = space.project(lambda x: np.exp(-(x**2)))
-    np.testing.assert_allclose(u.integral(order=0)(X[:1]), u(X[:1]), atol=1e-10)
+    np.testing.assert_allclose(u.antiderivative(order=0)(X[:1]), u(X[:1]), atol=1e-10)
 
 
 # -- integrate() --
@@ -450,7 +452,7 @@ def test_integrate_matches_integral_at_the_right_endpoint(space):
     # Since the default boundary is "left", antideriv(A) == 0 exactly, so the
     # whole-domain integral is just antideriv(B).
     u = space.project(f_)
-    antideriv = u.integral()
+    antideriv = u.antiderivative()
     np.testing.assert_allclose(u.integrate(), antideriv(np.array([B]))[0], atol=1e-10)
 
 
@@ -495,7 +497,7 @@ def test_piecewise_sub_interval_integrate_raises():
 
 
 def test_unbounded_domain_rejected_for_integrate_even_whole_domain():
-    # `.integral()` raises ValueError here, not NotImplementedError, so
+    # `.antiderivative()` raises ValueError here, not NotImplementedError, so
     # `integrate()`'s fallback (which only catches NotImplementedError)
     # does not swallow it -- there is no well-defined fallback anyway, since
     # an unweighted integral over an unbounded domain need not converge.

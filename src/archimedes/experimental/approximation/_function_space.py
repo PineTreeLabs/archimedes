@@ -181,8 +181,8 @@ class FunctionSpace:
     This is a ``@struct`` rather than a plain dataclass so that ``domain``
     is a pytree leaf: the domain parameters can be symbolically traced,
     and so optimized over (moving the endpoints of an element, say) jointly
-    with a ``Function``'s coefficients. ``basis`` and ``quad_rule`` are
-    static -- they carry structure, not numbers.
+    with a ``Function``'s coefficients. ``basis`` and the resolved
+    quadrature rule are static -- they carry structure, not numbers.
 
     Parameters
     ----------
@@ -195,17 +195,18 @@ class FunctionSpace:
         interval, ``RealLine.Parameters(loc=..., scale=...)`` for a
         Hermite-derived one). A pytree leaf, so it may be traced.
     quad_rule : QuadratureRule, optional
-        The space's natural quadrature rule, used unconditionally wherever
-        the required accuracy is fully determined by ``basis`` (its own
-        differentiation matrix, say, backing ``Function.derivative``), and
-        as the default for ``project`` (which accepts an explicit override,
-        since the right accuracy for a given target function isn't knowable
-        from the space alone). Static.
+        The space's natural quadrature rule, **on the basis's reference
+        domain**. Used unconditionally wherever the required accuracy is
+        fully determined by ``basis``, and as the default for ``project``.
 
         Defaults to ``basis.default_quadrature()``, which is exact for
-        those integrands by construction. An explicit rule is checked for
-        compatibility with the basis and rejected if it cannot integrate it
-        exactly -- see ``Basis.required_breakpoints``.
+        those integrands by construction.
+
+        .. warning::
+            Once constructed, ``quad_rule`` is not meant to be read back
+            directly: it stays on the basis's *reference* domain, not
+            ``domain``. Call :meth:`quadrature` to get nodes/weights mapped
+            onto this space's actual ``domain``.
     """
 
     basis: Basis = tree.field(static=True)
@@ -932,10 +933,9 @@ class FunctionSpace:
         return self.basis.evaluate(x, deriv=deriv, **self._domain_kwargs())
 
     def _resolve_rule(self, quad_rule: Quadrature | None = None) -> Quadrature:
-        """The rule to use for this call: an explicit override, used
-        exactly as given (no further domain mapping -- see
-        :attr:`quad_rule`'s docstring), or the space's own default rule
-        mapped onto ``self.domain`` via ``QuadratureRule.map_to``."""
+        """The rule to use for this call: an explicit override, used exactly as given,
+        or the space's own reference-domain ``quad_rule`` mapped onto ``self.domain``.
+        """
         if quad_rule is not None:
             return quad_rule
         return self.quad_rule.map_to(**self._domain_kwargs())
@@ -964,7 +964,7 @@ class FunctionSpace:
         Parameters
         ----------
         quad_rule : QuadratureRule, optional
-            Quadrature rule to use instead of ``self.quad_rule``.
+            Quadrature rule to use instead of this space's own default.
 
         Returns
         -------
@@ -1004,7 +1004,7 @@ class FunctionSpace:
             Derivative order; a multi-index for a :class:`TensorBasis`, a
             plain order otherwise. Default 0.
         quad_rule : QuadratureRule, optional
-            Quadrature rule to use instead of ``self.quad_rule``.
+            Quadrature rule to use instead of this space's own default.
 
         Returns
         -------
@@ -1058,18 +1058,7 @@ class FunctionSpace:
     ):
         r"""Inner product :math:`\langle f, g \rangle = \int f(x) \, g(x)
         \, w(x) \, dx` for ``f``, ``g`` in this space with coefficients
-        ``c1``, ``c2``, approximated via ``quad_rule`` (default
-        ``self.quad_rule``).
-
-        Unlike a product of two ``Function`` objects (deliberately unsupported
-        -- see :class:`Function`), an inner product returns a scalar rather
-        than another element of the space, so there's no aliasing/closure
-        question to resolve: it's computed by evaluating both functions at
-        the quadrature nodes and integrating the pointwise product, which
-        is exact whenever ``quad_rule`` is accurate enough for that
-        product -- equivalently ``c1 @ phi.T @ phi @ c2`` for the
-        basis matrix ``phi`` (see :meth:`basis_matrix`), but computed
-        directly without forming that full ``(n_basis, n_basis)`` matrix.
+        ``c1``, ``c2``.
 
         For vector-valued coefficients (shape ``(n_basis, m)``) the
         integrand is contracted over components, :math:`\langle f, g
@@ -1101,7 +1090,7 @@ class FunctionSpace:
         (trial) space's basis matrix ``Phi`` and ``test_space``'s basis
         matrix ``Psi`` (see :meth:`basis_matrix`), ``M = Psi.T @ Phi`` is
         the Gram matrix and ``b = Psi.T @ f(x)`` is the load vector -- both
-        approximated via ``quad_rule`` (default ``self.quad_rule``).
+        approximated via ``quad_rule`` (default this space's own quadrature).
         ``quad_rule`` must be accurate enough for the product of ``f`` and
         both bases, which is generally a higher-order requirement than
         exactness for either basis alone; pass an explicit ``quad_rule`` to
@@ -1131,7 +1120,7 @@ class FunctionSpace:
             array from the quadrature rule. Must return an array of shape
             ``(npts,)`` (scalar-valued) or ``(npts, m)`` (vector-valued).
         quad_rule : QuadratureRule, optional
-            Quadrature rule to use instead of ``self.quad_rule``.
+            Quadrature rule to use instead of this space's own default.
         test_space : FunctionSpace, optional
             Test space for a Petrov-Galerkin projection. Default this
             (trial) space, giving standard Galerkin projection.

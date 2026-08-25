@@ -167,7 +167,7 @@ def test_integral_basis_rejects_negative_order():
         MonomialBasis(3)._integral_basis(-1)
 
 
-# -- round-trip through Function.derivative()/.integral() --
+# -- round-trip through Function.derivative()/.antiderivative() --
 
 
 def test_function_derivative_and_integral_round_trip():
@@ -188,7 +188,7 @@ def test_function_derivative_and_integral_round_trip():
     du = u.derivative()
     np.testing.assert_allclose(du(x), df(x), atol=1e-6)
 
-    di = du.integral()
+    di = du.antiderivative()
     # Integration pins the antiderivative to vanish at the left endpoint,
     # so it recovers df up to the constant f(a) that differentiation lost.
     np.testing.assert_allclose(di(x), f(x) - f(-2.0), atol=1e-6)

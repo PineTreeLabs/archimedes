@@ -41,10 +41,10 @@ With different definitions of the basis, this can encompass a fairly wide variet
 
 <!-- TODO: Callout on other function approximation: RBF, GPR, DNN -->
 
-The design of the function approximation system in Archimedes is heavily influenced by other standout packages, most notably [chebfun](TODO) and FEniCS/Firedrake's [Unified Form Language](TODO) but also [shenfun](TODO) and [ApproxFun.jl](TODO).
+The design of the function approximation system in Archimedes is heavily influenced by other standout packages, most notably [chebfun](https://www.chebfun.org/) and FEniCS/Firedrake's [Unified Form Language](https://docs.fenicsproject.org/ufl/main/manual.html) but also [shenfun](https://shenfun.readthedocs.io/en/latest/) and [ApproxFun.jl](https://juliaapproximation.github.io/ApproxFun.jl/latest/).
 What these have in common is that the "function" is a first-class citizen, freeing you to think about what you are modeling instead of bookkeeping nodes, weights, local-to-global maps, and assembly.
 
-**So why write a new function approximation module?** Fair question, and Archimedes doesn't claim to beat any of these on their home turf - chebfun and ApproxFun.jl for adaptive, machine-precision work, shenfun for large-scale pseudospectral CFD, and FEniCS/Firedrake for serious FEM work.
+**So why write a new function approximation module?** Archimedes doesn't claim to beat any of these on their home turf: chebfun and ApproxFun.jl for adaptive, machine-precision work, shenfun for large-scale pseudospectral CFD, and FEniCS/Firedrake for serious FEM work.
 
 What's new here is _composition_ with the other Archimedes capabilities:
 * Write a pseudospectral trajectory optimization code using a [hierarchical dynamics model](../tutorials/hierarchical/hierarchical00.md) and solve the NLP using sparse autodiff
@@ -191,13 +191,13 @@ There are four key abstractions:
 - [`BasisMatrix`](#archimedes.experimental.approximation.BasisMatrix): the generalized Vandermonde matrix $\boldsymbol{\Phi}$ associated with the basis and quadrature rule
 - [`Function`](#archimedes.experimental.approximation.Function): A coefficient vector for a particular element of a function space, defining a (piecewise) continuous function in terms of a basis expansion.
 
-These are summarized in the following table
+The four key classes are summarized in the following table:
 
 | Math concept    | Math notation | Code equivalent | Code convention |
 | --------------- | --------------| --------------- | --------------- |
 | Basis functions | $\{ \phi_i(x) \}_{i=1}^n$ | `Basis` | `phi` |
 | Function space  | $\operatorname{span}\{\phi_1, \dots, \phi_n\}$ | `FunctionSpace` | `V` |
-| Generalized Vandermonde matrix | $\Phi_{ij} = \phi_j(x_i)$ | `BasisMatrix` | `Phi` |
+| Generalized Vandermonde matrix | $\boldsymbol{\Phi}_{ij} = \phi_j(x_i)$ | `BasisMatrix` | `Phi` |
 | Function | $f(x) = \sum_{i=1}^n c_i \phi_i(x)$ | `Function` | `f` |
 
 ### Math to Code
@@ -227,7 +227,7 @@ These are commonly used in PDE discretizations (e.g. spectral or finite element 
 | Galerkin projection | $\min_\mathbf{c} \lVert \hat{f} - f \rVert_\mathcal{V}^2$ | `space.project(f)` |
 | Petrov-Galerkin projection | $\langle \psi_j, \hat{f} - f \rangle_\mathcal{W} = 0, ~ \psi_j \in \mathcal{W}$ | `space.project(f, test_space=Psi)` |
 | Differentiation | $f'(x) = \sum_i c_i \phi_i'(x)$ | `f.derivative()` |
-| Antiderivative | $F(x) = \int_a^x f(t) \, dt$ | `f.integral()` |
+| Antiderivative | $F(x) = \int_a^x f(t) \, dt$ | `f.antiderivative()` |
 | Definite integral | $\int_a^b f(x) \, dx$ | `f.integrate()` |
 
 ### Basis Families
@@ -276,8 +276,8 @@ a, b, = -1, 1  # Domain bounds
 # Basic orthogonal polynomial basis on [-1, 1]
 legendre = FunctionSpace.legendre(n, a, b)
 
-x_plt = np.linspace(a, b, 100)
-x = legendre.quad_rule.nodes
+x_plt = np.linspace(a, b, 500)
+x, _w = legendre.quadrature()
 
 fig, ax = plt.subplots(1, 1, figsize=(7, 3))
 for i in range(n):
@@ -285,7 +285,7 @@ for i in range(n):
     e_i = np.eye(n)[:, i]
     f_i = legendre.function(e_i)
     ax.plot(x_plt, f_i(x_plt), label=rf"$\phi_{i}(x)$")
-    ax.plot(x, f_i(x), ".", color=ax[0].lines[-1].get_color())
+    ax.plot(x, f_i(x), ".", color=ax.lines[-1].get_color())
 
 
 ax.grid()
@@ -306,7 +306,7 @@ for theme in {"light", "dark"}:
         e_i = np.eye(n)[:, i]
         f_i = legendre.function(e_i)
         ax.plot(x_plt, f_i(x_plt), label=rf"$\phi_{i}(x)$")
-        ax.plot(x, f_i(x), ".", color=ax[0].lines[-1].get_color())
+        ax.plot(x, f_i(x), ".", color=ax.lines[-1].get_color())
 
 
     ax.grid()
@@ -334,7 +334,7 @@ We can use a similar approach to construct a global Lagrange basis.
 Note that here the basis uses the same nodes as its quadrature rule (Legendre for both), so we can clearly see the defining Lagrange property that the $i$-th basis function takes the value 1 at node $x_i$ and 0 at all other nodes.
 
 ```{code-cell} python
-:tags: [remove-output]
+:tags: [hide-cell, remove-output]
 # Construct a Lagrange basis using Legendre nodes
 # and quadrature rule using a single-element "piecewise"
 # space
@@ -345,14 +345,14 @@ lagrange = FunctionSpace.piecewise(
     nodes="legendre",
     continuity=-1,
 )
-x = lagrange.quad_rule.nodes
+x, _w = lagrange.quadrature()
 
 fig, ax = plt.subplots(1, 1, figsize=(7, 3))
 for i in range(n):
     e_i = np.eye(n)[:, i]
     f_i = lagrange.function(e_i)
     ax.plot(x_plt, f_i(x_plt), label=rf"$\phi_{i}(x)$")
-    ax.plot(x, f_i(x), ".", color=ax[1].lines[-1].get_color())
+    ax.plot(x, f_i(x), ".", color=ax.lines[-1].get_color())
 
 
 ax.grid()
@@ -373,7 +373,7 @@ for theme in {"light", "dark"}:
         e_i = np.eye(n)[:, i]
         f_i = lagrange.function(e_i)
         ax.plot(x_plt, f_i(x_plt), label=rf"$\phi_{i}(x)$")
-        ax.plot(x, f_i(x), ".", color=ax[0].lines[-1].get_color())
+        ax.plot(x, f_i(x), ".", color=ax.lines[-1].get_color())
 
 
     ax.grid()
@@ -396,73 +396,36 @@ for theme in {"light", "dark"}:
 ```
 
 We can also use the `piecewise` constructor to tile the Lagrange basis.
-The standard finite element basis uses Lobatto nodes per element (one node at each basis endpoint), but a Legendre quadrature rule, so now the quadrature nodes are _not_ the same as the Lagrange nodes.
+The standard finite element basis (CG1, also known as P1) uses Lobatto nodes per element (one node at each basis endpoint), but a Legendre quadrature rule, so now the quadrature nodes are _not_ the same as the Lagrange nodes.
 Hence, the basis functions are the classical finite element "hat" functions that take on 1 at the element boundaries, but the quadrature nodes are not co-located with the boundaries:
 
-
 ```{code-cell} python
-:tags: [remove-output]
-
-# Basic orthogonal polynomial basis on [-1, 1]
-legendre = FunctionSpace.legendre(n, a, b)
-
-# Construct a Lagrange basis using Legendre nodes
-# and quadrature rule using a single-element "piecewise"
-# space
-lagrange = FunctionSpace.piecewise(
-    "lagrange",
-    degree=n - 1,
-    breakpoints=(a, b),
-    nodes="legendre",
-    continuity=-1,
-)
+:tags: [hide-cell, remove-output]
 
 # Construct a classical P1 finite element basis
 breakpoints = np.linspace(a, b, n, endpoint=True)
-piecewise = FunctionSpace.piecewise(
+V = FunctionSpace.piecewise(
     "lagrange",
     degree=1,
     breakpoints=breakpoints,
-    nodes="lobatto",
 )
+x, _w = V.quadrature()
 
-x_plt = np.linspace(a, b, 100)
-
-fig, ax = plt.subplots(3, 1, figsize=(7, 6), sharex=True)
+fig, ax = plt.subplots(1, 1, figsize=(7, 3))
 for i in range(n):
-    # The i-th basis function is the i-th column of the identity matrix
     e_i = np.eye(n)[:, i]
-
-    # Legendre basis
-    x = legendre.quad_rule.nodes
-    f_i = legendre.function(e_i)
-    ax[0].plot(x_plt, f_i(x_plt), label=rf"$\phi_{i}(x)$")
-    ax[0].plot(x, f_i(x), ".", color=ax[0].lines[-1].get_color())
-
-    # Lagrange basis
-    x = lagrange.quad_rule.nodes
-    f_i = lagrange.function(e_i)
-    ax[1].plot(x_plt, f_i(x_plt), label=rf"$\phi_{i}(x)$")
-    ax[1].plot(x, f_i(x), ".", color=ax[1].lines[-1].get_color())
-
     # Piecewise basis
-    x = piecewise.quad_rule.nodes
-    f_i = piecewise.function(e_i)
-    ax[2].plot(x_plt, f_i(x_plt), label=rf"$\phi_{i}(x)$")
-    ax[2].plot(x, f_i(x), ".", color=ax[2].lines[-1].get_color())
+    x, _w = V.quadrature()
+    f_i = V.function(e_i)
+    ax.plot(x_plt, f_i(x_plt), label=rf"$\phi_{i}(x)$")
+    ax.plot(x, f_i(x), ".", color=ax.lines[-1].get_color())
 
 
-ax[0].grid()
-ax[0].set_ylabel("Legendre")
-ax[0].legend(loc="upper right")
-
-ax[1].grid()
-ax[1].set_ylabel("Lagrange")
-
-ax[2].grid()
-ax[2].set_ylabel("Piecewise Lagrange (P1)")
-
-ax[-1].set_xlabel("$x$")
+ax.grid()
+ax.set_ylabel(r"$\phi_i(x)$")
+ax.set_title("CG1 Lagrange Basis")
+ax.legend(loc="upper right")
+ax.set_xlabel("$x$")
 plt.show()
 ```
 
@@ -471,51 +434,235 @@ plt.show()
 
 for theme in {"light", "dark"}:
     arc.set_theme(theme)
-    fig, ax = plt.subplots(3, 1, figsize=(7, 6), sharex=True)
+    fig, ax = plt.subplots(1, 1, figsize=(7, 3))
     for i in range(n):
-        # The i-th basis function is the i-th column of the identity matrix
         e_i = np.eye(n)[:, i]
-
-        # Legendre basis
-        x = legendre.quad_rule.nodes
-        f_i = legendre.function(e_i)
-        ax[0].plot(x_plt, f_i(x_plt), label=rf"$\phi_{i}(x)$")
-        ax[0].plot(x, f_i(x), ".", color=ax[0].lines[-1].get_color())
-
-        # Lagrange basis
-        x = lagrange.quad_rule.nodes
-        f_i = lagrange.function(e_i)
-        ax[1].plot(x_plt, f_i(x_plt), label=rf"$\phi_{i}(x)$")
-        ax[1].plot(x, f_i(x), ".", color=ax[1].lines[-1].get_color())
-
-        # Piecewise basis
-        x = piecewise.quad_rule.nodes
-        f_i = piecewise.function(e_i)
-        ax[2].plot(x_plt, f_i(x_plt), label=rf"$\phi_{i}(x)$")
-        ax[2].plot(x, f_i(x), ".", color=ax[2].lines[-1].get_color())
+        f_i = V.function(e_i)
+        ax.plot(x_plt, f_i(x_plt), label=rf"$\phi_{i}(x)$")
+        ax.plot(x, f_i(x), ".", color=ax.lines[-1].get_color())
 
 
-    ax[0].grid()
-    ax[0].set_ylabel("Legendre")
-    ax[0].legend(loc="upper right")
+    ax.grid()
+    ax.set_ylabel(r"$\phi_i(x)$")
+    ax.set_title("CG1 Lagrange Basis")
+    ax.legend(loc="upper right")
+    ax.set_xlabel("$x$")
 
-    ax[1].grid()
-    ax[1].set_ylabel("Lagrange")
-
-    ax[2].grid()
-    ax[2].set_ylabel("Piecewise Lagrange (P1)")
-
-    ax[-1].set_xlabel("$x$")
-
-    plt.savefig(plot_dir / f"approximation_0_{theme}.png")
+    plt.savefig(plot_dir / f"approximation_2_{theme}.png")
     plt.close()
 ```
 
 
-```{image} _plots/approximation_0_light.png
+```{image} _plots/approximation_2_light.png
 :class: only-light
 ```
 
-```{image} _plots/approximation_0_dark.png
+```{image} _plots/approximation_2_dark.png
 :class: only-dark
 ```
+
+The discontinuous equivalent of the same Lagrange basis (DG1) can be constructed by simply switching to `continuity=-1`:
+
+```{code-cell} python
+:tags: [hide-cell, remove-output]
+
+# Construct a DG1 finite element basis
+breakpoints = np.linspace(a, b, n, endpoint=True)
+V = FunctionSpace.piecewise(
+    "lagrange",
+    degree=1,
+    breakpoints=breakpoints,
+    continuity=-1,
+)
+x, _w = V.quadrature()
+
+fig, ax = plt.subplots(1, 1, figsize=(7, 3))
+for i in range(V.n_basis):
+    e_i = np.eye(V.n_basis)[:, i]
+    x, _w = V.quadrature()
+    f_i = V.function(e_i)
+    ax.plot(x_plt, f_i(x_plt), label=rf"$\phi_{i}(x)$")
+    ax.plot(x, f_i(x), ".", color=ax.lines[-1].get_color())
+
+
+ax.grid()
+ax.set_ylabel(r"$\phi_i(x)$")
+ax.set_title("DG1 Lagrange Basis")
+ax.legend(loc="upper right")
+ax.set_xlabel("$x$")
+plt.show()
+```
+
+```{code-cell} python
+:tags: [remove-cell]
+
+for theme in {"light", "dark"}:
+    arc.set_theme(theme)
+    fig, ax = plt.subplots(1, 1, figsize=(7, 3))
+    for i in range(V.n_basis):
+        e_i = np.eye(V.n_basis)[:, i]
+        f_i = V.function(e_i)
+        ax.plot(x_plt, f_i(x_plt), label=rf"$\phi_{i}(x)$")
+        ax.plot(x, f_i(x), ".", color=ax.lines[-1].get_color())
+
+
+    ax.grid()
+    ax.set_ylabel(r"$\phi_i(x)$")
+    ax.set_title("DG1 Lagrange Basis")
+    ax.legend(loc="upper right")
+    ax.set_xlabel("$x$")
+
+    plt.savefig(plot_dir / f"approximation_3_{theme}.png")
+    plt.close()
+```
+
+
+```{image} _plots/approximation_3_light.png
+:class: only-light
+```
+
+```{image} _plots/approximation_3_dark.png
+:class: only-dark
+```
+
+One last example: a piecewise cubic Hermite basis can also be created with the `piecewise` constructor, and has roughly twice as many basis functions to handle the slope degrees of freedom at element interfaces:
+
+
+```{code-cell} python
+:tags: [hide-cell, remove-output]
+breakpoints = np.linspace(a, b, n, endpoint=True)
+V = FunctionSpace.piecewise(
+    "hermite",
+    degree=3,
+    breakpoints=breakpoints,
+    continuity=1,
+)
+x = V.quad_rule.nodes
+n_basis = V.n_basis
+
+fig, ax = plt.subplots(1, 1, figsize=(7, 3))
+for i in range(V.n_basis):
+    e_i = np.eye(V.n_basis)[:, i]
+    f_i = V.function(e_i)
+    ax.plot(x_plt, f_i(x_plt), label=rf"$\phi_{{{i}}}(x)$")
+    ax.plot(x, f_i(x), ".", color=ax.lines[-1].get_color())
+
+
+ax.grid()
+ax.set_ylabel(r"$\phi_i(x)$")
+ax.set_title("Cubic Hermite Basis")
+ax.legend(loc="upper right")
+ax.set_xlabel("$x$")
+plt.show()
+```
+
+```{code-cell} python
+:tags: [remove-cell]
+
+for theme in {"light", "dark"}:
+    arc.set_theme(theme)
+    fig, ax = plt.subplots(1, 1, figsize=(7, 3))
+    for i in range(V.n_basis):
+        e_i = np.eye(V.n_basis)[:, i]
+        f_i = V.function(e_i)
+        ax.plot(x_plt, f_i(x_plt), label=rf"$\phi_{i}(x)$")
+        ax.plot(x, f_i(x), ".", color=ax.lines[-1].get_color())
+
+
+    ax.grid()
+    ax.set_ylabel(r"$\phi_i(x)$")
+    ax.set_title("Cubic Hermite Basis")
+    ax.legend(loc="upper right")
+    ax.set_xlabel("$x$")
+
+    plt.savefig(plot_dir / f"approximation_4_{theme}.png")
+    plt.close()
+```
+
+
+```{image} _plots/approximation_4_light.png
+:class: only-light
+```
+
+```{image} _plots/approximation_4_dark.png
+:class: only-dark
+```
+
+### Working with a `Function`
+
+As the [basis family](#basis-families) code snippets show, you typically don't need to work with the `Basis` class directly unless you're constructing a relatively unusual basis.
+Instead, the `FunctionSpace` constructors (e.g. `FunctionSpace.legendre`) will automatically create the `Basis` for a given domain along with an exact Gaussian quadrature rule.
+
+The same is true of the `Function` class; a `Function` is typically created using one of two methods on `FunctionSpace`:
+
+1. `function_space.function(coefficients=None)`: directly initializes a `Function` with known coefficients, defaulting to all zeros if `coefficients` isn't passed.
+2. `function_space.project(f, quad_rule=None, test_space=None)`: solve the L2 projection problem for the callable `f(x)` to establish the coefficients, then return the `Function` with those coefficients.
+
+
+For example, to approximate the function $e^{-x} \sin \pi x$ using the 4th-order Legendre basis from earlier:
+
+```{code-cell} python
+def f(x):
+    return np.exp(-x) * np.sin(np.pi * x)
+
+
+f_approx = legendre.project(f)
+```
+
+```{code-cell} python
+:tags: [hide-cell, remove-output]
+x, _w = legendre.quadrature()
+
+fig, ax = plt.subplots(1, 1, figsize=(7, 3))
+ax.plot(x_plt, f(x_plt), label="Exact", lw=2)
+ax.plot(x_plt, f_approx(x_plt), '--', label="Approximation", lw=2)
+ax.plot(x, f_approx(x), '.', label="Quadrature Nodes", color=ax.lines[-1].get_color())
+ax.grid()
+ax.legend(loc="lower right")
+ax.set_xlabel("$x$")
+ax.set_ylabel("$f(x)$")
+plt.show()
+```
+
+```{code-cell} python
+:tags: [remove-cell]
+
+for theme in {"light", "dark"}:
+    arc.set_theme(theme)
+    fig, ax = plt.subplots(1, 1, figsize=(7, 3))
+    ax.plot(x_plt, f(x_plt), label="Exact", lw=2)
+    ax.plot(x_plt, f_approx(x_plt), '--', label="Approximation", lw=2)
+    ax.plot(x, f_approx(x), '.', label="Quadrature Nodes", color=ax.lines[-1].get_color())
+    ax.grid()
+    ax.legend(loc="lower right")
+    ax.set_xlabel("$x$")
+    ax.set_ylabel("$f(x)$")
+
+    plt.savefig(plot_dir / f"approximation_5_{theme}.png")
+    plt.close()
+```
+
+```{image} _plots/approximation_5_light.png
+:class: only-light
+```
+
+```{image} _plots/approximation_5_dark.png
+:class: only-dark
+```
+
+Once we've created `f_approx` we can use any of the methods from the [`Function` Operations](#function-operations) table:
+
+```{code-cell} python
+# Derivative, returned as another Function
+df_approx = f_approx.derivative()
+print(type(df_approx))
+
+# Compute the definite integral, returning a value
+print(f_approx.integrate(0.0, 0.5))
+
+# Compute the anti-derivative (indefinite integral), returning a Function
+f_reapprox = df_approx.antiderivative()
+```
+
+Note the difference between `integrate` and `antiderivative`.
+The former returns a *value* (definite integral)

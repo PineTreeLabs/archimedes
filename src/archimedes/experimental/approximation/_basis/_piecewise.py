@@ -346,7 +346,7 @@ class PiecewiseBasis(Basis):
             f"carried across elements to stay continuous, not just a "
             f"larger per-element basis, and that construction isn't "
             f"implemented. Project onto a global (non-piecewise) space "
-            f"first if you need an exact `.integral()`."
+            f"first if you need an exact `.antiderivative()`."
         )
 
     def _build_assembly(self) -> np.ndarray:

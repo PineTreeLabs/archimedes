@@ -434,7 +434,7 @@ def test_integral_round_trip():
     u = space.project(f)
     a = knots[degree]
     x = _sample_points(basis, extrapolate=False)
-    antideriv = u.integral()
+    antideriv = u.antiderivative()
     np.testing.assert_allclose(antideriv(x), f_antideriv(x) - f_antideriv(a), atol=1e-6)
 
 

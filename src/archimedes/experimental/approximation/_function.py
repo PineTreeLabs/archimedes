@@ -173,7 +173,7 @@ class Function:
             self.space._diff_matrix(deriv, space=target) @ self.coefficients, target
         )
 
-    def integral(
+    def antiderivative(
         self,
         order: int = 1,
         boundary: str = "left",
@@ -194,8 +194,9 @@ class Function:
             - ``"right"`` gives :math:`F(x) = \int_b^x f(t)\,dt = -\int_x^b f(t)\,dt`,
                 so :math:`F(b) = 0`
 
-        The two differ by the whole-domain definite integral:
-        ``f.integral(boundary="right") == f.integral(boundary="left") - total``
+        The two differ by the whole-domain definite integral: with
+        ``boundary="right"``, ``f.antiderivative()`` is ``total`` less than
+        it is with ``boundary="left"``.
 
         Parameters
         ----------
@@ -233,11 +234,11 @@ class Function:
     def integrate(self, a: float | None = None, b: float | None = None):
         r"""Definite integral :math:`\int_a^b f(x)\,dx`.
 
-        Wherever :meth:`integral` is defined for this space, this is built directly
-        on it: :math:`F(b) - F(a)`, exact to quadrature roundoff, for *any* ``a``,
-        ``b`` within the domain.
+        Wherever :meth:`antiderivative` is defined for this space, this is built
+        directly on it: :math:`F(b) - F(a)`, exact to quadrature roundoff, for
+        *any* ``a``, ``b`` within the domain.
 
-        Where :meth:`integral` isn't defined the *whole-domain* integral
+        Where :meth:`antiderivative` isn't defined the *whole-domain* integral
         (``a=None, b=None``) is still available, computed directly from this space's
         own quadrature rule.
 
@@ -263,7 +264,7 @@ class Function:
             (Hermite, Laguerre).
         """
         try:
-            antideriv = self.integral()
+            antideriv = self.antiderivative()
         except NotImplementedError:
             if a is not None or b is not None:
                 raise
@@ -288,7 +289,7 @@ class Function:
             The other operand, on the same space as this function.
         quad_rule : QuadratureRule, optional
             Quadrature rule to approximate the integral with. Default
-            ``self.space.quad_rule``.
+            this space's own quadrature.
 
         Returns
         -------
