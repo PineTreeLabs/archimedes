@@ -29,11 +29,15 @@ class Function:
         f(x) = \sum_{i=1}^n c_i \, \phi_i(x)
 
     Only evaluation and the operations that are exact and stay in the same
-    space are supported: addition and scalar multiplication with another
-    ``Function`` on the same ``space``. A general product of two
-    ``Function`` objects is not directly supported (see :meth:`multiply`),
-    since the product of two finite basis expansions isn't generally
-    representable in the same finite space.
+    space are supported: addition, subtraction, and scalar multiplication
+    or division with another ``Function`` on the same ``space``. Combining
+    ``Function`` objects on different spaces raises rather than silently
+    projecting one onto the other -- see :meth:`FunctionSpace.project` to do
+    that explicitly. A general product of two ``Function`` objects is not
+    directly supported (see :meth:`multiply`), since the product of two
+    finite basis expansions isn't generally representable in the same
+    finite space; nor is dividing by one, since the quotient of two basis
+    expansions is generally not a finite expansion at all.
 
     Parameters
     ----------
@@ -83,8 +87,24 @@ class Function:
 
     def __add__(self, other: Function) -> Function:
         if not self.space._is_compatible_with(other.space):
-            raise ValueError("Can only add Functions defined on the same FunctionSpace")
+            raise ValueError(
+                "Can only add Functions defined on the same FunctionSpace; "
+                "project one onto the other's space first, e.g. "
+                "self + self.space.project(other)"
+            )
         return Function(self.coefficients + other.coefficients, self.space)
+
+    def __sub__(self, other: Function) -> Function:
+        if not self.space._is_compatible_with(other.space):
+            raise ValueError(
+                "Can only subtract Functions defined on the same FunctionSpace; "
+                "project one onto the other's space first, e.g. "
+                "self - self.space.project(other)"
+            )
+        return Function(self.coefficients - other.coefficients, self.space)
+
+    def __neg__(self) -> Function:
+        return Function(-self.coefficients, self.space)
 
     def __mul__(self, other) -> Function:
         """Scalar multiple, or the pointwise product of two ``Function`` objects.
@@ -95,6 +115,18 @@ class Function:
         if isinstance(other, Function):
             return self.multiply(other)
         return Function(other * self.coefficients, self.space)
+
+    def __truediv__(self, other) -> Function:
+        """Scalar division; see :meth:`__mul__`."""
+        if isinstance(other, Function):
+            raise ValueError(
+                "Cannot divide by a Function: the quotient of two basis "
+                "expansions is generally not a finite expansion at all, so "
+                "there is no space to return it in. Approximate it "
+                "explicitly instead, e.g. "
+                "self.space.project(lambda x: self(x) / other(x))"
+            )
+        return self * (1 / other)
 
     __rmul__ = __mul__
 
@@ -300,7 +332,9 @@ class Function:
         """
         if not self.space._is_compatible_with(other.space):
             raise ValueError(
-                "Can only take the inner product of Functions on the same FunctionSpace"
+                "Can only take the inner product of Functions on the same "
+                "FunctionSpace; project one onto the other's space first, "
+                "e.g. self.dot(self.space.project(other))"
             )
         return self.space._inner_product(
             self.coefficients, other.coefficients, quad_rule

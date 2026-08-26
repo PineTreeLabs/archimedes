@@ -655,14 +655,46 @@ Once we've created `f_approx` we can use any of the methods from the [`Function`
 ```{code-cell} python
 # Derivative, returned as another Function
 df_approx = f_approx.derivative()
-print(type(df_approx))
+print(df_approx(-1.0))
 
 # Compute the definite integral, returning a value
 print(f_approx.integrate(0.0, 0.5))
 
 # Compute the anti-derivative (indefinite integral), returning a Function
 f_reapprox = df_approx.antiderivative()
+print(f_reapprox(-1.0))
 ```
 
 Note the difference between `integrate` and `antiderivative`.
-The former returns a *value* (definite integral)
+The former returns a *value* (definite integral), while the latter returns a *`Function`* (antiderivative, or indefinite integral).
+
+The `derivative` method by default returns a `Function` in the *minimal* function space needed to exactly represent the derivative. For a first derivative, that's usually one fewer basis function. 
+
+```{code-cell} python
+print("n_basis:")
+print(f"\tOriginal space:   {f_approx.space.n_basis}")
+
+df_approx = f_approx.derivative()
+print(f"\tDerivative space: {df_approx.space.n_basis}")
+```
+
+So by default, the derivative lives in a different space than the original function and the two can't be directly used together:
+
+```{code-cell} python
+try:
+    g_approx = f_approx + df_approx
+except ValueError as e:
+    print(e)
+```
+
+There are two ways around this: either specify the target space on derivative calculation (typically better), or use L2 projection to lift the derivative back to the original space:
+
+```{code-cell} python
+# 1. Target space for derivative
+df_approx_1 = f_approx.derivative(space=legendre)
+print(f_approx.dot(df_approx_1))
+
+# 2. L2 projection back to the original space
+df_approx_2 = legendre.project(df_approx)
+print(f_approx.dot(df_approx_2))
+```

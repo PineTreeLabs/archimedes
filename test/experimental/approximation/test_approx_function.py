@@ -50,7 +50,7 @@ def test_add_structurally_mismatched_space_raises(quadratic, quad_rule):
         quad_rule=quad_rule,
     )
     other = other_space.project(lambda x: x**2)
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="project one onto the other's space"):
         quadratic + other
 
 
@@ -71,11 +71,50 @@ def test_add_numerically_mismatched_domain_is_not_caught(quadratic, quad_rule):
     )
 
 
+def test_subtract_same_space(quadratic):
+    zeroed = quadratic - quadratic
+    np.testing.assert_allclose(zeroed.coefficients, 0.0, atol=1e-12)
+    cubic = quadratic.space.project(lambda x: x**3)
+    diff = cubic - quadratic
+    x = np.linspace(-1, 1, 9)
+    np.testing.assert_allclose(diff(x), x**3 - x**2, atol=1e-10)
+
+
+def test_subtract_structurally_mismatched_space_raises(quadratic, quad_rule):
+    other_space = FunctionSpace(
+        OrthogonalPolynomialBasis(LegendreMeasure(), n_basis=4),
+        domain=UnitInterval.Parameters(a=-1.0, b=1.0),
+        quad_rule=quad_rule,
+    )
+    other = other_space.project(lambda x: x**2)
+    with pytest.raises(ValueError, match="project one onto the other's space"):
+        quadratic - other
+
+
+def test_negation(quadratic):
+    negated = -quadratic
+    np.testing.assert_allclose(negated.coefficients, -quadratic.coefficients)
+    x = np.linspace(-1, 1, 9)
+    np.testing.assert_allclose(negated(x), -(x**2), atol=1e-10)
+
+
 def test_scalar_multiplication(quadratic):
     scaled = 3.0 * quadratic
     np.testing.assert_allclose(scaled.coefficients, 3.0 * quadratic.coefficients)
     rscaled = quadratic * 3.0
     np.testing.assert_allclose(rscaled.coefficients, scaled.coefficients)
+
+
+def test_scalar_division(quadratic):
+    halved = quadratic / 2.0
+    np.testing.assert_allclose(halved.coefficients, quadratic.coefficients / 2.0)
+    x = np.linspace(-1, 1, 9)
+    np.testing.assert_allclose(halved(x), x**2 / 2.0, atol=1e-10)
+
+
+def test_division_by_function_raises(quadratic):
+    with pytest.raises(ValueError, match="Cannot divide by a Function"):
+        quadratic / quadratic
 
 
 def test_is_struct_pytree(quadratic):
@@ -187,5 +226,5 @@ def test_dot_structurally_mismatched_space_raises(quadratic, quad_rule):
         quad_rule=quad_rule,
     )
     other = other_space.project(lambda x: x**2)
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="project one onto the other's space"):
         quadratic.dot(other)
