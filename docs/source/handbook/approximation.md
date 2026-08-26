@@ -52,7 +52,14 @@ What's new here is _composition_ with the other Archimedes capabilities:
 * Approximate continuum mechanics degrees of freedom with a basis expansion, then form the Lagrangian and derive equations of motion using autodiff
 * Optimize under uncertainty using a differentiable polynomial chaos expansion to model random variables without Monte Carlo
 
-None of these requires working with inflexible pre-rolled APIs that don't *quite* do what you want; the system is designed to be composable building blocks in the vein of NumPy/SciPy, giving you the freedom to do whatever you want in the spirit of Archimedes' "Made for Hackers" philosophy.
+None of these requires working with inflexible pre-rolled APIs that don't *quite* do what you want; the system is intended to be composable building blocks in the vein of NumPy/SciPy, giving you the freedom to do whatever you want in the spirit of Archimedes' "Made for Hackers" philosophy.
+
+This page doesn't demo any of these itself, but instead provides an introduction to the concepts, abstractions, and interfaces in the module.
+We'll start with an overview of the continuous math to establish notation and terminology, then get into the details of the `approximation` module.
+
+__See also:__
+
+- [Quadrature](quadrature.md) for the Gaussian quadrature module that underpins inner products in `approximation`
 
 ## Function Approximation in Brief
 
@@ -207,7 +214,8 @@ The operations in [From Continuous to Discrete](#from-continuous-to-discrete) ma
 #### Assembly Primitives
 
 `BasisMatrix.T` is defined as the adjoint under the *weighted* inner product, not a plain transpose.
-This avoids the need to manually track quadrature weights $W$ so that for instance `M = Phi.T @ Phi`, computed as $\Phi^\top W \Phi$, and `b = Phi.T @ f(x)`.
+This avoids the need to manually track quadrature weights $W$ in code.
+So for instance `M = Phi.T @ Phi` actually computes $\Phi^\top W \Phi$, and `b = Phi.T @ f(x)` computes $\Phi^\top W f(x)$.
 
 | Math concept | Math notation | Code |
 | --- | --- | --- |
@@ -598,6 +606,7 @@ The same is true of the `Function` class; a `Function` is typically created usin
 1. `function_space.function(coefficients=None)`: directly initializes a `Function` with known coefficients, defaulting to all zeros if `coefficients` isn't passed.
 2. `function_space.project(f, quad_rule=None, test_space=None)`: solve the L2 projection problem for the callable `f(x)` to establish the coefficients, then return the `Function` with those coefficients.
 
+#### L2 projection
 
 For example, to approximate the function $e^{-x} \sin \pi x$ using the 4th-order Legendre basis from earlier:
 
@@ -665,10 +674,45 @@ f_reapprox = df_approx.antiderivative()
 print(f_reapprox(-1.0))
 ```
 
+#### Integrals and antiderivatives
+
 Note the difference between `integrate` and `antiderivative`.
 The former returns a *value* (definite integral), while the latter returns a *`Function`* (antiderivative, or indefinite integral).
 
-The `derivative` method by default returns a `Function` in the *minimal* function space needed to exactly represent the derivative. For a first derivative, that's usually one fewer basis function. 
+The antiderivative needs to choose a point to start integration from to set the constant of integration.
+This is specified with the keyword arg `boundary` and defaults to `"left"`; on an $(a, b)$ interval:
+
+```{math}
+F(x) = \int_a^x f(t) ~ dt
+```
+
+The other possibility is `boundary="right"`, which gives:
+
+```{math}
+F(x) = \int_b^x f(t) ~ dt = -\int_x^b f(t) ~ dt
+```
+
+Note the sign convention here, which is chosen to satisfy the fundamental theorem of calculus with either `boundary` choice:
+
+```{code-cell} python
+for boundary in ("left", "right"):
+    F = f_approx.antiderivative(boundary=boundary)
+    dF = F.derivative()
+    print(f"{boundary} FTOC err: {(dF - f_approx).integrate()}")
+```
+
+Although this is numerically exact for the statement that $F'(x) = f(x)$, the other direction (differentiate first, then integrate) is _not_ exact:
+
+```{code-cell} python
+# The leading coefficient (a constant in the Legendre basis) is nonzero
+print(df_approx.antiderivative().coefficients - f_approx.coefficients)
+```
+
+The reason for this is that even though the underlying $f(x)$ has $f(a) = 0$ in this case, the L2 projection does not.  But differentiating the basis expansion and then integrating with `boundary="left"` _forces_ $f(a) = 0$ rather than choosing the constant to minimize L2 error.
+
+#### Derivative spaces
+
+Note that the `derivative` method by default returns a `Function` in the *minimal* function space needed to exactly represent the derivative. For a first derivative, that's usually one fewer basis function. 
 
 ```{code-cell} python
 print("n_basis:")

@@ -275,7 +275,7 @@ There are two abstractions that keep track of the weight function, reference dom
 The first is [`Measure`](#archimedes.measure.Measure), which combines a weight function with a reference interval to define families of orthogonal polynomials.
 The second is [`QuadratureRule`](#archimedes.quadrature.QuadratureRule), which stores the nodes, weights, and associated `Measure`, and which is responsible for domain transformations and performing the weighted sum.
 
-## See Also
+__See also:__
 
 - [Approximation](approximation.md) for the higher-level function approximation system that relies on quadrature for inner products
 
