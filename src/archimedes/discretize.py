@@ -214,11 +214,11 @@ def discretize(func=None, dt=None, method="rk4", n_steps=1, name=None, **options
     method : str, optional
         Numerical integration method. Default is ``"rk4"``. Available methods:
 
-        - ``"rk4"``: Fourth-order Runge-Kutta method. Explicit, O(h⁴) accuracy.
+        - ``"rk4"``: Fourth-order Runge-Kutta method [1]_. Explicit, O(h⁴) accuracy.
           Excellent balance of accuracy and computational efficiency for most
           systems. Recommended for well-behaved, non-stiff dynamics.
 
-        - ``"radau5"``: Fifth-order Radau IIA implicit method. Implicit,
+        - ``"radau5"``: Fifth-order Radau IIA implicit method [2]_. Implicit,
           A-stable with excellent stability properties. Suitable for stiff
           systems and when high accuracy is required. Involves solving
           nonlinear equations at each step using Newton's method.

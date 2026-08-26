@@ -141,7 +141,7 @@ for theme in {"light", "dark"}:
 :class: only-dark
 ```
 
-Internally, the integrand evaluation is vectorized; Archimedes-traceable pure functions constructed with NumPy should generally be fine (see [Gotchas](../../gotchas.md) for more details).
+Internally, the integrand evaluation is vectorized; Archimedes-traceable pure functions constructed with NumPy should generally be fine (see [Gotchas](../gotchas.md) for more details).
 
 Note that unlike [`scipy.integrate.quad`](https://docs.scipy.org/doc/scipy/reference/generated/scipy.integrate.quad.html), this high-level `quadint` function does not support adaptive integration with an error tolerance, nor does it support infinite or semi-infinite intervals.
 It is possible to define integrals over infinite or semi-infinite domains using weighted quadrature rules like [`gauss_laguerre`](#archimedes.quadrature.gauss_laguerre) or [`gauss_hermite`](#archimedes.quadrature.gauss_hermite), but not through `quadint` specifically.
@@ -150,7 +150,7 @@ It is possible to define integrals over infinite or semi-infinite domains using 
 
 NumPy and SciPy already implement the numerical building blocks for Gaussian-style quadrature, and SciPy's [`scipy.integrate.quad`](https://docs.scipy.org/doc/scipy/reference/generated/scipy.integrate.quad.html) and relatives is a good choice for evaluating a single integral.
 
-However, for integrals that need to be evaluated inside of simulation or optimization loops, or for any applications that need to support [codegen](../../tutorials/codegen/codegen00.md), Archimedes takes advantage of a fundamental split in the quadrature construction.
+However, for integrals that need to be evaluated inside of simulation or optimization loops, or for any applications that need to support [codegen](../tutorials/codegen/codegen00.md), Archimedes takes advantage of a fundamental split in the quadrature construction.
 Specifically, on a fixed reference domain (e.g. $[-1, 1]$ for Legendre-based rules), **the Gaussian quadrature nodes and weights are static, precomputable data, while the integrand data is symbolic.**
 In fact, internally Archimedes reuses SciPy implementations of node/weight calculations wherever possible.
 
@@ -159,7 +159,7 @@ Domains other than the reference domain can be used with an affine transformatio
 This makes it possible for quadrature integrals to compose with the rest of the Archimedes infrastructure, including autodiff, codegen, and hierarchical data structures.
 
 This "traced summation" model precludes adaptive quadrature, because adaptive rules need variable-length vectors for the nodes and weights, which are not supported in Archimedes/CasADi.
-You could construct a maximum-order-limited adaptive scheme by precomputing nodes and weights for all `n < n_max` and using [control flow primitives](../../control-flow.md), but this isn't implemented out of the box since it's not a common use case.
+You could construct a maximum-order-limited adaptive scheme by precomputing nodes and weights for all `n < n_max` and using [control flow primitives](../control-flow.md), but this isn't implemented out of the box since it's not a common use case.
 
 However, Archimedes quadrature does support symbolic evaluation (including limits):
 
@@ -440,6 +440,7 @@ Like Gauss-Lobatto, the Clenshaw-Curtis nodes *include* the endpoints, but there
 
 If these aren't relevant for your application, in general Gauss-Lobatto is preferable for its accuracy.
 
+(composite-rules)=
 ### Composite Rules
 
 Quadrature rules with uniform weight $w(x) \equiv 1$ can be "tiled" into a _composite_ rule.
@@ -613,6 +614,7 @@ for theme in ("light", "dark"):
 :class: only-dark
 ```
 
+(appendix-quadrature-and-orthogonal-polynomials)=
 ## Appendix: Quadrature and Orthogonal Polynomials
 
 The weight functions, reference domains, and node distributions can seem to be somewhat obscure at first.
@@ -769,6 +771,7 @@ For Gauss-Radau with an endpoint at $x = a$ and original weight $w(x) = 1$, the 
 
 That is, the nodes must be placed at the roots of the polynomials that are orthogonal with respect to this inner product with weight $(x - a)$.
 
+(custom-rules)=
 ### Custom Rules
 
 <!-- TODO: discretized Stieljes & Golub-Welsch extension -->

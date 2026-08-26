@@ -71,7 +71,10 @@ autodoc_preserve_defaults = True
 # autodoc_typehints = "description"  # or "signature", "both", "none"
 
 templates_path = ["_templates"]
-exclude_patterns = []
+exclude_patterns = [
+    "blog/_drafts/*",  # Unpublished draft posts
+    "blog/template.md",  # Scaffold for new posts, not a real page
+]
 
 googleanalytics_id = "G-DMLVH3TEDW"
 

@@ -35,5 +35,4 @@ This series assumes only that you are familiar with the basics of Archimedes (fo
 :maxdepth: 1
 hierarchical01
 hierarchical02
-   
 ```

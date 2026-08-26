@@ -409,13 +409,16 @@ def quaternion_kinematics(
     If the rotation represents the attitude of a body B relative to a
     frame A, then w should be the body relative angular velocity, i.e. ω_B.
 
-    The derivative is computed using quaternion kinematics:
+    The derivative is computed using quaternion kinematics::
+
         dq/dt = 0.5 * q ⊗ [0, ω]
+
     where ⊗ is the quaternion multiplication operator.
 
     The method optionally support Baumgarte stabilization to preserve
     unit normalization.  For a stabilization factor λ, the full
-    time derivative is:
+    time derivative is::
+
         dq/dt = 0.5 * q ⊗ [0, ω] - λ * (||q||² - 1) * q
 
     Parameters

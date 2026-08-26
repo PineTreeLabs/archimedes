@@ -19,18 +19,18 @@
 ## Examples:
 
 1. ~~Polynomial chaos expansion - Hohmann maneuver~~
-2. Gray-box system ID: nonlinear friction?
+2. ~~Gray-box system ID: nonlinear friction?~~
 3. Spectral/pseudospectral PDE solves (+ method of lines) - scalar PDEs (convection-diffusion, KdV, similar)
 4. 1D FEM - nonlinear Poisson, Euler-Bernoulli, Timoshenko beam (shear locking), fluid flow?
 5. Boundary value problems - Blasius
 6. ~~Eigenvalue problem - Sturm-Liouville with custom basis~~
 7. Trajectory optimization (pseudospectral/Hermite-Simpson) - block push problem, Cart-Pole swingup
-8. Lagrangian continuum mechanics - elastic pendulum
 
 ## Challenge/motivating problems
 
 1. Fluid flow w/ spectral/pseudospectral methods: Taylor-Couette & Rayleigh-Benard + weakly nonlinear analysis, chaotic thermosiphon (+ Lorenz phase-space plots)
 2. Cosserat rods (PyElastica), rope/tether problems
 3. Multistage trajectory optimization and/or low-thrust orbit transfer (see old examples/trajopt notebooks)
-4. Aeroelasticity: FEM wing model + Theodorsen-type aero (or state-space approximations)
-5. Inverted flag model (coupled FSI - research problem)
+4. Lagrangian continuum mechanics - elastic pendulum
+5. Aeroelasticity: FEM wing model + Theodorsen-type aero (or state-space approximations)
+6. Inverted flag model (coupled FSI - research problem)

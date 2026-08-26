@@ -132,6 +132,7 @@ This is known as _Petrov-Galerkin projection_, and the condition is that for any
 \langle \psi_j, \hat{f} - f \rangle_\mathcal{W} = 0.
 ```
 
+(from-continuous-to-discrete)=
 ### From Continuous to Discrete
 
 The inner product is thus a key calculation when working with basis expansions because of its role in finding an L2 projection of an arbitrary function.
@@ -189,14 +190,14 @@ which are exactly the normal equations for a weighted least-squares projection.
 
 ## The `approximation` Module
 
-The design of the [`approximation`](#archimedes.experimental.approximation) module follows directly from the theory above.
+The design of the `approximation` module follows directly from the theory above.
 
 There are four key abstractions:
 
-- [`Basis`](#archimedes.experimental.approximation.Basis): the definition of the $\phi(x)$ functions
-- [`FunctionSpace`](#archimedes.experimental.approximation.FunctionSpace): combination of a basis with a domain and associated quadrature rule, together implying an inner product
-- [`BasisMatrix`](#archimedes.experimental.approximation.BasisMatrix): the generalized Vandermonde matrix $\boldsymbol{\Phi}$ associated with the basis and quadrature rule
-- [`Function`](#archimedes.experimental.approximation.Function): A coefficient vector for a particular element of a function space, defining a (piecewise) continuous function in terms of a basis expansion.
+- `Basis`: the definition of the $\phi(x)$ functions
+- `FunctionSpace`: combination of a basis with a domain and associated quadrature rule, together implying an inner product
+- `BasisMatrix`: the generalized Vandermonde matrix $\boldsymbol{\Phi}$ associated with the basis and quadrature rule
+- `Function`: A coefficient vector for a particular element of a function space, defining a (piecewise) continuous function in terms of a basis expansion.
 
 The four key classes are summarized in the following table:
 
@@ -227,6 +228,7 @@ So for instance `M = Phi.T @ Phi` actually computes $\Phi^\top W \Phi$, and `b =
 
 These are commonly used in PDE discretizations (e.g. spectral or finite element methods), but many function approximation applications don't require directly using these matrix-level operations at all:
 
+(function-operations)=
 #### `Function` Operations
 
 | Math concept | Math notation | Code |
@@ -238,6 +240,7 @@ These are commonly used in PDE discretizations (e.g. spectral or finite element 
 | Antiderivative | $F(x) = \int_a^x f(t) \, dt$ | `f.antiderivative()` |
 | Definite integral | $\int_a^b f(x) \, dx$ | `f.integrate()` |
 
+(basis-families)=
 ### Basis Families
 
 All of the math and code abstractions above work for any finite-dimensional basis $\{\phi_i\}_{i=1}^n$.
