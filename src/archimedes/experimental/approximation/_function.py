@@ -55,7 +55,12 @@ class Function:
     -----
     Since ``FunctionSpace`` is also a ``@struct``, a ``Function`` can be
     symbolically traced, flattened, and used in optimization problems like
-    any other pytree.
+    any other pytree. However, note that ``FunctionSpace`` contains the
+    domain endpoints as pytree data to allow keeping the endpoints in the
+    decision variable vector for free-endpoint problems. So a flattened
+    ``Function`` contains both the coefficients and the domain endpoints by
+    default. Fixed problems should either just pass the coefficient vector
+    or create a small wrapper ``@struct`` class with the coefficient data.
     """
 
     coefficients: np.ndarray

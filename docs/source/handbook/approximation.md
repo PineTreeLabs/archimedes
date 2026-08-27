@@ -243,6 +243,8 @@ These are commonly used in PDE discretizations (e.g. spectral or finite element 
 (basis-families)=
 ### Basis Families
 
+<!-- TODO: Add ConcatBasis, TensorBasis -->
+
 All of the math and code abstractions above work for any finite-dimensional basis $\{\phi_i\}_{i=1}^n$.
 The main choice in function approximation is choosing an appropriate basis for the problem.
 
@@ -745,3 +747,5 @@ print(f_approx.dot(df_approx_1))
 df_approx_2 = legendre.project(df_approx)
 print(f_approx.dot(df_approx_2))
 ```
+
+<!-- TODO: Add a section on optimization, covering the endpoints-as-DVs issue -->
