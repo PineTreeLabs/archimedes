@@ -22,9 +22,9 @@
 2. ~~Gray-box system ID: nonlinear friction?~~
 3. Spectral/pseudospectral PDE solves (+ method of lines) - scalar PDEs (convection-diffusion, KdV, similar)
 4. ~~1D FEM - nonlinear Poisson, Euler-Bernoulli, Timoshenko beam (shear locking)~~
-5. Boundary value problems - Blasius
+5. (**) Boundary value problems - Blasius
 6. ~~Eigenvalue problem - Sturm-Liouville with custom basis~~
-7. Trajectory optimization (pseudospectral/Hermite-Simpson) - block push problem, Cart-Pole swingup
+7. (**) Trajectory optimization (pseudospectral/Hermite-Simpson) - block push problem, Cart-Pole swingup
 
 ## Challenge/motivating problems
 

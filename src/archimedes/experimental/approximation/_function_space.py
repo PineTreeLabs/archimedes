@@ -34,6 +34,7 @@ from ._basis import (
     ProductParameters,
     TensorBasis,
 )
+from ._basis._utils import _reference_breakpoints
 
 if TYPE_CHECKING:
     from ._function import Function
@@ -48,7 +49,10 @@ def _normalize_breakpoints(breakpoints) -> tuple[float, float, np.ndarray]:
 
     ``a``/``b`` are read directly from the array's own endpoints -- the
     caller never states them separately, so there is no second coordinate
-    system to keep in sync by hand.
+    system to keep in sync by hand. Validates ``breakpoints`` itself, then
+    defers the affine map (and its endpoint pinning) to
+    ``_reference_breakpoints``, shared with
+    :attr:`BSplineBasis.required_breakpoints`.
     """
     bp = np.asarray(breakpoints, dtype=float)
     if bp.ndim != 1 or len(bp) < 2:
@@ -58,14 +62,7 @@ def _normalize_breakpoints(breakpoints) -> tuple[float, float, np.ndarray]:
     if np.any(np.diff(bp) <= 0):
         raise ValueError("breakpoints must be strictly increasing")
 
-    a, b = float(bp[0]), float(bp[-1])
-    scale, shift = UnitInterval().affine_params(a, b)
-    ref = (bp - shift) / scale
-    # Pin the endpoints exactly: PiecewiseBasis checks `bp[0] != -1.0` by
-    # equality, not tolerance, and the affine round-trip is not guaranteed
-    # to land there in floating point.
-    ref[0], ref[-1] = -1.0, 1.0
-    return a, b, ref
+    return _reference_breakpoints(bp)
 
 
 _NODE_FAMILIES = {

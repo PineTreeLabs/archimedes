@@ -17,6 +17,7 @@ from ._quadrature_rule import (
     QuadratureRule,
     composite_quad,
 )
+from ._simpson import simpson
 from ._tensor import TensorQuadratureRule, tensor_quad
 from ._trapezoidal import trapezoidal
 
@@ -35,6 +36,7 @@ __all__ = [
     "golub_welsch",
     "golub_welsch_rule",
     "composite_quad",
+    "simpson",
     "tensor_quad",
     "quadint",
     "trapezoidal",

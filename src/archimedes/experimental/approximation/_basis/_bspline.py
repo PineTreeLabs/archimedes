@@ -20,7 +20,7 @@ from archimedes._core._array_impl import SymbolicArray
 from archimedes.measure import UnitInterval
 
 from ._base import RIGHT, Basis, _check_side
-from ._utils import _gather, _locate
+from ._utils import _gather, _locate, _reference_breakpoints
 
 __all__ = ["BSplineBasis"]
 
@@ -121,15 +121,9 @@ class BSplineBasis(Basis):
     @property
     def required_breakpoints(self) -> np.ndarray:
         """Distinct interior knots, on the reference domain ``[-1, 1]``"""
-        a, b = self.knots[self.degree], self.knots[len(self.knots) - 1 - self.degree]
-        scale, shift = UnitInterval().affine_params(a, b)
         interior = self.knots[self.degree : len(self.knots) - self.degree]
         distinct = np.unique(interior)
-        ref = (distinct - shift) / scale
-        # Pin the endpoints exactly, as `_normalize_breakpoints` does for
-        # `PiecewiseBasis`: `composite_quad` checks them by equality, and
-        # the affine round-trip is not guaranteed to land there in float.
-        ref[0], ref[-1] = -1.0, 1.0
+        _, _, ref = _reference_breakpoints(distinct)
         return ref
 
     def default_quadrature(self):
@@ -142,7 +136,7 @@ class BSplineBasis(Basis):
     def boundary_dofs(self, order: int = 0) -> tuple[int | None, int | None]:
         """Indices of the degrees of freedom that *are* the ``order``-th
         derivative at the left and right ends of the domain.
-        
+
         Returns ``(0, n_basis - 1)`` when ``knots`` is clamped (multiplicity
         ``degree + 1`` at both ends, so the first/last coefficients *are*
         the endpoint values); ``(None, None)`` otherwise, since an interior
@@ -161,7 +155,7 @@ class BSplineBasis(Basis):
 
     def _derivative_basis(self, deriv: int = 1) -> "BSplineBasis":
         """Derivative of the B-spline basis.
-        
+
         Uses the fact that differentiating a B-spline lowers its degree
         by one and removes one knot from each end.
         """
@@ -182,7 +176,7 @@ class BSplineBasis(Basis):
 
     def _integral_basis(self, order: int = 1) -> "BSplineBasis":
         """Anti-derivative of the B-spline basis
-        
+
         Degree ``degree + order`` on the knot vector with each end knot
         duplicated ``order`` more times. Interior knots (and so interior
         continuity) are untouched, since integrating raises smoothness by

@@ -1,7 +1,8 @@
 """Shared symbolic-safe indexing helpers for knot/breakpoint-based families.
 
-Utilities for locating which interval of a nondecreasing array owns a point
-and gathering rows by a (possibly symbolic) integer index.
+Utilities for locating which interval of a nondecreasing array owns a point,
+gathering rows by a (possibly symbolic) integer index, and mapping a
+physical-domain breakpoint partition onto the reference domain.
 """
 
 from __future__ import annotations
@@ -10,10 +11,41 @@ import casadi as cs
 import numpy as np
 
 from archimedes._core._array_impl import SymbolicArray, _unwrap_sym_array
+from archimedes.measure import UnitInterval
 
 from ._base import RIGHT, _check_side
 
-__all__ = ["_as_mx", "_gather", "_locate"]
+__all__ = ["_as_mx", "_gather", "_locate", "_reference_breakpoints"]
+
+
+def _reference_breakpoints(breakpoints) -> tuple[float, float, np.ndarray]:
+    """Physical-domain ``breakpoints`` (spanning ``[a, b] =
+    (breakpoints[0], breakpoints[-1])``) to ``(a, b, ref)``, ``ref`` being
+    the same partition mapped onto the reference domain ``[-1, 1]`` via
+    :class:`~archimedes.measure.UnitInterval`'s affine map.
+
+    Shared by :func:`PiecewiseBasis`'s ``FunctionSpace.piecewise``
+    constructor (``_function_space._normalize_breakpoints``, which adds its
+    own shape/monotonicity validation on top) and
+    :attr:`BSplineBasis.required_breakpoints`, which independently needed
+    the identical affine-map-plus-pin recipe.
+
+    The two endpoints of ``ref`` are pinned exactly to :math:`\\pm 1.0`
+    rather than trusted to the affine round-trip: ``composite_quad`` (and
+    ``PiecewiseBasis``) check a rule's/basis's endpoints by exact equality
+    against :math:`\\pm 1.0`, which floating-point arithmetic is not
+    guaranteed to reproduce from an arbitrary ``a``, ``b``.
+
+    Callers are responsible for validating ``breakpoints`` themselves (1-D,
+    at least 2 entries, strictly increasing) -- this assumes a valid array
+    and only performs the affine map.
+    """
+    bp = np.asarray(breakpoints, dtype=float)
+    a, b = float(bp[0]), float(bp[-1])
+    scale, shift = UnitInterval().affine_params(a, b)
+    ref = (bp - shift) / scale
+    ref[0], ref[-1] = -1.0, 1.0
+    return a, b, ref
 
 
 def _as_mx(value):
