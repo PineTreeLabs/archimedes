@@ -417,7 +417,7 @@ def test_simpson_single_segment_matches_gauss_lobatto_3():
     # Simpson's rule *is* 3-point Gauss-Lobatto -- see
     # test_clenshaw_curtis_matches_simpsons_rule for the other classical
     # coincidence (Clenshaw-Curtis at n=3).
-    rule = simpson(1)
+    rule = simpson(1, -1.0, 1.0)
     lobatto = gauss_lobatto(3)
     np.testing.assert_allclose(rule.nodes, lobatto.nodes)
     np.testing.assert_allclose(rule.weights, lobatto.weights)
@@ -425,7 +425,7 @@ def test_simpson_single_segment_matches_gauss_lobatto_3():
 
 @pytest.mark.parametrize("n_segments", [1, 2, 3, 5])
 def test_simpson_properties(n_segments):
-    rule = simpson(n_segments)
+    rule = simpson(n_segments, -1.0, 1.0)
     assert len(rule) == 3 * n_segments
     assert rule.nodes[0] == -1.0
     assert rule.nodes[-1] == 1.0
@@ -433,7 +433,7 @@ def test_simpson_properties(n_segments):
 
 
 def test_simpson_exact_for_cubic():
-    rule = simpson(4)
+    rule = simpson(4, -1.0, 1.0)
     assert np.isclose(rule.integrate(lambda x: x**3 - 2 * x + 1), 2.0)
     # Not exact for a quartic
     assert not np.isclose(rule.integrate(lambda x: x**4), 2 / 5)
@@ -441,17 +441,17 @@ def test_simpson_exact_for_cubic():
 
 def test_simpson_a_b_matches_map_to():
     a, b = -2.0, 5.0
-    assert simpson(3, a=a, b=b) == simpson(3).map_to(a, b)
+    assert simpson(3, a, b) == simpson(3, -1.0, 1.0).map_to(a, b)
 
 
 def test_simpson_shares_legendre_measure():
-    rule = simpson(4)
+    rule = simpson(4, -1.0, 1.0)
     assert isinstance(rule.measure, LegendreMeasure)
 
 
 def test_simpson_invalid_n_segments():
     with pytest.raises(ValueError):
-        simpson(0)
+        simpson(0, -1.0, 1.0)
 
 
 def test_gauss_hermite():
