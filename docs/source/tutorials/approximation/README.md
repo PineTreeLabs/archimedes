@@ -1,3 +1,5 @@
+The notebooks in this directory are works in progress. Feel free to take a look, but they're unedited and light on exposition. These are the code-only bones of what's intended to become full-fledged tutorials and/or blog posts in the future.
+
 
 ## Basis implementations
 
