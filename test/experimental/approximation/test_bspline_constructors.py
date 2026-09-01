@@ -81,7 +81,7 @@ def test_bspline_quad_rule_passthrough_accepts_compatible_rule():
     basis = BSplineBasis(degree, knots)
     rule = composite_quad(gauss_legendre(5), basis.required_breakpoints)
     sugar = FunctionSpace.bspline(degree, knots, quad_rule=rule)
-    assert sugar.quad_rule is rule
+    assert sugar.reference_quad_rule is rule
 
 
 def test_bspline_quad_rule_passthrough_rejects_incompatible_rule():
@@ -161,7 +161,7 @@ def test_clamped_bspline_quad_rule_forwarded():
     basis = BSplineBasis(degree, knots)
     rule = composite_quad(gauss_legendre(5), basis.required_breakpoints)
     sugar = FunctionSpace.clamped_bspline(degree, breakpoints, quad_rule=rule)
-    assert sugar.quad_rule is rule
+    assert sugar.reference_quad_rule is rule
 
 
 def test_clamped_bspline_project_matches_manual_construction():

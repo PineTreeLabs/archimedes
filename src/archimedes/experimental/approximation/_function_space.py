@@ -149,7 +149,7 @@ def _orthogonal_space(
     type differ between them.
     """
     basis = OrthogonalPolynomialBasis(measure, n_basis, density=density)
-    return cls(basis, domain, quad_rule=quad_rule)
+    return cls(basis, domain, reference_quad_rule=quad_rule)
 
 
 def _is_superset(have: np.ndarray, required: np.ndarray, tol: float = 1e-12) -> bool:
@@ -191,24 +191,23 @@ class FunctionSpace:
         ``UnitInterval.Parameters(a=..., b=...)`` for a basis on an
         interval, ``RealLine.Parameters(loc=..., scale=...)`` for a
         Hermite-derived one). A pytree leaf, so it may be traced.
-    quad_rule : QuadratureRule, optional
-        The space's natural quadrature rule, **on the basis's reference
-        domain**. Used unconditionally wherever the required accuracy is
-        fully determined by ``basis``, and as the default for ``project``.
+    reference_quad_rule : Quadrature | None, optional
+        The space's natural quadrature rule, given **on the basis's
+        reference domain**. Used unconditionally wherever the required accuracy is fully
+        determined by ``basis``, and as the default for ``project``. Every
+        classmethod constructor (:meth:`legendre`, :meth:`piecewise`, ...)
+        exposes this same argument under the friendlier name ``quad_rule``.
 
         Defaults to ``basis.default_quadrature()``, which is exact for
         those integrands by construction.
 
-        .. warning::
-            Once constructed, ``quad_rule`` is not meant to be read back
-            directly: it stays on the basis's *reference* domain, not
-            ``domain``. Call :meth:`quadrature` to get nodes/weights mapped
-            onto this space's actual ``domain``.
+        Read back via the :attr:`quad_rule` *property* instead, which maps
+        this onto ``domain`` first.
     """
 
     basis: Basis = tree.field(static=True)
     domain: Any
-    quad_rule: Quadrature | None = tree.field(static=True, default=None)
+    reference_quad_rule: Quadrature | None = tree.field(static=True, default=None)
 
     def __post_init__(self):
         if not isinstance(self.domain, self.basis.Parameters):
@@ -217,10 +216,17 @@ class FunctionSpace:
                 f"instance for this basis, got {type(self.domain).__name__}"
             )
 
-        if self.quad_rule is None:
-            object.__setattr__(self, "quad_rule", self.basis.default_quadrature())
+        if self.reference_quad_rule is None:
+            object.__setattr__(
+                self, "reference_quad_rule", self.basis.default_quadrature()
+            )
         else:
-            self._validate_quad_rule(self.quad_rule)
+            self._validate_quad_rule(self.reference_quad_rule)
+
+    @property
+    def quad_rule(self) -> Quadrature:
+        """Quadrature rule mapped to the physical domain"""
+        return self.reference_quad_rule.map_to(**self._domain_kwargs())
 
     def _validate_quad_rule(self, rule: Quadrature) -> None:
         """Reject a rule that cannot integrate this basis correctly.
@@ -453,7 +459,9 @@ class FunctionSpace:
             :class:`FourierBasis`).
         """
         basis = FourierBasis(n_basis, kind=kind, density=density)
-        return cls(basis, UnitInterval.Parameters(a=a, b=b), quad_rule=quad_rule)
+        return cls(
+            basis, UnitInterval.Parameters(a=a, b=b), reference_quad_rule=quad_rule
+        )
 
     @classmethod
     def monomial(
@@ -480,7 +488,9 @@ class FunctionSpace:
             Forwarded to the underlying ``FunctionSpace`` constructor.
         """
         basis = MonomialBasis(n_basis)
-        return cls(basis, UnitInterval.Parameters(a=a, b=b), quad_rule=quad_rule)
+        return cls(
+            basis, UnitInterval.Parameters(a=a, b=b), reference_quad_rule=quad_rule
+        )
 
     @classmethod
     def laguerre(
@@ -587,7 +597,9 @@ class FunctionSpace:
 
         element_basis = _resolve_element_basis(kind, degree, nodes)
         basis = PiecewiseBasis(element_basis, ref_breakpoints, continuity=continuity)
-        return cls(basis, UnitInterval.Parameters(a=a, b=b), quad_rule=quad_rule)
+        return cls(
+            basis, UnitInterval.Parameters(a=a, b=b), reference_quad_rule=quad_rule
+        )
 
     @classmethod
     def bspline(
@@ -622,7 +634,9 @@ class FunctionSpace:
         basis = BSplineBasis(degree, knots)
         a = basis.knots[degree]
         b = basis.knots[len(basis.knots) - 1 - degree]
-        return cls(basis, UnitInterval.Parameters(a=a, b=b), quad_rule=quad_rule)
+        return cls(
+            basis, UnitInterval.Parameters(a=a, b=b), reference_quad_rule=quad_rule
+        )
 
     @classmethod
     def clamped_bspline(
@@ -702,7 +716,7 @@ class FunctionSpace:
                 )
         basis = TensorBasis(tuple(space.basis for space in spaces))
         domain = ProductParameters(dims=tuple(space.domain for space in spaces))
-        return cls(basis, domain, quad_rule=quad_rule)
+        return cls(basis, domain, reference_quad_rule=quad_rule)
 
     # --- implementation ---
 
@@ -731,7 +745,7 @@ class FunctionSpace:
         """
         return (
             self.basis == other.basis
-            and self.quad_rule == other.quad_rule
+            and self.reference_quad_rule == other.reference_quad_rule
             and tree.structure(self.domain) == tree.structure(other.domain)
         )
 
@@ -930,12 +944,12 @@ class FunctionSpace:
         return self.basis.evaluate(x, deriv=deriv, **self._domain_kwargs())
 
     def _resolve_rule(self, quad_rule: Quadrature | None = None) -> Quadrature:
-        """The rule to use for this call: an explicit override, used exactly as given,
-        or the space's own reference-domain ``quad_rule`` mapped onto ``self.domain``.
+        """The rule to use for this call: an explicit override, used exactly
+        as given, or this space's own (already-mapped) :attr:`quad_rule`.
         """
         if quad_rule is not None:
             return quad_rule
-        return self.quad_rule.map_to(**self._domain_kwargs())
+        return self.quad_rule
 
     def _check_quad_rule_size(self, rule: Quadrature) -> None:
         # phi is (npts, n_basis), so phi.T @ diag(w) @ phi has rank at most

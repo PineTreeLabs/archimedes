@@ -418,14 +418,14 @@ def test_gradient_through_domain_parameters():
 def test_rule_of_the_wrong_dimension_rejected():
     basis = TensorBasis((_modal(3), _modal(3)))
     with pytest.raises(ValueError, match="but the quadrature rule is 1-dimensional"):
-        FunctionSpace(basis, domain=BOX, quad_rule=gauss_legendre(4))
+        FunctionSpace(basis, domain=BOX, reference_quad_rule=gauss_legendre(4))
 
 
 def test_mismatched_weight_rejected_per_dimension():
     basis = TensorBasis((_modal(3), _modal(3)))
     rule = tensor_quad(gauss_legendre(4), gauss_hermite(4))
     with pytest.raises(ValueError, match="does not match the basis in dimension 1"):
-        FunctionSpace(basis, domain=BOX, quad_rule=rule)
+        FunctionSpace(basis, domain=BOX, reference_quad_rule=rule)
 
 
 def test_mismatched_weight_rejected_in_one_dimension():
@@ -434,7 +434,9 @@ def test_mismatched_weight_rejected_in_one_dimension():
     basis = _modal(3)
     with pytest.raises(ValueError, match="quadrature weight does not match"):
         FunctionSpace(
-            basis, domain=UnitInterval.Parameters(0.0, 1.0), quad_rule=gauss_hermite(4)
+            basis,
+            domain=UnitInterval.Parameters(0.0, 1.0),
+            reference_quad_rule=gauss_hermite(4),
         )
 
 
@@ -442,7 +444,9 @@ def test_weightless_basis_imposes_no_weight_constraint():
     # A nodal basis reports no measure, so any rule is structurally allowed.
     basis = TensorBasis((_nodal(3), _nodal(3)))
     space = FunctionSpace(
-        basis, domain=BOX, quad_rule=tensor_quad(gauss_legendre(5), gauss_legendre(5))
+        basis,
+        domain=BOX,
+        reference_quad_rule=tensor_quad(gauss_legendre(5), gauss_legendre(5)),
     )
     assert space.n_basis == 9
 
@@ -451,13 +455,13 @@ def test_misaligned_breakpoints_rejected_per_dimension():
     basis = TensorBasis((_piecewise(3), _modal(3)))
     rule = tensor_quad(gauss_legendre(6), gauss_legendre(4))
     with pytest.raises(ValueError, match="piecewise smooth in dimension 0"):
-        FunctionSpace(basis, domain=BOX, quad_rule=rule)
+        FunctionSpace(basis, domain=BOX, reference_quad_rule=rule)
 
 
 def test_aligned_composite_rule_accepted():
     basis = TensorBasis((_piecewise(3), _modal(3)))
     rule = tensor_quad(composite_quad(gauss_legendre(3), BREAKS), gauss_legendre(4))
-    space = FunctionSpace(basis, domain=BOX, quad_rule=rule)
+    space = FunctionSpace(basis, domain=BOX, reference_quad_rule=rule)
     np.testing.assert_allclose(
         space.project(lambda x: x[:, 0] * x[:, 1])(_grid()),
         _grid()[:, 0] * _grid()[:, 1],

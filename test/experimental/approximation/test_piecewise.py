@@ -362,7 +362,7 @@ class TestC1Continuity:
         space = FunctionSpace(
             basis,
             domain=UnitInterval.Parameters(a=a, b=b),
-            quad_rule=composite_quad(gauss_legendre(4), self.BP),
+            reference_quad_rule=composite_quad(gauss_legendre(4), self.BP),
         )
 
         def f(x):
@@ -480,7 +480,7 @@ def test_projection_of_elementwise_representable_function(local, breakpoints):
         basis,
         domain=UnitInterval.Parameters(a=a, b=b),
         # Composite rule so quadrature resolves the element structure.
-        quad_rule=composite_quad(gauss_legendre(4), breakpoints),
+        reference_quad_rule=composite_quad(gauss_legendre(4), breakpoints),
     )
 
     # Globally quadratic: degree <= 2 on each element and continuous, so it
@@ -498,7 +498,7 @@ def test_mass_matrix_is_nonsingular(local, breakpoints):
     space = FunctionSpace(
         basis,
         domain=UnitInterval.Parameters(a=0.0, b=3.0),
-        quad_rule=composite_quad(gauss_legendre(4), breakpoints),
+        reference_quad_rule=composite_quad(gauss_legendre(4), breakpoints),
     )
     M = mass_matrix(space)
     np.testing.assert_allclose(M, M.T, atol=1e-12)
@@ -513,7 +513,7 @@ def test_stiffness_matrix_annihilates_constants(local, breakpoints):
     space = FunctionSpace(
         basis,
         domain=UnitInterval.Parameters(a=0.0, b=3.0),
-        quad_rule=composite_quad(gauss_legendre(4), breakpoints),
+        reference_quad_rule=composite_quad(gauss_legendre(4), breakpoints),
     )
     K = stiffness_matrix(space)
     np.testing.assert_allclose(K, K.T, atol=1e-12)
@@ -589,7 +589,7 @@ class TestQuadratureCompatibility:
         exact = FunctionSpace(
             basis,
             domain=self.DOMAIN,
-            quad_rule=composite_quad(gauss_legendre(8), self.BP),
+            reference_quad_rule=composite_quad(gauss_legendre(8), self.BP),
         )
         np.testing.assert_allclose(mass_matrix(default), mass_matrix(exact), atol=1e-12)
 
@@ -604,7 +604,10 @@ class TestQuadratureCompatibility:
 
     def test_aligned_rule_accepted(self, basis):
         rule = composite_quad(gauss_legendre(4), self.BP)
-        assert FunctionSpace(basis, domain=self.DOMAIN, quad_rule=rule) is not None
+        assert (
+            FunctionSpace(basis, domain=self.DOMAIN, reference_quad_rule=rule)
+            is not None
+        )
 
     def test_refinement_accepted(self, basis):
         # A superset is fine: each sub-element still lies inside one element
@@ -612,24 +615,31 @@ class TestQuadratureCompatibility:
         midpoints = (self.BP[:-1] + self.BP[1:]) / 2
         refined = np.unique(np.concatenate([self.BP, midpoints]))
         rule = composite_quad(gauss_legendre(4), refined)
-        assert FunctionSpace(basis, domain=self.DOMAIN, quad_rule=rule) is not None
+        assert (
+            FunctionSpace(basis, domain=self.DOMAIN, reference_quad_rule=rule)
+            is not None
+        )
 
     def test_misaligned_composite_rejected(self, basis):
         # Same number of elements, different partition -- silently produced a
         # ~2.5% error in the mass matrix before this was checked.
         rule = composite_quad(gauss_legendre(4), np.linspace(-1.0, 1.0, 4))
         with pytest.raises(ValueError, match="must not straddle"):
-            FunctionSpace(basis, domain=self.DOMAIN, quad_rule=rule)
+            FunctionSpace(basis, domain=self.DOMAIN, reference_quad_rule=rule)
 
     def test_plain_rule_rejected_however_fine(self, basis):
         # Node count is beside the point: a 24-point global rule is still
         # wrong, while an aligned 12-point one is exact.
         with pytest.raises(ValueError, match="must not straddle"):
-            FunctionSpace(basis, domain=self.DOMAIN, quad_rule=gauss_legendre(24))
+            FunctionSpace(
+                basis, domain=self.DOMAIN, reference_quad_rule=gauss_legendre(24)
+            )
 
     def test_smooth_basis_accepts_any_rule(self, local):
         # required_breakpoints is None, so there is nothing to enforce.
-        space = FunctionSpace(local, domain=self.DOMAIN, quad_rule=gauss_legendre(7))
+        space = FunctionSpace(
+            local, domain=self.DOMAIN, reference_quad_rule=gauss_legendre(7)
+        )
         assert len(space.quad_rule) == 7
 
     @pytest.mark.parametrize("continuity", [-1, 0])
@@ -707,7 +717,7 @@ class TestPerElementOrder:
         exact = FunctionSpace(
             basis,
             domain=self.DOMAIN,
-            quad_rule=composite_quad(gauss_legendre(8), self.BP),
+            reference_quad_rule=composite_quad(gauss_legendre(8), self.BP),
         )
         np.testing.assert_allclose(mass_matrix(default), mass_matrix(exact), atol=1e-12)
 

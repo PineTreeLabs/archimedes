@@ -90,4 +90,4 @@ def test_laguerre_uses_half_line_domain():
 def test_quad_rule_forwarded():
     rule = gauss_legendre(10)
     sugar = FunctionSpace.legendre(5, quad_rule=rule)
-    assert sugar.quad_rule is rule
+    assert sugar.reference_quad_rule is rule

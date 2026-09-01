@@ -30,7 +30,7 @@ def space(quad_rule):
     return FunctionSpace(
         OrthogonalPolynomialBasis(LegendreMeasure(), n_basis=5),
         domain=UnitInterval.Parameters(a=-1.0, b=1.0),
-        quad_rule=quad_rule,
+        reference_quad_rule=quad_rule,
     )
 
 
@@ -41,11 +41,13 @@ def test_n_basis_forwarded(space):
 def test_domain_must_match_basis_parameters_type(quad_rule):
     basis = OrthogonalPolynomialBasis(LegendreMeasure(), n_basis=5)
     with pytest.raises(TypeError):
-        FunctionSpace(basis, domain=(-1.0, 1.0), quad_rule=quad_rule)
+        FunctionSpace(basis, domain=(-1.0, 1.0), reference_quad_rule=quad_rule)
     with pytest.raises(TypeError):
         # Wrong domain type -- RealLine's Parameters takes loc/scale, not
         # a/b, so it isn't a UnitInterval.Parameters.
-        FunctionSpace(basis, domain=RealLine.Parameters(), quad_rule=quad_rule)
+        FunctionSpace(
+            basis, domain=RealLine.Parameters(), reference_quad_rule=quad_rule
+        )
 
 
 def test_evaluate_matches_direct_basis_contraction(space):
@@ -75,7 +77,7 @@ def test_mass_matrix_is_identity_on_non_reference_domain(quad_rule):
     wide_space = FunctionSpace(
         OrthogonalPolynomialBasis(LegendreMeasure(), n_basis=4),
         domain=UnitInterval.Parameters(a=0.0, b=4.0),
-        quad_rule=quad_rule,
+        reference_quad_rule=quad_rule,
     )
     M = mass_matrix(wide_space)
     np.testing.assert_allclose(M, np.eye(4), atol=1e-10)
@@ -124,7 +126,7 @@ def test_project_on_non_reference_domain(quad_rule):
     space = FunctionSpace(
         OrthogonalPolynomialBasis(LegendreMeasure(), n_basis=5),
         domain=UnitInterval.Parameters(a=0.0, b=4.0),
-        quad_rule=quad_rule,
+        reference_quad_rule=quad_rule,
     )
 
     def f(x):
@@ -144,7 +146,7 @@ def test_diff_matrix_uses_mapped_rule_not_reference(quad_rule):
     wide_space = FunctionSpace(
         OrthogonalPolynomialBasis(LegendreMeasure(), n_basis=5),
         domain=UnitInterval.Parameters(a=0.0, b=4.0),
-        quad_rule=quad_rule,
+        reference_quad_rule=quad_rule,
     )
     fn = wide_space.project(lambda x: x**2)
     deriv = fn.derivative()
@@ -155,6 +157,53 @@ def test_diff_matrix_uses_mapped_rule_not_reference(quad_rule):
 def test_resolve_rule_default_maps_onto_domain(space, quad_rule):
     resolved = space._resolve_rule()
     np.testing.assert_allclose(resolved.nodes, quad_rule.map_to(a=-1.0, b=1.0).nodes)
+
+
+def test_quad_rule_property_is_mapped_not_reference(quad_rule):
+    # `reference_quad_rule` stays on the reference domain; the public
+    # `quad_rule` property is what a caller should read directly.
+    wide_space = FunctionSpace(
+        OrthogonalPolynomialBasis(LegendreMeasure(), n_basis=5),
+        domain=UnitInterval.Parameters(a=0.0, b=4.0),
+        reference_quad_rule=quad_rule,
+    )
+    assert not np.allclose(
+        wide_space.reference_quad_rule.nodes, wide_space.quad_rule.nodes
+    )
+    np.testing.assert_allclose(
+        wide_space.quad_rule.nodes, quad_rule.map_to(a=0.0, b=4.0).nodes
+    )
+    assert np.all(wide_space.quad_rule.nodes >= 0.0)
+    assert np.all(wide_space.quad_rule.nodes <= 4.0)
+
+
+def test_quad_rule_shared_across_spaces_lands_on_physical_nodes(quad_rule):
+    # Regression test: a coupled (mixed-field) assembly evaluates two
+    # *different* FunctionSpaces at one shared set of physical nodes, by
+    # passing one space's `quad_rule` as an explicit override to another's
+    # `basis_matrix()`. If `quad_rule` were still the reference-domain rule,
+    # this would silently assemble both fields at the wrong (reference, not
+    # physical) points whenever domain != [-1, 1] -- exactly the bug that
+    # `reference_quad_rule`/`quad_rule` (property) exists to prevent.
+    domain = UnitInterval.Parameters(a=2.0, b=6.0)
+    space_a = FunctionSpace(
+        OrthogonalPolynomialBasis(LegendreMeasure(), n_basis=5),
+        domain=domain,
+        reference_quad_rule=quad_rule,
+    )
+    space_b = FunctionSpace(
+        OrthogonalPolynomialBasis(LegendreMeasure(), n_basis=3),
+        domain=domain,
+        reference_quad_rule=quad_rule,
+    )
+
+    shared_quad = space_a.quad_rule
+    Phi_a = space_a.basis_matrix(quad_rule=shared_quad)
+    Phi_b = space_b.basis_matrix(quad_rule=shared_quad)
+
+    np.testing.assert_allclose(Phi_a.nodes, Phi_b.nodes)
+    assert np.all(Phi_a.nodes >= 2.0)
+    assert np.all(Phi_a.nodes <= 6.0)
 
 
 def test_project_with_test_space_equal_to_self_matches_default(space):
@@ -170,7 +219,7 @@ def test_project_rejects_test_space_with_different_n_basis(space, quad_rule):
     test_space = FunctionSpace(
         OrthogonalPolynomialBasis(LegendreMeasure(), n_basis=3),
         domain=UnitInterval.Parameters(a=-1.0, b=1.0),
-        quad_rule=quad_rule,
+        reference_quad_rule=quad_rule,
     )
     with pytest.raises(ValueError, match="n_basis"):
         space.project(lambda x: x**2, test_space=test_space)
@@ -214,7 +263,7 @@ def test_project_of_function_outside_basis_degree_is_approximate(quad_rule):
     space = FunctionSpace(
         OrthogonalPolynomialBasis(LegendreMeasure(), n_basis=2),
         domain=UnitInterval.Parameters(a=-1.0, b=1.0),
-        quad_rule=quad_rule,
+        reference_quad_rule=quad_rule,
     )
     fn = space.project(lambda x: x**2)
     x = np.linspace(-1, 1, 9)
@@ -290,7 +339,7 @@ def test_quadrature_override_on_non_reference_domain_is_used_as_is(quad_rule):
     wide_space = FunctionSpace(
         OrthogonalPolynomialBasis(LegendreMeasure(), n_basis=4),
         domain=UnitInterval.Parameters(a=0.0, b=4.0),
-        quad_rule=quad_rule,
+        reference_quad_rule=quad_rule,
     )
     coarse = gauss_legendre(6)
     x, w = wide_space.quadrature(quad_rule=coarse)
@@ -304,7 +353,7 @@ def test_quadrature_override_pre_mapped_matches_default(quad_rule):
     wide_space = FunctionSpace(
         OrthogonalPolynomialBasis(LegendreMeasure(), n_basis=4),
         domain=UnitInterval.Parameters(a=0.0, b=4.0),
-        quad_rule=quad_rule,
+        reference_quad_rule=quad_rule,
     )
     pre_mapped = quad_rule.map_to(a=0.0, b=4.0)
     x, w = wide_space.quadrature(quad_rule=pre_mapped)
@@ -397,7 +446,7 @@ def test_basis_matrix_is_petrov_galerkin_agnostic(space, quad_rule):
     other = FunctionSpace(
         OrthogonalPolynomialBasis(LegendreMeasure(), n_basis=8),
         domain=UnitInterval.Parameters(a=-1.0, b=1.0),
-        quad_rule=quad_rule,
+        reference_quad_rule=quad_rule,
     )
     test_phi = other.basis_matrix()
     x, _ = space.quadrature()

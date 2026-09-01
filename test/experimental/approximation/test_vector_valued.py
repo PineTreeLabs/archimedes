@@ -33,7 +33,7 @@ def _modal():
     return FunctionSpace(
         OrthogonalPolynomialBasis(LegendreMeasure(), n_basis=5),
         domain=UnitInterval.Parameters(a=A, b=B),
-        quad_rule=gauss_legendre(10),
+        reference_quad_rule=gauss_legendre(10),
     )
 
 
@@ -41,7 +41,7 @@ def _nodal():
     return FunctionSpace(
         LagrangeBasis(reference_nodes=gauss_lobatto(4).nodes),
         domain=UnitInterval.Parameters(a=A, b=B),
-        quad_rule=gauss_legendre(10),
+        reference_quad_rule=gauss_legendre(10),
     )
 
 
@@ -54,7 +54,7 @@ def _piecewise():
         ),
         domain=UnitInterval.Parameters(a=A, b=B),
         # Composite rule so quadrature resolves the element structure.
-        quad_rule=composite_quad(gauss_legendre(5), BREAKPOINTS),
+        reference_quad_rule=composite_quad(gauss_legendre(5), BREAKPOINTS),
     )
 
 

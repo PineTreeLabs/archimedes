@@ -243,7 +243,7 @@ These are commonly used in PDE discretizations (e.g. spectral or finite element 
 (basis-families)=
 ### Basis Families
 
-<!-- TODO: Add ConcatBasis, TensorBasis -->
+<!-- TODO: Add ConcatBasis, TensorBasis, ConstrainedBasis -->
 
 All of the math and code abstractions above work for any finite-dimensional basis $\{\phi_i\}_{i=1}^n$.
 The main choice in function approximation is choosing an appropriate basis for the problem.
@@ -260,7 +260,7 @@ The linear-basis-expansion representation is surprisingly broad, including for e
 - Piecewise finite/spectral element bases
 - Multivariate tensor product bases
 
-`FunctionSpace` provides constructors for these common basis families, or you can write your own custom basis and pass it to the general `FunctionSpace(basis, domain, quad_rule=...)` constructor.
+`FunctionSpace` provides constructors for these common basis families, or you can write your own custom basis and pass it to the general `FunctionSpace(basis, domain, reference_quad_rule=...)` constructor.
 
 | Family | Constructor | Domain | Weight $w(x)$ | Notes |
 | --- | --- | --- | --- | --- |
@@ -538,7 +538,7 @@ for theme in {"light", "dark"}:
 :class: only-dark
 ```
 
-One last example: a piecewise cubic Hermite basis can also be created with the `piecewise` constructor, and has roughly twice as many basis functions to handle the slope degrees of freedom at element interfaces:
+One last example: a piecewise cubic Hermite basis can also be created with the `piecewise` constructor, and has roughly twice as many basis functions to handle the slope degrees of freedom at element interfaces.
 
 
 ```{code-cell} python

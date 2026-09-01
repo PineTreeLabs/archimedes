@@ -38,4 +38,4 @@ def test_monomial_default_quadrature_is_gauss_legendre():
 def test_monomial_quad_rule_forwarded():
     rule = gauss_legendre(9)
     sugar = FunctionSpace.monomial(5, quad_rule=rule)
-    assert sugar.quad_rule is rule
+    assert sugar.reference_quad_rule is rule

@@ -65,7 +65,7 @@ def test_quad_rule_forwarded():
         FunctionSpace.legendre(5),
         quad_rule=tensor_rule,
     )
-    assert space.quad_rule is tensor_rule
+    assert space.reference_quad_rule is tensor_rule
 
 
 def test_project_matches_manual_construction_for_a_separable_function():

@@ -52,4 +52,4 @@ def test_fourier_default_domain_is_reference_interval():
 def test_fourier_quad_rule_forwarded():
     rule = trapezoidal(11, periodic=True)
     sugar = FunctionSpace.fourier(5, quad_rule=rule)
-    assert sugar.quad_rule is rule
+    assert sugar.reference_quad_rule is rule

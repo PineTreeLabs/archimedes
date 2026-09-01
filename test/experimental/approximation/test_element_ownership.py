@@ -73,9 +73,9 @@ def test_mass_matrix_is_exact_whatever_the_rules_nodes(continuity, rule_name):
     # coordinate rule assigned each element's right-endpoint node to its
     # neighbour. `radau_left` passed only by accident of that convention.
     basis = _basis(continuity)
-    expected = mass_matrix(FunctionSpace(basis, DOMAIN, quad_rule=REFERENCE))
+    expected = mass_matrix(FunctionSpace(basis, DOMAIN, reference_quad_rule=REFERENCE))
     got = mass_matrix(
-        FunctionSpace(basis, DOMAIN, quad_rule=BOUNDARY_NODE_RULES[rule_name])
+        FunctionSpace(basis, DOMAIN, reference_quad_rule=BOUNDARY_NODE_RULES[rule_name])
     )
     np.testing.assert_allclose(got, expected, rtol=1e-10, atol=1e-12)
 
@@ -83,9 +83,11 @@ def test_mass_matrix_is_exact_whatever_the_rules_nodes(continuity, rule_name):
 @pytest.mark.parametrize("continuity", [-1, 0])
 def test_stiffness_matrix_is_exact_with_boundary_nodes(continuity):
     basis = _basis(continuity, n=4)
-    expected = stiffness_matrix(FunctionSpace(basis, DOMAIN, quad_rule=REFERENCE))
+    expected = stiffness_matrix(
+        FunctionSpace(basis, DOMAIN, reference_quad_rule=REFERENCE)
+    )
     rule = composite_quad(gauss_lobatto(5), BREAKS)
-    got = stiffness_matrix(FunctionSpace(basis, DOMAIN, quad_rule=rule))
+    got = stiffness_matrix(FunctionSpace(basis, DOMAIN, reference_quad_rule=rule))
     np.testing.assert_allclose(got, expected, rtol=1e-10, atol=1e-12)
 
 
@@ -104,8 +106,10 @@ def test_test_side_of_basis_matrix_uses_recorded_ownership(continuity, rule_name
     # breakpoint node it's at. That's not exercised here; `Function.__call__`
     # resolves it via `side` instead.)
     basis = _basis(continuity)
-    space = FunctionSpace(basis, DOMAIN, quad_rule=BOUNDARY_NODE_RULES[rule_name])
-    exact = FunctionSpace(basis, DOMAIN, quad_rule=REFERENCE)
+    space = FunctionSpace(
+        basis, DOMAIN, reference_quad_rule=BOUNDARY_NODE_RULES[rule_name]
+    )
+    exact = FunctionSpace(basis, DOMAIN, reference_quad_rule=REFERENCE)
 
     # Degree 2, matching `test_mass_matrix_is_exact_whatever_the_rules_nodes`:
     # every rule in BOUNDARY_NODE_RULES is only guaranteed exact to degree 4,
@@ -124,7 +128,7 @@ def test_test_side_of_basis_matrix_uses_recorded_ownership(continuity, rule_name
 def test_projection_is_exact_with_boundary_nodes():
     basis = _basis(-1, n=4)
     space = FunctionSpace(
-        basis, DOMAIN, quad_rule=composite_quad(gauss_lobatto(6), BREAKS)
+        basis, DOMAIN, reference_quad_rule=composite_quad(gauss_lobatto(6), BREAKS)
     )
     x = np.linspace(A, B, 41)
     np.testing.assert_allclose(
@@ -136,9 +140,9 @@ def test_refined_rule_whose_breakpoints_strictly_contain_the_basis():
     # Ownership maps rule elements to the basis element containing them, so a
     # rule refined beyond the basis is still handled exactly.
     basis = _basis(-1)
-    expected = mass_matrix(FunctionSpace(basis, DOMAIN, quad_rule=REFERENCE))
+    expected = mass_matrix(FunctionSpace(basis, DOMAIN, reference_quad_rule=REFERENCE))
     refined = composite_quad(gauss_lobatto(4), np.linspace(-1.0, 1.0, 5))
-    got = mass_matrix(FunctionSpace(basis, DOMAIN, quad_rule=refined))
+    got = mass_matrix(FunctionSpace(basis, DOMAIN, reference_quad_rule=refined))
     np.testing.assert_allclose(got, expected, rtol=1e-10, atol=1e-12)
 
 
@@ -148,7 +152,7 @@ def test_derivative_of_a_c0_space_integrates_exactly():
     space = FunctionSpace(_basis(0, n=4), DOMAIN)
     u = space.project(lambda x: x**3)
     du = u.derivative()
-    exact = FunctionSpace(du.space.basis, DOMAIN, quad_rule=REFERENCE)
+    exact = FunctionSpace(du.space.basis, DOMAIN, reference_quad_rule=REFERENCE)
     assert du.dot(du) == pytest.approx(
         exact._inner_product(du.coefficients, du.coefficients), rel=1e-10
     )
@@ -174,10 +178,12 @@ def test_tensor_of_piecewise_factors_with_boundary_nodes():
     domain = ProductParameters(dims=(DOMAIN, DOMAIN))
     lobatto = composite_quad(gauss_lobatto(4), BREAKS)
     got = mass_matrix(
-        FunctionSpace(basis, domain, quad_rule=tensor_quad(lobatto, lobatto))
+        FunctionSpace(basis, domain, reference_quad_rule=tensor_quad(lobatto, lobatto))
     )
     expected = mass_matrix(
-        FunctionSpace(basis, domain, quad_rule=tensor_quad(REFERENCE, REFERENCE))
+        FunctionSpace(
+            basis, domain, reference_quad_rule=tensor_quad(REFERENCE, REFERENCE)
+        )
     )
     np.testing.assert_allclose(got, expected, rtol=1e-10, atol=1e-12)
 
@@ -192,14 +198,14 @@ def test_tensor_mixes_piecewise_and_smooth_factors():
         FunctionSpace(
             basis,
             domain,
-            quad_rule=tensor_quad(
+            reference_quad_rule=tensor_quad(
                 composite_quad(gauss_lobatto(4), BREAKS), gauss_legendre(4)
             ),
         )
     )
     expected = mass_matrix(
         FunctionSpace(
-            basis, domain, quad_rule=tensor_quad(REFERENCE, gauss_legendre(4))
+            basis, domain, reference_quad_rule=tensor_quad(REFERENCE, gauss_legendre(4))
         )
     )
     np.testing.assert_allclose(got, expected, rtol=1e-10, atol=1e-12)

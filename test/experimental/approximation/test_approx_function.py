@@ -21,7 +21,7 @@ def space(quad_rule):
     return FunctionSpace(
         OrthogonalPolynomialBasis(LegendreMeasure(), n_basis=5),
         domain=UnitInterval.Parameters(a=-1.0, b=1.0),
-        quad_rule=quad_rule,
+        reference_quad_rule=quad_rule,
     )
 
 
@@ -47,7 +47,7 @@ def test_add_structurally_mismatched_space_raises(quadratic, quad_rule):
     other_space = FunctionSpace(
         OrthogonalPolynomialBasis(LegendreMeasure(), n_basis=4),
         domain=UnitInterval.Parameters(a=-1.0, b=1.0),
-        quad_rule=quad_rule,
+        reference_quad_rule=quad_rule,
     )
     other = other_space.project(lambda x: x**2)
     with pytest.raises(ValueError, match="project one onto the other's space"):
@@ -62,7 +62,7 @@ def test_add_numerically_mismatched_domain_is_not_caught(quadratic, quad_rule):
     other_space = FunctionSpace(
         OrthogonalPolynomialBasis(LegendreMeasure(), n_basis=5),
         domain=UnitInterval.Parameters(a=0.0, b=2.0),
-        quad_rule=quad_rule,
+        reference_quad_rule=quad_rule,
     )
     other = other_space.project(lambda x: x**2)
     result = quadratic + other  # does not raise
@@ -84,7 +84,7 @@ def test_subtract_structurally_mismatched_space_raises(quadratic, quad_rule):
     other_space = FunctionSpace(
         OrthogonalPolynomialBasis(LegendreMeasure(), n_basis=4),
         domain=UnitInterval.Parameters(a=-1.0, b=1.0),
-        quad_rule=quad_rule,
+        reference_quad_rule=quad_rule,
     )
     other = other_space.project(lambda x: x**2)
     with pytest.raises(ValueError, match="project one onto the other's space"):
@@ -140,7 +140,7 @@ def test_domain_parameters_are_traceable(space, quadratic):
         moving = FunctionSpace(
             space.basis,
             domain=UnitInterval.Parameters(a=a, b=b),
-            quad_rule=space.quad_rule,
+            reference_quad_rule=space.reference_quad_rule,
         )
         return Function(c, moving)(np.array([x0]))[0]
 
@@ -223,7 +223,7 @@ def test_dot_structurally_mismatched_space_raises(quadratic, quad_rule):
     other_space = FunctionSpace(
         OrthogonalPolynomialBasis(LegendreMeasure(), n_basis=4),
         domain=UnitInterval.Parameters(a=-1.0, b=1.0),
-        quad_rule=quad_rule,
+        reference_quad_rule=quad_rule,
     )
     other = other_space.project(lambda x: x**2)
     with pytest.raises(ValueError, match="project one onto the other's space"):

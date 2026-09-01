@@ -191,7 +191,7 @@ def test_quad_rule_passthrough_accepts_compatible_rule():
     _, _, ref = _normalize_breakpoints(breakpoints)
     rule = composite_quad(gauss_legendre(5), ref)
     sugar = FunctionSpace.piecewise("lagrange", 2, breakpoints, quad_rule=rule)
-    assert sugar.quad_rule is rule
+    assert sugar.reference_quad_rule is rule
 
 
 def test_quad_rule_passthrough_rejects_incompatible_rule():
