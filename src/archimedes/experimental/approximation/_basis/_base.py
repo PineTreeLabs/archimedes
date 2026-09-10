@@ -258,7 +258,7 @@ class Basis(metaclass=abc.ABCMeta):
 
         Used by :class:`FunctionSpace` wherever it integrates (``basis_matrix``,
         ``project``, and their private counterparts), which pass an already
-        domain-mapped ``rule`` (see ``FunctionSpace._resolve_rule``) --
+        domain-mapped ``rule`` (see ``FunctionSpace.quad_rule``) --
         ``rule.nodes`` is read as-is, with no further mapping here.
         ``domain_kwargs`` is still needed for this basis's *own*
         (independent) coefficient/breakpoint remap. Evaluation at

@@ -138,11 +138,11 @@ def test_project_on_non_reference_domain(quad_rule):
 
 
 def test_diff_matrix_uses_mapped_rule_not_reference(quad_rule):
-    # Regression test: `_diff_matrix`/`_integral_matrix` used to read
-    # `self.quad_rule` raw, bypassing `_resolve_rule` -- on a domain that
-    # differs visibly from the reference domain, that would silently
-    # evaluate both bases at reference-domain nodes instead of the
-    # physical ones.
+    # Regression test: `_diff_matrix`/`_integral_matrix` used to read the
+    # reference-domain rule directly, bypassing the domain mapping now done
+    # by the `quad_rule` property -- on a domain that differs visibly from
+    # the reference domain, that would silently evaluate both bases at
+    # reference-domain nodes instead of the physical ones.
     wide_space = FunctionSpace(
         OrthogonalPolynomialBasis(LegendreMeasure(), n_basis=5),
         domain=UnitInterval.Parameters(a=0.0, b=4.0),
@@ -152,11 +152,6 @@ def test_diff_matrix_uses_mapped_rule_not_reference(quad_rule):
     deriv = fn.derivative()
     x = np.linspace(0, 4, 13)
     np.testing.assert_allclose(deriv(x), 2 * x, atol=1e-8)
-
-
-def test_resolve_rule_default_maps_onto_domain(space, quad_rule):
-    resolved = space._resolve_rule()
-    np.testing.assert_allclose(resolved.nodes, quad_rule.map_to(a=-1.0, b=1.0).nodes)
 
 
 def test_quad_rule_property_is_mapped_not_reference(quad_rule):

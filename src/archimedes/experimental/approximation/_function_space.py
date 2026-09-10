@@ -225,7 +225,15 @@ class FunctionSpace:
 
     @property
     def quad_rule(self) -> Quadrature:
-        """Quadrature rule mapped to the physical domain"""
+        """The space's quadrature rule mapped onto its ``domain``.
+        
+        The domain mapping is recomputed on every access, since ``domain``
+        may be a traced/symbolic value for variable-endpoint problems.
+    
+        This property does not apply density-normalization, regardless
+        of whether the space has `density=True`. Call :meth:`quadrature`
+        to get optionally normalized quadrature weights and points.
+        """
         return self.reference_quad_rule.map_to(**self._domain_kwargs())
 
     def _validate_quad_rule(self, rule: Quadrature) -> None:
@@ -871,7 +879,7 @@ class FunctionSpace:
         current = self
         for _ in range(order):
             step_target = current._integral_space(1)
-            rule = step_target._resolve_rule()
+            rule = step_target.quad_rule
             step_target._check_quad_rule_size(rule)
             # (current.n_basis, step_target.n_basis): D @ F recovers the
             # derivative of F's coefficients in this (smaller) space.
@@ -930,7 +938,7 @@ class FunctionSpace:
             Shape ``(space.n_basis, self.n_basis)``.
         """
         target = self if space is None else space
-        rule = target._resolve_rule()
+        rule = target.quad_rule
         target._check_quad_rule_size(rule)
         phi = target.basis_matrix(quad_rule=rule)  # (npts, n_target)
         dphi = self.basis_matrix(deriv=deriv, quad_rule=rule)  # (npts, n_basis)
@@ -942,14 +950,6 @@ class FunctionSpace:
 
     def _basis_eval(self, x, deriv: int = 0):
         return self.basis.evaluate(x, deriv=deriv, **self._domain_kwargs())
-
-    def _resolve_rule(self, quad_rule: Quadrature | None = None) -> Quadrature:
-        """The rule to use for this call: an explicit override, used exactly
-        as given, or this space's own (already-mapped) :attr:`quad_rule`.
-        """
-        if quad_rule is not None:
-            return quad_rule
-        return self.quad_rule
 
     def _check_quad_rule_size(self, rule: Quadrature) -> None:
         # phi is (npts, n_basis), so phi.T @ diag(w) @ phi has rank at most
@@ -972,6 +972,11 @@ class FunctionSpace:
         This, together with :meth:`basis_matrix`, is what an assembly like
         :meth:`project` is built from.
 
+        Unlike :attr:`quad_rule`, the returned weights are density-adjusted
+        (see :attr:`Basis.density`) for this space. That is, if the space has
+        `density=True`, the returned weights sum to 1, and if `density=False`
+        they sum to the integral of the weight function over the domain.
+
         Parameters
         ----------
         quad_rule : QuadratureRule, optional
@@ -982,7 +987,7 @@ class FunctionSpace:
         nodes, weights : ndarray
             Nodes and weights on this space's target domain.
         """
-        rule = self._resolve_rule(quad_rule)
+        rule = quad_rule if quad_rule is not None else self.quad_rule
         # `density=self.basis.density` keeps the quadrature weights consistent
         # with the basis's own normalization (see `Basis.density`): a basis
         # orthonormal w.r.t. a probability measure needs weights that
@@ -1022,7 +1027,7 @@ class FunctionSpace:
         BasisMatrix
             The design matrix, bundled with its nodes and weights.
         """
-        rule = self._resolve_rule(quad_rule)
+        rule = quad_rule if quad_rule is not None else self.quad_rule
         matrix = self.basis._evaluate_at_nodes(
             rule, deriv=deriv, **self._domain_kwargs()
         )
@@ -1080,7 +1085,7 @@ class FunctionSpace:
         the same shape; for a per-component inner product, slice the
         coefficients and call this once per component.
         """
-        rule = self._resolve_rule(quad_rule)
+        rule = quad_rule if quad_rule is not None else self.quad_rule
         phi = self.basis_matrix(quad_rule=rule)  # (npts, n_basis)
         integrand = (phi @ c1) * (phi @ c2)  # (npts,) or (npts, m)
         if integrand.ndim > 1:
@@ -1168,7 +1173,7 @@ class FunctionSpace:
                     "test_space must denote the same domain as this (trial) space"
                 )
 
-        rule = self._resolve_rule(quad_rule)
+        rule = quad_rule if quad_rule is not None else self.quad_rule
         self._check_quad_rule_size(rule)
         x, _ = self.quadrature(rule)
         phi = self.basis_matrix(quad_rule=rule)  # (npts, n_basis) trial
