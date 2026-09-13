@@ -533,6 +533,7 @@ def test_equality_and_hash(local, breakpoints):
     assert a == b
     assert a != c
     assert a != d
+    assert a != "not a basis"
     assert len({a, b, c, d}) == 3
 
 

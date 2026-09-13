@@ -129,6 +129,14 @@ def test_boundary_dofs_conflict_is_rejected(rule):
         combo.boundary_dofs(0)
 
 
+def test_boundary_dofs_conflict_is_rejected_on_the_right(rule):
+    right_claimer = LagrangeBasis(reference_nodes=np.array([0.0, 1.0]))
+    other_right_claimer = LagrangeBasis(reference_nodes=np.array([0.5, 1.0]))
+    combo = ConcatBasis((right_claimer, other_right_claimer), quad_rule=rule)
+    with pytest.raises(ValueError, match="more than one piece claims the right"):
+        combo.boundary_dofs(0)
+
+
 # -- required_breakpoints --
 
 

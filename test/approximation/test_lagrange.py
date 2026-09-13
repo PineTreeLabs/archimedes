@@ -16,6 +16,11 @@ def nodes():
     return gauss_lobatto(6).nodes
 
 
+def test_rejects_malformed_node_shape():
+    with pytest.raises(ValueError, match="1-D with at least one entry"):
+        LagrangeBasis(reference_nodes=np.array([[-1.0, 1.0]]))
+
+
 def test_rejects_out_of_range_nodes():
     with pytest.raises(ValueError):
         LagrangeBasis(reference_nodes=np.array([-1.0, 0.0, 1.5]))
@@ -24,6 +29,11 @@ def test_rejects_out_of_range_nodes():
 def test_rejects_duplicate_nodes():
     with pytest.raises(ValueError):
         LagrangeBasis(reference_nodes=np.array([-1.0, 0.0, 0.0, 1.0]))
+
+
+def test_not_equal_to_other_type(nodes):
+    basis = LagrangeBasis(reference_nodes=nodes)
+    assert basis != "not a basis"
 
 
 def test_cardinal_property(nodes):

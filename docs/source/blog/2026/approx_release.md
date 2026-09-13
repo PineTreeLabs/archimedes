@@ -20,7 +20,7 @@ Jared Callaham • 1 Sep 2026
 Archimedes development has been pretty quiet for the past few months; I've been using it for consulting projects, but haven't had much time for adding new features.
 But today's announcement is a fairly substantial pair of new modules: [`quadrature`](#archimedes.quadrature) and [`approximation`](#archimedes.approximation).
 
-The short version is that `quadrature` is for **Gaussian-style numerical approximation of weighted integrals**:
+The headline summary is that `quadrature` is for **Gaussian-style numerical approximation of weighted integrals**:
 
 $$
 \int_a^b f(x) ~ w(x) ~ dx \approx \sum_{i=1}^n w_i f(x_i),
@@ -32,7 +32,10 @@ $$
 f(x) \approx \sum_{i=1}^n c_i \phi_i(x).
 $$
 
-These two are nicely complementary; `quadrature` provides the numerical integration used to define inner products between function spaces in `approximation`, while `approximation` implements (among other things) the orthogonal polynomial families that Gaussian quadrature 
+These two are nicely complementary; `quadrature` provides the numerical integration used to define inner products between function spaces in `approximation`, while `approximation` implements (among other things) the orthogonal polynomial families that Gaussian quadrature is built around.
+
+Those two lines of math are much richer than they might appear, especially in terms of their potential applications.
+I want to give a few of these example applications, but first a little backstory on why 
 
 <!-- 
 Examples:

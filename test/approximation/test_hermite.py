@@ -16,6 +16,10 @@ def test_construction_takes_no_arguments(basis):
     assert basis.n_basis == 4
 
 
+def test_parameters_is_unit_interval(basis):
+    assert basis.Parameters is UnitInterval.Parameters
+
+
 def test_equal_and_hashable(basis):
     other = CubicHermiteBasis()
     assert basis == other

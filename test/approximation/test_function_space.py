@@ -113,6 +113,24 @@ def test_project_accepts_quad_rule_override(space):
     np.testing.assert_allclose(fn(x), x**2, atol=1e-10)
 
 
+# -- function() --
+
+
+def test_function_with_explicit_coefficients(space):
+    coefficients = np.arange(space.n_basis, dtype=float)
+    fn = space.function(coefficients)
+    assert isinstance(fn, Function)
+    assert fn.space is space
+    np.testing.assert_array_equal(fn.coefficients, coefficients)
+
+
+def test_function_defaults_to_zero_coefficients(space):
+    fn = space.function()
+    assert isinstance(fn, Function)
+    assert fn.space is space
+    np.testing.assert_array_equal(fn.coefficients, np.zeros(space.n_basis))
+
+
 def test_project_rejects_quad_rule_with_too_few_points(space):
     # Fewer quadrature points than n_basis makes the mass matrix exactly
     # singular (phi is (npts, n_basis), rank <= npts) -- should raise
