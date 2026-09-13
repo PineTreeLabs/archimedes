@@ -11,7 +11,7 @@ import pytest
 from _helpers import mass_matrix, stiffness_matrix
 
 import archimedes as arc
-from archimedes.experimental.approximation import (
+from archimedes.approximation import (
     Function,
     FunctionSpace,
     LagrangeBasis,

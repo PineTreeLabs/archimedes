@@ -74,7 +74,7 @@ class Measure(metaclass=abc.ABCMeta):
     share one (Legendre and Jacobi are both :class:`UnitInterval`; both
     Hermite conventions are :class:`RealLine`) and since consumers with no
     weight function at all, such as a nodal
-    :class:`~archimedes.experimental.approximation.Basis`, need the domain
+    :class:`~archimedes.approximation.Basis`, need the domain
     without the measure.
     """
 

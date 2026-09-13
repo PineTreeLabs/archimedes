@@ -4,7 +4,7 @@ import pytest
 
 import archimedes as arc
 from archimedes._core._array_impl import SymbolicArray
-from archimedes.experimental.approximation import (
+from archimedes.approximation import (
     FourierBasis,
     FunctionSpace,
     OrthogonalPolynomialBasis,

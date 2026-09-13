@@ -36,7 +36,7 @@ class Quadrature(Protocol):
     """The interface every quadrature rule provides, whatever its dimension.
 
     Deliberately minimal: this is only what's needed by
-    :class:`~archimedes.experimental.approximation.FunctionSpace` to define
+    :class:`~archimedes.approximation.FunctionSpace` to define
     an inner product.
     """
 

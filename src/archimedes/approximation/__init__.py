@@ -27,7 +27,7 @@ Examples
 Project a function onto a degree-5 Legendre space and evaluate it:
 
 >>> import numpy as np
->>> from archimedes.experimental import approximation as approx
+>>> from archimedes import approximation as approx
 >>> space = approx.FunctionSpace.legendre(n_basis=6)
 >>> f = space.project(lambda x: np.sin(np.pi * x))
 >>> round(float(f(np.array([0.5]))[0]), 3)

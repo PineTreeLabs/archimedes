@@ -6,8 +6,8 @@ combining independent univariate spaces into one multivariate space.
 import numpy as np
 import pytest
 
-from archimedes.experimental.approximation import FunctionSpace
-from archimedes.experimental.approximation._basis._tensor import (
+from archimedes.approximation import FunctionSpace
+from archimedes.approximation._basis._tensor import (
     ProductParameters,
     TensorBasis,
 )

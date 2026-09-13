@@ -3,7 +3,7 @@ import pytest
 
 import archimedes as arc
 from archimedes._core._array_impl import SymbolicArray
-from archimedes.experimental.approximation import MonomialBasis
+from archimedes.approximation import MonomialBasis
 from archimedes.measure import UnitInterval
 
 # -- construction validation --
@@ -134,7 +134,7 @@ def test_product_basis_size():
 
 
 def test_product_basis_rejects_other_family():
-    from archimedes.experimental.approximation import FourierBasis
+    from archimedes.approximation import FourierBasis
 
     with pytest.raises(ValueError):
         MonomialBasis(3)._product_basis(FourierBasis(3, kind="cosine"))
@@ -171,7 +171,7 @@ def test_integral_basis_rejects_negative_order():
 
 
 def test_function_derivative_and_integral_round_trip():
-    from archimedes.experimental.approximation import FunctionSpace
+    from archimedes.approximation import FunctionSpace
 
     space = FunctionSpace.monomial(6, a=-2.0, b=3.0)
 

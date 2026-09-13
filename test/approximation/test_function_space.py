@@ -3,7 +3,7 @@ import numpy as np
 import pytest
 from _helpers import mass_matrix, stiffness_matrix
 
-from archimedes.experimental.approximation import (
+from archimedes.approximation import (
     Function,
     FunctionSpace,
     OrthogonalPolynomialBasis,

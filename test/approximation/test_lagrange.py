@@ -3,7 +3,7 @@ import pytest
 
 import archimedes as arc
 from archimedes._core._array_impl import SymbolicArray
-from archimedes.experimental.approximation import LagrangeBasis, PiecewiseBasis
+from archimedes.approximation import LagrangeBasis, PiecewiseBasis
 from archimedes.measure import UnitInterval
 from archimedes.quadrature import gauss_legendre as gauss_legendre_rule
 from archimedes.quadrature import gauss_lobatto, gauss_radau

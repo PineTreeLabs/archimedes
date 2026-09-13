@@ -5,7 +5,7 @@ from _helpers import mass_matrix, stiffness_matrix
 
 import archimedes as arc
 from archimedes._core._array_impl import SymbolicArray
-from archimedes.experimental.approximation import (
+from archimedes.approximation import (
     CubicHermiteBasis,
     FunctionSpace,
     LagrangeBasis,

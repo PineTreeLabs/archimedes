@@ -15,7 +15,7 @@ from _helpers import mass_matrix
 import archimedes as arc
 from archimedes import tree
 from archimedes._core._array_impl import SymbolicArray
-from archimedes.experimental.approximation import (
+from archimedes.approximation import (
     Function,
     FunctionSpace,
     LagrangeBasis,

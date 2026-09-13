@@ -17,7 +17,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 import archimedes as arc
-from archimedes.experimental.approximation import FunctionSpace
+from archimedes.approximation import FunctionSpace
 ```
 
 ```{code-cell} python

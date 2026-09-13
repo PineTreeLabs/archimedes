@@ -7,13 +7,13 @@ import pytest
 
 import archimedes as arc
 from archimedes._core._array_impl import SymbolicArray
-from archimedes.experimental.approximation import ConstrainedBasis, FunctionSpace
+from archimedes.approximation import ConstrainedBasis, FunctionSpace
 from archimedes.measure import LegendreMeasure, UnitInterval
 
 
 @pytest.fixture
 def legendre8():
-    from archimedes.experimental.approximation import OrthogonalPolynomialBasis
+    from archimedes.approximation import OrthogonalPolynomialBasis
 
     return OrthogonalPolynomialBasis(LegendreMeasure(), 8)
 
@@ -141,7 +141,7 @@ def test_mass_matrix_is_well_conditioned():
     # SVD null-space columns are orthonormal, and the base is already
     # orthonormal, so the combination should stay perfectly conditioned
     # rather than drifting with n like a hand-derived combination would.
-    from archimedes.experimental.approximation import OrthogonalPolynomialBasis
+    from archimedes.approximation import OrthogonalPolynomialBasis
 
     base32 = OrthogonalPolynomialBasis(LegendreMeasure(), 32)
     dirichlet = ConstrainedBasis.dirichlet(base32)

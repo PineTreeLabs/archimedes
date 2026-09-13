@@ -18,7 +18,7 @@ import pytest
 from _helpers import mass_matrix, stiffness_matrix
 
 import archimedes as arc
-from archimedes.experimental.approximation import (
+from archimedes.approximation import (
     FunctionSpace,
     LagrangeBasis,
     PiecewiseBasis,
@@ -189,7 +189,7 @@ def test_tensor_of_piecewise_factors_with_boundary_nodes():
 
 
 def test_tensor_mixes_piecewise_and_smooth_factors():
-    from archimedes.experimental.approximation import OrthogonalPolynomialBasis
+    from archimedes.approximation import OrthogonalPolynomialBasis
     from archimedes.measure import LegendreMeasure
 
     basis = TensorBasis((_basis(-1), OrthogonalPolynomialBasis(LegendreMeasure(), 3)))
@@ -303,7 +303,7 @@ def test_invalid_side_rejected(call):
 
 
 def _smooth_spaces():
-    from archimedes.experimental.approximation import OrthogonalPolynomialBasis
+    from archimedes.approximation import OrthogonalPolynomialBasis
     from archimedes.measure import LegendreMeasure
 
     return {

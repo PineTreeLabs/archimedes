@@ -7,7 +7,7 @@ and that ``quad_rule`` is forwarded correctly.
 
 import numpy as np
 
-from archimedes.experimental.approximation import FunctionSpace, MonomialBasis
+from archimedes.approximation import FunctionSpace, MonomialBasis
 from archimedes.measure import UnitInterval
 from archimedes.quadrature import gauss_legendre
 

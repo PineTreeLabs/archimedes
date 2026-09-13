@@ -9,7 +9,7 @@ and that ``density``/``quad_rule`` are forwarded correctly.
 import numpy as np
 import pytest
 
-from archimedes.experimental.approximation import (
+from archimedes.approximation import (
     FunctionSpace,
     OrthogonalPolynomialBasis,
 )

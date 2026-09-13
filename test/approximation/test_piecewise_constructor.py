@@ -7,14 +7,14 @@ reference-domain breakpoints and the target ``a``/``b``.
 import numpy as np
 import pytest
 
-from archimedes.experimental.approximation import (
+from archimedes.approximation import (
     CubicHermiteBasis,
     FunctionSpace,
     LagrangeBasis,
     OrthogonalPolynomialBasis,
     PiecewiseBasis,
 )
-from archimedes.experimental.approximation._function_space import (
+from archimedes.approximation._function_space import (
     _normalize_breakpoints,
 )
 from archimedes.measure import LegendreMeasure, UnitInterval

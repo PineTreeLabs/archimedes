@@ -5,7 +5,7 @@ from scipy.special import eval_legendre
 
 import archimedes as arc
 from archimedes._core._array_impl import SymbolicArray
-from archimedes.experimental.approximation import OrthogonalPolynomialBasis
+from archimedes.approximation import OrthogonalPolynomialBasis
 from archimedes.measure import (
     LaguerreMeasure,
     LegendreMeasure,

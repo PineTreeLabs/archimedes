@@ -1151,7 +1151,7 @@ class FunctionSpace:
         Examples
         --------
         >>> import numpy as np
-        >>> from archimedes.experimental.approximation import FunctionSpace
+        >>> from archimedes.approximation import FunctionSpace
         >>> space = FunctionSpace.legendre(n_basis=8)
         >>> f = space.project(lambda x: np.exp(x))
         >>> np.round(f(np.array([-0.5, 0.0, 0.5])), 4)

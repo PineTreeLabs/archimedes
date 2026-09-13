@@ -13,7 +13,7 @@ from scipy.interpolate import BSpline as ScipyBSpline
 
 import archimedes as arc
 from archimedes._core._array_impl import SymbolicArray
-from archimedes.experimental.approximation import (
+from archimedes.approximation import (
     BSplineBasis,
     Function,
     FunctionSpace,

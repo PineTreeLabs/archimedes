@@ -8,7 +8,7 @@ and that ``kind``/``density``/``quad_rule`` are forwarded correctly.
 import numpy as np
 import pytest
 
-from archimedes.experimental.approximation import FourierBasis, FunctionSpace
+from archimedes.approximation import FourierBasis, FunctionSpace
 from archimedes.measure import UnitInterval
 from archimedes.quadrature import trapezoidal
 

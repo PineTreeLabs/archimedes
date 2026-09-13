@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 
 import archimedes as arc
-from archimedes.experimental.approximation import (
+from archimedes.approximation import (
     Function,
     FunctionSpace,
     OrthogonalPolynomialBasis,

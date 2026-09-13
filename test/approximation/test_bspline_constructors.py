@@ -17,7 +17,7 @@ its input.
 import numpy as np
 import pytest
 
-from archimedes.experimental.approximation import BSplineBasis, FunctionSpace
+from archimedes.approximation import BSplineBasis, FunctionSpace
 from archimedes.measure import UnitInterval
 from archimedes.quadrature import composite_quad, gauss_legendre
 

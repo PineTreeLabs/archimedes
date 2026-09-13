@@ -3,7 +3,7 @@ import pytest
 
 import archimedes as arc
 from archimedes._core._array_impl import SymbolicArray
-from archimedes.experimental.approximation import CubicHermiteBasis, LagrangeBasis
+from archimedes.approximation import CubicHermiteBasis, LagrangeBasis
 from archimedes.measure import UnitInterval
 
 
