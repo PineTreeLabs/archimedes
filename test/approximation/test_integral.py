@@ -15,6 +15,8 @@ whole-domain-only fallback where it isn't.
 
 import numpy as np
 import pytest
+from conftest import family_space, nodal_space
+from conftest import lobatto_basis as _lobatto
 
 import archimedes as arc
 from archimedes.approximation import (
@@ -40,32 +42,21 @@ DOMAIN = UnitInterval.Parameters(a=A, b=B)
 BREAKS = np.linspace(-1.0, 1.0, 4)
 X = np.linspace(0.07, 1.93, 15)
 
+# `jacobi` is deliberately not part of either fixture below, for the same
+# reason as in test_derivative.py: it exercises the same
+# `OrthogonalPolynomialBasis` code path as `modal`, and what's actually
+# Jacobi-specific (measure/normalization preservation) is checked directly by
+# `test_polynomial_families_keep_their_measure_and_normalization`, without
+# going through either fixture.
 
-def _lobatto(n):
-    return LagrangeBasis(reference_nodes=gauss_lobatto(n).nodes)
+# The "every family really works" anchor -- used only by test_integral_is_exact.
+space = family_space("modal", "nodal", "bspline", n_basis=6)
 
-
-SPACE_BUILDERS = {
-    "modal": lambda: FunctionSpace(
-        OrthogonalPolynomialBasis(LegendreMeasure(), 6), domain=DOMAIN
-    ),
-    "jacobi": lambda: FunctionSpace(
-        OrthogonalPolynomialBasis(JacobiMeasure(1.5, 0.5), 6), domain=DOMAIN
-    ),
-    "nodal": lambda: FunctionSpace(_lobatto(6), domain=DOMAIN),
-    # Unlike PiecewiseBasis (see the dedicated "-- piecewise --" section
-    # below), a B-spline's knot vector is one global object with no running
-    # constant needed across elements, so `.antiderivative()` is fully defined --
-    # this is the concrete end-to-end check that BSplineBasis.Parameters'
-    # redundant (a, b) echo (see BSplineBasis's docstring) correctly anchors
-    # FunctionSpace._integral_matrix's boundary condition.
-    "bspline": lambda: FunctionSpace.clamped_bspline(3, np.linspace(A, B, 4)),
-}
-
-
-@pytest.fixture(params=sorted(SPACE_BUILDERS))
-def space(request):
-    return SPACE_BUILDERS[request.param]()
+# A 2-way reduced sweep (nodal + bspline -- the two structurally distinct
+# implementations of antiderivative/boundary handling: barycentric
+# collocation vs. de Boor knot-vector evaluation) for tests that check actual
+# numeric antiderivative/integrate() values per family.
+space2 = family_space("nodal", "bspline", nodal_n_basis=6)
 
 
 def f_(x):
@@ -99,11 +90,11 @@ def test_integral_is_exact(space):
     np.testing.assert_allclose(antideriv(X), f_left(X), atol=1e-10)
 
 
-def test_integral_undoes_derivative_up_to_the_dropped_constant(space):
+def test_integral_undoes_derivative_up_to_the_dropped_constant(space2):
     # The FTC round trip: integrating the derivative back up recovers f_,
     # shifted so it vanishes at the left endpoint (which the derivative
     # itself has no memory of).
-    u = space.project(f_)
+    u = space2.project(f_)
     np.testing.assert_allclose(
         u.derivative().antiderivative()(X), f_(X) - f_(A), atol=1e-9
     )
@@ -112,13 +103,13 @@ def test_integral_undoes_derivative_up_to_the_dropped_constant(space):
 def test_derivative_undoes_integral():
     # The other direction of the round trip: differentiating the
     # antiderivative recovers the original function exactly.
-    space = SPACE_BUILDERS["modal"]()
+    space = nodal_space(6, A, B)
     u = space.project(f_)
     np.testing.assert_allclose(u.antiderivative().derivative()(X), f_(X), atol=1e-9)
 
 
 def test_repeated_integration_matches_a_single_call_at_higher_order():
-    space = SPACE_BUILDERS["modal"]()
+    space = nodal_space(6, A, B)
     u = space.project(g_)
     np.testing.assert_allclose(
         u.antiderivative().antiderivative()(X), u.antiderivative(order=2)(X), atol=1e-9
@@ -128,14 +119,17 @@ def test_repeated_integration_matches_a_single_call_at_higher_order():
 def test_order_two_matches_the_cauchy_repeated_integral():
     # With A = 0, the standard closed form for the twice-iterated integral
     # of x**2 vanishing (with its first derivative) at the origin is x**4/12.
-    space = SPACE_BUILDERS["modal"]()
+    space = nodal_space(6, A, B)
     antideriv2 = space.project(g_).antiderivative(order=2)
     np.testing.assert_allclose(antideriv2(X), X**4 / 12, atol=1e-9)
     np.testing.assert_allclose(antideriv2(np.array([A]))[0], 0.0, atol=1e-10)
     np.testing.assert_allclose(antideriv2(np.array([A]), deriv=1)[0], 0.0, atol=1e-10)
 
 
-def test_order_zero_is_the_identity(space):
+def test_order_zero_is_the_identity():
+    # Generic FunctionSpace-level plumbing (order=0 is the identity map),
+    # not family-specific, so one representative family suffices.
+    space = nodal_space(6, A, B)
     u = space.project(f_)
     same = u.antiderivative(order=0)
     assert same.space.n_basis == space.n_basis
@@ -145,26 +139,27 @@ def test_order_zero_is_the_identity(space):
 # -- boundary semantics --
 
 
-def test_left_boundary_vanishes_at_a(space):
-    antideriv = space.project(f_).antiderivative(boundary="left")
+def test_left_boundary_vanishes_at_a(space2):
+    antideriv = space2.project(f_).antiderivative(boundary="left")
     np.testing.assert_allclose(antideriv(np.array([A]))[0], 0.0, atol=1e-10)
 
 
-def test_right_boundary_vanishes_at_b(space):
-    antideriv = space.project(f_).antiderivative(boundary="right")
+def test_right_boundary_vanishes_at_b(space2):
+    antideriv = space2.project(f_).antiderivative(boundary="right")
     np.testing.assert_allclose(antideriv(np.array([B]))[0], 0.0, atol=1e-10)
     np.testing.assert_allclose(antideriv(X), f_right(X), atol=1e-10)
 
 
-def test_left_and_right_differ_by_the_whole_domain_integral(space):
-    u = space.project(f_)
+def test_left_and_right_differ_by_the_whole_domain_integral(space2):
+    u = space2.project(f_)
     total = u.integrate()
     left = u.antiderivative(boundary="left")
     right = u.antiderivative(boundary="right")
     np.testing.assert_allclose(right(X), left(X) - total, atol=1e-9)
 
 
-def test_invalid_boundary_rejected(space):
+def test_invalid_boundary_rejected():
+    space = nodal_space(6, A, B)
     with pytest.raises(ValueError, match="boundary must be"):
         space.project(f_).antiderivative(boundary="middle")
 
@@ -172,17 +167,20 @@ def test_invalid_boundary_rejected(space):
 # -- the space is the maximal one (dual of derivative's minimal) --
 
 
-def test_integral_space_is_larger(space):
+def test_integral_space_is_larger():
+    space = nodal_space(6, A, B)
     assert space._integral_space().n_basis == space.n_basis + 1
     assert space._integral_space(3).n_basis == space.n_basis + 3
 
 
-def test_integral_matrix_shape(space):
+def test_integral_matrix_shape():
+    space = nodal_space(6, A, B)
     assert space._integral_matrix().shape == (space.n_basis + 1, space.n_basis)
     assert space._integral_matrix(order=2).shape == (space.n_basis + 2, space.n_basis)
 
 
-def test_integral_matrix_order_zero_is_identity(space):
+def test_integral_matrix_order_zero_is_identity():
+    space = nodal_space(6, A, B)
     np.testing.assert_allclose(space._integral_matrix(order=0), np.eye(space.n_basis))
 
 
@@ -207,7 +205,10 @@ def test_integral_basis_construction_does_not_require_a_finite_domain():
 # -- explicit result space --
 
 
-def test_explicit_result_space_is_honored(space):
+def test_explicit_result_space_is_honored():
+    # Generic FunctionSpace-level plumbing (an explicit `space=` kwarg is
+    # honored), not family-specific, so one representative family suffices.
+    space = nodal_space(6, A, B)
     u = space.project(f_)
     target = space._integral_space()
     antideriv = u.antiderivative(space=target)
@@ -215,13 +216,15 @@ def test_explicit_result_space_is_honored(space):
     np.testing.assert_allclose(antideriv(X), f_left(X), atol=1e-10)
 
 
-def test_wrong_size_explicit_space_is_rejected(space):
+def test_wrong_size_explicit_space_is_rejected():
+    space = nodal_space(6, A, B)
     u = space.project(f_)
     with pytest.raises(ValueError, match="expected"):
         u.antiderivative(space=space)  # same size as self, not self.n_basis + 1
 
 
-def test_wrong_size_explicit_space_is_rejected_at_order_zero(space):
+def test_wrong_size_explicit_space_is_rejected_at_order_zero():
+    space = nodal_space(6, A, B)
     u = space.project(f_)
     with pytest.raises(ValueError, match="expected"):
         u.antiderivative(order=0, space=space._integral_space())
@@ -230,19 +233,23 @@ def test_wrong_size_explicit_space_is_rejected_at_order_zero(space):
 # -- vector-valued --
 
 
-def test_vector_valued_integral(space):
+def test_vector_valued_integral():
+    # Vector-valuedness is generic plumbing (see test_vector_valued.py), not
+    # family-specific, so one representative family suffices.
     def fv(x):
         return np.stack([x**2, 3 * x], axis=-1)
 
+    space = nodal_space(6, A, B)
     antideriv = space.project(fv).antiderivative()
     expected = np.stack([X**3 / 3 - A**3 / 3, 1.5 * X**2 - 1.5 * A**2], axis=-1)
     np.testing.assert_allclose(antideriv(X), expected, atol=1e-9)
 
 
-def test_vector_valued_integrate(space):
+def test_vector_valued_integrate():
     def fv(x):
         return np.stack([x**2, 3 * x], axis=-1)
 
+    space = nodal_space(6, A, B)
     total = space.project(fv).integrate()
     expected = np.array([(B**3 - A**3) / 3, 1.5 * (B**2 - A**2)])
     np.testing.assert_allclose(total, expected, atol=1e-9)
@@ -251,7 +258,10 @@ def test_vector_valued_integrate(space):
 # -- symbolic --
 
 
-def test_integral_traces(space):
+def test_integral_traces():
+    # Symbolic tracing is generic FunctionSpace/Function machinery, not
+    # family-specific, so one representative family suffices.
+    space = nodal_space(6, A, B)
     u = space.project(f_)
     expected = u.antiderivative()(X)
 
@@ -281,7 +291,8 @@ def test_negative_integral_order_rejected(basis):
         basis._integral_basis(-1)
 
 
-def test_integral_matrix_rejects_negative_order(space):
+def test_integral_matrix_rejects_negative_order():
+    space = nodal_space(6, A, B)
     with pytest.raises(ValueError, match="order must be >= 0"):
         space._integral_matrix(order=-1)
 
@@ -441,23 +452,23 @@ def test_order_zero_is_exempt_from_the_finite_domain_requirement():
 # -- integrate() --
 
 
-def test_integrate_matches_the_whole_domain_analytic_value(space):
-    u = space.project(f_)
+def test_integrate_matches_the_whole_domain_analytic_value(space2):
+    u = space2.project(f_)
     np.testing.assert_allclose(
         u.integrate(), f_antideriv(B) - f_antideriv(A), atol=1e-9
     )
 
 
-def test_integrate_matches_integral_at_the_right_endpoint(space):
+def test_integrate_matches_integral_at_the_right_endpoint(space2):
     # Since the default boundary is "left", antideriv(A) == 0 exactly, so the
     # whole-domain integral is just antideriv(B).
-    u = space.project(f_)
+    u = space2.project(f_)
     antideriv = u.antiderivative()
     np.testing.assert_allclose(u.integrate(), antideriv(np.array([B]))[0], atol=1e-10)
 
 
-def test_integrate_supports_an_arbitrary_sub_interval(space):
-    u = space.project(f_)
+def test_integrate_supports_an_arbitrary_sub_interval(space2):
+    u = space2.project(f_)
     lo, hi = 0.3, 1.7
     np.testing.assert_allclose(
         u.integrate(lo, hi), f_antideriv(hi) - f_antideriv(lo), atol=1e-9

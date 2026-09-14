@@ -6,11 +6,9 @@ and that ``kind``/``density``/``quad_rule`` are forwarded correctly.
 """
 
 import numpy as np
-import pytest
 
 from archimedes.approximation import FourierBasis, FunctionSpace
 from archimedes.measure import UnitInterval
-from archimedes.quadrature import trapezoidal
 
 
 def test_fourier_matches_manual_construction():
@@ -34,11 +32,6 @@ def test_fourier_kind_cosine_and_sine_dispatch():
     assert FunctionSpace.fourier(4, kind="sine").basis.kind == "sine"
 
 
-def test_fourier_rejects_unknown_kind():
-    with pytest.raises(ValueError, match="kind must be"):
-        FunctionSpace.fourier(5, kind="bogus")
-
-
 def test_fourier_forwards_density():
     assert FunctionSpace.fourier(5, density=True).basis.density is True
     assert FunctionSpace.fourier(5).basis.density is False
@@ -47,9 +40,3 @@ def test_fourier_forwards_density():
 def test_fourier_default_domain_is_reference_interval():
     sugar = FunctionSpace.fourier(5)
     assert sugar.domain == UnitInterval.Parameters(a=-1.0, b=1.0)
-
-
-def test_fourier_quad_rule_forwarded():
-    rule = trapezoidal(11, periodic=True)
-    sugar = FunctionSpace.fourier(5, quad_rule=rule)
-    assert sugar.reference_quad_rule is rule

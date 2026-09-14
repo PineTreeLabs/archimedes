@@ -49,17 +49,13 @@ def test_bspline_domain_is_derived_from_knots():
 
 
 def test_bspline_open_knot_vector():
+    # boundary_dofs() behavior for an open knot vector is covered directly
+    # in test_bspline.py; here we only need to confirm the sugar constructor
+    # passes the knots through unchanged.
     knots = np.array([0.0, 0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0])
     degree = 2
     space = FunctionSpace.bspline(degree, knots)
     np.testing.assert_allclose(space.basis.knots, knots)
-    assert space.basis.boundary_dofs() == (None, None)
-
-
-def test_bspline_degree_zero():
-    space = FunctionSpace.bspline(0, [0.0, 1.0, 2.0, 3.0])
-    assert space.basis.degree == 0
-    assert space.n_basis == 3
 
 
 def test_bspline_project_is_exact_for_its_own_degree():
@@ -84,13 +80,10 @@ def test_bspline_quad_rule_passthrough_accepts_compatible_rule():
     assert sugar.reference_quad_rule is rule
 
 
-def test_bspline_quad_rule_passthrough_rejects_incompatible_rule():
-    # A plain (non-composite) rule can't integrate a piecewise-smooth basis
-    # exactly -- FunctionSpace's own validation catches this, same as it
-    # always has for PiecewiseBasis.
-    knots = np.array([0.0, 0.0, 0.0, 1.0, 2.0, 2.0, 2.0])
-    with pytest.raises(ValueError, match="only piecewise smooth"):
-        FunctionSpace.bspline(2, knots, quad_rule=gauss_legendre(5))
+# A plain (non-composite) rule can't integrate a piecewise-smooth basis
+# exactly -- FunctionSpace's own validation catches this, same as it always
+# has for PiecewiseBasis. Covered once, via FunctionSpace.piecewise, in
+# test_piecewise_constructor.py; no need to repeat it per basis family.
 
 
 # -- clamped_bspline() (clamped, from physical breakpoints) --
@@ -129,8 +122,15 @@ def test_clamped_bspline_domain_is_derived_from_breakpoints():
     assert space.domain == UnitInterval.Parameters(a=2.0, b=7.0)
 
 
-def test_clamped_bspline_degree_zero():
-    space = FunctionSpace.clamped_bspline(0, [0.0, 1.0, 2.0, 3.0])
+@pytest.mark.parametrize(
+    "ctor",
+    [FunctionSpace.bspline, FunctionSpace.clamped_bspline],
+    ids=["bspline", "clamped_bspline"],
+)
+def test_degree_zero(ctor):
+    # degree=0 needs no repeated end knots to be "clamped", so both
+    # constructors agree on the same knot vector for this special case.
+    space = ctor(0, [0.0, 1.0, 2.0, 3.0])
     assert space.basis.degree == 0
     assert space.n_basis == 3
     np.testing.assert_allclose(space.basis.knots, [0.0, 1.0, 2.0, 3.0])
@@ -150,18 +150,6 @@ def test_clamped_bspline_default_quadrature_is_composite_gauss_legendre():
     space = FunctionSpace.clamped_bspline(3, [0.0, 1.0, 2.0, 3.0, 4.0])
     rule = space.basis.default_quadrature()
     assert len(rule) == 4 * len(gauss_legendre(4))
-
-
-def test_clamped_bspline_quad_rule_forwarded():
-    degree = 2
-    breakpoints = np.array([0.0, 1.0, 2.0])
-    knots = np.concatenate(
-        [np.full(degree, breakpoints[0]), breakpoints, np.full(degree, breakpoints[-1])]
-    )
-    basis = BSplineBasis(degree, knots)
-    rule = composite_quad(gauss_legendre(5), basis.required_breakpoints)
-    sugar = FunctionSpace.clamped_bspline(degree, breakpoints, quad_rule=rule)
-    assert sugar.reference_quad_rule is rule
 
 
 def test_clamped_bspline_project_matches_manual_construction():

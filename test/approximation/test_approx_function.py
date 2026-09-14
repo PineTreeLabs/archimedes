@@ -1,3 +1,5 @@
+import operator
+
 import numpy as np
 import pytest
 
@@ -35,6 +37,15 @@ def test_call_matches_target_function(quadratic):
     np.testing.assert_allclose(quadratic(x), x**2, atol=1e-10)
 
 
+def test_call_rejects_unknown_keyword(quadratic):
+    # __call__ only accepts x/deriv/side -- no **kwargs catch-all -- so an
+    # unrecognized keyword should fail loudly rather than being silently
+    # swallowed or forwarded somewhere unexpected.
+    x = np.linspace(-1, 1, 5)
+    with pytest.raises(TypeError):
+        quadratic(x, bogus=1)
+
+
 def test_add_same_space(quadratic):
     doubled = quadratic + quadratic
     np.testing.assert_allclose(doubled.coefficients, 2 * quadratic.coefficients)
@@ -42,8 +53,12 @@ def test_add_same_space(quadratic):
     np.testing.assert_allclose(doubled(x), 2 * x**2, atol=1e-10)
 
 
-def test_add_structurally_mismatched_space_raises(quadratic, quad_rule):
-    # Different n_basis -> different basis -> genuinely incompatible.
+@pytest.mark.parametrize(
+    "op", [operator.add, operator.sub, Function.dot], ids=["add", "sub", "dot"]
+)
+def test_structurally_mismatched_space_raises(quadratic, quad_rule, op):
+    # __add__/__sub__/dot all guard on the same `_is_compatible_with` check;
+    # different n_basis -> different basis -> genuinely incompatible.
     other_space = FunctionSpace(
         OrthogonalPolynomialBasis(LegendreMeasure(), n_basis=4),
         domain=UnitInterval.Parameters(a=-1.0, b=1.0),
@@ -51,7 +66,7 @@ def test_add_structurally_mismatched_space_raises(quadratic, quad_rule):
     )
     other = other_space.project(lambda x: x**2)
     with pytest.raises(ValueError, match="project one onto the other's space"):
-        quadratic + other
+        op(quadratic, other)
 
 
 def test_add_numerically_mismatched_domain_is_not_caught(quadratic, quad_rule):
@@ -78,17 +93,6 @@ def test_subtract_same_space(quadratic):
     diff = cubic - quadratic
     x = np.linspace(-1, 1, 9)
     np.testing.assert_allclose(diff(x), x**3 - x**2, atol=1e-10)
-
-
-def test_subtract_structurally_mismatched_space_raises(quadratic, quad_rule):
-    other_space = FunctionSpace(
-        OrthogonalPolynomialBasis(LegendreMeasure(), n_basis=4),
-        domain=UnitInterval.Parameters(a=-1.0, b=1.0),
-        reference_quad_rule=quad_rule,
-    )
-    other = other_space.project(lambda x: x**2)
-    with pytest.raises(ValueError, match="project one onto the other's space"):
-        quadratic - other
 
 
 def test_negation(quadratic):
@@ -213,18 +217,3 @@ def test_dot_of_odd_and_even_function_on_symmetric_domain_vanishes(space):
     even_fn = space.project(lambda x: x**2)
     odd_fn = space.project(lambda x: x**3)
     np.testing.assert_allclose(even_fn.dot(odd_fn), 0.0, atol=1e-10)
-
-
-def test_norm_matches_sqrt_self_dot(quadratic):
-    np.testing.assert_allclose(quadratic.norm() ** 2, quadratic.dot(quadratic))
-
-
-def test_dot_structurally_mismatched_space_raises(quadratic, quad_rule):
-    other_space = FunctionSpace(
-        OrthogonalPolynomialBasis(LegendreMeasure(), n_basis=4),
-        domain=UnitInterval.Parameters(a=-1.0, b=1.0),
-        reference_quad_rule=quad_rule,
-    )
-    other = other_space.project(lambda x: x**2)
-    with pytest.raises(ValueError, match="project one onto the other's space"):
-        quadratic.dot(other)

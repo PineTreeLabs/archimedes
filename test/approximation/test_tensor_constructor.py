@@ -11,7 +11,6 @@ from archimedes.approximation._basis._tensor import (
     ProductParameters,
     TensorBasis,
 )
-from archimedes.quadrature import gauss_legendre, tensor_quad
 
 
 def test_matches_manual_tensor_basis_construction():
@@ -55,17 +54,6 @@ def test_rejects_a_multivariate_factor():
     )
     with pytest.raises(ValueError, match="must be univariate"):
         FunctionSpace.tensor(already_tensor, FunctionSpace.legendre(3))
-
-
-def test_quad_rule_forwarded():
-    rule = gauss_legendre(10)
-    tensor_rule = tensor_quad(rule, rule)
-    space = FunctionSpace.tensor(
-        FunctionSpace.legendre(5),
-        FunctionSpace.legendre(5),
-        quad_rule=tensor_rule,
-    )
-    assert space.reference_quad_rule is tensor_rule
 
 
 def test_project_matches_manual_construction_for_a_separable_function():

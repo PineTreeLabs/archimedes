@@ -124,17 +124,15 @@ def test_density_defaults_to_false():
 # -- genericity: same class, no family-specific code, for other measures --
 
 
-def test_generic_orthonormality_hermite():
-    basis = OrthogonalPolynomialBasis(PhysicistsHermiteMeasure(), n_basis=5)
-    rule = gauss_hermite(15, kind="phys")
-    phi = basis.evaluate(rule.nodes)
-    M = phi.T @ (rule.weights[:, None] * phi)
-    np.testing.assert_allclose(M, np.eye(5), atol=1e-8)
-
-
-def test_generic_orthonormality_laguerre():
-    basis = OrthogonalPolynomialBasis(LaguerreMeasure(), n_basis=5)
-    rule = gauss_laguerre(15)
+@pytest.mark.parametrize(
+    "measure,rule",
+    [
+        (PhysicistsHermiteMeasure(), gauss_hermite(15, kind="phys")),
+        (LaguerreMeasure(), gauss_laguerre(15)),
+    ],
+)
+def test_generic_orthonormality(measure, rule):
+    basis = OrthogonalPolynomialBasis(measure, n_basis=5)
     phi = basis.evaluate(rule.nodes)
     M = phi.T @ (rule.weights[:, None] * phi)
     np.testing.assert_allclose(M, np.eye(5), atol=1e-8)

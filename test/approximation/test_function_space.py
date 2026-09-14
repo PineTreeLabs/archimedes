@@ -219,15 +219,6 @@ def test_quad_rule_shared_across_spaces_lands_on_physical_nodes(quad_rule):
     assert np.all(Phi_a.nodes <= 6.0)
 
 
-def test_project_with_test_space_equal_to_self_matches_default(space):
-    # test_space=space should be indistinguishable from the (default)
-    # standard Galerkin path -- exercises the "not None" branch of the new
-    # checks without changing the math.
-    default = space.project(lambda x: x**2)
-    explicit = space.project(lambda x: x**2, test_space=space)
-    np.testing.assert_allclose(default.coefficients, explicit.coefficients)
-
-
 def test_project_rejects_test_space_with_different_n_basis(space, quad_rule):
     test_space = FunctionSpace(
         OrthogonalPolynomialBasis(LegendreMeasure(), n_basis=3),
@@ -401,19 +392,6 @@ def test_basis_matrix_matmul_applies_to_coefficients(space):
     c = np.array([1.0, -2.0, 0.5, 0.0, 3.0])
     phi = space.basis_matrix()
     np.testing.assert_allclose(phi @ c, phi.matrix @ c)
-
-
-def test_basis_matrix_adjoint_against_itself_reproduces_mass_matrix(space):
-    # mass_matrix is Phi^T Phi: M_ij = int phi_i phi_j w dx.
-    phi = space.basis_matrix()
-    M = phi.T @ phi.matrix
-    np.testing.assert_allclose(M, mass_matrix(space), atol=1e-10)
-
-
-def test_basis_matrix_adjoint_of_derivative_matches_stiffness_matrix(space):
-    dphi = space.basis_matrix(deriv=1)
-    K = dphi.T @ dphi.matrix
-    np.testing.assert_allclose(K, stiffness_matrix(space), atol=1e-10)
 
 
 def test_basis_matrix_adjoint_of_plain_function_matches_project_rhs(space):

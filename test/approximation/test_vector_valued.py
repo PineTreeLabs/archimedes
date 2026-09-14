@@ -2,73 +2,52 @@
 
 The vector-valuedness lives entirely in the coefficients: a ``Basis``
 evaluates to ``(npts, n_basis)`` regardless, so a ``FunctionSpace`` built
-for scalars carries ``(n_basis, m)`` coefficients unchanged. These tests
-sweep every basis family to confirm that holds, and that the operations
-which *do* need to know about components -- ``project`` and
-``inner_product`` -- agree with doing each component separately.
+for scalars carries ``(n_basis, m)`` coefficients unchanged. None of the
+generic plumbing this exercises (``project``, ``_evaluate``,
+``_inner_product``'s component contraction, pytree flattening, symbolic
+tracing) branches on which family's ``Basis`` is underneath -- confirmed by
+reading ``_function_space.py``/``_function.py`` -- so most tests below use a
+single representative family (``nodal``) rather than sweeping all three: one
+instance of this generic mechanism catches a regression in it just as well
+as three would. The two tests that actually exercise a family's own
+``evaluate``/``derivative`` path (rather than just the shape/contraction
+plumbing around it) additionally sweep ``piecewise``, since that's the one
+family with genuinely different (element-tiled) evaluation code.
 """
 
 import numpy as np
-import pytest
 from _helpers import mass_matrix
+from conftest import family_space
 
 import archimedes as arc
 from archimedes import tree
 from archimedes._core._array_impl import SymbolicArray
-from archimedes.approximation import (
-    Function,
-    FunctionSpace,
-    LagrangeBasis,
-    OrthogonalPolynomialBasis,
-    PiecewiseBasis,
-)
-from archimedes.measure import LegendreMeasure, UnitInterval
-from archimedes.quadrature import composite_quad, gauss_legendre, gauss_lobatto
+from archimedes.approximation import Function
+from archimedes.quadrature import composite_quad, gauss_legendre
 
 A, B = 0.0, 2.0  # target domain
 BREAKPOINTS = np.linspace(-1.0, 1.0, 3)
 
+# One representative family for the generic (family-agnostic) vector-valued
+# plumbing -- see the module docstring.
+space = family_space(
+    "nodal",
+    nodal_n_basis=4,
+    quad_rule=gauss_legendre(10),
+)
 
-def _modal():
-    return FunctionSpace(
-        OrthogonalPolynomialBasis(LegendreMeasure(), n_basis=5),
-        domain=UnitInterval.Parameters(a=A, b=B),
-        reference_quad_rule=gauss_legendre(10),
-    )
-
-
-def _nodal():
-    return FunctionSpace(
-        LagrangeBasis(reference_nodes=gauss_lobatto(4).nodes),
-        domain=UnitInterval.Parameters(a=A, b=B),
-        reference_quad_rule=gauss_legendre(10),
-    )
-
-
-def _piecewise():
-    return FunctionSpace(
-        PiecewiseBasis(
-            LagrangeBasis(reference_nodes=gauss_lobatto(4).nodes),
-            BREAKPOINTS,
-            continuity=0,
-        ),
-        domain=UnitInterval.Parameters(a=A, b=B),
-        # Composite rule so quadrature resolves the element structure.
-        reference_quad_rule=composite_quad(gauss_legendre(5), BREAKPOINTS),
-    )
-
-
-SPACE_BUILDERS = {
-    "modal": _modal,
-    "nodal": _nodal,
-    "piecewise": _piecewise,
-}
-
-
-@pytest.fixture(params=sorted(SPACE_BUILDERS))
-def space(request):
-    """Every basis family, so nothing here is specific to one of them."""
-    return SPACE_BUILDERS[request.param]()
+# nodal + piecewise, for the two tests that actually touch a family's own
+# evaluate/derivative implementation rather than just the generic plumbing
+# around it.
+space2 = family_space(
+    "nodal",
+    "piecewise",
+    nodal_n_basis=4,
+    element_n_basis=4,
+    breakpoints=BREAKPOINTS,
+    quad_rule=gauss_legendre(10),
+    piecewise_quad_rule=composite_quad(gauss_legendre(5), BREAKPOINTS),
+)
 
 
 # Components chosen to be exactly representable in all three spaces: each is
@@ -94,30 +73,14 @@ COMPONENTS = (f0, f1, f2)
 M_COMPONENTS = len(COMPONENTS)
 
 
-# -- shapes --
-
-
-def test_evaluate_shapes(space):
-    n = space.n_basis
-    x = np.linspace(A, B, 7)
-
-    scalar = space._evaluate(np.ones(n), x)
-    assert scalar.shape == (7,)
-
-    vector = space._evaluate(np.ones((n, M_COMPONENTS)), x)
-    assert vector.shape == (7, M_COMPONENTS)
-
-
-def test_project_preserves_shape(space):
-    assert space.project(f0).coefficients.shape == (space.n_basis,)
-    assert space.project(f_vec).coefficients.shape == (space.n_basis, M_COMPONENTS)
-
-
 # -- projection --
+# (Shape-only checks -- `test_evaluate_shapes`/`test_project_preserves_shape`
+# -- are cut: every exactness test below already implies the shape is right,
+# since a wrong shape would fail the value comparison too.)
 
 
-def test_project_vector_is_exact_for_representable_components(space):
-    fn = space.project(f_vec)
+def test_project_vector_is_exact_for_representable_components(space2):
+    fn = space2.project(f_vec)
     x = np.linspace(A, B, 41)
     np.testing.assert_allclose(fn(x), f_vec(x), atol=1e-9)
 
@@ -152,8 +115,8 @@ def test_project_single_column_is_not_the_scalar_case(space):
     assert fn(np.linspace(A, B, 5)).shape == (5, 1)
 
 
-def test_derivative_of_vector_function(space):
-    fn = space.project(f_vec)
+def test_derivative_of_vector_function(space2):
+    fn = space2.project(f_vec)
     x = np.linspace(A + 0.1, B - 0.1, 11)
     expected = np.stack([2 * x, 2 * np.ones_like(x), -np.ones_like(x)], axis=-1)
     np.testing.assert_allclose(fn(x, deriv=1), expected, atol=1e-8)

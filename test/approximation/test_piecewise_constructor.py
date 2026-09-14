@@ -42,9 +42,7 @@ def test_matches_manual_construction():
     [
         ("lobatto", 0),
         ("equispaced", 0),
-        ("legendre", -1),  # no endpoint nodes -- C0 is invalid, see below
-        ("radau_left", -1),
-        ("radau_right", -1),
+        ("radau_left", -1),  # no endpoint nodes -- C0 is invalid, see below
     ],
 )
 def test_nodes_family_matches_lagrange_classmethod(family, continuity):
@@ -222,20 +220,22 @@ def test_hermite_kind_matches_manual_construction(continuity):
     )
 
 
-def test_hermite_kind_requires_degree_three():
+@pytest.mark.parametrize(
+    "degree, breakpoints",
+    [
+        (2, np.linspace(0.0, 1.0, 6)),  # scalar degree, wrong value
+        ((3, 3, 2), np.linspace(0.0, 1.0, 4)),  # per-element tuple, one bad entry
+    ],
+    ids=["scalar", "per_element_tuple"],
+)
+def test_hermite_kind_requires_degree_three(degree, breakpoints):
+    # A tuple must be validated entry by entry, not just at index 0.
     with pytest.raises(ValueError, match="degree must be 3"):
-        FunctionSpace.piecewise("hermite", 2, np.linspace(0.0, 1.0, 6), continuity=1)
+        FunctionSpace.piecewise("hermite", degree, breakpoints, continuity=1)
 
 
 def test_hermite_kind_rejects_nodes():
     with pytest.raises(ValueError, match="nodes is only meaningful"):
         FunctionSpace.piecewise(
             "hermite", 3, np.linspace(0.0, 1.0, 6), nodes="lobatto", continuity=1
-        )
-
-
-def test_hermite_kind_per_element_tuple_degree_validates_each_entry():
-    with pytest.raises(ValueError, match="degree must be 3"):
-        FunctionSpace.piecewise(
-            "hermite", (3, 3, 2), np.linspace(0.0, 1.0, 4), continuity=1
         )

@@ -12,22 +12,16 @@ def basis():
     return CubicHermiteBasis()
 
 
-def test_construction_takes_no_arguments(basis):
+def test_construction_and_static_properties(basis):
     assert basis.n_basis == 4
-
-
-def test_parameters_is_unit_interval(basis):
     assert basis.Parameters is UnitInterval.Parameters
+    np.testing.assert_array_equal(basis._dof_order, [0, 1, 0, 1])
 
 
 def test_equal_and_hashable(basis):
     other = CubicHermiteBasis()
     assert basis == other
     assert hash(basis) == hash(other)
-
-
-def test_dof_order(basis):
-    np.testing.assert_array_equal(basis._dof_order, [0, 1, 0, 1])
 
 
 # -- cardinal-like properties at the endpoints --
@@ -93,8 +87,17 @@ class TestDomainMapping:
         c = np.array([1.0, -2.0, 3.0, -4.0])  # 1 - 2x + 3x^2 - 4x^3
         return [np.polynomial.Polynomial(c).deriv(k) for k in range(4)]
 
-    @pytest.mark.parametrize("a,b", [(2.0, 9.0), (-5.0, -1.0), (0.0, 0.25)])
-    @pytest.mark.parametrize("deriv", [0, 1, 2, 3])
+    @pytest.mark.parametrize(
+        "a,b,deriv",
+        [
+            (2.0, 9.0, 0),
+            (2.0, 9.0, 1),
+            (2.0, 9.0, 2),
+            (2.0, 9.0, 3),
+            (-5.0, -1.0, 1),
+            (-5.0, -1.0, 3),
+        ],
+    )
     def test_exact_on_mapped_domain(self, basis, poly, a, b, deriv):
         coeffs = np.array([poly[0](a), poly[1](a), poly[0](b), poly[1](b)])
         x = np.linspace(a, b, 11)

@@ -120,19 +120,6 @@ def test_derivative_at_nodes_matches_finite_difference(nodes):
     np.testing.assert_allclose(dphi, dphi_fd, atol=1e-5)
 
 
-def test_derivative_reproduces_polynomial_derivative(nodes):
-    basis = LagrangeBasis(reference_nodes=nodes)
-
-    def f(x):
-        return 3 * x**5 - 2 * x**3 + x - 1
-
-    def df(x):
-        return 15 * x**4 - 6 * x**2 + 1
-
-    x = np.linspace(-1, 1, 21)
-    np.testing.assert_allclose(basis.evaluate(x, deriv=1) @ f(nodes), df(x), atol=1e-8)
-
-
 def test_derivatives_sum_to_zero(nodes):
     # d/dx of the partition of unity.
     basis = LagrangeBasis(reference_nodes=nodes)

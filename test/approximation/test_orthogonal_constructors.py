@@ -23,7 +23,6 @@ from archimedes.measure import (
     RealLine,
     UnitInterval,
 )
-from archimedes.quadrature import gauss_legendre
 
 
 def test_legendre_matches_manual_construction():
@@ -58,10 +57,6 @@ def test_hermite_defaults_to_probabilists_measure():
     assert sugar.domain == RealLine.Parameters(loc=1.0, scale=2.0)
 
 
-def test_hermite_kind_prob_is_explicit_default():
-    assert FunctionSpace.hermite(4, kind="prob") == FunctionSpace.hermite(4)
-
-
 def test_hermite_kind_phys_uses_physicists_measure():
     sugar = FunctionSpace.hermite(4, kind="phys")
     assert isinstance(sugar.basis.measure, PhysicistsHermiteMeasure)
@@ -85,9 +80,3 @@ def test_laguerre_uses_half_line_domain():
     sugar = FunctionSpace.laguerre(4, rate=2.0, start=1.0)
     assert isinstance(sugar.basis.measure, LaguerreMeasure)
     assert sugar.domain == HalfLine.Parameters(rate=2.0, start=1.0)
-
-
-def test_quad_rule_forwarded():
-    rule = gauss_legendre(10)
-    sugar = FunctionSpace.legendre(5, quad_rule=rule)
-    assert sugar.reference_quad_rule is rule

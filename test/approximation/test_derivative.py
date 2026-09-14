@@ -10,6 +10,8 @@ the independent path to the same values.
 import numpy as np
 import pytest
 from _helpers import mass_matrix, stiffness_matrix
+from conftest import family_space, modal_space, nodal_space
+from conftest import lobatto_basis as _lobatto
 
 import archimedes as arc
 from archimedes.approximation import (
@@ -38,29 +40,31 @@ BREAKS = np.linspace(-1.0, 1.0, 4)
 # Off the breakpoints: a C0 basis has a genuinely two-valued derivative there.
 X = np.linspace(0.07, 1.93, 15)
 
+# `jacobi` is deliberately not part of either fixture below: it exercises the
+# same `OrthogonalPolynomialBasis` code path as `modal` for every derivative
+# operation here, so sweeping it through generic tests would only duplicate
+# `modal`'s coverage. What's actually specific to Jacobi (measure/
+# normalization preservation across a derivative) is checked directly by
+# `test_polynomial_families_keep_their_measure_and_normalization` and
+# `test_jacobi_derivative_stays_orthonormal` below, without going through
+# either fixture.
 
-def _lobatto(n):
-    return LagrangeBasis(reference_nodes=gauss_lobatto(n).nodes)
+# The "every family really works" anchor: full 4-way sweep, used only by the
+# two tests that most directly check exactness end-to-end.
+space = family_space(
+    "modal", "nodal", "piecewise", "bspline", n_basis=6, breakpoints=BREAKS
+)
 
-
-SPACE_BUILDERS = {
-    "modal": lambda: FunctionSpace(
-        OrthogonalPolynomialBasis(LegendreMeasure(), 6), domain=DOMAIN
-    ),
-    "jacobi": lambda: FunctionSpace(
-        OrthogonalPolynomialBasis(JacobiMeasure(1.5, 0.5), 6), domain=DOMAIN
-    ),
-    "nodal": lambda: FunctionSpace(_lobatto(6), domain=DOMAIN),
-    "piecewise": lambda: FunctionSpace(
-        PiecewiseBasis(_lobatto(4), BREAKS, continuity=0), domain=DOMAIN
-    ),
-    "bspline": lambda: FunctionSpace.clamped_bspline(3, np.linspace(A, B, 4)),
-}
-
-
-@pytest.fixture(params=sorted(SPACE_BUILDERS))
-def space(request):
-    return SPACE_BUILDERS[request.param]()
+# A 2-way reduced sweep (nodal + piecewise) for tests that check
+# FunctionSpace-generic derivative plumbing (sizing, matrix shapes,
+# consistency between two evaluation paths) that doesn't need re-proving
+# across every family once the anchor tests above have done so -- nodal and
+# piecewise are the two structurally distinct (collocation vs. element-tiled)
+# implementations not already exercised by a dedicated section elsewhere in
+# this file.
+space2 = family_space(
+    "nodal", "piecewise", nodal_n_basis=6, element_n_basis=4, breakpoints=BREAKS
+)
 
 
 def f_(x):
@@ -83,20 +87,20 @@ def test_derivative_is_exact(space):
     np.testing.assert_allclose(du(X), df_(X), atol=1e-11)
 
 
-def test_derivative_agrees_with_pointwise_evaluation(space):
+def test_derivative_agrees_with_pointwise_evaluation(space2):
     # The defining invariant: the same values reached two independent ways.
-    u = space.project(f_)
+    u = space2.project(f_)
     np.testing.assert_allclose(u.derivative()(X), u(X, deriv=1), atol=1e-11)
 
 
 @pytest.mark.parametrize("order,exact", [(1, df_), (2, d2f_)])
-def test_higher_order_derivatives(space, order, exact):
-    du = space.project(f_).derivative(order)
+def test_higher_order_derivatives(space2, order, exact):
+    du = space2.project(f_).derivative(order)
     np.testing.assert_allclose(du(X), exact(X), atol=1e-10)
 
 
-def test_repeated_differentiation_matches_a_single_call(space):
-    u = space.project(f_)
+def test_repeated_differentiation_matches_a_single_call(space2):
+    u = space2.project(f_)
     np.testing.assert_allclose(
         u.derivative().derivative()(X), u.derivative(2)(X), atol=1e-10
     )
@@ -162,16 +166,16 @@ def test_pointwise_evaluation_past_the_degree_still_gives_zero():
 # -- the space is the minimal one --
 
 
-def test_derivative_space_is_smaller(space):
-    u = space.project(f_)
+def test_derivative_space_is_smaller(space2):
+    u = space2.project(f_)
     du = u.derivative()
-    if isinstance(space.basis, PiecewiseBasis):
+    if isinstance(space2.basis, PiecewiseBasis):
         # Sizing is per element, then reassembled under continuity.
         assert du.space.basis.element_basis[0].n_basis == (
-            space.basis.element_basis[0].n_basis - 1
+            space2.basis.element_basis[0].n_basis - 1
         )
     else:
-        assert du.space.n_basis == space.n_basis - 1
+        assert du.space.n_basis == space2.n_basis - 1
 
 
 def test_polynomial_families_keep_their_measure_and_normalization():
@@ -201,7 +205,7 @@ def test_jacobi_derivative_stays_orthonormal():
 def test_projecting_back_up_is_exact():
     # The documented way to get `f + f.derivative()`: the derivative lives in
     # a subspace, so projecting it up loses nothing.
-    space = SPACE_BUILDERS["modal"]()
+    space = modal_space(6, A, B)
     u = space.project(f_)
     lifted = space.project(u.derivative())
     assert lifted.space.n_basis == space.n_basis
@@ -304,17 +308,17 @@ def test_square_diff_matrix_reproduces_the_classical_one():
     )
 
 
-def test_square_diff_matrix_is_exact_in_the_same_space(space):
+def test_square_diff_matrix_is_exact_in_the_same_space(space2):
     # The same-space form collocation wants: coefficients keep their meaning.
-    u = space.project(f_)
-    du = Function(space._diff_matrix() @ u.coefficients, space)
+    u = space2.project(f_)
+    du = Function(space2._diff_matrix() @ u.coefficients, space2)
     np.testing.assert_allclose(du(X), df_(X), atol=1e-10)
 
 
-def test_diff_matrix_shape_follows_the_target(space):
-    target = space._derivative_space()
-    assert space._diff_matrix().shape == (space.n_basis, space.n_basis)
-    assert space._diff_matrix(space=target).shape == (target.n_basis, space.n_basis)
+def test_diff_matrix_shape_follows_the_target(space2):
+    target = space2._derivative_space()
+    assert space2._diff_matrix().shape == (space2.n_basis, space2.n_basis)
+    assert space2._diff_matrix(space=target).shape == (target.n_basis, space2.n_basis)
 
 
 def test_diff_matrix_matches_function_derivative(space):
@@ -327,7 +331,11 @@ def test_diff_matrix_matches_function_derivative(space):
     )
 
 
-def test_explicit_result_space_is_honored(space):
+def test_explicit_result_space_is_honored():
+    # FunctionSpace-generic plumbing (an explicit `space=` kwarg is honored
+    # rather than the automatic minimal one) -- doesn't depend on which
+    # family computed it, so one representative family suffices.
+    space = nodal_space(6, A, B)
     u = space.project(f_)
     du = u.derivative(space=space)
     assert du.space is space
@@ -335,7 +343,7 @@ def test_explicit_result_space_is_honored(space):
 
 
 def test_undersized_explicit_space_projects_rather_than_failing():
-    space = SPACE_BUILDERS["modal"]()
+    space = modal_space(6, A, B)
     small = FunctionSpace(OrthogonalPolynomialBasis(LegendreMeasure(), 2), DOMAIN)
     du = space.project(f_).derivative(space=small)
     assert du.space.n_basis == 2
@@ -348,7 +356,7 @@ def test_undersized_explicit_space_projects_rather_than_failing():
 def test_stiffness_matrix_agrees_with_derivative_inner_products():
     # The end-to-end check that matters for FEM: assembling <u', v'> from
     # derivative Functions gives the same answer as the stiffness matrix.
-    space = SPACE_BUILDERS["nodal"]()
+    space = nodal_space(6, A, B)
     u = space.project(f_)
     v = space.project(lambda x: x**2 - 3 * x)
     assert u.derivative().dot(v.derivative()) == pytest.approx(
@@ -395,10 +403,14 @@ def test_tensor_derivative_rejects_a_bare_integer():
 # -- vector-valued --
 
 
-def test_vector_valued_derivative(space):
+def test_vector_valued_derivative():
+    # Generic vector-valued plumbing (coefficients carry an extra column;
+    # see test_vector_valued.py) rather than anything family-specific, so
+    # one representative family suffices.
     def fv(x):
         return np.stack([x**3, 2 * x**2], axis=-1)
 
+    space = nodal_space(6, A, B)
     du = space.project(fv).derivative()
     assert du.coefficients.shape == (du.space.n_basis, 2)
     np.testing.assert_allclose(du(X), np.stack([3 * X**2, 4 * X], axis=-1), atol=1e-10)
@@ -407,7 +419,10 @@ def test_vector_valued_derivative(space):
 # -- symbolic --
 
 
-def test_derivative_traces(space):
+def test_derivative_traces():
+    # Symbolic tracing is generic FunctionSpace/Function machinery, not
+    # family-specific, so one representative family suffices.
+    space = nodal_space(6, A, B)
     u = space.project(f_)
     expected = u.derivative()(X)
 

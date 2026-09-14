@@ -61,6 +61,15 @@ def space(request):
     return FunctionSpace(TensorBasis((make(4), make(4))), domain=BOX)
 
 
+@pytest.fixture(params=["modal", "piecewise"])
+def vector_space(request):
+    # Vector-coefficient broadcasting lives in Function/FunctionSpace, not
+    # per-factor -- two representative families (dense modal + local-support
+    # piecewise) are enough, dropping the redundant "nodal" case.
+    make = FACTORIES[request.param]
+    return FunctionSpace(TensorBasis((make(4), make(4))), domain=BOX)
+
+
 def f_(x):
     """Non-separable: no product of a function of x and a function of y."""
     return x[:, 0] ** 2 * x[:, 1] + 3.0 * x[:, 0] - x[:, 1] ** 3 + 1.0
@@ -200,7 +209,11 @@ def test_three_dimensional_space():
     np.testing.assert_allclose(space.project(g)(x), g(x), atol=1e-11)
 
 
-def test_coefficients_reshape_to_the_multi_index_grid(space):
+def test_coefficients_reshape_to_the_multi_index_grid():
+    # Reshape logic reads only basis.shape (n_basis per factor), which is
+    # family-agnostic -- one family suffices rather than the full 3-family
+    # matrix used by the exactness/product tests.
+    space = FunctionSpace(TensorBasis((_modal(4), _modal(4))), domain=BOX)
     u = space.project(f_)
     assert u.coefficients.reshape(space.basis.shape).shape == (
         space.basis.bases[0].n_basis,
@@ -211,22 +224,46 @@ def test_coefficients_reshape_to_the_multi_index_grid(space):
 # -- derivatives --
 
 
-@pytest.mark.parametrize(
-    "deriv,exact",
-    [
-        ((1, 0), lambda x: 2.0 * x[:, 0] * x[:, 1] + 3.0),
-        ((0, 1), lambda x: x[:, 0] ** 2 - 3.0 * x[:, 1] ** 2),
-        ((1, 1), lambda x: 2.0 * x[:, 0]),
-        ((2, 0), lambda x: 2.0 * x[:, 1]),
-        ((0, 3), lambda x: -6.0 * np.ones_like(x[:, 0])),
-    ],
+DERIV_CASES = [
+    ((1, 0), lambda x: 2.0 * x[:, 0] * x[:, 1] + 3.0),
+    ((0, 1), lambda x: x[:, 0] ** 2 - 3.0 * x[:, 1] ** 2),
+    ((1, 1), lambda x: 2.0 * x[:, 0]),
+    ((2, 0), lambda x: 2.0 * x[:, 1]),
+    ((0, 3), lambda x: -6.0 * np.ones_like(x[:, 0])),
+]
+
+# Stay off the element boundaries: a C0 piecewise basis has a genuinely
+# one-sided derivative there.
+_PARTIAL_DERIV_X = np.stack(
+    [np.linspace(0.15, 1.85, 11), np.linspace(-0.85, 0.85, 11)], axis=-1
 )
-def test_partial_derivatives_including_mixed(space, deriv, exact):
+
+
+@pytest.mark.parametrize("deriv,exact", DERIV_CASES)
+def test_partial_derivatives_including_mixed(deriv, exact):
+    # Full deriv/mixed-partial breadth checked on one family (modal): the
+    # multi-index distribution and _row_kron combination this exercises is
+    # family-agnostic machinery, and each factor's own derivative
+    # correctness is covered exhaustively in its own test file. See
+    # test_partial_derivative_on_a_piecewise_factor for a smoke check that
+    # the same machinery works with a factor that has element structure.
+    space = FunctionSpace(TensorBasis((_modal(4), _modal(4))), domain=BOX)
     u = space.project(f_)
-    # Stay off the element boundaries: a C0 piecewise basis has a genuinely
-    # one-sided derivative there.
-    x = np.stack([np.linspace(0.15, 1.85, 11), np.linspace(-0.85, 0.85, 11)], axis=-1)
-    np.testing.assert_allclose(u(x, deriv=deriv), exact(x), atol=1e-9)
+    np.testing.assert_allclose(
+        u(_PARTIAL_DERIV_X, deriv=deriv), exact(_PARTIAL_DERIV_X), atol=1e-9
+    )
+
+
+def test_partial_derivative_on_a_piecewise_factor():
+    # Smoke check (one representative deriv) that the multi-index/row_kron
+    # machinery above also works when a factor has local support / element
+    # structure, not just a globally smooth modal basis.
+    space = FunctionSpace(TensorBasis((_piecewise(4), _piecewise(4))), domain=BOX)
+    u = space.project(f_)
+    deriv, exact = DERIV_CASES[0]
+    np.testing.assert_allclose(
+        u(_PARTIAL_DERIV_X, deriv=deriv), exact(_PARTIAL_DERIV_X), atol=1e-9
+    )
 
 
 def test_derivative_beyond_the_degree_vanishes():
@@ -303,12 +340,12 @@ def test_gaussian_and_uniform_dimensions_together():
 # -- vector-valued and products --
 
 
-def test_vector_valued_projection(space):
+def test_vector_valued_projection(vector_space):
     def fv(x):
         return np.stack([x[:, 0] * x[:, 1], x[:, 0] ** 2 - x[:, 1]], axis=-1)
 
-    u = space.project(fv)
-    assert u.coefficients.shape == (space.n_basis, 2)
+    u = vector_space.project(fv)
+    assert u.coefficients.shape == (vector_space.n_basis, 2)
     x = _grid()
     np.testing.assert_allclose(u(x), fv(x), atol=1e-11)
 

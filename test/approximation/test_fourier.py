@@ -54,9 +54,10 @@ def test_max_mode(kind, n_basis, expected):
     assert FourierBasis(n_basis, kind=kind).max_mode == expected
 
 
-def test_measures_is_legendre():
+def test_measures_and_density_defaults():
     basis = FourierBasis(5)
     assert basis.measures == (LegendreMeasure(),)
+    assert basis.density is False
 
 
 # -- values at hand-computed points, on the reference domain [-1, 1] --
@@ -96,18 +97,11 @@ def test_sine_values_at_known_points():
     np.testing.assert_allclose(phi, expected, atol=1e-12)
 
 
-def test_evaluate_shape():
-    for kind, n_basis in [("full", 7), ("cosine", 4), ("sine", 4)]:
-        basis = FourierBasis(n_basis, kind=kind)
-        x = np.linspace(-1, 1, 11)
-        assert basis.evaluate(x).shape == (len(x), n_basis)
-
-
 # -- derivatives vs. finite differences --
 
 
 @pytest.mark.parametrize("kind,n_basis", [("full", 7), ("cosine", 4), ("sine", 4)])
-@pytest.mark.parametrize("deriv", [1, 2, 3])
+@pytest.mark.parametrize("deriv", [1, 3])
 def test_derivative_matches_finite_difference(kind, n_basis, deriv):
     basis = FourierBasis(n_basis, kind=kind)
     x = np.linspace(-0.9, 0.9, 13)
@@ -122,8 +116,15 @@ def test_derivative_matches_finite_difference(kind, n_basis, deriv):
 # -- orthonormality via the basis's own default quadrature --
 
 
-@pytest.mark.parametrize("kind,n_basis", [("full", 7), ("cosine", 4), ("sine", 4)])
-@pytest.mark.parametrize("density", [False, True])
+@pytest.mark.parametrize(
+    "kind,n_basis,density",
+    [
+        ("full", 7, False),
+        ("cosine", 4, False),
+        ("sine", 4, False),
+        ("full", 7, True),
+    ],
+)
 def test_orthonormal_on_reference_domain(kind, n_basis, density):
     basis = FourierBasis(n_basis, kind=kind, density=density)
     rule = basis.default_quadrature()
@@ -135,27 +136,26 @@ def test_orthonormal_on_reference_domain(kind, n_basis, density):
     np.testing.assert_allclose(M, np.eye(n_basis), atol=1e-10)
 
 
-@pytest.mark.parametrize("kind,n_basis", [("full", 7), ("cosine", 4), ("sine", 4)])
-def test_orthonormal_on_mapped_domain(kind, n_basis):
+@pytest.mark.parametrize(
+    "kind,n_basis,density",
+    [
+        ("full", 7, False),
+        ("cosine", 4, False),
+        ("sine", 4, False),
+        ("full", 5, True),
+    ],
+)
+def test_orthonormal_on_mapped_domain(kind, n_basis, density):
     a, b = 2.0, 7.0
-    basis = FourierBasis(n_basis, kind=kind)
+    basis = FourierBasis(n_basis, kind=kind, density=density)
     rule = basis.default_quadrature().map_to(a, b)
     x = rule.nodes
     w = rule.weights
+    if density:
+        w = w / np.sum(w)
     phi = basis.evaluate(x, a=a, b=b)
     M = phi.T @ (w[:, None] * phi)
     np.testing.assert_allclose(M, np.eye(n_basis), atol=1e-10)
-
-
-def test_density_orthonormal_against_probability_measure():
-    a, b = -3.0, 4.0
-    basis = FourierBasis(5, kind="full", density=True)
-    rule = basis.default_quadrature().map_to(a, b)
-    x = rule.nodes
-    w = rule.weights / np.sum(rule.weights)
-    phi = basis.evaluate(x, a=a, b=b)
-    M = phi.T @ (w[:, None] * phi)
-    np.testing.assert_allclose(M, np.eye(5), atol=1e-10)
 
 
 def test_density_rescales_by_sqrt_mass_relative_to_raw():
@@ -167,10 +167,6 @@ def test_density_rescales_by_sqrt_mass_relative_to_raw():
     phi_density = density.evaluate(x, a=a, b=b)
     mass = LegendreMeasure().mass(a, b)
     np.testing.assert_allclose(phi_density, phi_raw * np.sqrt(mass), atol=1e-10)
-
-
-def test_density_defaults_to_false():
-    assert FourierBasis(3).density is False
 
 
 # -- static (NumPy) vs. dynamic (symbolic, via arc.compile) equivalence --

@@ -9,6 +9,8 @@ reimplementation.
 
 import numpy as np
 import pytest
+from conftest import family_space, nodal_space
+from conftest import lobatto_basis as _lobatto
 
 import archimedes as arc
 from archimedes._core._array_impl import SymbolicArray
@@ -34,25 +36,11 @@ A, B = 0.0, 2.0
 DOMAIN = UnitInterval.Parameters(a=A, b=B)
 BREAKPOINTS = np.linspace(-1.0, 1.0, 3)
 
-
-def _lobatto(n):
-    return LagrangeBasis(reference_nodes=gauss_lobatto(n).nodes)
-
-
-SPACE_BUILDERS = {
-    "modal": lambda: FunctionSpace(
-        OrthogonalPolynomialBasis(LegendreMeasure(), 4), domain=DOMAIN
-    ),
-    "nodal": lambda: FunctionSpace(_lobatto(4), domain=DOMAIN),
-    "piecewise": lambda: FunctionSpace(
-        PiecewiseBasis(_lobatto(4), BREAKPOINTS, continuity=0), domain=DOMAIN
-    ),
-}
-
-
-@pytest.fixture(params=sorted(SPACE_BUILDERS))
-def space(request):
-    return SPACE_BUILDERS[request.param]()
+# modal/nodal/piecewise are three genuinely distinct `_product_basis`
+# implementations (no `jacobi`-style duplicate here, unlike
+# test_derivative.py/test_integral.py), so the full 3-way sweep below is
+# used for the tests that actually check product correctness/sizing.
+space = family_space("modal", "nodal", "piecewise", n_basis=4, breakpoints=BREAKPOINTS)
 
 
 def f_(x):
@@ -87,7 +75,11 @@ def test_product_space_size(space):
         assert product.space.n_basis == n1 + n2 - 1
 
 
-def test_multiply_is_commutative(space):
+def test_multiply_is_commutative():
+    # Commutativity of `*` is generic Function-level behavior (built on
+    # `multiply`, which projects the same pointwise product either way), not
+    # family-specific, so one representative family suffices.
+    space = nodal_space(4, A, B)
     f, g = space.project(f_), space.project(g_)
     x = np.linspace(A, B, 41)
     np.testing.assert_allclose((f * g)(x), (g * f)(x), atol=1e-12)
@@ -118,7 +110,11 @@ def test_project_back_down_after_product(space):
 # -- scalars still work --
 
 
-def test_scalar_multiplication_stays_in_space(space):
+def test_scalar_multiplication_stays_in_space():
+    # Scalar multiplication is generic Function-level behavior (the
+    # `__mul__`/`__rmul__` branch that never leaves `self.space`), not
+    # family-specific, so one representative family suffices.
+    space = nodal_space(4, A, B)
     f = space.project(f_)
     x = np.linspace(A, B, 21)
     for scaled in (3.0 * f, f * 3.0):
@@ -155,7 +151,10 @@ def test_scalar_valued_times_vector_valued_broadcasts(space):
 # -- explicit result space --
 
 
-def test_explicit_space_override(space):
+def test_explicit_space_override():
+    # Honoring an explicit `space=` kwarg is generic Function-level plumbing,
+    # not family-specific, so one representative family suffices.
+    space = nodal_space(4, A, B)
     f, g = space.project(f_), space.project(g_)
     big = f.space._product_space(g.space)
     product = f.multiply(g, space=big)
@@ -163,9 +162,11 @@ def test_explicit_space_override(space):
     np.testing.assert_allclose(product(x), f_(x) * g_(x), atol=1e-11)
 
 
-def test_undersized_explicit_space_projects_rather_than_failing(space):
+def test_undersized_explicit_space_projects_rather_than_failing():
     # Documented behavior: a too-small space gives the projection of the
-    # product, which is a well-defined approximation but not exact.
+    # product, which is a well-defined approximation but not exact. Generic
+    # Function-level fallback behavior, not family-specific.
+    space = nodal_space(4, A, B)
     f, g = space.project(f_), space.project(g_)
     product = f.multiply(g, space=space)
     assert product.space.n_basis == space.n_basis
@@ -385,7 +386,10 @@ def test_fourier_different_basis_families_rejected():
 # -- symbolic --
 
 
-def test_product_traces(space):
+def test_product_traces():
+    # Symbolic tracing is generic Function-level machinery, not
+    # family-specific, so one representative family suffices.
+    space = nodal_space(4, A, B)
     f, g = space.project(f_), space.project(g_)
     x = np.linspace(A, B, 5)
     expected = (f * g)(x)

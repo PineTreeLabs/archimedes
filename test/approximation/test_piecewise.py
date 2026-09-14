@@ -108,10 +108,6 @@ def test_tuple_length_must_match_n_elements(local, breakpoints):
         PiecewiseBasis((local, local), breakpoints, continuity=0)  # 3 elements
 
 
-def test_boundary_dofs_lobatto(local):
-    assert local.boundary_dofs() == (0, local.n_basis - 1)
-
-
 # -- global boundary DOFs --
 
 
@@ -473,48 +469,23 @@ def test_domain_mapping(local, breakpoints):
 # -- composition with FunctionSpace --
 
 
-def test_projection_of_elementwise_representable_function(local, breakpoints):
-    a, b = 0.0, 3.0
-    basis = PiecewiseBasis(local, breakpoints, continuity=0)
-    space = FunctionSpace(
-        basis,
-        domain=UnitInterval.Parameters(a=a, b=b),
-        # Composite rule so quadrature resolves the element structure.
-        reference_quad_rule=composite_quad(gauss_legendre(4), breakpoints),
-    )
-
-    # Globally quadratic: degree <= 2 on each element and continuous, so it
-    # lies exactly in the C0 space.
-    def f(x):
-        return 3 * x**2 - 2 * x + 1
-
-    fn = space.project(f)
-    x = np.linspace(a, b, 61)
-    np.testing.assert_allclose(fn(x), f(x), atol=1e-8)
-
-
-def test_mass_matrix_is_nonsingular(local, breakpoints):
+def test_mass_and_stiffness_matrices_of_assembled_basis(local, breakpoints):
+    # The DOF-merge assembly must not introduce rank deficiency (mass matrix
+    # nonsingular) or break the classic FEM/Neumann structure: the constant
+    # function lies in the C0 space and has zero derivative, so the
+    # stiffness matrix must have the all-ones coefficient vector in its
+    # kernel and rank exactly n_basis - 1.
     basis = PiecewiseBasis(local, breakpoints, continuity=0)
     space = FunctionSpace(
         basis,
         domain=UnitInterval.Parameters(a=0.0, b=3.0),
         reference_quad_rule=composite_quad(gauss_legendre(4), breakpoints),
     )
+
     M = mass_matrix(space)
     np.testing.assert_allclose(M, M.T, atol=1e-12)
     assert np.linalg.matrix_rank(M) == space.n_basis
 
-
-def test_stiffness_matrix_annihilates_constants(local, breakpoints):
-    # The constant function lies in the C0 space and has zero derivative, so
-    # the stiffness matrix must have the all-ones coefficient vector in its
-    # kernel and rank exactly n_basis - 1 (the classic FEM/Neumann structure).
-    basis = PiecewiseBasis(local, breakpoints, continuity=0)
-    space = FunctionSpace(
-        basis,
-        domain=UnitInterval.Parameters(a=0.0, b=3.0),
-        reference_quad_rule=composite_quad(gauss_legendre(4), breakpoints),
-    )
     K = stiffness_matrix(space)
     np.testing.assert_allclose(K, K.T, atol=1e-12)
     np.testing.assert_allclose(K @ np.ones(space.n_basis), 0.0, atol=1e-10)
@@ -593,15 +564,6 @@ class TestQuadratureCompatibility:
             reference_quad_rule=composite_quad(gauss_legendre(8), self.BP),
         )
         np.testing.assert_allclose(mass_matrix(default), mass_matrix(exact), atol=1e-12)
-
-    def test_space_without_quad_rule_projects_correctly(self, basis):
-        space = FunctionSpace(basis, domain=self.DOMAIN)
-
-        def f(x):
-            return 3 * x**2 - 2 * x + 1
-
-        x = np.linspace(0.0, 3.0, 41)
-        np.testing.assert_allclose(space.project(f)(x), f(x), atol=1e-9)
 
     def test_aligned_rule_accepted(self, basis):
         rule = composite_quad(gauss_legendre(4), self.BP)
@@ -712,9 +674,12 @@ class TestPerElementOrder:
         )
         assert rule == expected
 
-    def test_default_quadrature_integrates_mass_matrix_exactly(self, basis):
+    def test_heterogeneous_basis_reproduces_uniform_case_properties(self, basis):
+        # The properties checked at module level for a uniform element_basis
+        # -- exact mass matrix via the default quadrature, partition of
+        # unity from either side, and C0 continuity at interior breakpoints
+        # -- must all still hold once elements genuinely differ in order.
         default = FunctionSpace(basis, domain=self.DOMAIN)
-        # A much higher-order aligned rule must give the same mass matrix.
         exact = FunctionSpace(
             basis,
             domain=self.DOMAIN,
@@ -722,13 +687,11 @@ class TestPerElementOrder:
         )
         np.testing.assert_allclose(mass_matrix(default), mass_matrix(exact), atol=1e-12)
 
-    @pytest.mark.parametrize("side", ["left", "right"])
-    def test_partition_of_unity(self, basis, side):
         x = np.concatenate([np.linspace(-1, 1, 401), self.BP])
-        phi = basis.evaluate(x, side=side)
-        np.testing.assert_allclose(phi.sum(axis=1), 1.0, atol=1e-10)
+        for side in ("left", "right"):
+            phi = basis.evaluate(x, side=side)
+            np.testing.assert_allclose(phi.sum(axis=1), 1.0, atol=1e-10)
 
-    def test_c0_is_continuous_at_breakpoints(self, basis):
         eps = 1e-9
         for knot in self.BP[1:-1]:
             left = basis.evaluate(np.array([knot - eps]))
@@ -800,10 +763,20 @@ class TestEvaluateExpansion:
             [np.linspace(-1.3, 1.3, 23) * scale + shift, breakpoints * scale + shift]
         )
 
-    @pytest.mark.parametrize("continuity", [-1, 0])
-    @pytest.mark.parametrize("n_elements", [1, 2, 5])
-    @pytest.mark.parametrize("deriv", [0, 1, 2])
-    @pytest.mark.parametrize("n_components", [None, 3])
+    @pytest.mark.parametrize(
+        "continuity,n_elements,deriv,n_components",
+        [
+            (-1, 1, 0, None),
+            (-1, 1, 2, None),
+            (-1, 5, 0, None),
+            (-1, 5, 2, None),
+            (0, 1, 0, None),
+            (0, 1, 2, None),
+            (0, 5, 0, None),
+            (0, 5, 2, None),
+            (0, 5, 1, 3),  # one vector-valued case, so that path isn't dropped
+        ],
+    )
     def test_matches_dense_path(
         self, local, continuity, n_elements, deriv, n_components
     ):

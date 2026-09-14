@@ -59,6 +59,30 @@ def basis(case):
     return BSplineBasis(degree, knots)
 
 
+# Deliberate "witness" pair for tests whose branch coverage doesn't actually
+# depend on knot layout: one clamped/nonuniform case and one
+# repeated-interior-knot case, chosen specifically because together they
+# exercise the two edge-sensitive code paths in `_local_values` (clamped-
+# boundary indexing, and the multiplicity-stepping loop for a repeated
+# interior knot). Used to de-cross tests that were needlessly parametrized
+# across the full 6-case `case` fixture above; do not swap this pair out
+# without re-checking that coverage.
+WITNESS_CASES = [CLAMPED_NONUNIFORM, INTERIOR_MAX_MULT]
+WITNESS_CASE_IDS = ["clamped_nonuniform", "interior_max_mult"]
+
+
+@pytest.fixture(params=WITNESS_CASES, ids=WITNESS_CASE_IDS)
+def witness_case(request):
+    degree, knots = request.param
+    return degree, knots
+
+
+@pytest.fixture
+def witness_basis(witness_case):
+    degree, knots = witness_case
+    return BSplineBasis(degree, knots)
+
+
 def _sample_points(basis, extrapolate=True):
     a, b = basis.knots[basis.degree], basis.knots[-1 - basis.degree]
     x = np.linspace(a, b, 37)
@@ -117,7 +141,10 @@ def test_equality_and_hash():
     assert a != "not a basis"
 
 
-def test_negative_deriv_rejected(basis):
+def test_negative_deriv_rejected(witness_basis):
+    # Case-invariant branch (raises before touching knots/degree at all);
+    # trimmed from the full 6-case matrix to the witness pair.
+    basis = witness_basis
     x = np.array([basis.knots[basis.degree]])
     with pytest.raises(ValueError, match="deriv must be >= 0"):
         basis.evaluate(x, deriv=-1)
@@ -125,7 +152,10 @@ def test_negative_deriv_rejected(basis):
         basis.evaluate_expansion(np.zeros(basis.n_basis), x, deriv=-1)
 
 
-def test_invalid_side_rejected(basis):
+def test_invalid_side_rejected(witness_basis):
+    # Case-invariant (validated before any knot-dependent logic runs);
+    # trimmed to the witness pair.
+    basis = witness_basis
     x = np.array([basis.knots[basis.degree]])
     with pytest.raises(ValueError, match="side must be"):
         basis.evaluate(x, side="up")
@@ -147,10 +177,10 @@ def test_values_match_scipy(basis):
         np.testing.assert_allclose(phi[:, i], expected, atol=1e-9)
 
 
-@pytest.mark.parametrize("deriv", [1, 2, 3])
-def test_derivatives_match_scipy(basis, deriv):
-    if deriv > basis.degree:
-        pytest.skip("covered by test_deriv_past_degree_is_zero")
+def test_first_derivative_matches_scipy(basis):
+    # Full 6-case breadth: this is the core oracle check, and the
+    # knot-difference derivative formula is genuinely case-sensitive.
+    deriv = 1
     x = _sample_points(basis)
     phi = basis.evaluate(x, deriv=deriv)
     for i in range(basis.n_basis):
@@ -160,7 +190,25 @@ def test_derivatives_match_scipy(basis, deriv):
         np.testing.assert_allclose(phi[:, i], sp(x, nu=deriv), atol=1e-6)
 
 
-def test_deriv_past_degree_is_zero(basis):
+@pytest.mark.parametrize("deriv", [2, 3])
+def test_higher_derivatives_match_scipy(witness_basis, deriv):
+    # De-crossed from the full 6-case matrix: deriv=2,3 checked only at the
+    # 2 witness cases (both degree 3) -- see test_first_derivative_matches_scipy
+    # for the full-breadth deriv=1 check.
+    basis = witness_basis
+    x = _sample_points(basis)
+    phi = basis.evaluate(x, deriv=deriv)
+    for i in range(basis.n_basis):
+        c = np.zeros(basis.n_basis)
+        c[i] = 1.0
+        sp = ScipyBSpline(basis.knots, c, basis.degree, extrapolate=True)
+        np.testing.assert_allclose(phi[:, i], sp(x, nu=deriv), atol=1e-6)
+
+
+def test_deriv_past_degree_is_zero(witness_basis):
+    # Case-invariant early-return branch; only degree variety matters, and
+    # the witness pair already covers degree 3.
+    basis = witness_basis
     x = _sample_points(basis)
     phi = basis.evaluate(x, deriv=basis.degree + 1)
     np.testing.assert_allclose(phi, 0.0, atol=1e-12)
@@ -168,9 +216,11 @@ def test_deriv_past_degree_is_zero(basis):
     np.testing.assert_allclose(phi2, 0.0, atol=1e-12)
 
 
-def test_derivative_matches_finite_difference(basis):
-    if basis.degree < 1:
-        pytest.skip("no first derivative to check")
+def test_derivative_matches_finite_difference(witness_basis):
+    # Independent-oracle sanity check alongside test_first_derivative_matches_scipy;
+    # trimmed to the witness pair (both degree 3, so a first derivative
+    # always exists).
+    basis = witness_basis
     a, b = basis.knots[basis.degree], basis.knots[-1 - basis.degree]
     x = np.linspace(a + 0.05 * (b - a), b - 0.05 * (b - a), 25)
     h = 1e-6
@@ -183,14 +233,18 @@ def test_derivative_matches_finite_difference(basis):
 # -- structural properties --
 
 
-def test_partition_of_unity(basis):
+def test_partition_of_unity(witness_basis):
+    # Generic recurrence property; trimmed to the witness pair.
+    basis = witness_basis
     a, b = basis.knots[basis.degree], basis.knots[-1 - basis.degree]
     x = np.linspace(a + 1e-9, b - 1e-9, 101)
     phi = basis.evaluate(x)
     np.testing.assert_allclose(phi.sum(axis=1), 1.0, atol=1e-8)
 
 
-def test_local_support(basis):
+def test_local_support(witness_basis):
+    # Generic support-window property; trimmed to the witness pair.
+    basis = witness_basis
     knots = basis.knots
     p = basis.degree
     a, b = knots[p], knots[-1 - p]
@@ -202,7 +256,11 @@ def test_local_support(basis):
         np.testing.assert_allclose(phi[outside, i], 0.0, atol=1e-10)
 
 
-def test_side_left_and_right_agree_away_from_knots(basis):
+def test_side_left_and_right_agree_away_from_knots(witness_basis):
+    # Away from knots the multiplicity-stepping loop never fires
+    # meaningfully; the genuinely side-sensitive cases have their own
+    # dedicated tests below. Trimmed to the witness pair.
+    basis = witness_basis
     a, b = basis.knots[basis.degree], basis.knots[-1 - basis.degree]
     x = np.linspace(a + 0.01, b - 0.01, 23)
     # Avoid landing exactly on an interior knot by construction of the grid.
@@ -254,7 +312,10 @@ def test_side_agrees_at_a_c1_interior_knot():
 # -- evaluate_expansion (fused local-support path) --
 
 
-def test_evaluate_expansion_matches_dense(basis):
+def test_evaluate_expansion_matches_dense(witness_basis):
+    # Algebraic identity, independent of knot values beyond the _gather
+    # boundary indexing exercised by the witness pair.
+    basis = witness_basis
     rng = np.random.default_rng(0)
     x = _sample_points(basis)
     c = rng.normal(size=basis.n_basis)
@@ -262,10 +323,25 @@ def test_evaluate_expansion_matches_dense(basis):
     np.testing.assert_allclose(basis.evaluate_expansion(c, x), phi @ c, atol=1e-9)
 
 
-@pytest.mark.parametrize("deriv", [1, 2, 3])
-def test_evaluate_expansion_matches_dense_derivatives(basis, deriv):
-    if deriv > basis.degree:
-        pytest.skip("covered by test_evaluate_expansion_deriv_past_degree")
+def test_evaluate_expansion_matches_dense_first_derivative(witness_basis):
+    # Algebraic identity; trimmed to the witness pair for deriv=1.
+    basis = witness_basis
+    rng = np.random.default_rng(1)
+    x = _sample_points(basis)
+    c = rng.normal(size=basis.n_basis)
+    phi = basis.evaluate(x, deriv=1)
+    np.testing.assert_allclose(
+        basis.evaluate_expansion(c, x, deriv=1), phi @ c, atol=1e-7
+    )
+
+
+@pytest.mark.parametrize("deriv", [2, 3])
+def test_evaluate_expansion_matches_dense_higher_derivatives(deriv):
+    # De-crossed from the full case matrix: deriv=2,3 checked only at the
+    # interior_max_mult witness case, since this algebraic identity doesn't
+    # depend on knot layout the way the scipy oracle comparisons do.
+    degree, knots = INTERIOR_MAX_MULT
+    basis = BSplineBasis(degree, knots)
     rng = np.random.default_rng(1)
     x = _sample_points(basis)
     c = rng.normal(size=basis.n_basis)
@@ -275,7 +351,9 @@ def test_evaluate_expansion_matches_dense_derivatives(basis, deriv):
     )
 
 
-def test_evaluate_expansion_vector_valued(basis):
+def test_evaluate_expansion_vector_valued(witness_basis):
+    # Tests only the vector_valued branch, which is case-invariant.
+    basis = witness_basis
     rng = np.random.default_rng(2)
     x = _sample_points(basis)
     c = rng.normal(size=(basis.n_basis, 3))
@@ -283,7 +361,9 @@ def test_evaluate_expansion_vector_valued(basis):
     np.testing.assert_allclose(basis.evaluate_expansion(c, x), phi @ c, atol=1e-9)
 
 
-def test_evaluate_expansion_deriv_past_degree(basis):
+def test_evaluate_expansion_deriv_past_degree(witness_basis):
+    # Same case-invariant early-return branch as test_deriv_past_degree_is_zero.
+    basis = witness_basis
     x = _sample_points(basis)
     c = np.ones(basis.n_basis)
     result = basis.evaluate_expansion(c, x, deriv=basis.degree + 1)
@@ -310,8 +390,10 @@ def test_boundary_dofs_open():
     assert basis.boundary_dofs() == (None, None)
 
 
-def test_boundary_dofs_nonzero_order_is_always_none(basis):
-    assert basis.boundary_dofs(order=1) == (None, None)
+def test_boundary_dofs_nonzero_order_is_always_none(witness_basis):
+    # `order != 0` returns immediately without reading `self` at all, so
+    # this never needed the full 6-case matrix; trimmed to the witness pair.
+    assert witness_basis.boundary_dofs(order=1) == (None, None)
 
 
 # -- _derivative_basis / _integral_basis --
