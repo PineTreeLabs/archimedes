@@ -492,7 +492,6 @@ x, _w = V.quadrature()
 fig, ax = plt.subplots(1, 1, figsize=(7, 3))
 for i in range(V.n_basis):
     e_i = np.eye(V.n_basis)[:, i]
-    x, _w = V.quadrature()
     f_i = V.function(e_i)
     ax.plot(x_plt, f_i(x_plt), label=rf"$\phi_{i}(x)$")
     ax.plot(x, f_i(x), ".", color=ax.lines[-1].get_color())

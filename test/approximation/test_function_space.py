@@ -156,11 +156,10 @@ def test_project_on_non_reference_domain(quad_rule):
 
 
 def test_diff_matrix_uses_mapped_rule_not_reference(quad_rule):
-    # Regression test: `_diff_matrix`/`_integral_matrix` used to read the
-    # reference-domain rule directly, bypassing the domain mapping now done
-    # by the `quad_rule` property -- on a domain that differs visibly from
-    # the reference domain, that would silently evaluate both bases at
-    # reference-domain nodes instead of the physical ones.
+    # `_diff_matrix`/`_integral_matrix` must evaluate both bases at the
+    # mapped (physical) quadrature nodes given by the `quad_rule` property,
+    # not the reference-domain nodes. Check this on a domain that differs
+    # visibly from the reference one.
     wide_space = FunctionSpace(
         OrthogonalPolynomialBasis(LegendreMeasure(), n_basis=5),
         domain=UnitInterval.Parameters(a=0.0, b=4.0),
@@ -191,13 +190,11 @@ def test_quad_rule_property_is_mapped_not_reference(quad_rule):
 
 
 def test_quad_rule_shared_across_spaces_lands_on_physical_nodes(quad_rule):
-    # Regression test: a coupled (mixed-field) assembly evaluates two
-    # *different* FunctionSpaces at one shared set of physical nodes, by
-    # passing one space's `quad_rule` as an explicit override to another's
-    # `basis_matrix()`. If `quad_rule` were still the reference-domain rule,
-    # this would silently assemble both fields at the wrong (reference, not
-    # physical) points whenever domain != [-1, 1] -- exactly the bug that
-    # `reference_quad_rule`/`quad_rule` (property) exists to prevent.
+    # A coupled (mixed-field) assembly evaluates two different
+    # FunctionSpaces at one shared set of physical nodes, by passing one
+    # space's `quad_rule` as an explicit override to another's
+    # `basis_matrix()`. Check both fields are assembled at the shared
+    # physical nodes, not the reference-domain ones, when domain != [-1, 1].
     domain = UnitInterval.Parameters(a=2.0, b=6.0)
     space_a = FunctionSpace(
         OrthogonalPolynomialBasis(LegendreMeasure(), n_basis=5),

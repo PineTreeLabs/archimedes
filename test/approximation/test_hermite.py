@@ -71,15 +71,14 @@ def test_vanishes_beyond_polynomial_degree(basis):
         np.testing.assert_array_equal(got, 0.0)
 
 
-# -- physical-domain scale factor: the central new piece of math --
+# -- physical-domain scale factor --
 
 
 class TestDomainMapping:
-    """Regression coverage for the per-column `scale**(_dof_order - deriv)`
-    factor (see the class docstring): a naive uniform `scale**deriv`, as
-    every homogeneous family uses, would be wrong for the derivative-type
-    columns as soon as the physical element width isn't 2 (i.e. `scale !=
-    1`)."""
+    """Check the per-column `scale**(_dof_order - deriv)` factor: value and
+    derivative DOFs scale differently under a domain remap, so a single
+    uniform `scale**deriv` factor is wrong once the physical element width
+    isn't 2 (`scale != 1`)."""
 
     @pytest.fixture
     def poly(self):

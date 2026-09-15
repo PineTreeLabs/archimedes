@@ -68,10 +68,11 @@ BOUNDARY_NODE_RULES = {
 @pytest.mark.parametrize("continuity", [-1, 0])
 @pytest.mark.parametrize("rule_name", sorted(BOUNDARY_NODE_RULES))
 def test_mass_matrix_is_exact_whatever_the_rules_nodes(continuity, rule_name):
-    # Before ownership was recorded, `lobatto` was 15.6% wrong and
-    # `radau_right` 20.8% wrong for continuity=-1, because the half-open
-    # coordinate rule assigned each element's right-endpoint node to its
-    # neighbour. `radau_left` passed only by accident of that convention.
+    # A node placed exactly on an element boundary belongs to the element
+    # the quadrature rule recorded it against, not to whichever element the
+    # half-open coordinate convention would pick. Check this for every rule
+    # in BOUNDARY_NODE_RULES, including `gauss`, which places no nodes on
+    # boundaries at all.
     basis = _basis(continuity)
     expected = mass_matrix(FunctionSpace(basis, DOMAIN, reference_quad_rule=REFERENCE))
     got = mass_matrix(

@@ -59,14 +59,11 @@ def basis(case):
     return BSplineBasis(degree, knots)
 
 
-# Deliberate "witness" pair for tests whose branch coverage doesn't actually
-# depend on knot layout: one clamped/nonuniform case and one
-# repeated-interior-knot case, chosen specifically because together they
-# exercise the two edge-sensitive code paths in `_local_values` (clamped-
-# boundary indexing, and the multiplicity-stepping loop for a repeated
-# interior knot). Used to de-cross tests that were needlessly parametrized
-# across the full 6-case `case` fixture above; do not swap this pair out
-# without re-checking that coverage.
+# A two-case witness pair for tests whose branch coverage doesn't depend on
+# knot layout: a clamped/nonuniform case and a repeated-interior-knot case,
+# chosen because together they exercise the two edge-sensitive code paths in
+# `_local_values` -- clamped-boundary indexing, and the multiplicity-
+# stepping loop for a repeated interior knot.
 WITNESS_CASES = [CLAMPED_NONUNIFORM, INTERIOR_MAX_MULT]
 WITNESS_CASE_IDS = ["clamped_nonuniform", "interior_max_mult"]
 
@@ -537,9 +534,9 @@ def test_static_and_dynamic_evaluation_agree(basis):
 
 
 def test_static_and_dynamic_evaluation_agree_side_left():
-    # Regression check for the multiplicity-aware left-side span location:
-    # `_locate`'s single-step backup is not enough at a repeated knot, and
-    # the fix must trace the same as it runs eagerly.
+    # At a repeated interior knot, `_locate`'s left-side span needs more
+    # than a single-step backup. Check the traced (symbolic) evaluation
+    # matches the eager one at this case.
     degree, knots = INTERIOR_MAX_MULT
     basis = BSplineBasis(degree, knots)
     x = np.array([1.0])

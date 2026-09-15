@@ -12,22 +12,14 @@ the same modal family under a different :class:`~archimedes.measure.Measure`)
 -- and sweep a `space` fixture across whichever subset is relevant to what
 they're testing.
 
-Centralizing the *construction* here (rather than each file re-deriving its
-own ``SPACE_BUILDERS`` dict) keeps a future change to how these spaces are
-built -- e.g. a ``FunctionSpace``/``Basis`` constructor signature change --
-to one place, rather than four. It also fixes the drift that motivated this
-file: `n_basis`, domain endpoints, and breakpoints previously varied between
-files' independently hand-rolled dicts (some using ``n_basis=6``, one
-``n_basis=4``, one ``n_basis=5``) with no way to tell whether that variation
-was deliberate.
-
-The actual numeric knobs legitimately still differ per file -- what a test
-needs to make its own operation exact varies (a product needs headroom for
-`n_1 + n_2 - 1` growth; a vector-valued projection needs an explicit
-`quad_rule` chosen so every family exactly represents the same low-degree
-components; ...) -- so callers pass the handful of knobs they need explicitly
-at the call site via :func:`family_space`/:func:`family_builders`, rather
-than being forced onto one shared set of numbers.
+Centralizing the construction here, rather than each file defining its own
+builder dict, keeps the family set and how each family is built in one
+place. The numeric knobs (`n_basis`, breakpoints, quadrature) still differ
+per file: a product needs headroom for `n_1 + n_2 - 1` growth, a
+vector-valued projection needs an explicit `quad_rule` so every family
+represents the same low-degree components exactly, and so on. Callers pass
+the knobs they need at the call site via :func:`family_space`/
+:func:`family_builders`, instead of hand-rolling a new builder dict.
 """
 
 from __future__ import annotations

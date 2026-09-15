@@ -466,8 +466,8 @@ def test_mismatched_weight_rejected_per_dimension():
 
 
 def test_mismatched_weight_rejected_in_one_dimension():
-    # The same check applies to a plain 1-D space, where it was previously
-    # possible to integrate a Legendre basis against a Hermite rule.
+    # The same check applies to a plain 1-D space: a Legendre basis must
+    # reject a Hermite quadrature rule.
     basis = _modal(3)
     with pytest.raises(ValueError, match="quadrature weight does not match"):
         FunctionSpace(

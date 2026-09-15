@@ -2,17 +2,14 @@
 
 The vector-valuedness lives entirely in the coefficients: a ``Basis``
 evaluates to ``(npts, n_basis)`` regardless, so a ``FunctionSpace`` built
-for scalars carries ``(n_basis, m)`` coefficients unchanged. None of the
-generic plumbing this exercises (``project``, ``_evaluate``,
-``_inner_product``'s component contraction, pytree flattening, symbolic
-tracing) branches on which family's ``Basis`` is underneath -- confirmed by
-reading ``_function_space.py``/``_function.py`` -- so most tests below use a
-single representative family (``nodal``) rather than sweeping all three: one
-instance of this generic mechanism catches a regression in it just as well
-as three would. The two tests that actually exercise a family's own
-``evaluate``/``derivative`` path (rather than just the shape/contraction
-plumbing around it) additionally sweep ``piecewise``, since that's the one
-family with genuinely different (element-tiled) evaluation code.
+for scalars carries ``(n_basis, m)`` coefficients unchanged. The plumbing
+this exercises (``project``, ``_evaluate``, ``_inner_product``'s component
+contraction, pytree flattening, symbolic tracing) does not branch on which
+family's ``Basis`` is underneath, so most tests below use a single
+representative family (``nodal``) rather than sweeping all three. The two
+tests that exercise a family's own ``evaluate``/``derivative`` path
+directly also sweep ``piecewise``, the one family with element-tiled
+evaluation.
 """
 
 import numpy as np

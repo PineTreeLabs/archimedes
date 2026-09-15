@@ -239,8 +239,8 @@ def test_c0_derivative_is_discontinuous_at_breakpoints(local, breakpoints):
 
 class TestC1Continuity:
     """continuity=1 merges both the value and the first-derivative DOF at
-    each interior breakpoint -- the assembly generalization this module was
-    missing before ``CubicHermiteBasis`` existed to exercise it."""
+    each interior breakpoint, using ``CubicHermiteBasis`` as the per-element
+    basis."""
 
     BP = np.array([-1.0, -0.3, 0.4, 1.0])  # deliberately uneven, 3 elements
 
@@ -312,13 +312,12 @@ class TestC1Continuity:
 
     @pytest.mark.parametrize("deriv", [0, 1, 2, 3])
     def test_evaluate_expansion_fused_path_matches_dense_path(self, basis, deriv):
-        # The critical regression test: `evaluate_expansion`'s fused fast
-        # path (taken because every element shares one `CubicHermiteBasis`
-        # instance) must agree with the dense `evaluate(...) @ coefficients`
-        # path even though the physical domain isn't (-1, 1) and the mesh is
-        # non-uniform -- exactly the case that exposed the per-column scale
-        # bug (a single scalar Jacobian is wrong for a heterogeneous-DOF
-        # basis at deriv >= 1 whenever the element width isn't 2).
+        # `evaluate_expansion`'s fused path (taken because every element
+        # shares one `CubicHermiteBasis` instance) must agree with the dense
+        # `evaluate(...) @ coefficients` path on a non-uniform mesh whose
+        # physical domain isn't (-1, 1). Value and derivative DOFs need
+        # different Jacobian scaling, so a single scalar factor isn't enough
+        # once the element width differs from the reference width of 2.
         a, b = 2.0, 9.0
         scale, shift = UnitInterval().affine_params(a, b)
         x = np.concatenate(
@@ -374,17 +373,15 @@ class TestC1Continuity:
 
 
 class TestModalDiscontinuous:
-    """A modal (`OrthogonalPolynomialBasis`) element under `continuity=-1` --
+    """A modal (`OrthogonalPolynomialBasis`) element under `continuity=-1`,
     the one continuity level a modal basis supports (see
     `test_c0_requires_element_basis_with_boundary_dofs`). Unlike a nodal or
     Hermite element, its `evaluate` normalizes by `measure.mass(a, b)`
-    (`Basis._reference_scale_exponent`), which the fused fast path used to
-    silently ignore -- forwarding no domain kwargs at all to the shared
-    per-element basis, defaulting to the *reference* interval's normalization
-    regardless of the element's actual physical width. That's invisible for a
-    single element spanning the whole physical domain (width happens to
-    match), which is why it went uncaught until multiple elements exposed a
-    per-element width different from the reference one."""
+    (`Basis._reference_scale_exponent`), so the fused fast path must forward
+    each element's own physical domain to the shared per-element basis
+    rather than the reference interval. A single element spanning the whole
+    physical domain can't distinguish the two, so this needs a mesh with
+    more than one element."""
 
     BP = np.array([-1.0, -0.3, 0.4, 1.0])  # deliberately uneven, 3 elements
 
@@ -398,9 +395,9 @@ class TestModalDiscontinuous:
 
     @pytest.mark.parametrize("deriv", [0, 1, 2, 3])
     def test_evaluate_expansion_fused_path_matches_dense_path(self, basis, deriv):
-        # Non-uniform mesh and a physical domain far from (-1, 1), exactly
-        # like `TestC1Continuity`'s regression test -- the element width
-        # must differ from the reference width of 2 for the bug to show up.
+        # Non-uniform mesh and a physical domain far from (-1, 1): the
+        # element width must differ from the reference width of 2 to
+        # distinguish per-element from reference-interval normalization.
         a, b = 2.0, 9.0
         scale, shift = UnitInterval().affine_params(a, b)
         x = np.concatenate(
@@ -432,11 +429,10 @@ class TestModalDiscontinuous:
 
     def test_project_and_reconstruct(self, modal):
         # End-to-end via the public `FunctionSpace.piecewise` API: project a
-        # polynomial (exactly representable per element) onto a multi-element
-        # discontinuous Legendre space and check it round-trips -- the
-        # direct FunctionSpace/Function-level analogue of the
-        # fused-vs-dense check above, and the scenario the bug was originally
-        # found in.
+        # polynomial (exactly representable per element) onto a
+        # multi-element discontinuous Legendre space and check it
+        # round-trips. The Function-level analogue of the fused-vs-dense
+        # check above.
         a, b = 0.0, 2 * np.pi
         space = FunctionSpace.piecewise(
             "legendre", 3, np.linspace(a, b, 9), continuity=-1
@@ -584,8 +580,8 @@ class TestQuadratureCompatibility:
         )
 
     def test_misaligned_composite_rejected(self, basis):
-        # Same number of elements, different partition -- silently produced a
-        # ~2.5% error in the mass matrix before this was checked.
+        # Same number of elements, different partition: the rule's element
+        # boundaries don't align with the basis's own breakpoints.
         rule = composite_quad(gauss_legendre(4), np.linspace(-1.0, 1.0, 4))
         with pytest.raises(ValueError, match="must not straddle"):
             FunctionSpace(basis, domain=self.DOMAIN, reference_quad_rule=rule)

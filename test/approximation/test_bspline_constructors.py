@@ -9,9 +9,8 @@ constructors:
   interior knots, multiplicity ``degree + 1`` at both ends) from physical
   breakpoints.
 
-Each constructor has exactly one required argument that's always meaningful
--- unlike an earlier combined design, neither ever silently ignores part of
-its input.
+Each constructor has exactly one required argument, and neither ignores
+part of its input.
 """
 
 import numpy as np
