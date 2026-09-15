@@ -304,11 +304,139 @@ $$
 
 where $\ell_i(x)$ are the [Lagrange basis functions](https://en.wikipedia.org/wiki/Lagrange_polynomial) evaluated at the Gauss-Lobatto quadrature nodes.
 
-This is exactly our linear basis expansion representation, so we can reuse the same function approximation infrastructure.
+This is exactly our linear basis expansion representation, so we can reuse the same function approximation infrastructure, now combined with constrained optimization using [`minimize`](#archimedes.minimize).
 
-<!-- LGL trajopt -->
+Collocation is imposed by differentiating the interpolant using the  $(n+1) \times (n+1)$ differentiation matrix $D_{ij} = \ell_j'(t_i)$ and requiring it to match the dynamics at every node:
+
+$$
+\sum_{j=0}^n D_{ij} \, x_j = f(x_i, u_i), \quad i = 0, \ldots, n,
+\qquad x_0 = x(t_0), \quad x_n = x(t_f).
+$$
+
+This is the "defect" constraint. Boundary conditions, path constraints, etc. can simply be concatenated to form the full constraint vector:
+
+```{code-cell} python
+:tags: [hide-output]
+t0, tf = 0.0, 1.0
+x0, xf = np.array([0.0, 0.0]), np.array([1.0, 0.0])
+p = 6  # polynomial degree
+
+quad_rule = arc.quadrature.composite_quad(arc.quadrature.gauss_lobatto(p + 1), [-1.0, 1.0])
+V = FunctionSpace.piecewise(
+    "lagrange", p, breakpoints=[t0, tf], nodes="lobatto", quad_rule=quad_rule
+)
+tp, w = V.quadrature()
+
+def f(x, u):
+    return np.array([x[1], u[0]], like=x)
+
+
+def obj(params):
+    u_fn = V.function(params["u"])
+    return u_fn.dot(u_fn)
+
+
+def constr(params):
+    xp, up = params["x"], params["u"]  # Values at nodes
+    x_fn = V.function(xp)
+
+    # State derivative at nodes, from differentiating interpolant
+    x_dot = x_fn(tp, deriv=1)
+
+    # Vectorize the dynamics evaluation over the nodes
+    x_dot_eval = arc.vmap(f, in_axes=(0, 0))(xp, up)
+    defect = x_dot - x_dot_eval
+
+    # Concatenate boundary values
+    return np.concatenate([defect, xp[:1] - x0, xp[-1:] - xf]).ravel()
+
+
+x_guess = x0 + (tp[:, None] - t0) * (xf - x0) / (tf - t0)
+init = {"x": x_guess, "u": np.zeros((p + 1, 1))}
+
+res = arc.minimize(obj, x0=init, constr=constr)
+sol = res.x
+x_opt, u_opt = V.function(sol["x"]), V.function(sol["u"])
+```
+
+The block-push problem has a [simple analytic solution](https://epubs.siam.org/doi/10.1137/16M1062569):
+
+```{code-cell} python
+def x_ex(t):
+    return 3 * t**2 - 2 * t**3
+
+
+def u_ex(t):
+    return 6 - 12 * t
+
+
+t_plt = np.linspace(t0, tf, 1000)
+x_plt = x_opt(t_plt)
+u_plt = u_opt(t_plt)
+
+print(f"Max absolute error: {max(abs(x_plt[:, 0] - x_ex(t_plt))):.4e}")
+```
+
+```{code-cell} python
+:tags: [hide-cell, remove-output]
+
+fig, ax = plt.subplots(2, 1, figsize=(7, 3), sharex=True)
+ax[0].plot(t_plt, x_plt[:, 0])
+ax[0].scatter(tp, x_opt(tp)[:, 0], c=ax[0].lines[0].get_color(), label="Optimal trajectory")
+ax[0].plot(t_plt, x_ex(t_plt), "--", lw=2, label="Exact solution")
+ax[0].legend()
+ax[0].grid()
+ax[0].set_ylabel(r"$x$")
+ax[1].plot(t_plt, u_plt)
+ax[1].scatter(tp[:-1], u_opt(tp[:-1]), c=ax[1].lines[0].get_color())
+ax[1].plot(t_plt, u_ex(t_plt), "--", lw=2)
+ax[1].grid()
+ax[1].set_ylabel(r"$u$")
+ax[1].set_xlabel(r"$t$")
+
+plt.show()
+```
+
+```{code-cell} python
+:tags: [remove-cell]
+
+for theme in {"light", "dark"}:
+    arc.set_theme(theme)
+
+    fig, ax = plt.subplots(2, 1, figsize=(7, 3), sharex=True)
+    ax[0].plot(t_plt, x_plt[:, 0])
+    ax[0].scatter(tp, x_opt(tp)[:, 0], c=ax[0].lines[0].get_color(), label="Optimal trajectory")
+    ax[0].plot(t_plt, x_ex(t_plt), "--", lw=2, label="Exact solution")
+    ax[0].legend()
+    ax[0].grid()
+    ax[0].set_ylabel(r"$x$")
+    ax[1].plot(t_plt, u_plt)
+    ax[1].scatter(tp[:-1], u_opt(tp[:-1]), c=ax[1].lines[0].get_color())
+    ax[1].plot(t_plt, u_ex(t_plt), "--", lw=2)
+    ax[1].grid()
+    ax[1].set_ylabel(r"$u$")
+    ax[1].set_xlabel(r"$t$")
+
+    plt.savefig(plot_dir / f"approx_release_2_{theme}.png")
+    plt.close()
+```
+
+```{image} _plots/approx_release_2_light.png
+:class: only-light
+```
+
+```{image} _plots/approx_release_2_dark.png
+:class: only-dark
+```
+
+Similar recipes can be used for Hermite-Simpson trajectory optimization, $hp$-adaptive pseudospectral collocation on multi-element meshes, and other trajectory optimization formulations.
+
+Eventually the plan is for Archimedes to provide some built-in functionality so you can just pass objective and constraint functions without hand-rolling the discretization, but for now the core quadrature and interpolation/differentiation machinery is there for you to write custom algorithms.
+
+And of course, this is all compatible with the [codegen system](../../tutorials/codegen/codegen00.md), so you can either deploy the optimized state/control functions and interpolate them online in a feedforward/feedback scheme, or re-solve the optimal control problem online for a model-predictive control scheme. (Although note that CasADi only supports codegen for certain NLP solvers: SQP but not IPOPT).
 
 ### System identification
+
 
 
 ### Uncertainty quantification
