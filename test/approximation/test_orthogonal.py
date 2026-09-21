@@ -5,12 +5,16 @@ from scipy.special import eval_legendre
 
 import archimedes as arc
 from archimedes._core._array_impl import SymbolicArray
-from archimedes.approximation import OrthogonalPolynomialBasis
+from archimedes.approximation import FunctionSpace, OrthogonalPolynomialBasis
 from archimedes.measure import (
+    HalfLine,
+    JacobiMeasure,
     LaguerreMeasure,
     LegendreMeasure,
     PhysicistsHermiteMeasure,
     ProbabilistsHermiteMeasure,
+    RealLine,
+    UnitInterval,
 )
 from archimedes.quadrature import gauss_hermite, gauss_laguerre, gauss_legendre
 
@@ -138,3 +142,55 @@ def test_static_and_dynamic_evaluation_agree(deriv):
 
     dynamic_phi = np.array([np.asarray(traced(xi)).ravel() for xi in x])
     np.testing.assert_allclose(static_phi, dynamic_phi, atol=1e-12)
+
+
+# -- FunctionSpace classmethod constructors --
+
+
+def test_legendre_constructor():
+    manual = FunctionSpace(
+        OrthogonalPolynomialBasis(LegendreMeasure(), 8),
+        UnitInterval.Parameters(a=-2.0, b=3.0),
+    )
+    space = FunctionSpace.legendre(8, a=-2.0, b=3.0)
+    assert space.n_basis == manual.n_basis
+    assert space.domain == manual.domain
+    np.testing.assert_allclose(
+        space.basis_matrix().matrix, manual.basis_matrix().matrix
+    )
+
+
+@pytest.mark.parametrize("second_kind, expected_exponent", [(False, -0.5), (True, 0.5)])
+def test_chebyshev_constructor(second_kind, expected_exponent):
+    space = FunctionSpace.chebyshev(6, second_kind=second_kind)
+    assert space.basis.measure == JacobiMeasure(expected_exponent, expected_exponent)
+
+
+def test_jacobi_constructor():
+    space = FunctionSpace.jacobi(0.5, 1.5, 5, a=0.0, b=2.0)
+    assert space.basis.measure == JacobiMeasure(0.5, 1.5)
+    assert space.domain == UnitInterval.Parameters(a=0.0, b=2.0)
+    assert space.n_basis == 5
+
+
+def test_hermite_constructor():
+    space = FunctionSpace.hermite(4, loc=1.0, scale=2.0)
+    assert isinstance(space.basis.measure, ProbabilistsHermiteMeasure)
+    assert space.domain == RealLine.Parameters(loc=1.0, scale=2.0)
+
+    space = FunctionSpace.hermite(4, kind="phys")
+    assert isinstance(space.basis.measure, PhysicistsHermiteMeasure)
+
+    with pytest.raises(ValueError, match="Hermite kind must be"):
+        FunctionSpace.hermite(4, kind="bogus")
+
+    # density=True normalizes to a probability measure, for either kind.
+    for kind in ("phys", "prob"):
+        assert FunctionSpace.hermite(4, kind=kind, density=True).basis.density is True
+        assert FunctionSpace.hermite(4, kind=kind).basis.density is False
+
+
+def test_laguerre_constructor():
+    space = FunctionSpace.laguerre(4, rate=2.0, start=1.0)
+    assert isinstance(space.basis.measure, LaguerreMeasure)
+    assert space.domain == HalfLine.Parameters(rate=2.0, start=1.0)
