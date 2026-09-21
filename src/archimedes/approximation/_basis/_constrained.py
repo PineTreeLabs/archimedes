@@ -1,4 +1,4 @@
-"""A basis built as a fixed linear combination of another basis's functions
+"""A basis built as a fixed linear combination of another basis's functions.
 
 Typically the recombination is chosen so that every combination satisfies a
 set of linear constraints (e.g. boundary conditions) by construction rather
@@ -124,10 +124,10 @@ class ConstrainedBasis(Basis):
         Raises
         ------
         ValueError
-            If the constraint rows are not linearly independent (rank <
-            number of rows), so the null space is larger than the caller
-            expects and some constraints are redundant rather than each
-            cutting the dimension by one.
+            Raised when the constraint rows are not linearly independent
+            (rank < number of rows). The null space is then larger than
+            the caller expects, so some constraints are redundant instead
+            of each cutting the dimension by one.
         """
         A = np.asarray(constraints(base))
         if A.ndim != 2 or A.shape[1] != base.n_basis:
@@ -150,13 +150,13 @@ class ConstrainedBasis(Basis):
 
     @classmethod
     def dirichlet(cls, base: Basis) -> "ConstrainedBasis":
-        """Every function vanishes at both reference endpoints,
-        :math:`\\phi(-1) = \\phi(1) = 0`.
+        r"""Every function vanishes at both reference endpoints,
+        :math:`\phi(-1) = \phi(1) = 0`.
 
         Spans the same space as the classical hand-derived combinations
         (e.g. Shen's Chebyshev-Galerkin basis :math:`T_k - T_{k+2}`), but
         is not necessarily numerically identical to them -- both are valid
-        bases of :math:`\\mathrm{null}(A)`.
+        bases of :math:`\mathrm{null}(A)`.
         """
 
         def constraints(base):
@@ -169,8 +169,8 @@ class ConstrainedBasis(Basis):
 
     @classmethod
     def neumann(cls, base: Basis) -> "ConstrainedBasis":
-        """Every function has zero derivative at both reference endpoints,
-        :math:`\\phi'(-1) = \\phi'(1) = 0`."""
+        r"""Every function has zero derivative at both reference endpoints,
+        :math:`\phi'(-1) = \phi'(1) = 0`."""
 
         def constraints(base):
             kwargs = _reference_kwargs(base)
@@ -190,9 +190,9 @@ class ConstrainedBasis(Basis):
 
     @property
     def measures(self):
-        """Delegates to ``base``: the constraint only recombines rows of
-        the same design matrix, so the quadrature weight ``base`` is
-        orthogonal under still applies unchanged."""
+        """Delegates to ``base``: recombining ``base``'s functions linearly
+        does not change which quadrature weight matches them, so
+        ``base``'s own ``measures`` still apply unchanged."""
         return self.base.measures
 
     @property

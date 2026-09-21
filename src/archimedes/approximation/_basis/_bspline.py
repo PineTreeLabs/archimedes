@@ -1,13 +1,15 @@
 r"""B-spline basis on a general knot vector.
 
 Evaluation follows de Boor's BSPLVB algorithm (*A Practical Guide to
-Splines*, Revised Ed., Ch. X): the stable triangular recurrence that builds
-all ``degree + 1`` nonzero B-splines at a point column by column, with no
-special-casing for repeated knots and denominators bounded below by the
-local knot spacing. Derivatives reuse the same recurrence at a lower order
-followed by the classical knot-difference derivative formula (Ch. IX-X,
-the basis-function analogue of BVALUE's stage-1 coefficient differencing),
-applied one order at a time.
+Splines*, Revised Ed., Ch. X). It is a stable triangular recurrence that
+builds all ``degree + 1`` nonzero B-splines at a point column by column,
+with no special-casing for repeated knots. Denominators stay bounded below
+by the local knot spacing.
+
+Derivatives reuse the same recurrence at a lower order. They then apply
+the classical knot-difference derivative formula one order at a time --
+the basis-function analogue of BVALUE's stage-1 coefficient differencing
+(Ch. IX-X).
 """
 
 from __future__ import annotations
@@ -195,7 +197,7 @@ class BSplineBasis(Basis):
     # --- evaluation ---
 
     def _local_values(self, x, deriv: int, side: str):
-        """The ``degree + 1`` nonzero (``deriv``-th derivative) B-spline
+        r"""The ``degree + 1`` nonzero (``deriv``-th derivative) B-spline
         values at each point of ``x``, as a list of ``degree + 1`` arrays
         shape ``(npts,)``, together with ``base`` (shape ``(npts,)``): the
         global index of the first (list index 0) local function.
@@ -207,10 +209,10 @@ class BSplineBasis(Basis):
         single-order derivative identity
 
         .. math::
-            \\frac{d}{dx} N_{i,q+1}(x) = q \\left(
-                \\frac{N_{i,q}(x)}{t_{i+q}-t_i} -
-                \\frac{N_{i+1,q}(x)}{t_{i+q+1}-t_{i+1}}
-            \\right)
+            \frac{d}{dx} N_{i,q+1}(x) = q \left(
+                \frac{N_{i,q}(x)}{t_{i+q}-t_i} -
+                \frac{N_{i+1,q}(x)}{t_{i+q+1}-t_{i+1}}
+            \right)
 
         ``deriv`` times in a row -- valid at every order since the identity
         is linear in :math:`N`, so differentiating it again reproduces the
@@ -319,7 +321,7 @@ class BSplineBasis(Basis):
     def evaluate_expansion(
         self, coefficients, x, deriv: int = 0, side: str = RIGHT, **domain_kwargs
     ):
-        """Evaluate :math:`\\sum_i c_i \\, \\N_i(x)` (or its derivative) directly."""
+        r"""Evaluate :math:`\sum_i c_i \, N_i(x)` (or its derivative) directly."""
         # Gathers only the ``degree + 1`` locally relevant coefficients per point
         # rather than materializing the full ``(npts, n_basis)`` design matrix: the
         # local-support analogue of PiecewiseBasis.evaluate_expansion.

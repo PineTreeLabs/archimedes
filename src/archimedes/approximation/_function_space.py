@@ -175,8 +175,8 @@ class FunctionSpace:
     See :class:`Function` for a specific element of the space (a
     coefficient vector).
 
-    This is a ``@struct`` rather than a plain dataclass so that ``domain``
-    is a pytree leaf: the domain parameters can be symbolically traced,
+    ``FunctionSpace`` is a ``@struct`` rather than a plain dataclass so that
+    ``domain`` is a pytree leaf: the domain parameters can be symbolically traced,
     and so optimized over (moving the endpoints of an element, say) jointly
     with a ``Function``'s coefficients. ``basis`` and the resolved
     quadrature rule are static -- they carry structure, not numbers.
@@ -226,12 +226,12 @@ class FunctionSpace:
     @property
     def quad_rule(self) -> Quadrature:
         """The space's quadrature rule mapped onto its ``domain``.
-        
+
         The domain mapping is recomputed on every access, since ``domain``
         may be a traced/symbolic value for variable-endpoint problems.
-    
+
         This property does not apply density-normalization, regardless
-        of whether the space has `density=True`. Call :meth:`quadrature`
+        of whether the space has ``density=True``. Call :meth:`quadrature`
         to get optionally normalized quadrature weights and points.
         """
         return self.reference_quad_rule.map_to(**self._domain_kwargs())
@@ -308,7 +308,24 @@ class FunctionSpace:
         density: bool = False,
         quad_rule: Quadrature | None = None,
     ) -> FunctionSpace:
-        """Global Legendre polynomial space on ``[a, b]``."""
+        """Global Legendre polynomial space on ``[a, b]``.
+
+        Parameters
+        ----------
+        n_basis : int
+            Number of basis functions.
+        a, b : float, optional
+            Bounds of the target interval. Default ``-1``, ``1``.
+        density : bool, optional
+            Normalize against the probability density rather than the raw
+            weight; see :attr:`Basis.density`. Default ``False``.
+        quad_rule : QuadratureRule, optional
+            Forwarded to the underlying ``FunctionSpace`` constructor.
+
+        Returns
+        -------
+        FunctionSpace
+        """
         return _orthogonal_space(
             cls,
             LegendreMeasure(),
@@ -335,6 +352,25 @@ class FunctionSpace:
         :math:`\alpha = \beta = -1/2` (first kind, the default) or
         :math:`\alpha = \beta = 1/2` (``second_kind=True``); see
         :class:`~archimedes.measure.JacobiMeasure`.
+
+        Parameters
+        ----------
+        n_basis : int
+            Number of basis functions.
+        a, b : float, optional
+            Bounds of the target interval. Default ``-1``, ``1``.
+        second_kind : bool, optional
+            Use the second-kind convention (:math:`\alpha = \beta = 1/2`)
+            instead of the first-kind default. Default ``False``.
+        density : bool, optional
+            Normalize against the probability density rather than the raw
+            weight; see :attr:`Basis.density`. Default ``False``.
+        quad_rule : QuadratureRule, optional
+            Forwarded to the underlying ``FunctionSpace`` constructor.
+
+        Returns
+        -------
+        FunctionSpace
         """
         exponent = 0.5 if second_kind else -0.5
         return _orthogonal_space(
@@ -358,7 +394,27 @@ class FunctionSpace:
         quad_rule: Quadrature | None = None,
     ) -> FunctionSpace:
         """Global Jacobi polynomial space on ``[a, b]``; see
-        :class:`~archimedes.measure.JacobiMeasure` for ``alpha``/``beta``."""
+        :class:`~archimedes.measure.JacobiMeasure` for ``alpha``/``beta``.
+
+        Parameters
+        ----------
+        alpha, beta : float
+            Jacobi measure parameters; see
+            :class:`~archimedes.measure.JacobiMeasure`.
+        n_basis : int
+            Number of basis functions.
+        a, b : float, optional
+            Bounds of the target interval. Default ``-1``, ``1``.
+        density : bool, optional
+            Normalize against the probability density rather than the raw
+            weight; see :attr:`Basis.density`. Default ``False``.
+        quad_rule : QuadratureRule, optional
+            Forwarded to the underlying ``FunctionSpace`` constructor.
+
+        Returns
+        -------
+        FunctionSpace
+        """
         return _orthogonal_space(
             cls,
             JacobiMeasure(alpha, beta),
@@ -510,7 +566,28 @@ class FunctionSpace:
         quad_rule: Quadrature | None = None,
     ) -> FunctionSpace:
         """Global Laguerre polynomial space on ``[start, inf)``; see
-        :class:`~archimedes.measure.LaguerreMeasure`."""
+        :class:`~archimedes.measure.LaguerreMeasure`.
+
+        Parameters
+        ----------
+        n_basis : int
+            Number of basis functions.
+        rate : float, optional
+            Rate parameter of the target domain; see
+            :class:`~archimedes.measure.HalfLine`. Default ``1``.
+        start : float, optional
+            Left endpoint of the target domain; see
+            :class:`~archimedes.measure.HalfLine`. Default ``0``.
+        density : bool, optional
+            Normalize against the probability density rather than the raw
+            weight; see :attr:`Basis.density`. Default ``False``.
+        quad_rule : QuadratureRule, optional
+            Forwarded to the underlying ``FunctionSpace`` constructor.
+
+        Returns
+        -------
+        FunctionSpace
+        """
         return _orthogonal_space(
             cls,
             LaguerreMeasure(),
@@ -534,7 +611,7 @@ class FunctionSpace:
         """A piecewise ``FunctionSpace``: a local basis tiled across
         ``breakpoints``, on the domain those breakpoints themselves span.
 
-        Convenienve constructor for a :class:`PiecewiseBasis` for the common
+        Convenience constructor for a :class:`PiecewiseBasis` for the common
         cases listed below. For anything else (a heterogeneous per-element family, a
         symbolic/traced domain independent of the mesh, an explicit
         reference-domain ``quad_rule``), build a ``PiecewiseBasis`` directly
@@ -661,9 +738,10 @@ class FunctionSpace:
         (so the first/last coefficients are exactly the endpoint values,
         like a Bezier curve's) and simple interior knots at each breakpoint (the
         smoothest possible interior continuity, :math:`C^{degree - 1}`).
-        This is the common case; for anything else (an open/non-clamped
-        knot vector, non-simple interior multiplicity, ...), call
-        :meth:`bspline` directly with an explicit knot vector.
+        Building a clamped knot vector this way is the common case. For
+        anything else (an open/non-clamped knot vector, non-simple interior
+        multiplicity, ...), call :meth:`bspline` directly with an explicit
+        knot vector.
 
         Parameters
         ----------
@@ -746,7 +824,7 @@ class FunctionSpace:
         numerically identical. So value comparison would be both
         undecidable and prone to false rejection.
 
-        This means a caller can add two ``Function`` objects whose domains
+        As a result, a caller can add two ``Function`` objects whose domains
         differ *numerically* -- e.g. ``(a=0, b=1)`` and ``(a=0, b=2)`` -- without
         an error. **Callers are responsible for ensuring the domains agree
         numerically**; only the structure is enforced here.
@@ -913,8 +991,9 @@ class FunctionSpace:
 
         the Galerkin projection of :math:`\phi_i^{(k)}` onto the target
         space, with :math:`M` and the quadrature taken from that target.
-        This is exact whenever the target space contains the derivative,
-        which it does by construction for both defaults below.
+        This differentiation matrix is exact whenever the target space
+        contains the derivative, which it does by construction for both
+        defaults below.
 
         Parameters
         ----------
@@ -969,13 +1048,14 @@ class FunctionSpace:
     ) -> tuple[np.ndarray, np.ndarray]:
         """Quadrature nodes and weights mapped onto this space's domain.
 
-        This, together with :meth:`basis_matrix`, is what an assembly like
-        :meth:`project` is built from.
+        An assembly like :meth:`project` is built from these nodes and
+        weights, together with :meth:`basis_matrix`.
 
         Unlike :attr:`quad_rule`, the returned weights are density-adjusted
-        (see :attr:`Basis.density`) for this space. That is, if the space has
-        `density=True`, the returned weights sum to 1, and if `density=False`
-        they sum to the integral of the weight function over the domain.
+        (see :attr:`Basis.density`) for this space. If the space has
+        ``density=True``, the returned weights sum to 1. If it has
+        ``density=False``, they sum to the integral of the weight function
+        over the domain.
 
         Parameters
         ----------
@@ -1008,8 +1088,8 @@ class FunctionSpace:
 
         The returned :class:`BasisMatrix` carries its own nodes
         (``Phi.nodes``), so a custom (Petrov-)Galerkin residual or
-        projection needs only this method: evaluate pointwise expressions at
-        ``Phi.nodes`` and test them against ``Phi.T``. Call
+        projection needs only this method. Evaluate pointwise expressions
+        at ``Phi.nodes`` and test them against ``Phi.T``. Call
         :meth:`quadrature` directly only when weights are wanted without a
         basis matrix (a plain integral). See :meth:`project` for a worked
         example.
@@ -1102,27 +1182,27 @@ class FunctionSpace:
     ) -> Function:
         """Galerkin (or Petrov-Galerkin) projection of ``f`` onto this space.
 
-        Solves ``M @ c = b`` for the coefficients ``c``, where, for this
-        (trial) space's basis matrix ``Phi`` and ``test_space``'s basis
-        matrix ``Psi`` (see :meth:`basis_matrix`), ``M = Psi.T @ Phi`` is
-        the Gram matrix and ``b = Psi.T @ f(x)`` is the load vector -- both
+        Solves ``M @ c = b`` for the coefficients ``c``, using this (trial)
+        space's basis matrix ``Phi`` and ``test_space``'s basis matrix
+        ``Psi`` (see :meth:`basis_matrix`). ``M = Psi.T @ Phi`` is the Gram
+        matrix and ``b = Psi.T @ f(x)`` is the load vector, both
         approximated via ``quad_rule`` (default this space's own quadrature).
         ``quad_rule`` must be accurate enough for the product of ``f`` and
         both bases, which is generally a higher-order requirement than
-        exactness for either basis alone; pass an explicit ``quad_rule`` to
+        exactness for either basis alone. Pass an explicit ``quad_rule`` to
         use something other than the space's natural default.
 
         ``test_space`` defaults to this space (standard Galerkin, ``M`` the
         mass matrix). Passing a different space performs Petrov-Galerkin
         projection: the residual ``f - Phi @ c`` is made orthogonal to
         ``test_space`` rather than to this space. ``test_space`` must have
-        the same ``n_basis`` as this space (so ``M`` is square) and must
-        denote the same physical domain (checked structurally only, since
-        domains may be traced). The result is still returned **in this
-        (trial) space** -- ``test_space``
-        only supplies the orthogonality condition used to solve for ``c``,
-        not how ``c`` is interpreted, since ``c`` are always coefficients of
-        *this* space's basis functions.
+        the same ``n_basis`` as this space, so that ``M`` is square.
+        ``test_space`` must also denote the same physical domain (checked
+        structurally only, since domains may be traced). The result is
+        still returned **in this (trial) space**. ``test_space`` only
+        supplies the orthogonality condition used to solve for ``c``. It
+        does not change how ``c`` is interpreted, since ``c`` are always
+        coefficients of *this* space's basis functions.
 
         ``f`` may be vector-valued: if ``f(x)`` has shape ``(npts, m)``,
         each component is projected and the result has coefficients of

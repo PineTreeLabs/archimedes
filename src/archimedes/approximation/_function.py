@@ -34,10 +34,10 @@ class Function:
     ``Function`` objects on different spaces raises rather than silently
     projecting one onto the other -- see :meth:`FunctionSpace.project` to do
     that explicitly. A general product of two ``Function`` objects is not
-    directly supported (see :meth:`multiply`), since the product of two
-    finite basis expansions isn't generally representable in the same
-    finite space; nor is dividing by one, since the quotient of two basis
-    expansions is generally not a finite expansion at all.
+    directly supported (see :meth:`multiply`): the product of two finite
+    basis expansions isn't generally representable in the same finite
+    space. Dividing by one is not supported either, since the quotient of
+    two basis expansions is generally not a finite expansion at all.
 
     Parameters
     ----------
@@ -139,14 +139,14 @@ class Function:
         r"""Pointwise product :math:`(fg)(x) = f(x) \, g(x)`.
 
         The product of two basis expansions does not lie in either operand's
-        space, so the result is returned in a *larger* one, which for
-        polynomial families has ``n_1 + n_2 - 1`` degrees of freedom and
+        space, so the result is returned in a *larger* one. For polynomial
+        families that space has ``n_1 + n_2 - 1`` degrees of freedom and
         represents the product **exactly** (to quadrature roundoff), not as an
         approximation.
 
-        The degree therefore grows with each product. That is deliberate --
-        an exact operation should not silently lose information -- so
-        reducing back down requires an explicit :meth:`FunctionSpace.project`
+        The degree therefore grows with each product. This growth is
+        deliberate: an exact operation should not silently lose information.
+        Reducing back down requires an explicit :meth:`FunctionSpace.project`
         rather than an automatic truncation. Repeated products without
         projecting will grow the space quickly.
 
@@ -218,18 +218,21 @@ class Function:
     ) -> Function:
         r"""The ``order``-th antiderivative :math:`F^{(-\mathrm{order})}`.
 
-        Numerically exact, and the dual of :meth:`derivative`: the result is returned
-        in the smallest space that represents it, which for a polynomial family is
-        *larger* than this one (integrating raises the degree). This is needed to
-        make the antiderivative well-defined: an indefinite integral is only unique
-        up to an additive constant (per order), and ``boundary`` pins it by requiring
-        :math:`F` (and, for ``order > 1``, its derivatives through order ``order - 1``)
-        to vanish at that endpoint of the domain:
+        The antiderivative is numerically exact and is the dual of
+        :meth:`derivative`: the result is returned in the smallest space
+        that represents it. For a polynomial family, that space is *larger*
+        than this one, since integrating raises the degree.
+
+        Pinning the antiderivative is necessary because an indefinite
+        integral is unique only up to an additive constant (per order). The
+        ``boundary`` argument pins it by requiring :math:`F` (and, for
+        ``order > 1``, its derivatives through order ``order - 1``) to
+        vanish at that endpoint of the domain:
 
             - ``"left"`` (the default) gives :math:`F(x) = \int_a^x f(t)\,dt`,
-                so :math:`F(a) = 0`
-            - ``"right"`` gives :math:`F(x) = \int_b^x f(t)\,dt = -\int_x^b f(t)\,dt`,
-                so :math:`F(b) = 0`
+              so :math:`F(a) = 0`.
+            - ``"right"`` gives :math:`F(x) = \int_b^x f(t)\,dt =
+              -\int_x^b f(t)\,dt`, so :math:`F(b) = 0`.
 
         The two differ by the whole-domain definite integral: with
         ``boundary="right"``, ``f.antiderivative()`` is ``total`` less than
@@ -346,5 +349,8 @@ class Function:
         )
 
     def norm(self, quad_rule: QuadratureRule | None = None):
-        r""":math:`\lVert f \rVert = \sqrt{\langle f, f \rangle}`; see :meth:`dot`."""
+        r"""Compute the norm :math:`\lVert f \rVert = \sqrt{\langle f, f \rangle}`.
+
+        See :meth:`dot`.
+        """
         return np.sqrt(self.dot(self, quad_rule))

@@ -17,7 +17,7 @@ __all__ = ["ConcatBasis"]
 
 @dataclasses.dataclass(frozen=True)
 class ConcatBasis(Basis):
-    r"""A basis whose functions are the concatenation of several pieces'.
+    r"""A basis whose functions are the concatenation of several pieces.
 
     Where :class:`ConstrainedBasis` recombines *one* basis's functions by
     a matrix (a change of basis), this stacks functions from *several*,
@@ -26,11 +26,11 @@ class ConcatBasis(Basis):
     .. math::
         \Phi(x) = \big[\, \Phi_1(x) \;\; \Phi_2(x) \;\; \cdots \,\big]
 
-    This is a direct sum, not a linear combination. The two compose: e.g. a
-    spectral-element "vertex + bubble" basis is ``ConcatBasis((vertex,
-    ConstrainedBasis.dirichlet(base)))``, pairing two plain Lagrange
-    vertex functions (carrying the boundary values) with the homogeneous
-    interior modes from ``base``.
+    This is a direct sum, not a linear combination. The two compose. For
+    example, a spectral-element "vertex + bubble" basis is
+    ``ConcatBasis((vertex, ConstrainedBasis.dirichlet(base)))``, pairing two
+    plain Lagrange vertex functions (carrying the boundary values) with the
+    homogeneous interior modes from ``base``.
 
     Parameters
     ----------
@@ -73,7 +73,7 @@ class ConcatBasis(Basis):
 
     @property
     def measures(self):
-        """Always ``(None,)``; see the class docstring."""
+        """Always ``(None,)``. See the class docstring for why."""
         return (None,)
 
     @property
@@ -90,7 +90,7 @@ class ConcatBasis(Basis):
         return np.concatenate([piece._dof_order for piece in self.pieces])
 
     def default_quadrature(self):
-        """The ``quad_rule`` given at construction; see the class
+        """The ``quad_rule`` given at construction. See the class
         docstring for why this is required rather than derived."""
         return self.quad_rule
 
@@ -101,7 +101,7 @@ class ConcatBasis(Basis):
         Raises
         ------
         ValueError
-            If more than one piece claims the same side at this ``order``
+            If more than one piece claims the same side at this ``order``.
         """
         offset = 0
         left = right = None

@@ -117,7 +117,8 @@ class CubicHermiteBasis(Basis):
         :meth:`~LagrangeBasis.boundary_dofs` stays populated -- e.g. the
         first derivative of a :math:`C^1`-assembled Hermite function is
         itself exactly :math:`C^0`, and needs endpoint DOFs to be
-        reassembled as such (see :meth:`PiecewiseBasis._derivative_basis`).
+        reassembled as such when a piecewise basis differentiates its
+        elements.
         """
         if deriv < 0:
             raise ValueError(f"deriv must be >= 0, got {deriv}")

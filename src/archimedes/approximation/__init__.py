@@ -12,13 +12,13 @@
 
 Bases are univariate by default. :class:`TensorBasis` combines one per
 dimension into a multivariate basis, with :class:`ProductParameters`
-carrying the per-dimension target domains; everything above it works
+carrying the per-dimension target domains. Everything above it works
 unchanged, since a tensor basis still evaluates to a ``(npts, n_basis)``
 design matrix.
 
-Two composition primitives build custom bases out of existing ones:
+Two composition primitives build custom bases out of existing ones.
 :class:`ConstrainedBasis` recombines *one* basis's functions by a fixed
-matrix (e.g. the null space of a boundary-condition constraint), and
+matrix (e.g. the null space of a boundary-condition constraint).
 :class:`ConcatBasis` stacks functions from *several* bases side by side
 (e.g. spectral-element vertex + bubble functions).
 

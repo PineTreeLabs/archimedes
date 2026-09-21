@@ -126,11 +126,11 @@ class FourierBasis(Basis):
         return UnitInterval.Parameters
 
     def default_quadrature(self):
-        """Periodic-trapezoidal rule of ``2 * max_mode + 1`` points.
+        r"""Periodic-trapezoidal rule of ``2 * max_mode + 1`` points.
 
-        Exact for trigonometric polynomials of mode :math:`\\leq 2 \\cdot
-        \\mathrm{max\\_mode}`, which covers this basis's own mass-matrix
-        integrand (products of modes up to :math:`\\mathrm{max\\_mode}`
+        Exact for trigonometric polynomials of mode :math:`\leq 2 \cdot
+        \mathrm{max\_mode}`, which covers this basis's own mass-matrix
+        integrand (products of modes up to :math:`\mathrm{max\_mode}`
         each).
         """
         from archimedes.quadrature import trapezoidal
@@ -138,19 +138,19 @@ class FourierBasis(Basis):
         return trapezoidal(2 * self.max_mode + 1, periodic=True)
 
     def _product_basis(self, other):
-        """Product-to-sum closure table (``N = self.max_mode +
+        r"""Product-to-sum closure table (``N = self.max_mode +
         other.max_mode``):
 
         - either operand ``"full"`` -> ``"full"``, mode ``N``
         - ``"cosine" x "cosine"`` -> ``"cosine"``, mode ``N``
         - ``"sine" x "sine"`` -> ``"cosine"``, mode ``N`` (not ``"sine"``:
-          :math:`\\sin(a)\\sin(b) = \\tfrac12[\\cos(a-b) - \\cos(a+b)]` has
+          :math:`\sin(a)\sin(b) = \tfrac12[\cos(a-b) - \cos(a+b)]` has
           no sine term, and includes a DC term whenever the two modes
           match)
         - ``"cosine" x "sine"`` (either order) -> ``"sine"``, mode ``N``
 
-        Requires the same ``density``, matching
-        :meth:`OrthogonalPolynomialBasis._product_basis`.
+        Requires the same ``density``, as other polynomial bases' product
+        spaces do.
         """
         if not isinstance(other, FourierBasis):
             raise ValueError(
@@ -187,20 +187,21 @@ class FourierBasis(Basis):
         return FourierBasis(self.max_mode + 1, kind="cosine", density=self.density)
 
     def _integral_basis(self, order=1):
-        """``"full"``/``"cosine"`` raise -- both contain the constant/DC
+        r"""``"full"``/``"cosine"`` raise -- both contain the constant/DC
         basis function, whose antiderivative is a non-periodic linear ramp
         with no representation in any Fourier-type space (a different
         reason than :class:`PiecewiseBasis`/:class:`CubicHermiteBasis`
         raise for theirs).
 
         ``"sine"`` has no constant term, so its first integral is
-        well-defined -- but since :math:`\\theta(a) = -\\pi`,
-        :math:`\\theta(b) = \\pi` exactly, pinning the antiderivative to
-        vanish at either endpoint (:meth:`FunctionSpace._integral_matrix`'s
-        convention) always forces a nonzero constant term back in, so
-        ``order=1`` **grows** into ``"cosine"`` at the same ``max_mode``
-        rather than staying ``"sine"``. Any ``order >= 2`` raises, since
-        that intermediate ``"cosine"`` result can't itself be integrated.
+        well-defined -- but since :math:`\theta(a) = -\pi`,
+        :math:`\theta(b) = \pi` exactly, pinning the antiderivative to
+        vanish at either endpoint (this module's convention for building
+        integral matrices) always forces a nonzero constant term back in,
+        so ``order=1`` **grows** into ``"cosine"`` at the same
+        ``max_mode`` rather than staying ``"sine"``. Any ``order >= 2``
+        raises, since that intermediate ``"cosine"`` result can't itself
+        be integrated.
         """
         if order < 0:
             raise ValueError(f"order must be >= 0, got {order}")

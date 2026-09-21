@@ -95,7 +95,11 @@ class OrthogonalPolynomialBasis(Basis):
     @property
     def _reference_scale_exponent(self) -> float:
         """``0.5`` with the raw weight (``density=False``), ``0.0`` with
-        ``density=True``; see :attr:`Basis._reference_scale_exponent`."""
+        ``density=True`` -- the extra uniform power of ``scale`` this
+        family's normalization needs on top of the per-column chain-rule
+        factor, since the mass term contributes one power of ``scale``
+        unless ``density=True`` folds it out of the normalization
+        entirely."""
         return 0.0 if self.density else 0.5
 
     def default_quadrature(self):
@@ -166,9 +170,9 @@ class OrthogonalPolynomialBasis(Basis):
     def _integral_basis(self, order=1):
         """Same measure and normalization, ``n_basis + order`` functions.
 
-        Dual of :meth:`_derivative_basis`: integrating raises the
-        polynomial degree by one per order rather than lowering it, so
-        (unlike differentiation) this is always defined.
+        Dual of differentiation: integrating raises the polynomial degree
+        by one per order rather than lowering it, so (unlike
+        differentiation) this is always defined.
         """
         if order < 0:
             raise ValueError(f"order must be >= 0, got {order}")

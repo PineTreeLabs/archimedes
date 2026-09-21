@@ -58,8 +58,8 @@ def _dim_kwargs(basis: Basis, spec: Any) -> dict:
 
     Accepts the reference domain (``None``), a ``ReferenceDomain.Parameters``
     struct (what a ``FunctionSpace`` domain holds), a kwargs dict, or a
-    positional tuple matched against ``basis.Parameters``' field order --
-    the same set of forms ``TensorQuadratureRule`` accepts, so the two
+    positional tuple matched against ``basis.Parameters``' field order.
+    These are the same forms ``TensorQuadratureRule`` accepts, so the two
     ``dims`` conventions stay identical.
     """
     if spec is None:
@@ -86,15 +86,15 @@ def _dim_kwargs(basis: Basis, spec: Any) -> dict:
 class _DimensionView:
     """One dimension of a tensor rule, presented as a 1-D quadrature rule.
 
-    A tensor rule's ``nodes``/``elements`` are ``(n, ndim)``; a univariate
+    A tensor rule's ``nodes``/``elements`` are ``(n, ndim)``. A univariate
     factor needs column ``d`` of each, at the *full* node count (every
-    combination), not the ``n_d`` of the underlying per-dimension rule. So
-    this is a view of the expanded arrays rather than ``rule.rules[d]``.
+    combination), not the ``n_d`` of the underlying per-dimension rule.
+    So this is a view of the expanded arrays rather than ``rule.rules[d]``.
 
-    Only the members :meth:`Basis._evaluate_at_nodes` implementations touch
-    are provided, which is why this is a plain adapter and not a
-    ``Quadrature``: weights are meaningless here (they do not factor per
-    dimension row-wise), and nothing downstream asks for them.
+    Only the attributes a per-dimension node evaluation needs are provided,
+    which is why this is a plain adapter and not a ``Quadrature``.
+    Weights are meaningless here, since they do not factor per dimension
+    row-wise, and nothing downstream asks for them.
     """
 
     def __init__(self, rule, dim: int):
@@ -119,13 +119,12 @@ def _row_kron(mats: list) -> np.ndarray:
     """Row-wise Kronecker (Khatri-Rao) product of design matrices.
 
     Given ``(npts, p)`` and ``(npts, q)``, returns ``(npts, p * q)`` with
-    ``out[:, i * q + j] = a[:, i] * b[:, j]`` -- i.e. the first factor
-    varies slowest, matching C order and
-    ``TensorQuadratureRule``'s node ordering.
+    ``out[:, i * q + j] = a[:, i] * b[:, j]``. The first factor varies
+    slowest, matching C order and ``TensorQuadratureRule``'s node ordering.
 
-    Built column by column rather than as ``a[:, :, None] * b[:, None, :]``
-    because ``SymbolicArray`` supports no more than two dimensions, so the
-    broadcasting form is unavailable under tracing.
+    Built column by column rather than as ``a[:, :, None] * b[:, None, :]``,
+    since ``SymbolicArray`` supports no more than two dimensions. The
+    broadcasting form is therefore unavailable under tracing.
     """
     out = mats[0]
     for phi in mats[1:]:

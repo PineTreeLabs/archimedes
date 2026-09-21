@@ -55,11 +55,11 @@ class BasisMatrix:
     ``.T`` gives the adjoint of :math:`\Phi` under the Euclidean inner
     product on coefficients and the weighted inner product on sampled
     values: :math:`\langle \Phi c, r\rangle_w = \langle c, \Phi^\top
-    r\rangle`, so :math:`\Phi^\top r = \phi^\top (w \odot r)`. This makes a
-    Galerkin projection read almost like the math it approximates:
-    ``phi.T @ phi`` is the Gram (mass) matrix :math:`\Phi^\top\Phi`, and
-    ``phi.T @ f(x)`` is the load vector :math:`\Phi^\top f` -- see
-    :meth:`FunctionSpace.project`.
+    r\rangle`. That adjoint relation gives :math:`\Phi^\top r = \phi^\top
+    (w \odot r)`, so a Galerkin projection reads almost like the math it
+    approximates: ``phi.T @ phi`` is the Gram (mass) matrix
+    :math:`\Phi^\top\Phi`, and ``phi.T @ f(x)`` is the load vector
+    :math:`\Phi^\top f` -- see :meth:`FunctionSpace.project`.
     """
 
     matrix: np.ndarray
@@ -71,12 +71,12 @@ class BasisMatrix:
         return self.matrix.shape  # type: ignore[return-value]
 
     def __matmul__(self, coefficients: np.ndarray) -> np.ndarray:
-        """:math:`\\Phi c`: sampled values at the quadrature nodes."""
+        r""":math:`\Phi c`: sampled values at the quadrature nodes."""
         return self.matrix @ coefficients  # type: ignore[no-any-return]
 
     @property
     def T(self) -> _BasisMatrixAdjoint:  # noqa: N802
-        """The adjoint :math:`\\Phi^\\top`; see the class docstring."""
+        r"""The adjoint :math:`\Phi^\top`; see the class docstring."""
         return _BasisMatrixAdjoint(self)
 
 
@@ -87,7 +87,7 @@ class _BasisMatrixAdjoint:
     basis_matrix: BasisMatrix
 
     def __matmul__(self, values: np.ndarray | BasisMatrix) -> np.ndarray:
-        """:math:`\\Phi^\\top r = \\phi^\\top (w \\odot r)`.
+        r""":math:`\Phi^\top r = \phi^\top (w \odot r)`.
 
         ``values`` (``r``) must already be sampled at the same quadrature
         nodes as ``self.basis_matrix`` -- shape ``(npts,)`` for a scalar
@@ -199,10 +199,10 @@ class Basis(metaclass=abc.ABCMeta):
         breakpoints. :class:`FunctionSpace` uses this when no explicit rule
         is given.
 
-        This is *not* generally sufficient for :meth:`FunctionSpace.project`,
-        whose accuracy requirement depends on the target function rather
-        than on the space -- ``project`` takes an explicit override for
-        that case.
+        That default rule is *not* generally sufficient for
+        :meth:`FunctionSpace.project`, whose accuracy requirement depends on
+        the target function rather than on the space -- ``project`` takes an
+        explicit override for that case.
         """
         raise NotImplementedError
 
@@ -214,7 +214,7 @@ class Basis(metaclass=abc.ABCMeta):
         side: str = RIGHT,
         **domain_kwargs,
     ) -> np.ndarray:
-        """Evaluate :math:`\\sum_i c_i \\, \\phi_i(x)` directly.
+        r"""Evaluate :math:`\sum_i c_i \, \phi_i(x)` directly.
 
         Mathematically equivalent to ``evaluate(x, deriv) @ coefficients``,
         which is the default implementation, but allows families with local
@@ -298,11 +298,11 @@ class Basis(metaclass=abc.ABCMeta):
         )
 
     def _derivative_basis(self, deriv=1) -> "Basis":
-        """The smallest basis that represents this family's ``deriv``-th
+        r"""The smallest basis that represents this family's ``deriv``-th
         derivatives *exactly*.
 
         Note this is a strictly smaller space, not merely a different one:
-        :math:`P_{n-2} \\subset P_{n-1}`, so the derivative would also be
+        :math:`P_{n-2} \subset P_{n-1}`, so the derivative would also be
         exactly representable in the *original* basis. Returning the minimal
         space keeps the rule uniform so that every closed operation gives
         the tightest exact space and keeps downstream products from carrying
@@ -319,7 +319,7 @@ class Basis(metaclass=abc.ABCMeta):
 
         Notes
         -----
-        The result is usually, but not necessarily, in the the *same family*
+        The result is usually, but not necessarily, in the *same family*
         at a lower order. A family whose degrees of freedom are not all the
         same *kind* of quantity (e.g.
         :class:`CubicHermiteBasis`,
@@ -337,11 +337,11 @@ class Basis(metaclass=abc.ABCMeta):
 
     def _integral_basis(self, order: int = 1) -> "Basis":
         """The smallest basis whose ``order``-th derivatives span this
-        family's elements exactly -- the dual of :meth:`_derivative_basis`.
+        family's elements exactly -- the dual of differentiation.
 
-        Where :meth:`_derivative_basis` returns a *smaller* space
-        (differentiating lowers polynomial degree), this returns a *larger*
-        one: integrating raises degree by one per order. Unlike
+        Differentiating returns a *smaller* space, since it lowers
+        polynomial degree; this returns a *larger* one instead: integrating
+        raises degree by one per order. Unlike
         differentiation, this never runs out of room -- there is always a
         space big enough to hold the antiderivative exactly -- so the only
         real question is which one, not whether one exists. See
@@ -401,7 +401,7 @@ class Basis(metaclass=abc.ABCMeta):
 
     @property
     def _reference_scale_exponent(self) -> float:
-        """Extra, *uniform* (same for every column) power of ``scale`` needed
+        r"""Extra, *uniform* (same for every column) power of ``scale`` needed
         on top of the per-column ``(2/width) ** (deriv - dof_order[k])``
         chain-rule factor to turn a *reference*-domain ``evaluate(t, deriv)``
         call (``t`` already mapped into ``[-1, 1]``, no domain kwargs) into
@@ -412,11 +412,11 @@ class Basis(metaclass=abc.ABCMeta):
 
         :class:`OrthogonalPolynomialBasis` overrides this to ``0.0`` (with
         ``density=True``) or ``0.5`` (``density=False``): its ``evaluate``
-        normalizes by :math:`\\sqrt{\\mathrm{mass}(a, b) \\cdot \\beta_1 \\cdots
-        \\beta_k}`, and since ``mass`` scales as one power of ``scale`` (see
+        normalizes by :math:`\sqrt{\mathrm{mass}(a, b) \cdot \beta_1 \cdots
+        \beta_k}`, and since ``mass`` scales as one power of ``scale`` (see
         ``Measure.mass``) while each ``beta`` scales as two, the physical
         basis function picks up a uniform extra factor of
-        :math:`\\mathrm{scale}^{-1/2}` relative to the reference one --
+        :math:`\mathrm{scale}^{-1/2}` relative to the reference one --
         *unless* ``density=True`` folds ``mass`` out of the normalization
         entirely, in which case there is no such extra factor.
 

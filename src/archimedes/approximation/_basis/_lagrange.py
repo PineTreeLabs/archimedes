@@ -293,9 +293,9 @@ class LagrangeBasis(Basis):
         if deriv < 0:
             raise ValueError(f"deriv must be >= 0, got {deriv}")
         # Not `self._derived(n_basis)`: regenerating from `node_family` would
-        # silently move nodes that were supplied explicitly. This matters for
-        # `TensorBasis`, which asks for order 0 on every undifferentiated
-        # factor.
+        # silently move nodes that were supplied explicitly. That distinction
+        # matters for `TensorBasis`, which asks for order 0 on every
+        # undifferentiated factor.
         if deriv == 0:
             return self
         if deriv >= self.n_basis:
@@ -311,10 +311,10 @@ class LagrangeBasis(Basis):
     def _integral_basis(self, order=1):
         """``n_basis + order`` nodes from this basis's ``node_family``.
 
-        Dual of :meth:`_derivative_basis`: growing rather than shrinking
-        the node set, so (unlike differentiation) this is always defined.
-        As with :meth:`_derivative_basis`, the result's nodes -- and so the
-        meaning of its coefficients -- differ from this basis's own.
+        Dual of differentiation: growing rather than shrinking the node
+        set, so (unlike differentiation) this is always defined. As with
+        taking a derivative, the result's nodes -- and so the meaning of
+        its coefficients -- differ from this basis's own.
         """
         if order < 0:
             raise ValueError(f"order must be >= 0, got {order}")
@@ -323,7 +323,7 @@ class LagrangeBasis(Basis):
         return self._derived(self.n_basis + order)
 
     def boundary_dofs(self, order: int = 0) -> tuple[int | None, int | None]:
-        """Indices of the nodes at :math:`t = \\pm 1`, or ``None`` if the
+        r"""Indices of the nodes at :math:`t = \pm 1`, or ``None`` if the
         corresponding endpoint isn't a node.
 
         Gauss-Lobatto nodes include both endpoints; Gauss-Radau includes

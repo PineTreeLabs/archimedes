@@ -77,10 +77,10 @@ class MonomialBasis(Basis):
         return gauss_legendre(self.n_basis)
 
     def _product_basis(self, other):
-        """:math:`t^i \\cdot t^j` spans degree ``0`` through
+        r"""``t^i \cdot t^j`` spans degree ``0`` through
         ``(n_1 - 1) + (n_2 - 1)``, so the product space needs
-        ``n_1 + n_2 - 1`` functions -- the same arithmetic as
-        :meth:`OrthogonalPolynomialBasis._product_basis`, with no
+        ``n_1 + n_2 - 1`` functions -- the same degree-counting argument
+        used for other polynomial bases' product spaces, with no
         measure-compatibility check since this family has no measure.
         """
         if not isinstance(other, MonomialBasis):
@@ -91,8 +91,8 @@ class MonomialBasis(Basis):
         return MonomialBasis(self.n_basis + other.n_basis - 1)
 
     def _derivative_basis(self, deriv=1):
-        """``n_basis - deriv`` functions; see
-        :meth:`OrthogonalPolynomialBasis._derivative_basis`."""
+        """``n_basis - deriv`` functions, shrinking the same way
+        differentiation shrinks other polynomial bases."""
         if deriv < 0:
             raise ValueError(f"deriv must be >= 0, got {deriv}")
         if deriv == 0:
@@ -108,8 +108,8 @@ class MonomialBasis(Basis):
         return MonomialBasis(self.n_basis - deriv)
 
     def _integral_basis(self, order=1):
-        """``n_basis + order`` functions; see
-        :meth:`OrthogonalPolynomialBasis._integral_basis`."""
+        """``n_basis + order`` functions, growing the same way
+        integration grows other polynomial bases."""
         if order < 0:
             raise ValueError(f"order must be >= 0, got {order}")
         if order == 0:

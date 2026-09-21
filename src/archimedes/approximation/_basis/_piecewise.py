@@ -298,16 +298,17 @@ class PiecewiseBasis(Basis):
     def _derivative_basis(self, deriv=1):
         """Same breakpoints, per-element derivative basis, weaker continuity.
 
-        The derivative can in general leave the original space rather than being
-        contained in a subspace of it, so differentiating ``deriv`` times can only
-        be relied on for continuity down to ``q - deriv``.
+        The derivative can in general leave the original space, rather than
+        being contained in a subspace of it. Differentiating ``deriv`` times
+        can only be relied on for continuity down to ``q - deriv``.
 
-        For example, a :math:`C^0` (``q=0``) function's derivative jumps at every
-        breakpoint; a :math:`C^1` (``q=1``, e.g. cubic Hermite) function's *first*
-        derivative is still continuous (``max(1 - 1, -1) = 0``), while its *second*
-        derivative need not be (``max(1 - 2, -1) = -1``). Within each element the
-        derivative is still a polynomial of degree ``n_loc - 1 - deriv``, so that
-        element's basis shrinks in the usual way and the representation stays exact,
+        For example, a :math:`C^0` (``q=0``) function's derivative jumps at
+        every breakpoint. A :math:`C^1` (``q=1``, e.g. cubic Hermite)
+        function's *first* derivative is still continuous
+        (``max(1 - 1, -1) = 0``), while its *second* derivative need not be
+        (``max(1 - 2, -1) = -1``). Within each element, the derivative is
+        still a polynomial of degree ``n_loc - 1 - deriv``. That element's
+        basis shrinks in the usual way, so the representation stays exact
         whether or not the elements share an order.
         """
         if deriv < 0:
@@ -321,24 +322,27 @@ class PiecewiseBasis(Basis):
         )
 
     def _integral_basis(self, order=1):
-        """Not implemented: unlike :meth:`_derivative_basis`, growing each
-        element's basis is not enough on its own.
+        """Not implemented: unlike differentiating, growing each element's
+        basis is not enough on its own to integrate.
 
         A derivative is exact element-by-element with no cross-element
-        bookkeeping, since differentiating cannot lower continuity below
-        ``-1`` and the standard DOF-merge assembly (:meth:`_build_assembly`)
-        already handles whatever continuity remains. An antiderivative
-        instead needs continuity to go *up*, which the assembly cannot
-        produce by itself: it merges DOFs that are already the same shared
-        quantity in both elements, but a modal family like Legendre has no
-        boundary DOF to merge in the first place (:meth:`boundary_dofs`
-        returns ``(None, None)`` regardless of order), even though the
-        antiderivative of a Legendre element genuinely must be continuous
-        with its neighbor. What's needed instead is a running constant
-        carried from each element into the next -- the piecewise analogue
-        of :meth:`Function.integral`'s single boundary pin, but
-        applied once per element rather than once globally. That
-        construction doesn't exist yet.
+        bookkeeping. Differentiating cannot lower continuity below ``-1``,
+        and the DOF-merge assembly this basis builds at construction time
+        already handles whatever continuity remains.
+
+        An antiderivative instead needs continuity to go *up*, which that
+        assembly cannot produce by itself. It merges DOFs that are already
+        the same shared quantity in both elements, but a modal family like
+        Legendre has no boundary DOF to merge in the first place
+        (:meth:`boundary_dofs` returns ``(None, None)`` regardless of
+        order). Even so, the antiderivative of a Legendre element genuinely
+        must be continuous with its neighbor.
+
+        What's needed instead is a running constant carried from each
+        element into the next -- the piecewise analogue of
+        :meth:`Function.integral`'s single boundary pin, but applied once
+        per element rather than once globally. That construction doesn't
+        exist yet.
         """
         raise NotImplementedError(
             f"{type(self).__name__} does not define an integral basis: an "
@@ -367,10 +371,10 @@ class PiecewiseBasis(Basis):
           finite elements, generalized to slope-matching and beyond.
 
         The merge itself is always a bare identity, including for a
-        derivative-type DOF (``order >= 1``): any rescaling needed to make
-        it comparable across elements of different width is the element
-        basis's own responsibility (see :attr:`Basis._dof_order`), not this
-        assembly's. So generalizing from one merged order (``C0``) to
+        derivative-type DOF (``order >= 1``). Any rescaling needed to make
+        such a DOF comparable across elements of different width is the
+        element basis's own responsibility, not this assembly's. So
+        generalizing from one merged order (``C0``) to
         several is purely bookkeeping -- track one "previous element's
         global index" per order instead of one overall, keyed by which
         local index each order's ``boundary_dofs`` reports.
