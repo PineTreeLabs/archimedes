@@ -101,7 +101,7 @@ def test_project_vector_respects_quad_rule_override(space):
     np.testing.assert_allclose(fn(x), f_vec(x), atol=1e-9)
 
 
-def test_project_single_column_is_not_the_scalar_case(space):
+def test_project_single_column_is_not_scalar_case(space):
     """An ``(npts, 1)`` target stays 2-D rather than collapsing to scalar."""
 
     def f(x):
@@ -184,7 +184,7 @@ def test_add_and_scale_vector_functions(space):
 # -- pytree / symbolic --
 
 
-def test_vector_function_is_a_pytree(space):
+def test_vector_function_is_pytree(space):
     fn = space.project(f_vec)
     flat, unravel = tree.ravel(fn)
     # coefficients (n_basis * m) + the two domain endpoints

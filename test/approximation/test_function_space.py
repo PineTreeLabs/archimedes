@@ -97,13 +97,11 @@ def test_project_recovers_exact_polynomial(space):
     assert isinstance(fn, Function)
 
 
-def test_project_uses_space_quad_rule_by_default(space, quad_rule):
+def test_project_quad_rule(space, quad_rule):
     default = space.project(lambda x: x**2)
     explicit = space.project(lambda x: x**2, quad_rule=quad_rule)
     np.testing.assert_allclose(default.coefficients, explicit.coefficients)
 
-
-def test_project_accepts_quad_rule_override(space):
     # A coarser rule than space.quad_rule (but still enough points to keep
     # the mass matrix nonsingular and resolve the degree-8 mass-matrix
     # integrand for n_basis=5) still recovers x^2 exactly.
@@ -116,15 +114,14 @@ def test_project_accepts_quad_rule_override(space):
 # -- function() --
 
 
-def test_function_with_explicit_coefficients(space):
+def test_function(space):
     coefficients = np.arange(space.n_basis, dtype=float)
     fn = space.function(coefficients)
     assert isinstance(fn, Function)
     assert fn.space is space
     np.testing.assert_array_equal(fn.coefficients, coefficients)
 
-
-def test_function_defaults_to_zero_coefficients(space):
+    # Defaults to zero coefficients.
     fn = space.function()
     assert isinstance(fn, Function)
     assert fn.space is space
@@ -216,7 +213,7 @@ def test_quad_rule_shared_across_spaces_lands_on_physical_nodes(quad_rule):
     assert np.all(Phi_a.nodes <= 6.0)
 
 
-def test_project_rejects_test_space_with_different_n_basis(space, quad_rule):
+def test_project_rejects_mismatched_test_space(space, quad_rule):
     test_space = FunctionSpace(
         OrthogonalPolynomialBasis(LegendreMeasure(), n_basis=3),
         domain=UnitInterval.Parameters(a=-1.0, b=1.0),
@@ -225,8 +222,6 @@ def test_project_rejects_test_space_with_different_n_basis(space, quad_rule):
     with pytest.raises(ValueError, match="n_basis"):
         space.project(lambda x: x**2, test_space=test_space)
 
-
-def test_project_rejects_test_space_with_different_domain(space):
     test_space = FunctionSpace(
         OrthogonalPolynomialBasis(ProbabilistsHermiteMeasure(), n_basis=5),
         domain=RealLine.Parameters(),
@@ -276,11 +271,18 @@ def test_project_of_function_outside_basis_degree_is_approximate(quad_rule):
 # -- inner_product --
 
 
-def test_inner_product_matches_mass_matrix_quadratic_form(space):
+def test_inner_product(space):
     c1 = np.array([1.0, -2.0, 0.5, 0.0, 3.0])
     c2 = np.array([0.2, 1.0, -1.0, 4.0, 0.1])
     M = mass_matrix(space)
     np.testing.assert_allclose(space._inner_product(c1, c2), c1 @ M @ c2, atol=1e-10)
+
+    coarse = gauss_legendre(6)
+    np.testing.assert_allclose(
+        space._inner_product(c1, c2, quad_rule=coarse),
+        space._inner_product(c1, c2),
+        atol=1e-10,
+    )
 
 
 def test_inner_product_of_orthonormal_basis_vectors_is_kronecker_delta(space):
@@ -294,21 +296,10 @@ def test_inner_product_of_orthonormal_basis_vectors_is_kronecker_delta(space):
             )
 
 
-def test_inner_product_accepts_quad_rule_override(space):
-    c1 = np.array([1.0, -2.0, 0.5, 0.0, 3.0])
-    c2 = np.array([0.2, 1.0, -1.0, 4.0, 0.1])
-    coarse = gauss_legendre(6)
-    np.testing.assert_allclose(
-        space._inner_product(c1, c2, quad_rule=coarse),
-        space._inner_product(c1, c2),
-        atol=1e-10,
-    )
-
-
 # -- quadrature / basis_matrix / BasisMatrix.T --
 
 
-def test_quadrature_matches_mapped_rule(space, quad_rule):
+def test_quadrature(space, quad_rule):
     x, w = space.quadrature()
     mapped = quad_rule.map_to(a=-1.0, b=1.0)
     np.testing.assert_allclose(x, mapped.nodes)
@@ -317,12 +308,10 @@ def test_quadrature_matches_mapped_rule(space, quad_rule):
         expected_w = expected_w / np.sum(expected_w)
     np.testing.assert_allclose(w, expected_w)
 
-
-def test_quadrature_accepts_quad_rule_override(space):
     # space's domain happens to be [-1, 1], the reference domain itself, so
     # an unmapped override coincides numerically with one mapped onto it --
-    # see test_quadrature_override_on_non_reference_domain_is_used_as_is for
-    # the case where that's not true.
+    # see test_quadrature_override_on_non_reference_domain for the case
+    # where that's not true.
     coarse = gauss_legendre(6)
     x, w = space.quadrature(quad_rule=coarse)
     np.testing.assert_allclose(x, coarse.nodes)
@@ -332,7 +321,7 @@ def test_quadrature_accepts_quad_rule_override(space):
     np.testing.assert_allclose(w, expected_w)
 
 
-def test_quadrature_override_on_non_reference_domain_is_used_as_is(quad_rule):
+def test_quadrature_override_on_non_reference_domain(quad_rule):
     # An explicit override is used exactly as given, with no further domain
     # mapping applied -- so on a genuinely non-reference domain, an
     # unmapped override rule gives *reference*-domain nodes back, not nodes
@@ -347,15 +336,8 @@ def test_quadrature_override_on_non_reference_domain_is_used_as_is(quad_rule):
     np.testing.assert_allclose(x, coarse.nodes)
     np.testing.assert_allclose(w, coarse.weights)
 
-
-def test_quadrature_override_pre_mapped_matches_default(quad_rule):
     # The correct way to use an override on a non-identity domain: map it
     # yourself first.
-    wide_space = FunctionSpace(
-        OrthogonalPolynomialBasis(LegendreMeasure(), n_basis=4),
-        domain=UnitInterval.Parameters(a=0.0, b=4.0),
-        reference_quad_rule=quad_rule,
-    )
     pre_mapped = quad_rule.map_to(a=0.0, b=4.0)
     x, w = wide_space.quadrature(quad_rule=pre_mapped)
     x_default, w_default = wide_space.quadrature()
@@ -363,13 +345,18 @@ def test_quadrature_override_pre_mapped_matches_default(quad_rule):
     np.testing.assert_allclose(w, w_default)
 
 
-def test_basis_matrix_matches_direct_basis_evaluation(space):
+def test_basis_matrix(space):
     x, w = space.quadrature()
     expected = space.basis.evaluate(x, a=-1.0, b=1.0)
     phi = space.basis_matrix()
     np.testing.assert_allclose(phi.matrix, expected)
     np.testing.assert_allclose(phi.weights, w)
     assert phi.shape == expected.shape
+
+    coarse = gauss_legendre(6)
+    x, _ = space.quadrature(quad_rule=coarse)
+    expected = space.basis.evaluate(x, a=-1.0, b=1.0)
+    np.testing.assert_allclose(space.basis_matrix(quad_rule=coarse).matrix, expected)
 
 
 def test_basis_matrix_of_derivative(space):
@@ -378,20 +365,13 @@ def test_basis_matrix_of_derivative(space):
     np.testing.assert_allclose(space.basis_matrix(deriv=1).matrix, expected)
 
 
-def test_basis_matrix_accepts_quad_rule_override(space):
-    coarse = gauss_legendre(6)
-    x, _ = space.quadrature(quad_rule=coarse)
-    expected = space.basis.evaluate(x, a=-1.0, b=1.0)
-    np.testing.assert_allclose(space.basis_matrix(quad_rule=coarse).matrix, expected)
-
-
 def test_basis_matrix_matmul_applies_to_coefficients(space):
     c = np.array([1.0, -2.0, 0.5, 0.0, 3.0])
     phi = space.basis_matrix()
     np.testing.assert_allclose(phi @ c, phi.matrix @ c)
 
 
-def test_basis_matrix_adjoint_of_plain_function_matches_project_rhs(space):
+def test_basis_matrix_adjoint(space):
     # project's right-hand side is `phi.T @ f(x)` solved against the mass
     # matrix; for an orthonormal basis M = I, so project(f).coefficients ==
     # phi.T @ f(x).
@@ -403,15 +383,11 @@ def test_basis_matrix_adjoint_of_plain_function_matches_project_rhs(space):
     phi = space.basis_matrix()
     np.testing.assert_allclose(phi.T @ f(x), fn.coefficients, atol=1e-10)
 
-
-def test_basis_matrix_adjoint_accepts_vector_valued_integrand(space):
-    x, _ = space.quadrature()
-    phi = space.basis_matrix()
-
-    def f(x):
+    # Also accepts a vector-valued integrand.
+    def fv(x):
         return np.stack([x, x**2], axis=-1)  # (npts, 2)
 
-    R = phi.T @ f(x)
+    R = phi.T @ fv(x)
     assert R.shape == (space.n_basis, 2)
     np.testing.assert_allclose(R[:, 0], phi.T @ x, atol=1e-12)
     np.testing.assert_allclose(R[:, 1], phi.T @ x**2, atol=1e-12)

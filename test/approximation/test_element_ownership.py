@@ -21,11 +21,12 @@ import archimedes as arc
 from archimedes.approximation import (
     FunctionSpace,
     LagrangeBasis,
+    OrthogonalPolynomialBasis,
     PiecewiseBasis,
     ProductParameters,
     TensorBasis,
 )
-from archimedes.measure import UnitInterval
+from archimedes.measure import LegendreMeasure, UnitInterval
 from archimedes.quadrature import (
     composite_quad,
     gauss_legendre,
@@ -67,7 +68,7 @@ BOUNDARY_NODE_RULES = {
 
 @pytest.mark.parametrize("continuity", [-1, 0])
 @pytest.mark.parametrize("rule_name", sorted(BOUNDARY_NODE_RULES))
-def test_mass_matrix_is_exact_whatever_the_rules_nodes(continuity, rule_name):
+def test_mass_matrix_uses_recorded_ownership(continuity, rule_name):
     # A node placed exactly on an element boundary belongs to the element
     # the quadrature rule recorded it against, not to whichever element the
     # half-open coordinate convention would pick. Check this for every rule
@@ -82,7 +83,7 @@ def test_mass_matrix_is_exact_whatever_the_rules_nodes(continuity, rule_name):
 
 
 @pytest.mark.parametrize("continuity", [-1, 0])
-def test_stiffness_matrix_is_exact_with_boundary_nodes(continuity):
+def test_stiffness_matrix_uses_recorded_ownership(continuity):
     basis = _basis(continuity, n=4)
     expected = stiffness_matrix(
         FunctionSpace(basis, DOMAIN, reference_quad_rule=REFERENCE)
@@ -94,13 +95,13 @@ def test_stiffness_matrix_is_exact_with_boundary_nodes(continuity):
 
 @pytest.mark.parametrize("continuity", [-1, 0])
 @pytest.mark.parametrize("rule_name", ["lobatto", "radau_right"])
-def test_test_side_of_basis_matrix_uses_recorded_ownership(continuity, rule_name):
+def test_basis_matrix_uses_recorded_ownership(continuity, rule_name):
     # `basis_matrix` shares `basis._evaluate_at_nodes` with `mass_matrix`
     # rather than evaluating the basis by coordinate, so contracting a smooth
     # (coordinate-resolvable) integrand against it (via its adjoint) must be
     # exact here too -- the same ownership issue
-    # `test_mass_matrix_is_exact_whatever_the_rules_nodes` guards against,
-    # exercised through the promoted quadrature primitives instead. (The
+    # `test_mass_matrix_uses_recorded_ownership` guards against, exercised
+    # through the promoted quadrature primitives instead. (The
     # *trial* side -- the integrand's own dependence on x -- has no such
     # guarantee: it only ever sees coordinates, so a discontinuous basis
     # evaluated by coordinate can't resolve which copy of a duplicated
@@ -137,7 +138,7 @@ def test_projection_is_exact_with_boundary_nodes():
     )
 
 
-def test_refined_rule_whose_breakpoints_strictly_contain_the_basis():
+def test_refined_rule_accepted():
     # Ownership maps rule elements to the basis element containing them, so a
     # rule refined beyond the basis is still handled exactly.
     basis = _basis(-1)
@@ -147,7 +148,7 @@ def test_refined_rule_whose_breakpoints_strictly_contain_the_basis():
     np.testing.assert_allclose(got, expected, rtol=1e-10, atol=1e-12)
 
 
-def test_derivative_of_a_c0_space_integrates_exactly():
+def test_c0_derivative_integrates_exactly():
     # `derivative()` always lands in a discontinuous space, so this is the
     # path that made the issue reachable from ordinary use.
     space = FunctionSpace(_basis(0, n=4), DOMAIN)
@@ -190,9 +191,6 @@ def test_tensor_of_piecewise_factors_with_boundary_nodes():
 
 
 def test_tensor_mixes_piecewise_and_smooth_factors():
-    from archimedes.approximation import OrthogonalPolynomialBasis
-    from archimedes.measure import LegendreMeasure
-
     basis = TensorBasis((_basis(-1), OrthogonalPolynomialBasis(LegendreMeasure(), 3)))
     domain = ProductParameters(dims=(DOMAIN, DOMAIN))
     got = mass_matrix(
@@ -216,7 +214,7 @@ def test_tensor_mixes_piecewise_and_smooth_factors():
 
 
 @pytest.mark.parametrize("continuity,jump", [(-1, True), (0, False)])
-def test_side_gives_the_one_sided_limits(continuity, jump):
+def test_side_gives_one_sided_limits(continuity, jump):
     space = FunctionSpace(_basis(continuity), DOMAIN)
     u = space.project(lambda x: np.where(x < KNOT, x, 2 * x - 0.25))
     eps = 1e-9
@@ -230,7 +228,7 @@ def test_side_gives_the_one_sided_limits(continuity, jump):
 
 
 @pytest.mark.parametrize("continuity", [-1, 0])
-def test_derivative_jumps_even_when_the_value_does_not(continuity):
+def test_derivative_jumps_when_value_does_not(continuity):
     # The gradient-jump error indicator for a C0 space needs exactly this.
     space = FunctionSpace(_basis(continuity), DOMAIN)
     u = space.project(lambda x: np.where(x < KNOT, x, 2 * x - 0.25))
@@ -240,7 +238,7 @@ def test_derivative_jumps_even_when_the_value_does_not(continuity):
     )
 
 
-def test_right_is_the_default():
+def test_right_is_default():
     space = FunctionSpace(_basis(-1), DOMAIN)
     u = space.project(lambda x: np.where(x < KNOT, 1.0, 2.0))
     at = np.array([KNOT])
@@ -276,7 +274,7 @@ def test_side_traces_symbolically(side):
     np.testing.assert_allclose(np.asarray(traced(x)).ravel(), expected, atol=1e-12)
 
 
-def test_side_at_the_outer_endpoints():
+def test_side_at_outer_endpoints():
     # The domain's own endpoints are owned by the end elements under either
     # convention -- there is no element beyond them to hand the point to.
     basis = _basis(-1)
@@ -305,9 +303,6 @@ def test_invalid_side_rejected(call):
 
 
 def _smooth_spaces():
-    from archimedes.approximation import OrthogonalPolynomialBasis
-    from archimedes.measure import LegendreMeasure
-
     return {
         "modal": FunctionSpace(OrthogonalPolynomialBasis(LegendreMeasure(), 4), DOMAIN),
         "nodal": FunctionSpace(_element(4), DOMAIN),
@@ -315,7 +310,7 @@ def _smooth_spaces():
 
 
 @pytest.mark.parametrize("name", sorted(_smooth_spaces()))
-def test_smooth_families_accept_side_and_both_limits_coincide(name):
+def test_smooth_family_side_limits_agree(name):
     # Not "allow and ignore": a one-sided limit is well posed for any
     # function, and where the basis is smooth the two limits are equal, so
     # returning the ordinary value *is* the right answer. That is what lets
@@ -367,15 +362,10 @@ def test_tensor_side_is_per_dimension(side, expected):
     assert u(corner, side=side)[0] == pytest.approx(expected, rel=1e-9)
 
 
-def test_tensor_side_must_have_one_entry_per_dimension():
+def test_tensor_side_validation():
     space = _corner_space()
     u = space.project(lambda p: p[:, 0])
     with pytest.raises(ValueError, match="one entry per dimension"):
         u(np.array([[KNOT, KNOT]]), side=("left",))
-
-
-def test_tensor_side_entries_are_validated():
-    space = _corner_space()
-    u = space.project(lambda p: p[:, 0])
     with pytest.raises(ValueError, match="side must be 'left' or 'right'"):
         u(np.array([[KNOT, KNOT]]), side=("left", "up"))

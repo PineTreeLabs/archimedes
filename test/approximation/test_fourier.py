@@ -1,4 +1,4 @@
-# ruff: noqa: N806  (M is the conventional name for a Gram matrix)
+# ruff: noqa: N806
 import numpy as np
 import pytest
 
@@ -13,28 +13,20 @@ from archimedes.approximation import (
 )
 from archimedes.measure import LegendreMeasure, UnitInterval
 
-# -- construction validation --
 
-
-def test_rejects_unknown_kind():
+def test_construction_validation():
     with pytest.raises(ValueError, match="kind must be"):
         FourierBasis(3, kind="triangle")
 
-
-def test_n_basis_must_be_positive():
     with pytest.raises(ValueError):
         FourierBasis(0)
     with pytest.raises(ValueError):
         FourierBasis(-1, kind="cosine")
 
-
-def test_full_requires_odd_n_basis():
     with pytest.raises(ValueError, match="odd"):
         FourierBasis(4, kind="full")
     FourierBasis(5, kind="full")  # does not raise
 
-
-def test_negative_deriv_rejected():
     basis = FourierBasis(5)
     with pytest.raises(ValueError):
         basis.evaluate(np.array([0.0]), deriv=-1)
@@ -61,8 +53,11 @@ def test_measures_and_density_defaults():
 
 
 # -- values at hand-computed points, on the reference domain [-1, 1] --
-# (mass = LegendreMeasure().mass() = 2, so const = 1/sqrt(2), mode factor
-# sqrt(2/2) = 1; theta = pi * x, so x=0,0.5,1 give theta=0,pi/2,pi.)
+# mass = LegendreMeasure().mass() = 2
+# const = 1/sqrt(2)
+# mode factor sqrt(2/2) = 1
+# theta = pi * x
+# so x=(0, 0.5, 1.0)  ==>  theta=(0, pi/2, pi)
 
 
 def test_full_values_at_known_points():
@@ -158,7 +153,7 @@ def test_orthonormal_on_mapped_domain(kind, n_basis, density):
     np.testing.assert_allclose(M, np.eye(n_basis), atol=1e-10)
 
 
-def test_density_rescales_by_sqrt_mass_relative_to_raw():
+def test_density_rescaling():
     a, b = -1.0, 5.0
     raw = FourierBasis(5, kind="full")
     density = FourierBasis(5, kind="full", density=True)
@@ -172,31 +167,19 @@ def test_density_rescales_by_sqrt_mass_relative_to_raw():
 # -- static (NumPy) vs. dynamic (symbolic, via arc.compile) equivalence --
 
 
-def test_static_and_dynamic_evaluation_agree():
+@pytest.mark.parametrize("deriv", [0, 1])
+def test_static_and_dynamic_evaluation_agree(deriv):
     basis = FourierBasis(5, kind="full")
     x = np.linspace(-1, 1, 9)
-    static_phi = basis.evaluate(x)
+    static_phi = basis.evaluate(x, deriv=deriv)
 
     @arc.compile
     def traced(x):
         assert isinstance(x, SymbolicArray)
-        return basis.evaluate(np.atleast_1d(x))
+        return basis.evaluate(np.atleast_1d(x), deriv=deriv)
 
     dynamic_phi = np.array([np.asarray(traced(xi)).ravel() for xi in x])
     np.testing.assert_allclose(static_phi, dynamic_phi, atol=1e-12)
-
-
-def test_static_and_dynamic_derivative_agree():
-    basis = FourierBasis(5, kind="full")
-    x = np.linspace(-0.8, 0.8, 7)
-    static_dphi = basis.evaluate(x, deriv=1)
-
-    @arc.compile
-    def traced(x):
-        return basis.evaluate(np.atleast_1d(x), deriv=1)
-
-    dynamic_dphi = np.array([np.asarray(traced(xi)).ravel() for xi in x])
-    np.testing.assert_allclose(static_dphi, dynamic_dphi, atol=1e-12)
 
 
 # -- tensor-product composition: FourierBasis needs no special-casing --
@@ -208,7 +191,7 @@ class TestTensorComposition:
         legendre = FunctionSpace.legendre(4, a=0.0, b=2.0)
         return FunctionSpace.tensor(fourier, legendre)
 
-    def test_fourier_x_legendre_projects_a_separable_function(self):
+    def test_separable_function_projection(self):
         space = self._space()
 
         def f(x):
@@ -218,7 +201,7 @@ class TestTensorComposition:
         x = np.stack([np.linspace(-0.9, 0.9, 9), np.linspace(0.1, 1.9, 9)], axis=-1)
         np.testing.assert_allclose(u(x), f(x), atol=1e-8)
 
-    def test_fourier_partial_derivative_in_tensor_product(self):
+    def test_partial_derivative(self):
         # deriv=(1, 0): only the Fourier factor differentiates. Its own
         # `_derivative_basis` never raises (unlike a polynomial factor's),
         # so this exercises TensorBasis's per-dimension delegation against
@@ -237,7 +220,7 @@ class TestTensorComposition:
         np.testing.assert_allclose(du(x), df_dx0(x), atol=1e-7)
         np.testing.assert_allclose(du(x), u(x, deriv=(1, 0)), atol=1e-7)
 
-    def test_manual_tensor_basis_construction_matches_sugar(self):
+    def test_matches_manual_construction(self):
         fourier_basis = FourierBasis(5, kind="full")
         legendre_basis = OrthogonalPolynomialBasis(LegendreMeasure(), 4)
         manual = FunctionSpace(
@@ -249,6 +232,6 @@ class TestTensorComposition:
                 )
             ),
         )
-        sugar = self._space()
-        assert sugar.basis == manual.basis
-        assert sugar.domain == manual.domain
+        space = self._space()
+        assert space.basis == manual.basis
+        assert space.domain == manual.domain

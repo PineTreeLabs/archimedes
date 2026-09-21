@@ -99,14 +99,14 @@ def test_higher_order_derivatives(space2, order, exact):
     np.testing.assert_allclose(du(X), exact(X), atol=1e-10)
 
 
-def test_repeated_differentiation_matches_a_single_call(space2):
+def test_repeated_differentiation_matches_single_call(space2):
     u = space2.project(f_)
     np.testing.assert_allclose(
         u.derivative().derivative()(X), u.derivative(2)(X), atol=1e-10
     )
 
 
-def test_derivative_down_to_a_constant_is_allowed():
+def test_derivative_down_to_constant_is_allowed():
     # deriv == n_basis - 1 leaves the constants, which is a real space.
     space = FunctionSpace(OrthogonalPolynomialBasis(LegendreMeasure(), 4), DOMAIN)
     du = space.project(f_).derivative(3)
@@ -115,7 +115,7 @@ def test_derivative_down_to_a_constant_is_allowed():
 
 
 @pytest.mark.parametrize("order", [4, 9])
-def test_derivative_past_the_degree_is_an_error(order):
+def test_derivative_past_degree_is_error(order):
     # Identically zero, so there is no space to put it in -- better to say so
     # than to invent a one-dimensional space holding zeros.
     space = FunctionSpace(OrthogonalPolynomialBasis(LegendreMeasure(), 4), DOMAIN)
@@ -139,24 +139,13 @@ def test_derivative_past_the_degree_is_an_error(order):
     ],
     ids=["modal", "nodal", "piecewise"],
 )
-def test_every_family_rejects_a_derivative_past_the_degree(basis, order):
+def test_every_family_rejects_derivative_past_degree(basis, order):
     # Piecewise delegates to its element basis, so the bound is the element's.
     with pytest.raises(ValueError, match="at or past the degree"):
         basis._derivative_basis(order)
 
 
-def test_derivative_past_the_degree_names_the_tensor_dimension():
-    basis = TensorBasis(
-        (
-            OrthogonalPolynomialBasis(LegendreMeasure(), 5),
-            OrthogonalPolynomialBasis(LegendreMeasure(), 3),
-        )
-    )
-    with pytest.raises(ValueError, match="in dimension 1: .*at or past the degree"):
-        basis._derivative_basis((1, 3))
-
-
-def test_pointwise_evaluation_past_the_degree_still_gives_zero():
+def test_pointwise_evaluation_past_degree_gives_zero():
     # `evaluate` is asking for values, where zero is the right answer; only
     # `derivative` needs a space and so has nowhere to put it.
     space = FunctionSpace(OrthogonalPolynomialBasis(LegendreMeasure(), 4), DOMAIN)
@@ -253,7 +242,7 @@ def test_already_discontinuous_stays_discontinuous():
     assert basis._derivative_basis().continuity == -1
 
 
-def test_zeroth_derivative_returns_the_same_basis():
+def test_zeroth_derivative_returns_same_basis():
     basis = PiecewiseBasis(_lobatto(4), BREAKS, continuity=0)
     assert basis._derivative_basis(0) is basis
 
@@ -261,21 +250,17 @@ def test_zeroth_derivative_returns_the_same_basis():
 # -- C1 (Hermite): continuity drops by exactly one order per differentiation --
 
 
-def test_c1_hermite_first_derivative_is_c0():
+def test_c1_hermite_derivative_continuity():
     # Continuity through order q means differentiating `deriv` times can only
     # be relied on for continuity `q - deriv`: a C1 (Hermite) function's
-    # *first* derivative is exactly C0 (matching slopes is the Hermite DOF
-    # itself), not forced all the way down to discontinuous.
+    # first derivative is exactly C0 (matching slopes is the Hermite DOF
+    # itself), while its second derivative (curvature/moment) need not
+    # match across elements -- the familiar "moment jump" in Hermite beam
+    # finite elements.
     basis = PiecewiseBasis(CubicHermiteBasis(), BREAKS, continuity=1)
     derived = basis._derivative_basis(1)
     assert derived.continuity == 0
     np.testing.assert_allclose(derived.breakpoints, BREAKS)
-
-
-def test_c1_hermite_second_derivative_is_discontinuous():
-    # Curvature/moment need not match across elements -- the familiar
-    # "moment jump" in Hermite beam finite elements.
-    basis = PiecewiseBasis(CubicHermiteBasis(), BREAKS, continuity=1)
     assert basis._derivative_basis(2).continuity == -1
 
 
@@ -297,7 +282,7 @@ def test_hermite_function_derivative_matches_closed_form():
 # -- diff_matrix --
 
 
-def test_square_diff_matrix_reproduces_the_classical_one():
+def test_square_diff_matrix_matches_classical():
     # For a Lagrange basis the generic projection formula collapses to the
     # barycentric differentiation matrix, up to the domain's chain rule.
     basis = _lobatto(6)
@@ -308,14 +293,14 @@ def test_square_diff_matrix_reproduces_the_classical_one():
     )
 
 
-def test_square_diff_matrix_is_exact_in_the_same_space(space2):
+def test_square_diff_matrix_is_exact_in_same_space(space2):
     # The same-space form collocation wants: coefficients keep their meaning.
     u = space2.project(f_)
     du = Function(space2._diff_matrix() @ u.coefficients, space2)
     np.testing.assert_allclose(du(X), df_(X), atol=1e-10)
 
 
-def test_diff_matrix_shape_follows_the_target(space2):
+def test_diff_matrix_shape_follows_target(space2):
     target = space2._derivative_space()
     assert space2._diff_matrix().shape == (space2.n_basis, space2.n_basis)
     assert space2._diff_matrix(space=target).shape == (target.n_basis, space2.n_basis)
@@ -331,7 +316,7 @@ def test_diff_matrix_matches_function_derivative(space):
     )
 
 
-def test_explicit_result_space_is_honored():
+def test_explicit_result_space():
     # FunctionSpace-generic plumbing (an explicit `space=` kwarg is honored
     # rather than the automatic minimal one) -- doesn't depend on which
     # family computed it, so one representative family suffices.
@@ -341,8 +326,8 @@ def test_explicit_result_space_is_honored():
     assert du.space is space
     np.testing.assert_allclose(du(X), df_(X), atol=1e-10)
 
-
-def test_undersized_explicit_space_projects_rather_than_failing():
+    # An undersized explicit space falls back to a genuine (lossy)
+    # projection rather than raising.
     space = modal_space(6, A, B)
     small = FunctionSpace(OrthogonalPolynomialBasis(LegendreMeasure(), 2), DOMAIN)
     du = space.project(f_).derivative(space=small)
@@ -394,7 +379,16 @@ def test_tensor_partial_derivatives(deriv, shape, exact):
     np.testing.assert_allclose(du(x), exact(x), atol=1e-10)
 
 
-def test_tensor_derivative_rejects_a_bare_integer():
+def test_tensor_derivative_validation():
+    basis = TensorBasis(
+        (
+            OrthogonalPolynomialBasis(LegendreMeasure(), 5),
+            OrthogonalPolynomialBasis(LegendreMeasure(), 3),
+        )
+    )
+    with pytest.raises(ValueError, match="in dimension 1: .*at or past the degree"):
+        basis._derivative_basis((1, 3))
+
     basis = TensorBasis((OrthogonalPolynomialBasis(LegendreMeasure(), 4),) * 2)
     with pytest.raises(ValueError, match="must be a multi-index"):
         basis._derivative_basis(1)
@@ -404,9 +398,8 @@ def test_tensor_derivative_rejects_a_bare_integer():
 
 
 def test_vector_valued_derivative():
-    # Generic vector-valued plumbing (coefficients carry an extra column;
-    # see test_vector_valued.py) rather than anything family-specific, so
-    # one representative family suffices.
+    # Vector-valuedness is generic plumbing (coefficients carry an extra
+    # column), not family-specific, so one representative family suffices.
     def fv(x):
         return np.stack([x**3, 2 * x**2], axis=-1)
 
@@ -435,7 +428,7 @@ def test_derivative_traces():
     )
 
 
-def test_gradient_through_a_traced_domain_parameter():
+def test_gradient_through_traced_domain_parameter():
     basis = _lobatto(5)
     coefficients = np.array([0.0, 1.0, 2.0, 3.0, 4.0])
 
@@ -536,7 +529,7 @@ def test_product_requires_matching_node_families():
         a._product_basis(b)
 
 
-def test_node_family_returning_the_wrong_count_is_rejected():
+def test_node_family_returning_wrong_count_is_rejected():
     basis = LagrangeBasis(
         reference_nodes=_radau_left(5), node_family=lambda n: np.zeros(2)
     )
@@ -595,7 +588,7 @@ def test_fourier_sine_alternates_kind_by_parity(deriv):
         assert derived.n_basis == 4  # grows by 1: max_mode unchanged
 
 
-def test_fourier_derivative_never_exhausts_the_degree():
+def test_fourier_derivative_never_exhausts_degree():
     # Contrast with `test_derivative_past_the_degree_is_an_error`: a periodic
     # family never runs out of room, however high the order.
     for basis in (

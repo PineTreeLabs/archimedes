@@ -1,8 +1,3 @@
-"""Tests for the ``FunctionSpace.tensor`` classmethod constructor: thin
-sugar over ``FunctionSpace(TensorBasis(bases), ProductParameters(dims))``,
-combining independent univariate spaces into one multivariate space.
-"""
-
 import numpy as np
 import pytest
 
@@ -13,54 +8,42 @@ from archimedes.approximation._basis._tensor import (
 )
 
 
-def test_matches_manual_tensor_basis_construction():
+def test_tensor():
     space_1 = FunctionSpace.legendre(4, a=-1.0, b=1.0)
     space_2 = FunctionSpace.hermite(3, loc=0.0, scale=2.0, kind="prob")
-
-    sugar = FunctionSpace.tensor(space_1, space_2)
+    space = FunctionSpace.tensor(space_1, space_2)
     manual = FunctionSpace(
         TensorBasis((space_1.basis, space_2.basis)),
         ProductParameters(dims=(space_1.domain, space_2.domain)),
     )
-
-    assert sugar.basis == manual.basis
-    assert sugar.domain == manual.domain
+    assert space.basis == manual.basis
+    assert space.domain == manual.domain
     np.testing.assert_allclose(
-        sugar.basis_matrix().matrix, manual.basis_matrix().matrix
+        space.basis_matrix().matrix, manual.basis_matrix().matrix
     )
 
-
-def test_n_basis_is_the_product_of_the_factors():
+    # n_basis is the product of the factors' sizes, even for a single
+    # (degenerate) factor.
     space = FunctionSpace.tensor(
         FunctionSpace.legendre(3), FunctionSpace.legendre(4), FunctionSpace.legendre(5)
     )
     assert space.n_basis == 3 * 4 * 5
+    assert FunctionSpace.tensor(space_1).basis == TensorBasis((space_1.basis,))
 
-
-def test_single_space_is_a_degenerate_tensor_product():
-    space_1 = FunctionSpace.legendre(4)
-    space = FunctionSpace.tensor(space_1)
-    assert space.basis == TensorBasis((space_1.basis,))
-
-
-def test_rejects_no_spaces():
     with pytest.raises(ValueError, match="at least one space"):
         FunctionSpace.tensor()
 
-
-def test_rejects_a_multivariate_factor():
     already_tensor = FunctionSpace.tensor(
         FunctionSpace.legendre(3), FunctionSpace.legendre(3)
     )
     with pytest.raises(ValueError, match="must be univariate"):
         FunctionSpace.tensor(already_tensor, FunctionSpace.legendre(3))
 
-
-def test_project_matches_manual_construction_for_a_separable_function():
+    # project() matches the manual construction for a representative
+    # function.
     space_1 = FunctionSpace.hermite(4, loc=0.0, scale=1.0, kind="prob", density=True)
     space_2 = FunctionSpace.hermite(4, loc=0.0, scale=2.0, kind="prob", density=True)
-
-    sugar = FunctionSpace.tensor(space_1, space_2)
+    space = FunctionSpace.tensor(space_1, space_2)
     manual = FunctionSpace(
         TensorBasis((space_1.basis, space_2.basis)),
         ProductParameters(dims=(space_1.domain, space_2.domain)),
@@ -70,6 +53,6 @@ def test_project_matches_manual_construction_for_a_separable_function():
         x1, x2 = x[:, 0], x[:, 1]
         return x1**2 + x2
 
-    f_sugar = sugar.project(f)
-    f_manual = manual.project(f)
-    np.testing.assert_allclose(f_sugar.coefficients, f_manual.coefficients)
+    np.testing.assert_allclose(
+        space.project(f).coefficients, manual.project(f).coefficients
+    )

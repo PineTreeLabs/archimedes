@@ -1,10 +1,5 @@
 """Tests for ``BSplineBasis``: general (non-uniform, arbitrary-multiplicity,
 clamped or open) B-spline evaluation via de Boor's BSPLVB recurrence.
-
-Values and derivatives are checked against ``scipy.interpolate.BSpline`` as
-an independent oracle, across clamped/open, uniform/non-uniform, and
-repeated-interior-knot (reduced continuity, up to a genuine discontinuity at
-maximal multiplicity) knot vectors.
 """
 
 import numpy as np
@@ -92,32 +87,22 @@ def _sample_points(basis, extrapolate=True):
 # -- construction validation --
 
 
-def test_degree_must_be_nonnegative():
+def test_construction_validation():
     with pytest.raises(ValueError, match="degree must be"):
         BSplineBasis(-1, [0.0, 0, 1, 1])
 
-
-def test_knots_must_be_1d():
     with pytest.raises(ValueError, match="1-D"):
         BSplineBasis(1, [[0.0, 0], [1, 1]])
 
-
-def test_knots_must_have_minimum_length():
     with pytest.raises(ValueError, match="at least 2\\*degree\\+2"):
         BSplineBasis(3, [0.0, 0, 0, 0, 1])
 
-
-def test_knots_must_be_nondecreasing():
     with pytest.raises(ValueError, match="nondecreasing"):
         BSplineBasis(1, [0.0, 0, 1, 0.5, 2, 2])
 
-
-def test_knot_multiplicity_is_bounded():
     with pytest.raises(ValueError, match="repeat at most"):
         BSplineBasis(1, [0.0, 0, 0, 1, 2])
 
-
-def test_degenerate_basic_interval_is_rejected():
     with pytest.raises(ValueError, match="degenerate"):
         BSplineBasis(1, [-5.0, 0, 0, 5])
 
@@ -139,8 +124,8 @@ def test_equality_and_hash():
 
 
 def test_negative_deriv_rejected(witness_basis):
-    # Case-invariant branch (raises before touching knots/degree at all);
-    # trimmed from the full 6-case matrix to the witness pair.
+    # Raises before touching knots/degree, so this doesn't depend on knot
+    # layout -- the witness pair is enough.
     basis = witness_basis
     x = np.array([basis.knots[basis.degree]])
     with pytest.raises(ValueError, match="deriv must be >= 0"):
@@ -150,8 +135,8 @@ def test_negative_deriv_rejected(witness_basis):
 
 
 def test_invalid_side_rejected(witness_basis):
-    # Case-invariant (validated before any knot-dependent logic runs);
-    # trimmed to the witness pair.
+    # Validated before any knot-dependent logic runs, so this doesn't
+    # depend on knot layout -- the witness pair is enough.
     basis = witness_basis
     x = np.array([basis.knots[basis.degree]])
     with pytest.raises(ValueError, match="side must be"):
@@ -189,9 +174,8 @@ def test_first_derivative_matches_scipy(basis):
 
 @pytest.mark.parametrize("deriv", [2, 3])
 def test_higher_derivatives_match_scipy(witness_basis, deriv):
-    # De-crossed from the full 6-case matrix: deriv=2,3 checked only at the
-    # 2 witness cases (both degree 3) -- see test_first_derivative_matches_scipy
-    # for the full-breadth deriv=1 check.
+    # The witness pair (both degree 3) is enough for deriv=2,3; see
+    # test_first_derivative_matches_scipy for the full-breadth deriv=1 check.
     basis = witness_basis
     x = _sample_points(basis)
     phi = basis.evaluate(x, deriv=deriv)
@@ -202,9 +186,9 @@ def test_higher_derivatives_match_scipy(witness_basis, deriv):
         np.testing.assert_allclose(phi[:, i], sp(x, nu=deriv), atol=1e-6)
 
 
-def test_deriv_past_degree_is_zero(witness_basis):
-    # Case-invariant early-return branch; only degree variety matters, and
-    # the witness pair already covers degree 3.
+def test_deriv_past_degree(witness_basis):
+    # Case-invariant early-return branch -- only degree matters, and the
+    # witness pair covers degree 3.
     basis = witness_basis
     x = _sample_points(basis)
     phi = basis.evaluate(x, deriv=basis.degree + 1)
@@ -214,9 +198,9 @@ def test_deriv_past_degree_is_zero(witness_basis):
 
 
 def test_derivative_matches_finite_difference(witness_basis):
-    # Independent-oracle sanity check alongside test_first_derivative_matches_scipy;
-    # trimmed to the witness pair (both degree 3, so a first derivative
-    # always exists).
+    # An independent oracle alongside test_first_derivative_matches_scipy;
+    # doesn't depend on knot layout, so the witness pair (both degree 3,
+    # where a first derivative always exists) is enough.
     basis = witness_basis
     a, b = basis.knots[basis.degree], basis.knots[-1 - basis.degree]
     x = np.linspace(a + 0.05 * (b - a), b - 0.05 * (b - a), 25)
@@ -231,7 +215,7 @@ def test_derivative_matches_finite_difference(witness_basis):
 
 
 def test_partition_of_unity(witness_basis):
-    # Generic recurrence property; trimmed to the witness pair.
+    # A generic recurrence property, independent of knot layout.
     basis = witness_basis
     a, b = basis.knots[basis.degree], basis.knots[-1 - basis.degree]
     x = np.linspace(a + 1e-9, b - 1e-9, 101)
@@ -240,7 +224,7 @@ def test_partition_of_unity(witness_basis):
 
 
 def test_local_support(witness_basis):
-    # Generic support-window property; trimmed to the witness pair.
+    # A generic support-window property, independent of knot layout.
     basis = witness_basis
     knots = basis.knots
     p = basis.degree
@@ -253,10 +237,10 @@ def test_local_support(witness_basis):
         np.testing.assert_allclose(phi[outside, i], 0.0, atol=1e-10)
 
 
-def test_side_left_and_right_agree_away_from_knots(witness_basis):
-    # Away from knots the multiplicity-stepping loop never fires
-    # meaningfully; the genuinely side-sensitive cases have their own
-    # dedicated tests below. Trimmed to the witness pair.
+def test_side_away_from_knots(witness_basis):
+    # Away from knots, the multiplicity-stepping loop never fires
+    # meaningfully -- the genuinely side-sensitive cases have their own
+    # dedicated tests below.
     basis = witness_basis
     a, b = basis.knots[basis.degree], basis.knots[-1 - basis.degree]
     x = np.linspace(a + 0.01, b - 0.01, 23)
@@ -266,7 +250,7 @@ def test_side_left_and_right_agree_away_from_knots(witness_basis):
     )
 
 
-def test_side_disagrees_at_a_discontinuous_interior_knot():
+def test_side_at_discontinuous_knot():
     degree, knots = INTERIOR_MAX_MULT
     basis = BSplineBasis(degree, knots)
     xk = np.array([1.0])  # the multiplicity-(degree+1) interior knot
@@ -295,7 +279,7 @@ def test_side_disagrees_at_a_discontinuous_interior_knot():
     np.testing.assert_allclose(right.ravel(), num_right, atol=1e-4)
 
 
-def test_side_agrees_at_a_c1_interior_knot():
+def test_side_at_c1_knot():
     # Multiplicity degree - 1 (< degree + 1) still leaves the basis itself
     # (deriv=0) continuous, unlike the maximal-multiplicity case above.
     degree, knots = INTERIOR_DOUBLE_KNOT
@@ -320,25 +304,10 @@ def test_evaluate_expansion_matches_dense(witness_basis):
     np.testing.assert_allclose(basis.evaluate_expansion(c, x), phi @ c, atol=1e-9)
 
 
-def test_evaluate_expansion_matches_dense_first_derivative(witness_basis):
-    # Algebraic identity; trimmed to the witness pair for deriv=1.
+@pytest.mark.parametrize("deriv", [1, 2, 3])
+def test_evaluate_expansion_matches_dense_derivative(witness_basis, deriv):
+    # Algebraic identity, independent of knot layout.
     basis = witness_basis
-    rng = np.random.default_rng(1)
-    x = _sample_points(basis)
-    c = rng.normal(size=basis.n_basis)
-    phi = basis.evaluate(x, deriv=1)
-    np.testing.assert_allclose(
-        basis.evaluate_expansion(c, x, deriv=1), phi @ c, atol=1e-7
-    )
-
-
-@pytest.mark.parametrize("deriv", [2, 3])
-def test_evaluate_expansion_matches_dense_higher_derivatives(deriv):
-    # De-crossed from the full case matrix: deriv=2,3 checked only at the
-    # interior_max_mult witness case, since this algebraic identity doesn't
-    # depend on knot layout the way the scipy oracle comparisons do.
-    degree, knots = INTERIOR_MAX_MULT
-    basis = BSplineBasis(degree, knots)
     rng = np.random.default_rng(1)
     x = _sample_points(basis)
     c = rng.normal(size=basis.n_basis)
@@ -349,7 +318,8 @@ def test_evaluate_expansion_matches_dense_higher_derivatives(deriv):
 
 
 def test_evaluate_expansion_vector_valued(witness_basis):
-    # Tests only the vector_valued branch, which is case-invariant.
+    # Exercises only the vector-valued branch, which doesn't depend on knot
+    # layout.
     basis = witness_basis
     rng = np.random.default_rng(2)
     x = _sample_points(basis)
@@ -359,7 +329,8 @@ def test_evaluate_expansion_vector_valued(witness_basis):
 
 
 def test_evaluate_expansion_deriv_past_degree(witness_basis):
-    # Same case-invariant early-return branch as test_deriv_past_degree_is_zero.
+    # Same early-return branch as test_deriv_past_degree_is_zero, via
+    # evaluate_expansion.
     basis = witness_basis
     x = _sample_points(basis)
     c = np.ones(basis.n_basis)
@@ -387,16 +358,16 @@ def test_boundary_dofs_open():
     assert basis.boundary_dofs() == (None, None)
 
 
-def test_boundary_dofs_nonzero_order_is_always_none(witness_basis):
-    # `order != 0` returns immediately without reading `self` at all, so
-    # this never needed the full 6-case matrix; trimmed to the witness pair.
+def test_boundary_dofs_nonzero_order(witness_basis):
+    # `order != 0` returns immediately without reading `self`, so this
+    # doesn't depend on knot layout.
     assert witness_basis.boundary_dofs(order=1) == (None, None)
 
 
 # -- _derivative_basis / _integral_basis --
 
 
-def test_derivative_basis_size_and_degree():
+def test_derivative_basis():
     degree, knots = CLAMPED_NONUNIFORM
     basis = BSplineBasis(degree, knots)
     assert basis._derivative_basis(0) is basis
@@ -408,17 +379,13 @@ def test_derivative_basis_size_and_degree():
     d_full = basis._derivative_basis(degree)
     assert d_full.degree == 0
 
-
-def test_derivative_basis_rejects_invalid_order():
-    degree, knots = CLAMPED_NONUNIFORM
-    basis = BSplineBasis(degree, knots)
     with pytest.raises(ValueError, match="deriv must be >= 0"):
         basis._derivative_basis(-1)
     with pytest.raises(ValueError, match="at or past the degree"):
         basis._derivative_basis(degree + 1)
 
 
-def test_integral_basis_size_and_degree():
+def test_integral_basis():
     degree, knots = CLAMPED_NONUNIFORM
     basis = BSplineBasis(degree, knots)
     assert basis._integral_basis(0) is basis
@@ -435,10 +402,6 @@ def test_integral_basis_size_and_degree():
         i2.knots[degree + 2 : -(degree + 2)], knots[degree:-degree]
     )
 
-
-def test_integral_basis_rejects_negative_order():
-    degree, knots = CLAMPED_NONUNIFORM
-    basis = BSplineBasis(degree, knots)
     with pytest.raises(ValueError, match="order must be >= 0"):
         basis._integral_basis(-1)
 
@@ -451,7 +414,7 @@ def _space(basis):
     return FunctionSpace(basis, UnitInterval.Parameters(a=a, b=b))
 
 
-def test_default_quadrature_is_exact_for_a_polynomial_of_the_basis_degree(basis):
+def test_default_quadrature_exactness(basis):
     space = _space(basis)
     coeffs = np.linspace(0.0, 1.0, basis.degree + 1)
 
@@ -469,7 +432,7 @@ def test_default_quadrature_is_exact_for_a_polynomial_of_the_basis_degree(basis)
     np.testing.assert_allclose(got, expected, atol=1e-9)
 
 
-def test_project_is_exact_for_a_polynomial_of_the_basis_degree(basis):
+def test_project_exactness(basis):
     space = _space(basis)
     coeffs = np.linspace(0.5, 1.5, basis.degree + 1)
 
@@ -533,7 +496,7 @@ def test_static_and_dynamic_evaluation_agree(basis):
     np.testing.assert_allclose(static_phi, dynamic_phi, atol=1e-9)
 
 
-def test_static_and_dynamic_evaluation_agree_side_left():
+def test_static_and_dynamic_side_left():
     # At a repeated interior knot, `_locate`'s left-side span needs more
     # than a single-step backup. Check the traced (symbolic) evaluation
     # matches the eager one at this case.
@@ -572,17 +535,12 @@ def test_gradient_through_traced_coefficients():
 #
 # Unlike every other family, a BSplineBasis's knots are physical and its
 # `evaluate` ignores the `a`/`b` domain kwargs `TensorBasis` forwards per
-# dimension (see the class docstring) -- so, unlike the generic
-# `FACTORIES`/`space` fixture in test_tensor_basis.py (which builds *one*
-# basis and reuses it, remapped, across dimensions with different target
-# domains), each dimension here needs its *own* BSplineBasis instance
-# already built on its own physical range. Forcing this family into that
-# shared harness would silently test the wrong thing (both dimensions
-# evaluating the same physical knots despite claiming different domains),
-# so this is a dedicated, correctly-constructed check instead.
+# dimension (see the class docstring), so each dimension here needs its own
+# BSplineBasis instance already built on its own physical range, rather
+# than one basis reused and remapped across dimensions.
 
 
-def test_tensor_composition_is_exact_on_a_nonseparable_polynomial():
+def test_tensor_composition_exactness():
     basis_x = FunctionSpace.clamped_bspline(3, np.linspace(0.0, 2.0, 4)).basis
     basis_y = FunctionSpace.clamped_bspline(2, np.linspace(-1.0, 1.0, 3)).basis
     tensor = TensorBasis((basis_x, basis_y))

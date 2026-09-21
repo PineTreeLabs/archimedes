@@ -161,44 +161,27 @@ def test_explicit_space_override():
     x = np.linspace(A, B, 41)
     np.testing.assert_allclose(product(x), f_(x) * g_(x), atol=1e-11)
 
-
-def test_undersized_explicit_space_projects_rather_than_failing():
-    # Documented behavior: a too-small space gives the projection of the
-    # product, which is a well-defined approximation but not exact. Generic
-    # Function-level fallback behavior, not family-specific.
-    space = nodal_space(4, A, B)
-    f, g = space.project(f_), space.project(g_)
+    # A too-small space gives the projection of the product, which is a
+    # well-defined approximation but not exact.
     product = f.multiply(g, space=space)
     assert product.space.n_basis == space.n_basis
-    x = np.linspace(A, B, 41)
     assert np.abs(product(x) - f_(x) * g_(x)).max() > 1e-6
 
 
 # -- incompatibility --
 
 
-def test_different_measures_rejected():
+def test_product_basis_validation():
     legendre = OrthogonalPolynomialBasis(LegendreMeasure(), 3)
     hermite = OrthogonalPolynomialBasis(PhysicistsHermiteMeasure(), 3)
     with pytest.raises(ValueError, match="same measure"):
         legendre._product_basis(hermite)
 
-
-def test_different_density_rejected():
     raw = OrthogonalPolynomialBasis(PhysicistsHermiteMeasure(), 3)
     density = OrthogonalPolynomialBasis(PhysicistsHermiteMeasure(), 3, density=True)
     with pytest.raises(ValueError, match="same normalization"):
         raw._product_basis(density)
 
-
-def test_matching_density_forwarded_to_product():
-    left = OrthogonalPolynomialBasis(PhysicistsHermiteMeasure(), 3, density=True)
-    right = OrthogonalPolynomialBasis(PhysicistsHermiteMeasure(), 4, density=True)
-    product = left._product_basis(right)
-    assert product.density is True
-
-
-def test_different_basis_families_rejected():
     modal = OrthogonalPolynomialBasis(LegendreMeasure(), 3)
     nodal = _lobatto(3)
     with pytest.raises(ValueError, match="cannot form a product basis"):
@@ -208,15 +191,11 @@ def test_different_basis_families_rejected():
     with pytest.raises(ValueError, match="cannot form a product basis"):
         PiecewiseBasis(nodal, BREAKPOINTS, continuity=0)._product_basis(nodal)
 
-
-def test_different_breakpoints_rejected():
     left = PiecewiseBasis(_lobatto(3), np.linspace(-1.0, 1.0, 3), continuity=0)
     right = PiecewiseBasis(_lobatto(3), np.linspace(-1.0, 1.0, 4), continuity=0)
     with pytest.raises(ValueError, match="identical breakpoints"):
         left._product_basis(right)
 
-
-def test_structurally_different_domains_rejected():
     interval = FunctionSpace(
         OrthogonalPolynomialBasis(LegendreMeasure(), 3), domain=DOMAIN
     )
@@ -226,6 +205,13 @@ def test_structurally_different_domains_rejected():
     )
     with pytest.raises(ValueError, match="structurally identical domains"):
         interval._product_space(line)
+
+
+def test_matching_density_forwarded_to_product():
+    left = OrthogonalPolynomialBasis(PhysicistsHermiteMeasure(), 3, density=True)
+    right = OrthogonalPolynomialBasis(PhysicistsHermiteMeasure(), 4, density=True)
+    product = left._product_basis(right)
+    assert product.density is True
 
 
 def test_basis_without_product_support_raises():
@@ -360,11 +346,18 @@ def test_fourier_sine_squared_lands_in_cosine():
     np.testing.assert_allclose(squared(x), f(x) ** 2, atol=1e-10)
 
 
-def test_fourier_different_density_rejected():
+def test_fourier_product_validation():
     raw = FourierBasis(5, kind="full", density=False)
     density = FourierBasis(5, kind="full", density=True)
     with pytest.raises(ValueError, match="same normalization"):
         raw._product_basis(density)
+
+    fourier = FourierBasis(5, kind="full")
+    modal = OrthogonalPolynomialBasis(LegendreMeasure(), 3)
+    with pytest.raises(ValueError, match="cannot form a product basis"):
+        fourier._product_basis(modal)
+    with pytest.raises(ValueError, match="cannot form a product basis"):
+        modal._product_basis(fourier)
 
 
 def test_fourier_matching_density_forwarded_to_product():
@@ -372,15 +365,6 @@ def test_fourier_matching_density_forwarded_to_product():
     right = FourierBasis(4, kind="cosine", density=True)
     product = left._product_basis(right)
     assert product.density is True
-
-
-def test_fourier_different_basis_families_rejected():
-    fourier = FourierBasis(5, kind="full")
-    modal = OrthogonalPolynomialBasis(LegendreMeasure(), 3)
-    with pytest.raises(ValueError, match="cannot form a product basis"):
-        fourier._product_basis(modal)
-    with pytest.raises(ValueError, match="cannot form a product basis"):
-        modal._product_basis(fourier)
 
 
 # -- symbolic --

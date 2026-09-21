@@ -46,11 +46,17 @@ def test_call_rejects_unknown_keyword(quadratic):
         quadratic(x, bogus=1)
 
 
-def test_add_same_space(quadratic):
+def test_add_and_subtract_same_space(quadratic):
     doubled = quadratic + quadratic
     np.testing.assert_allclose(doubled.coefficients, 2 * quadratic.coefficients)
     x = np.linspace(-1, 1, 9)
     np.testing.assert_allclose(doubled(x), 2 * x**2, atol=1e-10)
+
+    zeroed = quadratic - quadratic
+    np.testing.assert_allclose(zeroed.coefficients, 0.0, atol=1e-12)
+    cubic = quadratic.space.project(lambda x: x**3)
+    diff = cubic - quadratic
+    np.testing.assert_allclose(diff(x), x**3 - x**2, atol=1e-10)
 
 
 @pytest.mark.parametrize(
@@ -86,15 +92,6 @@ def test_add_numerically_mismatched_domain_is_not_caught(quadratic, quad_rule):
     )
 
 
-def test_subtract_same_space(quadratic):
-    zeroed = quadratic - quadratic
-    np.testing.assert_allclose(zeroed.coefficients, 0.0, atol=1e-12)
-    cubic = quadratic.space.project(lambda x: x**3)
-    diff = cubic - quadratic
-    x = np.linspace(-1, 1, 9)
-    np.testing.assert_allclose(diff(x), x**3 - x**2, atol=1e-10)
-
-
 def test_negation(quadratic):
     negated = -quadratic
     np.testing.assert_allclose(negated.coefficients, -quadratic.coefficients)
@@ -102,14 +99,12 @@ def test_negation(quadratic):
     np.testing.assert_allclose(negated(x), -(x**2), atol=1e-10)
 
 
-def test_scalar_multiplication(quadratic):
+def test_scalar_arithmetic(quadratic):
     scaled = 3.0 * quadratic
     np.testing.assert_allclose(scaled.coefficients, 3.0 * quadratic.coefficients)
     rscaled = quadratic * 3.0
     np.testing.assert_allclose(rscaled.coefficients, scaled.coefficients)
 
-
-def test_scalar_division(quadratic):
     halved = quadratic / 2.0
     np.testing.assert_allclose(halved.coefficients, quadratic.coefficients / 2.0)
     x = np.linspace(-1, 1, 9)
@@ -168,7 +163,7 @@ def test_domain_parameters_are_traceable(space, quadratic):
 # -- symbolic tracing / autodiff --
 
 
-def test_call_compiles_and_matches_static_evaluation(space, quadratic):
+def test_static_and_dynamic_evaluation_agree(space, quadratic):
     x = np.linspace(-1, 1, 9)
     static_vals = np.array([quadratic(xi) for xi in x])
 

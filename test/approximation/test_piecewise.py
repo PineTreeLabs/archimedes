@@ -35,37 +35,26 @@ def hermite():
 # -- construction / validation --
 
 
-def test_rejects_non_spanning_breakpoints(local):
+def test_construction_validation(local, breakpoints):
     with pytest.raises(ValueError):
         PiecewiseBasis(local, np.array([-1.0, 0.0, 0.5]))
     with pytest.raises(ValueError):
         PiecewiseBasis(local, np.array([-0.5, 0.0, 1.0]))
-
-
-def test_rejects_non_increasing_breakpoints(local):
     with pytest.raises(ValueError):
         PiecewiseBasis(local, np.array([-1.0, 0.5, 0.0, 1.0]))
-
-
-def test_rejects_too_few_breakpoints(local):
     with pytest.raises(ValueError):
         PiecewiseBasis(local, np.array([-1.0]))
-
-
-def test_rejects_unsupported_continuity(local, breakpoints):
     with pytest.raises(ValueError):
         PiecewiseBasis(local, breakpoints, continuity=-2)
 
 
-def test_c1_with_hermite_element_succeeds(hermite, breakpoints):
+def test_c1_requires_order_one_boundary_dofs(hermite, local, breakpoints):
     # continuity=1 (matching values *and* first derivatives) is only
     # rejected when the element basis can't supply an order-1 boundary DOF
     # -- it's not a blanket "not yet implemented" any more.
     basis = PiecewiseBasis(hermite, breakpoints, continuity=1)
     assert basis.continuity == 1
 
-
-def test_c1_requires_element_basis_with_order_one_boundary_dofs(local, breakpoints):
     # LagrangeBasis has no derivative-type DOF (boundary_dofs(1) is always
     # (None, None)), so continuity=1 must still be rejected for it even
     # though continuity=0 works fine for the same element basis.
@@ -74,7 +63,7 @@ def test_c1_requires_element_basis_with_order_one_boundary_dofs(local, breakpoin
         PiecewiseBasis(local, breakpoints, continuity=1)
 
 
-def test_c0_requires_element_basis_with_boundary_dofs(breakpoints):
+def test_c0_requires_boundary_dofs(breakpoints):
     # A modal basis has no endpoint DOF to identify across elements.
     modal = OrthogonalPolynomialBasis(LegendreMeasure(), n_basis=3)
     with pytest.raises(ValueError):
@@ -83,9 +72,7 @@ def test_c0_requires_element_basis_with_boundary_dofs(breakpoints):
     basis = PiecewiseBasis(modal, breakpoints, continuity=-1)
     assert basis.n_basis == 9
 
-
-def test_c0_requires_both_endpoints(breakpoints):
-    # Gauss-Legendre nodes are all interior -> no boundary DOFs at all.
+    # Gauss-Legendre nodes are all interior -> no boundary DOFs at all either.
     interior_only = LagrangeBasis(reference_nodes=gauss_legendre(3).nodes)
     assert interior_only.boundary_dofs() == (None, None)
     with pytest.raises(ValueError):
@@ -95,7 +82,7 @@ def test_c0_requires_both_endpoints(breakpoints):
 # -- per-element bases (tuple form) --
 
 
-def test_construct_with_tuple_of_uniform_bases_equals_scalar(local, breakpoints):
+def test_uniform_tuple_equals_scalar(local, breakpoints):
     scalar = PiecewiseBasis(local, breakpoints, continuity=0)
     tupled = PiecewiseBasis((local, local, local), breakpoints, continuity=0)
 
@@ -111,20 +98,16 @@ def test_tuple_length_must_match_n_elements(local, breakpoints):
 # -- global boundary DOFs --
 
 
-def test_piecewise_boundary_dofs_c0(local, breakpoints):
+def test_boundary_dofs(local, breakpoints):
     # The left end belongs to element 0's local `left` DOF and the right end
     # to the last element's local `right` DOF, mapped through assembly.
     basis = PiecewiseBasis(local, breakpoints, continuity=0)
     assert basis.boundary_dofs() == (0, basis.n_basis - 1)
 
-
-def test_piecewise_boundary_dofs_discontinuous(local, breakpoints):
     # No shared/global endpoint identity when elements are independent.
     basis = PiecewiseBasis(local, breakpoints, continuity=-1)
     assert basis.boundary_dofs() == (None, None)
 
-
-def test_piecewise_boundary_dofs_no_element_endpoint_dofs(breakpoints):
     # A discontinuous tiling of an element basis with no boundary DOFs of its
     # own (e.g. Gauss-Legendre nodes) has none globally either.
     interior_only = LagrangeBasis(reference_nodes=gauss_legendre(3).nodes)
@@ -132,7 +115,7 @@ def test_piecewise_boundary_dofs_no_element_endpoint_dofs(breakpoints):
     assert basis.boundary_dofs() == (None, None)
 
 
-def test_piecewise_boundary_dofs_agree_with_evaluation(local, breakpoints):
+def test_boundary_dofs_agree_with_evaluation(local, breakpoints):
     # The DOF identified as the boundary must actually be the one whose
     # coefficient equals the endpoint value: a unit coefficient there and
     # zero elsewhere should evaluate to 1 at that end and 0 at the other.
@@ -261,7 +244,7 @@ class TestC1Continuity:
         assert basis.boundary_dofs(1) == (1, basis.n_basis - 1)
         assert basis.boundary_dofs(2) == (None, None)
 
-    def test_value_and_slope_continuous_curvature_need_not_be(self, basis):
+    def test_value_and_slope_continuity(self, basis):
         # C1 constrains value and first derivative, not second: deriv=0,1
         # must agree across a breakpoint, deriv=2 need not.
         eps = 1e-9
@@ -311,7 +294,7 @@ class TestC1Continuity:
         assert np.abs(col[x > knot]).max() > 1e-6
 
     @pytest.mark.parametrize("deriv", [0, 1, 2, 3])
-    def test_evaluate_expansion_fused_path_matches_dense_path(self, basis, deriv):
+    def test_evaluate_expansion_matches_dense(self, basis, deriv):
         # `evaluate_expansion`'s fused path (taken because every element
         # shares one `CubicHermiteBasis` instance) must agree with the dense
         # `evaluate(...) @ coefficients` path on a non-uniform mesh whose
@@ -394,7 +377,7 @@ class TestModalDiscontinuous:
         return PiecewiseBasis(modal, self.BP, continuity=-1)
 
     @pytest.mark.parametrize("deriv", [0, 1, 2, 3])
-    def test_evaluate_expansion_fused_path_matches_dense_path(self, basis, deriv):
+    def test_evaluate_expansion_matches_dense(self, basis, deriv):
         # Non-uniform mesh and a physical domain far from (-1, 1): the
         # element width must differ from the reference width of 2 to
         # distinguish per-element from reference-interval normalization.
@@ -411,7 +394,7 @@ class TestModalDiscontinuous:
         np.testing.assert_allclose(fused, dense, atol=1e-8)
 
     @pytest.mark.parametrize("deriv", [0, 1, 2])
-    def test_evaluate_expansion_fused_path_matches_dense_path_density(self, deriv):
+    def test_evaluate_expansion_matches_dense_normalized(self, deriv):
         # `density=True` folds the mass out of the normalization entirely, a
         # different branch of `_reference_scale_exponent` (0.0 rather than
         # 0.5) -- must also agree with the dense path.
@@ -544,7 +527,7 @@ class TestQuadratureCompatibility:
         # A globally smooth family imposes no constraint
         assert local.required_breakpoints is None
 
-    def test_default_quadrature_is_composite_over_own_breakpoints(self, basis):
+    def test_default_quadrature_is_composite(self, basis):
         rule = basis.default_quadrature()
         np.testing.assert_array_equal(rule.breakpoints, self.BP)
         # `element_basis` is always normalized to a per-element tuple, even
@@ -561,16 +544,15 @@ class TestQuadratureCompatibility:
         )
         np.testing.assert_allclose(mass_matrix(default), mass_matrix(exact), atol=1e-12)
 
-    def test_aligned_rule_accepted(self, basis):
+    def test_compatible_rules_accepted(self, basis):
         rule = composite_quad(gauss_legendre(4), self.BP)
         assert (
             FunctionSpace(basis, domain=self.DOMAIN, reference_quad_rule=rule)
             is not None
         )
 
-    def test_refinement_accepted(self, basis):
-        # A superset is fine: each sub-element still lies inside one element
-        # of the basis, so the integrand is a polynomial there.
+        # A superset is fine too: each sub-element still lies inside one
+        # element of the basis, so the integrand is a polynomial there.
         midpoints = (self.BP[:-1] + self.BP[1:]) / 2
         refined = np.unique(np.concatenate([self.BP, midpoints]))
         rule = composite_quad(gauss_legendre(4), refined)
@@ -579,14 +561,13 @@ class TestQuadratureCompatibility:
             is not None
         )
 
-    def test_misaligned_composite_rejected(self, basis):
+    def test_incompatible_rules_rejected(self, basis):
         # Same number of elements, different partition: the rule's element
         # boundaries don't align with the basis's own breakpoints.
         rule = composite_quad(gauss_legendre(4), np.linspace(-1.0, 1.0, 4))
         with pytest.raises(ValueError, match="must not straddle"):
             FunctionSpace(basis, domain=self.DOMAIN, reference_quad_rule=rule)
 
-    def test_plain_rule_rejected_however_fine(self, basis):
         # Node count is beside the point: a 24-point global rule is still
         # wrong, while an aligned 12-point one is exact.
         with pytest.raises(ValueError, match="must not straddle"):
@@ -639,7 +620,7 @@ class TestPerElementOrder:
     def test_boundary_dofs(self, basis):
         assert basis.boundary_dofs() == (0, basis.n_basis - 1)
 
-    def test_c0_requires_boundary_dofs_on_every_element(self):
+    def test_construction_validation(self):
         # Gauss-Legendre nodes are all interior -> no boundary DOFs, even
         # though the other two elements have them.
         interior_only = LagrangeBasis(reference_nodes=gauss_legendre(3).nodes)
@@ -650,7 +631,6 @@ class TestPerElementOrder:
                 continuity=0,
             )
 
-    def test_measures_mismatch_across_elements_rejected(self):
         # A modal basis has a real measure; a nodal one has None -- mixing
         # them leaves the assembled basis with no single coherent weight.
         # continuity=-1 so this isn't rejected by the boundary-dof check
@@ -694,7 +674,7 @@ class TestPerElementOrder:
             right = basis.evaluate(np.array([knot + eps]))
             np.testing.assert_allclose(left, right, atol=1e-6)
 
-    def test_evaluate_expansion_matches_evaluate(self, basis):
+    def test_evaluate_expansion_matches_dense(self, basis):
         # Heterogeneous element_basis falls back to the dense
         # evaluate(x) @ coefficients path -- no fused fast path is possible
         # once elements genuinely differ.
@@ -773,9 +753,7 @@ class TestEvaluateExpansion:
             (0, 5, 1, 3),  # one vector-valued case, so that path isn't dropped
         ],
     )
-    def test_matches_dense_path(
-        self, local, continuity, n_elements, deriv, n_components
-    ):
+    def test_matches_dense(self, local, continuity, n_elements, deriv, n_components):
         bp = np.linspace(-1.0, 1.0, n_elements + 1)
         basis = PiecewiseBasis(local, bp, continuity=continuity)
         shape = (

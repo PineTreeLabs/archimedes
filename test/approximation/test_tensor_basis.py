@@ -92,7 +92,7 @@ def test_sizes_and_shape():
     assert basis.shape == (4, 3, 2)
 
 
-def test_measures_are_per_dimension():
+def test_measures():
     basis = TensorBasis(
         (
             OrthogonalPolynomialBasis(ProbabilistsHermiteMeasure(), 3),
@@ -102,11 +102,10 @@ def test_measures_are_per_dimension():
     )
     assert basis.measures == (ProbabilistsHermiteMeasure(), LegendreMeasure(), None)
 
-
-def test_measures_default_to_none_for_weightless_families():
+    # Weightless families (nodal, and piecewise built from one) report None.
     assert _nodal(3).measures == (None,)
-    # A piecewise basis reports its element basis's weight.
     assert _piecewise(3).measures == (None,)
+    # A discontinuous piecewise element still reports its own basis's weight.
     assert PiecewiseBasis(_modal(3), BREAKS, continuity=-1).measures == (
         LegendreMeasure(),
     )
@@ -124,7 +123,7 @@ def test_density_is_shared_across_factors():
     assert normalized.density is True
 
 
-def test_parameters_type_and_domain_validation():
+def test_parameters_type_and_domain():
     basis = TensorBasis((_modal(3), _modal(3)))
     assert basis.Parameters is ProductParameters
     assert FunctionSpace(basis, domain=BOX).n_basis == 9
@@ -138,7 +137,7 @@ def test_equality_and_hash():
     )
 
 
-def test_default_quadrature_is_the_tensor_of_the_factors_rules():
+def test_default_quadrature():
     basis = TensorBasis((_modal(3), _modal(4)))
     rule = basis.default_quadrature()
     assert rule.ndim == 2
@@ -148,7 +147,7 @@ def test_default_quadrature_is_the_tensor_of_the_factors_rules():
 # -- ordering --
 
 
-def test_multi_index_is_flattened_in_c_order():
+def test_multi_index_c_order():
     # The claim the docstring makes: coefficients.reshape(shape) recovers the
     # natural array layout, with the last dimension varying fastest.
     bx, by = _modal(4), _modal(3)
@@ -175,7 +174,7 @@ def test_node_and_basis_orderings_agree():
 # -- exactness --
 
 
-def test_projection_is_exact_for_non_separable_polynomials(space):
+def test_nonseparable_exactness(space):
     u = space.project(f_)
     x = _grid()
     np.testing.assert_allclose(u(x), f_(x), atol=1e-11)
@@ -186,7 +185,7 @@ def test_orthonormal_basis_has_identity_mass_matrix():
     np.testing.assert_allclose(mass_matrix(space), np.eye(12), atol=1e-12)
 
 
-def test_separable_functions_are_representable_too():
+def test_separable_exactness():
     space = FunctionSpace(TensorBasis((_modal(4), _modal(4))), domain=BOX)
     x = _grid()
 
@@ -209,7 +208,7 @@ def test_three_dimensional_space():
     np.testing.assert_allclose(space.project(g)(x), g(x), atol=1e-11)
 
 
-def test_coefficients_reshape_to_the_multi_index_grid():
+def test_coefficients_reshape_to_multi_index_grid():
     # Reshape logic reads only basis.shape (n_basis per factor), which is
     # family-agnostic -- one family suffices rather than the full 3-family
     # matrix used by the exactness/product tests.
@@ -240,13 +239,13 @@ _PARTIAL_DERIV_X = np.stack(
 
 
 @pytest.mark.parametrize("deriv,exact", DERIV_CASES)
-def test_partial_derivatives_including_mixed(deriv, exact):
+def test_partial_derivatives(deriv, exact):
     # Full deriv/mixed-partial breadth checked on one family (modal): the
     # multi-index distribution and _row_kron combination this exercises is
     # family-agnostic machinery, and each factor's own derivative
     # correctness is covered exhaustively in its own test file. See
-    # test_partial_derivative_on_a_piecewise_factor for a smoke check that
-    # the same machinery works with a factor that has element structure.
+    # test_partial_derivative_on_piecewise_factor for a smoke check that the
+    # same machinery works with a factor that has element structure.
     space = FunctionSpace(TensorBasis((_modal(4), _modal(4))), domain=BOX)
     u = space.project(f_)
     np.testing.assert_allclose(
@@ -254,7 +253,7 @@ def test_partial_derivatives_including_mixed(deriv, exact):
     )
 
 
-def test_partial_derivative_on_a_piecewise_factor():
+def test_partial_derivative_on_piecewise_factor():
     # Smoke check (one representative deriv) that the multi-index/row_kron
     # machinery above also works when a factor has local support / element
     # structure, not just a globally smooth modal basis.
@@ -266,20 +265,19 @@ def test_partial_derivative_on_a_piecewise_factor():
     )
 
 
-def test_derivative_beyond_the_degree_vanishes():
+def test_deriv_argument_handling():
     basis = TensorBasis((_modal(3), _modal(3)))
     x = _grid()
+
+    # Beyond the max degree (2 per factor), the derivative vanishes.
     np.testing.assert_allclose(basis.evaluate(x, deriv=(3, 0)), 0.0, atol=1e-12)
 
-
-def test_scalar_zero_is_shorthand_for_no_derivative():
-    basis = TensorBasis((_modal(3), _modal(3)))
-    x = _grid()
+    # A scalar 0 is shorthand for "no derivative in any dimension."
     np.testing.assert_allclose(basis.evaluate(x, deriv=0), basis.evaluate(x))
     np.testing.assert_allclose(basis.evaluate(x, deriv=(0, 0)), basis.evaluate(x))
 
 
-def test_stiffness_matrix_is_the_gradient_form():
+def test_stiffness_matrix_gradient_form():
     # In >1D the stiffness matrix is the Laplacian's bilinear form, i.e. the
     # sum of the per-direction stiffnesses, not any single partial.
     basis = TensorBasis((_modal(4), _modal(4)))
@@ -291,7 +289,7 @@ def test_stiffness_matrix_is_the_gradient_form():
     np.testing.assert_allclose(stiffness_matrix(space), sum(blocks), atol=1e-12)
 
 
-def test_stiffness_matrix_matches_a_known_laplacian_entry():
+def test_stiffness_matrix_matches_laplacian_entry():
     # <grad u, grad u> for u = x*y on [0,1]^2 is int (y^2 + x^2) = 2/3.
     basis = TensorBasis((_modal(3), _modal(3)))
     domain = ProductParameters(dims=(UnitInterval.Parameters(0.0, 1.0),) * 2)
@@ -321,7 +319,7 @@ def test_mixed_measures_with_density_give_moments():
     assert np.sum(u.coefficients[1:] ** 2) == pytest.approx(variance)
 
 
-def test_gaussian_and_uniform_dimensions_together():
+def test_gaussian_and_uniform_measures():
     basis = TensorBasis(
         (
             OrthogonalPolynomialBasis(ProbabilistsHermiteMeasure(), 4, density=True),
@@ -371,7 +369,7 @@ def test_product_basis_sizes_per_dimension():
 # -- domain parameter forms --
 
 
-def test_dim_parameter_forms_agree():
+def test_dims_forms():
     basis = TensorBasis((_modal(3), _modal(3)))
     x = _grid()
     as_params = basis.evaluate(
@@ -382,27 +380,19 @@ def test_dim_parameter_forms_agree():
     np.testing.assert_allclose(as_dicts, as_params)
     np.testing.assert_allclose(as_tuples, as_params)
 
+    # Omitted per-dimension parameters fall back to the reference domain.
+    x2 = np.stack([np.linspace(-1, 1, 5), np.linspace(-1, 1, 5)], axis=-1)
+    np.testing.assert_allclose(
+        basis.evaluate(x2, dims=(None, None)), basis.evaluate(x2)
+    )
 
-def test_omitted_dims_use_the_reference_domain():
-    basis = TensorBasis((_modal(3), _modal(3)))
-    x = np.stack([np.linspace(-1, 1, 5), np.linspace(-1, 1, 5)], axis=-1)
-    np.testing.assert_allclose(basis.evaluate(x, dims=(None, None)), basis.evaluate(x))
 
-
-def test_too_many_positional_dim_parameters_rejected():
+def test_dims_validation():
     basis = TensorBasis((_modal(3), _modal(3)))
     with pytest.raises(ValueError, match="positional domain parameters"):
         basis.evaluate(_grid(), dims=((0.0, 1.0, 2.0), (0.0, 1.0)))
-
-
-def test_unrecognized_dim_parameter_spec_rejected():
-    basis = TensorBasis((_modal(3), _modal(3)))
     with pytest.raises(TypeError, match="per-dimension parameters must be"):
         basis.evaluate(_grid(), dims=(3.0, None))
-
-
-def test_wrong_number_of_dim_parameters_rejected():
-    basis = TensorBasis((_modal(3), _modal(3)))
     with pytest.raises(ValueError, match="expected 2 per-dimension parameters"):
         basis.evaluate(_grid(), dims=((0.0, 1.0),))
 
@@ -452,16 +442,18 @@ def test_gradient_through_domain_parameters():
 # -- quadrature compatibility --
 
 
-def test_rule_of_the_wrong_dimension_rejected():
+def test_quadrature_validation():
     basis = TensorBasis((_modal(3), _modal(3)))
     with pytest.raises(ValueError, match="but the quadrature rule is 1-dimensional"):
         FunctionSpace(basis, domain=BOX, reference_quad_rule=gauss_legendre(4))
 
-
-def test_mismatched_weight_rejected_per_dimension():
-    basis = TensorBasis((_modal(3), _modal(3)))
     rule = tensor_quad(gauss_legendre(4), gauss_hermite(4))
     with pytest.raises(ValueError, match="does not match the basis in dimension 1"):
+        FunctionSpace(basis, domain=BOX, reference_quad_rule=rule)
+
+    basis = TensorBasis((_piecewise(3), _modal(3)))
+    rule = tensor_quad(gauss_legendre(6), gauss_legendre(4))
+    with pytest.raises(ValueError, match="piecewise smooth in dimension 0"):
         FunctionSpace(basis, domain=BOX, reference_quad_rule=rule)
 
 
@@ -488,13 +480,6 @@ def test_weightless_basis_imposes_no_weight_constraint():
     assert space.n_basis == 9
 
 
-def test_misaligned_breakpoints_rejected_per_dimension():
-    basis = TensorBasis((_piecewise(3), _modal(3)))
-    rule = tensor_quad(gauss_legendre(6), gauss_legendre(4))
-    with pytest.raises(ValueError, match="piecewise smooth in dimension 0"):
-        FunctionSpace(basis, domain=BOX, reference_quad_rule=rule)
-
-
 def test_aligned_composite_rule_accepted():
     basis = TensorBasis((_piecewise(3), _modal(3)))
     rule = tensor_quad(composite_quad(gauss_legendre(3), BREAKS), gauss_legendre(4))
@@ -506,7 +491,7 @@ def test_aligned_composite_rule_accepted():
     )
 
 
-def test_required_breakpoints_is_a_per_dimension_tuple():
+def test_required_breakpoints_per_dimension():
     basis = TensorBasis((_piecewise(3), _modal(3)))
     required = basis.required_breakpoints
     np.testing.assert_allclose(required[0], BREAKS)
@@ -516,23 +501,17 @@ def test_required_breakpoints_is_a_per_dimension_tuple():
 # -- errors --
 
 
-def test_requires_at_least_one_dimension():
+def test_construction_validation():
     with pytest.raises(ValueError, match="at least one dimension"):
         TensorBasis(())
 
-
-def test_rejects_non_basis_factors():
     with pytest.raises(TypeError, match=r"bases\[1\] must be a Basis"):
         TensorBasis((_modal(3), "nope"))
 
-
-def test_rejects_nested_tensor_factors():
     inner = TensorBasis((_modal(3), _modal(3)))
     with pytest.raises(ValueError, match="must be univariate"):
         TensorBasis((_modal(3), inner))
 
-
-def test_rejects_disagreeing_density():
     with pytest.raises(ValueError, match="must agree on `density`"):
         TensorBasis(
             (
@@ -542,41 +521,26 @@ def test_rejects_disagreeing_density():
         )
 
 
-def test_rejects_nonzero_integer_deriv():
+def test_evaluate_validation():
     basis = TensorBasis((_modal(3), _modal(3)))
     with pytest.raises(ValueError, match="must be a multi-index"):
         basis.evaluate(_grid(), deriv=1)
-
-
-def test_rejects_wrong_length_multi_index():
-    basis = TensorBasis((_modal(3), _modal(3)))
     with pytest.raises(ValueError, match="one entry per dimension"):
         basis.evaluate(_grid(), deriv=(1, 0, 0))
-
-
-def test_rejects_negative_derivative_order():
-    basis = TensorBasis((_modal(3), _modal(3)))
     with pytest.raises(ValueError, match="orders must be >= 0"):
         basis.evaluate(_grid(), deriv=(-1, 0))
-
-
-def test_rejects_wrong_x_shape():
-    basis = TensorBasis((_modal(3), _modal(3)))
     with pytest.raises(ValueError, match=r"x must have shape \(npts, 2\)"):
         basis.evaluate(np.linspace(0.0, 1.0, 5))
     with pytest.raises(ValueError, match=r"x must have shape \(npts, 2\)"):
         basis.evaluate(np.zeros((5, 3)))
 
 
-def test_rejects_mismatched_product_dimensions():
+def test_product_basis_validation():
     a = TensorBasis((_modal(3), _modal(3)))
     b = TensorBasis((_modal(3),))
     with pytest.raises(ValueError, match="same number of dimensions"):
         a._product_basis(b)
 
-
-def test_rejects_product_with_a_non_tensor_basis():
-    a = TensorBasis((_modal(3), _modal(3)))
     with pytest.raises(ValueError, match="cannot form a product basis"):
         a._product_basis(_modal(3))
 
@@ -594,7 +558,7 @@ def test_domain_must_be_product_parameters():
         FunctionSpace(basis, domain=UnitInterval.Parameters(0.0, 1.0))
 
 
-def test_piecewise_rejects_a_multivariate_element_basis():
+def test_piecewise_rejects_multivariate_element_basis():
     inner = TensorBasis((_nodal(3), _nodal(3)))
     with pytest.raises(ValueError, match="element_basis must be univariate"):
         PiecewiseBasis(inner, BREAKS, continuity=-1)

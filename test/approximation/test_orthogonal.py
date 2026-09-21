@@ -1,4 +1,4 @@
-# ruff: noqa: N806  (M, K are the conventional names for these matrices)
+# ruff: noqa: N806  (M is the conventional name for a Gram matrix)
 import numpy as np
 import pytest
 from scipy.special import eval_legendre
@@ -15,12 +15,10 @@ from archimedes.measure import (
 from archimedes.quadrature import gauss_hermite, gauss_laguerre, gauss_legendre
 
 
-def test_n_basis_validation():
+def test_construction_validation():
     with pytest.raises(ValueError):
         OrthogonalPolynomialBasis(LegendreMeasure(), n_basis=0)
 
-
-def test_negative_deriv_rejected():
     basis = OrthogonalPolynomialBasis(LegendreMeasure(), n_basis=3)
     with pytest.raises(ValueError):
         basis.evaluate(np.array([0.0]), deriv=-1)
@@ -40,26 +38,16 @@ def test_legendre_values_match_scipy_up_to_orthonormal_scale(n_basis):
         np.testing.assert_allclose(phi[:, k], classical / norm, atol=1e-10)
 
 
-def test_derivative_matches_finite_difference():
+@pytest.mark.parametrize("deriv,h,atol", [(1, 1e-6, 1e-5), (2, 1e-5, 1e-3)])
+def test_derivative_matches_finite_difference(deriv, h, atol):
+    # Not hand-derived per order -- a second derivative falls out of the
+    # same generic recurrence as the first.
     basis = OrthogonalPolynomialBasis(LegendreMeasure(), n_basis=6)
     x = np.linspace(-0.9, 0.9, 13)
-    h = 1e-6
-    dphi = basis.evaluate(x, deriv=1)
-    dphi_fd = (basis.evaluate(x + h) - basis.evaluate(x - h)) / (2 * h)
-    np.testing.assert_allclose(dphi, dphi_fd, atol=1e-5)
-
-
-def test_second_derivative_matches_finite_difference_of_first():
-    # Not hand-derived per family -- differentiating the recurrence twice
-    # falls out of the same generic implementation.
-    basis = OrthogonalPolynomialBasis(LegendreMeasure(), n_basis=6)
-    x = np.linspace(-0.9, 0.9, 13)
-    h = 1e-5
-    d2phi = basis.evaluate(x, deriv=2)
-    d2phi_fd = (basis.evaluate(x + h, deriv=1) - basis.evaluate(x - h, deriv=1)) / (
-        2 * h
-    )
-    np.testing.assert_allclose(d2phi, d2phi_fd, atol=1e-3)
+    dphi = basis.evaluate(x, deriv=deriv)
+    lo = basis.evaluate(x - h, deriv=deriv - 1)
+    hi = basis.evaluate(x + h, deriv=deriv - 1)
+    np.testing.assert_allclose(dphi, (hi - lo) / (2 * h), atol=atol)
 
 
 def test_orthonormal_on_reference_domain():
@@ -84,23 +72,10 @@ def test_orthonormal_on_mapped_domain():
 # -- `density`: orthonormal against the probability measure, not the raw weight --
 
 
-def test_density_orthonormal_against_probability_measure():
-    # With density=True, integrating phi_i * phi_j against density-normalized
-    # (mass-1) quadrature weights should give the identity, same as the
-    # raw-weight case gives for density=False.
-    loc, scale = 1.5, 2.0
-    basis = OrthogonalPolynomialBasis(
-        ProbabilistsHermiteMeasure(), n_basis=5, density=True
-    )
-    rule = gauss_hermite(15, kind="prob").map_to(loc, scale)
-    x = rule.nodes
-    w = rule.weights / np.sum(rule.weights)
-    phi = basis.evaluate(x, loc=loc, scale=scale)
-    M = phi.T @ (w[:, None] * phi)
-    np.testing.assert_allclose(M, np.eye(5), atol=1e-8)
+def test_density():
+    basis = OrthogonalPolynomialBasis(LegendreMeasure(), n_basis=3)
+    assert basis.density is False
 
-
-def test_density_rescales_by_sqrt_mass_relative_to_raw():
     # Only norm[0] (beta_0) differs between the two conventions -- 1 instead
     # of measure.mass(...) -- so phi_density = phi_raw * sqrt(mass) exactly,
     # for every degree.
@@ -115,10 +90,19 @@ def test_density_rescales_by_sqrt_mass_relative_to_raw():
     mass = ProbabilistsHermiteMeasure().mass(loc=loc, scale=scale)
     np.testing.assert_allclose(phi_density, phi_raw * np.sqrt(mass), atol=1e-10)
 
-
-def test_density_defaults_to_false():
-    basis = OrthogonalPolynomialBasis(LegendreMeasure(), n_basis=3)
-    assert basis.density is False
+    # With density=True, integrating phi_i * phi_j against density-normalized
+    # (mass-1) quadrature weights gives the identity, same as the raw-weight
+    # case does for density=False.
+    loc, scale = 1.5, 2.0
+    basis = OrthogonalPolynomialBasis(
+        ProbabilistsHermiteMeasure(), n_basis=5, density=True
+    )
+    rule = gauss_hermite(15, kind="prob").map_to(loc, scale)
+    x = rule.nodes
+    w = rule.weights / np.sum(rule.weights)
+    phi = basis.evaluate(x, loc=loc, scale=scale)
+    M = phi.T @ (w[:, None] * phi)
+    np.testing.assert_allclose(M, np.eye(5), atol=1e-8)
 
 
 # -- genericity: same class, no family-specific code, for other measures --
@@ -141,28 +125,16 @@ def test_generic_orthonormality(measure, rule):
 # -- static (NumPy) vs. dynamic (symbolic, via arc.compile) equivalence --
 
 
-def test_static_and_dynamic_evaluation_agree():
+@pytest.mark.parametrize("deriv", [0, 1])
+def test_static_and_dynamic_evaluation_agree(deriv):
     basis = OrthogonalPolynomialBasis(LegendreMeasure(), n_basis=5)
     x = np.linspace(-1, 1, 9)
-    static_phi = basis.evaluate(x)
+    static_phi = basis.evaluate(x, deriv=deriv)
 
     @arc.compile
     def traced(x):
         assert isinstance(x, SymbolicArray)
-        return basis.evaluate(x)
+        return basis.evaluate(x, deriv=deriv)
 
     dynamic_phi = np.array([np.asarray(traced(xi)).ravel() for xi in x])
     np.testing.assert_allclose(static_phi, dynamic_phi, atol=1e-12)
-
-
-def test_static_and_dynamic_derivative_agree():
-    basis = OrthogonalPolynomialBasis(LegendreMeasure(), n_basis=5)
-    x = np.linspace(-0.8, 0.8, 7)
-    static_dphi = basis.evaluate(x, deriv=1)
-
-    @arc.compile
-    def traced(x):
-        return basis.evaluate(x, deriv=1)
-
-    dynamic_dphi = np.array([np.asarray(traced(xi)).ravel() for xi in x])
-    np.testing.assert_allclose(static_dphi, dynamic_dphi, atol=1e-12)

@@ -1,19 +1,17 @@
 """Tests for ``ConcatBasis``: the direct sum of several bases' functions."""
 
-import dataclasses
-
 import numpy as np
 import pytest
 
 import archimedes as arc
 from archimedes._core._array_impl import SymbolicArray
 from archimedes.approximation import (
-    Basis,
     ConcatBasis,
     ConstrainedBasis,
     FunctionSpace,
     LagrangeBasis,
     OrthogonalPolynomialBasis,
+    PiecewiseBasis,
 )
 from archimedes.measure import LegendreMeasure, PhysicistsHermiteMeasure, UnitInterval
 from archimedes.quadrature import gauss_legendre
@@ -48,30 +46,19 @@ def combo(vertex, bubble, rule):
 # -- construction --
 
 
-def test_empty_pieces_rejected(rule):
+def test_construction_validation(vertex, rule):
     with pytest.raises(ValueError, match="non-empty"):
         ConcatBasis((), quad_rule=rule)
 
-
-def test_mismatched_parameters_rejected(vertex, rule):
     hermite_piece = OrthogonalPolynomialBasis(PhysicistsHermiteMeasure(), 4)
     with pytest.raises(TypeError, match="Parameters type"):
         ConcatBasis((vertex, hermite_piece), quad_rule=rule)
 
 
-def test_n_basis_is_the_sum(combo, vertex, bubble):
+def test_properties(combo, vertex, bubble, rule):
     assert combo.n_basis == vertex.n_basis + bubble.n_basis
-
-
-def test_parameters_delegates_to_first_piece(combo, vertex):
     assert combo.Parameters is vertex.Parameters
-
-
-def test_measures_always_none(combo):
     assert combo.measures == (None,)
-
-
-def test_default_quadrature_is_the_given_rule(combo, rule):
     assert combo.default_quadrature() is rule
 
 
@@ -87,9 +74,6 @@ def test_evaluate_concatenates_pieces(combo, vertex, bubble):
     )
     np.testing.assert_allclose(got, expected)
 
-
-def test_evaluate_derivative_concatenates_pieces(combo, vertex, bubble):
-    x = np.linspace(-1.0, 1.0, 9)
     got = combo.evaluate(x, deriv=1)
     expected = np.concatenate(
         [
@@ -109,27 +93,23 @@ def test_side_argument_is_validated(combo):
 # -- boundary_dofs --
 
 
-def test_boundary_dofs_offsets_into_concatenated_index(combo, vertex):
+def test_boundary_dofs(combo, vertex):
     left, right = combo.boundary_dofs(0)
     vertex_left, vertex_right = vertex.boundary_dofs(0)
     assert (left, right) == (vertex_left, vertex_right)
 
-
-def test_boundary_dofs_none_when_no_piece_claims_it(combo):
     # Order 1 (derivative DOF) isn't claimed by either the linear vertex
     # functions or the modal bubble space.
     assert combo.boundary_dofs(1) == (None, None)
 
 
-def test_boundary_dofs_conflict_is_rejected(rule):
+def test_boundary_dofs_conflict_rejected(rule):
     left_claimer = LagrangeBasis(reference_nodes=np.array([-1.0, 0.0]))
     other_left_claimer = LagrangeBasis(reference_nodes=np.array([-1.0, 0.5]))
     combo = ConcatBasis((left_claimer, other_left_claimer), quad_rule=rule)
     with pytest.raises(ValueError, match="more than one piece claims the left"):
         combo.boundary_dofs(0)
 
-
-def test_boundary_dofs_conflict_is_rejected_on_the_right(rule):
     right_claimer = LagrangeBasis(reference_nodes=np.array([0.0, 1.0]))
     other_right_claimer = LagrangeBasis(reference_nodes=np.array([0.5, 1.0]))
     combo = ConcatBasis((right_claimer, other_right_claimer), quad_rule=rule)
@@ -144,31 +124,9 @@ def test_required_breakpoints_none_when_no_piece_has_any(combo):
     assert combo.required_breakpoints is None
 
 
-def test_required_breakpoints_is_the_union(rule):
-    @dataclasses.dataclass(frozen=True)
-    class _StubBasis(Basis):
-        breakpoints: tuple
-
-        @property
-        def n_basis(self):
-            return 1
-
-        @property
-        def Parameters(self):  # noqa: N802
-            return UnitInterval.Parameters
-
-        @property
-        def required_breakpoints(self):
-            return np.array(self.breakpoints)
-
-        def default_quadrature(self):
-            return rule
-
-        def evaluate(self, x, deriv=0, side="right", **domain_kwargs):
-            return np.ones((len(x), 1))
-
-    a = _StubBasis((-1.0, 0.0, 1.0))
-    b = _StubBasis((-1.0, 0.5, 1.0))
+def test_required_breakpoints_is_union(vertex, rule):
+    a = PiecewiseBasis(vertex, np.array([-1.0, 0.0, 1.0]), continuity=-1)
+    b = PiecewiseBasis(vertex, np.array([-1.0, 0.5, 1.0]), continuity=-1)
     combo = ConcatBasis((a, b), quad_rule=rule)
     np.testing.assert_array_equal(combo.required_breakpoints, [-1.0, 0.0, 0.5, 1.0])
 

@@ -16,19 +16,17 @@ def nodes():
     return gauss_lobatto(6).nodes
 
 
-def test_rejects_malformed_node_shape():
+def test_construction_validation(nodes):
     with pytest.raises(ValueError, match="1-D with at least one entry"):
         LagrangeBasis(reference_nodes=np.array([[-1.0, 1.0]]))
-
-
-def test_rejects_out_of_range_nodes():
     with pytest.raises(ValueError):
         LagrangeBasis(reference_nodes=np.array([-1.0, 0.0, 1.5]))
-
-
-def test_rejects_duplicate_nodes():
     with pytest.raises(ValueError):
         LagrangeBasis(reference_nodes=np.array([-1.0, 0.0, 0.0, 1.0]))
+
+    basis = LagrangeBasis(reference_nodes=nodes)
+    with pytest.raises(ValueError, match="deriv must be >= 0"):
+        basis.evaluate(np.array([0.0]), deriv=-1)
 
 
 def test_not_equal_to_other_type(nodes):
@@ -42,31 +40,20 @@ def test_cardinal_property(nodes):
     phi = basis.evaluate(nodes)
     np.testing.assert_allclose(phi, np.eye(len(nodes)), atol=1e-10)
 
-
-def test_partition_of_unity(nodes):
-    basis = LagrangeBasis(reference_nodes=nodes)
+    # Partition of unity, away from the nodes.
     x = np.linspace(-1, 1, 25)
-    phi = basis.evaluate(x)
-    np.testing.assert_allclose(phi.sum(axis=1), 1.0, atol=1e-10)
+    np.testing.assert_allclose(basis.evaluate(x).sum(axis=1), 1.0, atol=1e-10)
 
-
-def test_interpolates_polynomial_within_degree_exactly(nodes):
     # n_basis=6 nodes -> exact reproduction through degree 5.
-    basis = LagrangeBasis(reference_nodes=nodes)
-
     def f(x):
         return 3 * x**5 - 2 * x**3 + x - 1
 
-    phi_at_nodes = basis.evaluate(nodes)
-    np.testing.assert_allclose(phi_at_nodes, np.eye(len(nodes)), atol=1e-10)
-
     yp = f(nodes)
-    x = np.linspace(-1, 1, 17)
     interp = basis.evaluate(x) @ yp
     np.testing.assert_allclose(interp, f(x), atol=1e-8)
 
 
-def test_domain_mapping_preserves_cardinal_property(nodes):
+def test_domain_mapping(nodes):
     a, b = 2.0, 7.0
     basis = LagrangeBasis(reference_nodes=nodes)
     scale, shift = UnitInterval().affine_params(a, b)
@@ -74,13 +61,6 @@ def test_domain_mapping_preserves_cardinal_property(nodes):
 
     phi = basis.evaluate(mapped_nodes, a=a, b=b)
     np.testing.assert_allclose(phi, np.eye(len(nodes)), atol=1e-10)
-
-
-def test_domain_mapping_interpolates_exactly(nodes):
-    a, b = 2.0, 7.0
-    basis = LagrangeBasis(reference_nodes=nodes)
-    scale, shift = UnitInterval().affine_params(a, b)
-    mapped_nodes = scale * nodes + shift
 
     def f(x):
         return 3 * x**5 - 2 * x**3 + x - 1
@@ -91,30 +71,21 @@ def test_domain_mapping_interpolates_exactly(nodes):
     np.testing.assert_allclose(interp, f(x), atol=1e-6)
 
 
-def test_negative_derivative_order_rejected(nodes):
-    basis = LagrangeBasis(reference_nodes=nodes)
-    with pytest.raises(ValueError, match="deriv must be >= 0"):
-        basis.evaluate(np.array([0.0]), deriv=-1)
-
-
 # -- derivatives --
 
 
 def test_derivative_matches_finite_difference(nodes):
     basis = LagrangeBasis(reference_nodes=nodes)
-    # Deliberately off-node points; the at-node branch is covered separately.
-    x = np.linspace(-0.93, 0.91, 17)
     h = 1e-6
+
+    # Off-node points exercise the general barycentric-formula branch.
+    x = np.linspace(-0.93, 0.91, 17)
     dphi = basis.evaluate(x, deriv=1)
     dphi_fd = (basis.evaluate(x + h) - basis.evaluate(x - h)) / (2 * h)
     np.testing.assert_allclose(dphi, dphi_fd, atol=1e-5)
 
-
-def test_derivative_at_nodes_matches_finite_difference(nodes):
-    # At a node the general barycentric formula is 0/0, so this exercises the
+    # At a node the general formula is 0/0, so this exercises the
     # differentiation-matrix branch instead.
-    basis = LagrangeBasis(reference_nodes=nodes)
-    h = 1e-6
     dphi = basis.evaluate(nodes, deriv=1)
     dphi_fd = (basis.evaluate(nodes + h) - basis.evaluate(nodes - h)) / (2 * h)
     np.testing.assert_allclose(dphi, dphi_fd, atol=1e-5)
@@ -150,7 +121,7 @@ def test_derivative_on_mapped_domain(nodes):
 # -- static (NumPy) vs. dynamic (symbolic, via arc.compile) equivalence --
 
 
-def test_static_and_dynamic_evaluation_agree_including_at_nodes(nodes):
+def test_static_and_dynamic_evaluation_agree(nodes):
     basis = LagrangeBasis(reference_nodes=nodes)
     # Include exact node points -- the tricky 0/0 branch -- alongside
     # ordinary interior points.
@@ -213,7 +184,7 @@ class TestHigherDerivatives:
         got = basis.evaluate(x, deriv=deriv) @ poly(basis.reference_nodes)
         np.testing.assert_allclose(got, poly.deriv(deriv)(x), atol=1e-10)
 
-    def test_first_derivative_matches_barycentric_formula(self, basis):
+    def test_derivative_matches_barycentric(self, basis):
         # Cross-check against the analytic barycentric derivative, which the
         # matrix-power identity replaced.
         x = np.linspace(-0.9, 0.9, 11)
@@ -236,7 +207,7 @@ class TestHigherDerivatives:
             np.testing.assert_array_equal(got, 0.0)
 
     @pytest.mark.parametrize("deriv", [1, 2, 3])
-    def test_symbolic_matches_numeric(self, basis, deriv):
+    def test_static_and_dynamic_evaluation_agree(self, basis, deriv):
         x = np.concatenate([np.array([-0.62, 0.31]), basis.reference_nodes])
         expected = basis.evaluate(x, deriv=deriv)
 
@@ -250,8 +221,8 @@ class TestHigherDerivatives:
 
     @pytest.mark.parametrize("deriv", [2, 3])
     def test_piecewise_inherits_higher_derivatives(self, basis, deriv):
-        # The whole point of fixing this: stiffness-like operators on a
-        # piecewise space need element derivatives above first order.
+        # Stiffness-like operators on a piecewise space need element
+        # derivatives above first order.
         bp = np.linspace(-1.0, 1.0, 3)
         pw = PiecewiseBasis(basis, bp, continuity=0)
         x = np.array([-0.7, -0.2, 0.35, 0.8])
@@ -261,96 +232,95 @@ class TestHigherDerivatives:
 
 
 # -- named node-family constructors --
+#
+# Each classmethod's `reference_nodes` match the corresponding
+# `archimedes.quadrature` rule (or `np.linspace`) directly, and its
+# `node_family` regenerates the same points at a different size -- which is
+# also what `_derivative_basis`/`_product_basis` rely on to stay in the same
+# family.
 
 
-class TestNodeFamilyConstructors:
-    """Each classmethod's ``reference_nodes`` match the corresponding
-    ``archimedes.quadrature`` rule (or ``np.linspace``) directly, and its
-    ``node_family`` regenerates the same points at a different size --
-    which is also what :meth:`_derivative_basis`/:meth:`_product_basis`
-    rely on to stay in the same family.
-    """
+def test_gauss_lobatto_nodes():
+    basis = LagrangeBasis.gauss_lobatto(6)
+    np.testing.assert_array_equal(basis.reference_nodes, gauss_lobatto(6).nodes)
+    assert basis.node_family is None  # the family default, left unset
 
-    def test_gauss_lobatto_nodes(self):
-        basis = LagrangeBasis.gauss_lobatto(6)
-        np.testing.assert_array_equal(basis.reference_nodes, gauss_lobatto(6).nodes)
-        assert basis.node_family is None  # the family default, left unset
 
-    def test_gauss_legendre_nodes(self):
-        basis = LagrangeBasis.gauss_legendre(6)
-        np.testing.assert_array_equal(
-            basis.reference_nodes, gauss_legendre_rule(6).nodes
-        )
-        assert basis.boundary_dofs() == (None, None)  # no endpoint nodes
+def test_gauss_legendre_nodes():
+    basis = LagrangeBasis.gauss_legendre(6)
+    np.testing.assert_array_equal(basis.reference_nodes, gauss_legendre_rule(6).nodes)
+    assert basis.boundary_dofs() == (None, None)  # no endpoint nodes
 
-    @pytest.mark.parametrize("endpoint", ["left", "right"])
-    def test_gauss_radau_nodes(self, endpoint):
-        basis = LagrangeBasis.gauss_radau(6, endpoint=endpoint)
-        np.testing.assert_array_equal(
-            basis.reference_nodes, gauss_radau(6, endpoint=endpoint).nodes
-        )
-        # Radau fixes exactly one endpoint -- the other is interior.
-        left, right = basis.boundary_dofs()
-        assert (left is not None) != (right is not None)
 
-    def test_gauss_radau_rejects_bad_endpoint(self):
-        with pytest.raises(ValueError, match="endpoint must be"):
-            LagrangeBasis.gauss_radau(6, endpoint="middle")
-
-    def test_equispaced_nodes(self):
-        basis = LagrangeBasis.equispaced(5)
-        np.testing.assert_array_equal(basis.reference_nodes, np.linspace(-1.0, 1.0, 5))
-        assert basis.boundary_dofs() == (0, 4)  # both endpoints included
-
-    @pytest.mark.parametrize(
-        "ctor", [LagrangeBasis.gauss_legendre, LagrangeBasis.equispaced]
+@pytest.mark.parametrize("endpoint", ["left", "right"])
+def test_gauss_radau_nodes(endpoint):
+    basis = LagrangeBasis.gauss_radau(6, endpoint=endpoint)
+    np.testing.assert_array_equal(
+        basis.reference_nodes, gauss_radau(6, endpoint=endpoint).nodes
     )
-    def test_node_family_equal_across_independent_instances(self, ctor):
-        # The subtlety this whole test class exists to pin down: an inline
-        # `lambda` (or a `functools.partial`, which -- perhaps surprisingly
-        # -- has no value-based `__eq__` either) would make two otherwise-
-        # identical instances compare unequal, silently breaking
-        # `_product_basis` and basis equality between two spaces built the
-        # same way.
-        a, b = ctor(6), ctor(6)
-        assert a == b
-        assert hash(a) == hash(b)
+    # Radau fixes exactly one endpoint -- the other is interior.
+    left, right = basis.boundary_dofs()
+    assert (left is not None) != (right is not None)
 
-    def test_gauss_radau_node_family_differs_by_endpoint(self):
-        left = LagrangeBasis.gauss_radau(6, endpoint="left")
-        right = LagrangeBasis.gauss_radau(6, endpoint="right")
-        assert left != right
-        assert left.node_family != right.node_family
 
-    def test_gauss_radau_node_family_equal_for_same_endpoint(self):
-        a = LagrangeBasis.gauss_radau(6, endpoint="left")
-        b = LagrangeBasis.gauss_radau(6, endpoint="left")
-        assert a == b
-        assert hash(a) == hash(b)
+def test_gauss_radau_rejects_bad_endpoint():
+    with pytest.raises(ValueError, match="endpoint must be"):
+        LagrangeBasis.gauss_radau(6, endpoint="middle")
 
-    @pytest.mark.parametrize(
-        "ctor",
-        [
-            LagrangeBasis.gauss_legendre,
-            LagrangeBasis.equispaced,
-            lambda n: LagrangeBasis.gauss_radau(n, endpoint="left"),
-        ],
-    )
-    def test_derivative_basis_regenerates_from_same_family(self, ctor):
-        basis = ctor(6)
-        derived = basis._derivative_basis(2)
-        assert derived.node_family == basis.node_family
-        assert derived.n_basis == 4
 
-    def test_product_basis_regenerates_from_same_family(self):
-        a = LagrangeBasis.gauss_legendre(4)
-        b = LagrangeBasis.gauss_legendre(5)
-        prod = a._product_basis(b)
-        assert prod.node_family == a.node_family
-        assert prod.n_basis == 8
+def test_equispaced_nodes():
+    basis = LagrangeBasis.equispaced(5)
+    np.testing.assert_array_equal(basis.reference_nodes, np.linspace(-1.0, 1.0, 5))
+    assert basis.boundary_dofs() == (0, 4)  # both endpoints included
 
-    def test_product_basis_rejects_mismatched_family(self):
-        a = LagrangeBasis.gauss_radau(5, endpoint="left")
-        b = LagrangeBasis.gauss_radau(5, endpoint="right")
-        with pytest.raises(ValueError, match="node_family"):
-            a._product_basis(b)
+
+@pytest.mark.parametrize(
+    "ctor", [LagrangeBasis.gauss_legendre, LagrangeBasis.equispaced]
+)
+def test_node_family_equality(ctor):
+    # A `node_family` built from an inline `lambda` (or a `functools.partial`,
+    # which also has no value-based `__eq__`) would make two otherwise-
+    # identical instances compare unequal, breaking `_product_basis` and
+    # basis equality between spaces built the same way.
+    a, b = ctor(6), ctor(6)
+    assert a == b
+    assert hash(a) == hash(b)
+
+
+def test_gauss_radau_node_family():
+    left = LagrangeBasis.gauss_radau(6, endpoint="left")
+    right = LagrangeBasis.gauss_radau(6, endpoint="right")
+    assert left != right
+    assert left.node_family != right.node_family
+
+    left2 = LagrangeBasis.gauss_radau(6, endpoint="left")
+    assert left == left2
+    assert hash(left) == hash(left2)
+
+
+@pytest.mark.parametrize(
+    "ctor",
+    [
+        LagrangeBasis.gauss_legendre,
+        LagrangeBasis.equispaced,
+        lambda n: LagrangeBasis.gauss_radau(n, endpoint="left"),
+    ],
+)
+def test_derivative_basis_preserves_family(ctor):
+    basis = ctor(6)
+    derived = basis._derivative_basis(2)
+    assert derived.node_family == basis.node_family
+    assert derived.n_basis == 4
+
+
+def test_product_basis_preserves_family():
+    a = LagrangeBasis.gauss_legendre(4)
+    b = LagrangeBasis.gauss_legendre(5)
+    prod = a._product_basis(b)
+    assert prod.node_family == a.node_family
+    assert prod.n_basis == 8
+
+    a2 = LagrangeBasis.gauss_radau(5, endpoint="left")
+    b2 = LagrangeBasis.gauss_radau(5, endpoint="right")
+    with pytest.raises(ValueError, match="node_family"):
+        a2._product_basis(b2)

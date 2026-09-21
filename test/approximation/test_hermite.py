@@ -43,7 +43,7 @@ def test_endpoint_values_and_derivatives(basis):
     )
 
 
-def test_reproduces_exact_cubic_on_reference_domain(basis):
+def test_exact_cubic_on_reference_domain(basis):
     # Any cubic is spanned exactly by value + slope at both endpoints.
     def f(t):
         return 1.0 - 2.0 * t + 3.0 * t**2 - 4.0 * t**3
@@ -57,12 +57,10 @@ def test_reproduces_exact_cubic_on_reference_domain(basis):
     np.testing.assert_allclose(basis.evaluate(t, deriv=1) @ coeffs, df(t), atol=1e-9)
 
 
-def test_negative_derivative_order_rejected(basis):
+def test_derivative_order_edge_cases(basis):
     with pytest.raises(ValueError, match="deriv must be >= 0"):
         basis.evaluate(np.array([0.0]), deriv=-1)
 
-
-def test_vanishes_beyond_polynomial_degree(basis):
     # Degree 3, so the 4th derivative and beyond are identically zero.
     x = np.linspace(-0.9, 0.9, 5)
     for deriv in (4, 7):
@@ -103,7 +101,7 @@ class TestDomainMapping:
         got = basis.evaluate(x, deriv=deriv, a=a, b=b) @ coeffs
         np.testing.assert_allclose(got, poly[deriv](x), atol=1e-8)
 
-    def test_domain_mapping_preserves_endpoint_pattern(self, basis):
+    def test_endpoint_pattern(self, basis):
         a, b = 3.0, 11.0
         scale, shift = UnitInterval().affine_params(a, b)
         x = scale * np.array([-1.0, 1.0]) + shift
@@ -129,8 +127,13 @@ def test_boundary_dofs(basis):
 
 
 class TestDerivativeBasis:
-    def test_zeroth_derivative_is_self(self, basis):
+    def test_validation(self, basis):
         assert basis._derivative_basis(0) is basis
+
+        with pytest.raises(ValueError, match="deriv must be >= 0"):
+            basis._derivative_basis(-1)
+        with pytest.raises(ValueError, match="at or past the degree"):
+            basis._derivative_basis(4)
 
     @pytest.mark.parametrize("deriv,expected_n", [(1, 3), (2, 2), (3, 1)])
     def test_crosses_into_lagrange(self, basis, deriv, expected_n):
@@ -138,15 +141,7 @@ class TestDerivativeBasis:
         assert isinstance(derived, LagrangeBasis)
         assert derived.n_basis == expected_n
 
-    def test_negative_derivative_order_rejected(self, basis):
-        with pytest.raises(ValueError, match="deriv must be >= 0"):
-            basis._derivative_basis(-1)
-
-    def test_rejects_derivative_at_or_past_degree(self, basis):
-        with pytest.raises(ValueError, match="at or past the degree"):
-            basis._derivative_basis(4)
-
-    def test_derivative_reproduces_polynomial_derivative(self, basis):
+    def test_polynomial_derivative(self, basis):
         # The crossed-into Lagrange basis should still exactly represent
         # the cubic's first derivative (a quadratic) at its own nodes.
         def f(t):
