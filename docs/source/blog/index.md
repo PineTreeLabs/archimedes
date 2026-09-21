@@ -40,3 +40,13 @@ An end-to-end example of simple sensor fusion with Archimedes
 
 Parameter estimation for a Li-ion battery cell
 :::
+
+
+:::{grid-item-card} Quadrature and Function Approximation
+:link: 2026/approx_release/approx_release
+:link-type: doc
+
+20 Mar 2026 · Announcements
+
+Two new modules, endless fun
+:::

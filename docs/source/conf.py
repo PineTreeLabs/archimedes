@@ -41,7 +41,7 @@ myst_enable_extensions = [
     "html_admonition",
     "html_image",
     "linkify",
-    "replacements",
+    # "replacements",
     "smartquotes",
     "strikethrough",
     "substitution",
