@@ -37,9 +37,9 @@ DOMAIN = UnitInterval.Parameters(a=A, b=B)
 BREAKPOINTS = np.linspace(-1.0, 1.0, 3)
 
 # modal/nodal/piecewise are three genuinely distinct `_product_basis`
-# implementations (no `jacobi`-style duplicate here, unlike
-# test_derivative.py/test_integral.py), so the full 3-way sweep below is
-# used for the tests that actually check product correctness/sizing.
+# implementations, with no shared-implementation duplicate to skip. The
+# full 3-way sweep below is used for the tests that actually check
+# product correctness/sizing.
 space = family_space("modal", "nodal", "piecewise", n_basis=4, breakpoints=BREAKPOINTS)
 
 
@@ -214,7 +214,7 @@ def test_matching_density_forwarded_to_product():
     assert product.density is True
 
 
-def test_basis_without_product_support_raises():
+def test_basis_without_product_support_rejected():
     class Constant(Basis):
         n_basis = 1
 

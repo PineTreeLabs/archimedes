@@ -1,9 +1,8 @@
 """Shared basis-family builders for tests that sweep FunctionSpace behavior
 across representative basis families.
 
-Several test modules (``test_derivative.py``, ``test_integral.py``,
-``test_products.py``, ``test_vector_valued.py``) each construct a small set
-of ``FunctionSpace`` instances -- one per basis family ("modal"
+Several test modules each construct a small set of ``FunctionSpace``
+instances -- one per basis family ("modal"
 :class:`~archimedes.approximation.OrthogonalPolynomialBasis`, "nodal"
 :class:`~archimedes.approximation.LagrangeBasis`, "piecewise"
 :class:`~archimedes.approximation.PiecewiseBasis`, "bspline"
@@ -40,9 +39,9 @@ from archimedes.quadrature import Quadrature, gauss_lobatto
 
 
 def lobatto_basis(n: int) -> LagrangeBasis:
-    """A :class:`~archimedes.approximation.LagrangeBasis` on the ``n``-point
-    Gauss-Lobatto reference nodes -- the element basis every "nodal" and
-    "piecewise" builder below uses."""
+    """Build a :class:`~archimedes.approximation.LagrangeBasis` on the
+    ``n``-point Gauss-Lobatto reference nodes -- the element basis every
+    "nodal" and "piecewise" builder below uses."""
     return LagrangeBasis(reference_nodes=gauss_lobatto(n).nodes)
 
 
@@ -53,7 +52,8 @@ def modal_space(
     measure: Measure | None = None,
     quad_rule: Quadrature | None = None,
 ) -> FunctionSpace:
-    """Global orthogonal-polynomial space (Legendre by default) on ``[a, b]``."""
+    """Build a global orthogonal-polynomial space (Legendre by default) on
+    ``[a, b]``."""
     measure = LegendreMeasure() if measure is None else measure
     return FunctionSpace(
         OrthogonalPolynomialBasis(measure, n_basis),
@@ -68,7 +68,7 @@ def nodal_space(
     b: float = 2.0,
     quad_rule: Quadrature | None = None,
 ) -> FunctionSpace:
-    """Global Lagrange (Gauss-Lobatto node) space on ``[a, b]``."""
+    """Build a global Lagrange (Gauss-Lobatto node) space on ``[a, b]``."""
     return FunctionSpace(
         lobatto_basis(n_basis),
         domain=UnitInterval.Parameters(a=a, b=b),
@@ -84,8 +84,8 @@ def piecewise_space(
     continuity: int = 0,
     quad_rule: Quadrature | None = None,
 ) -> FunctionSpace:
-    """Piecewise Lagrange space: ``element_n_basis``-node elements tiled
-    across (reference-domain) ``breakpoints``."""
+    """Build a piecewise Lagrange space: ``element_n_basis``-node elements
+    tiled across (reference-domain) ``breakpoints``."""
     return FunctionSpace(
         PiecewiseBasis(
             lobatto_basis(element_n_basis), breakpoints, continuity=continuity
@@ -100,7 +100,7 @@ def bspline_space(
     breakpoints: np.ndarray,
     quad_rule: Quadrature | None = None,
 ) -> FunctionSpace:
-    """Clamped B-spline space on physical-domain ``breakpoints``."""
+    """Build a clamped B-spline space on physical-domain ``breakpoints``."""
     return FunctionSpace.clamped_bspline(degree, breakpoints, quad_rule=quad_rule)
 
 
@@ -118,8 +118,8 @@ def family_builders(
     bspline_breakpoints: np.ndarray | None = None,
     jacobi_measure: Measure | None = None,
 ) -> dict[str, Callable[[], FunctionSpace]]:
-    """The ``{family_name: () -> FunctionSpace}`` registry, sized and placed
-    by the keyword arguments given.
+    """Build the ``{family_name: () -> FunctionSpace}`` registry, sized and
+    placed by the keyword arguments given.
 
     Every caller picks the numeric knobs its own tests need -- this shares
     the *construction*, not one fixed set of numbers.
@@ -197,7 +197,7 @@ def family_builders(
 
 
 def family_space(*names: str, **builder_kwargs):
-    """A ``pytest.fixture`` parametrized over the given basis-family
+    """Build a ``pytest.fixture`` parametrized over the given basis-family
     ``names``, each built from :func:`family_builders`.
 
     Usage, at module level::

@@ -141,7 +141,7 @@ def test_static_and_dynamic_evaluation_agree(nodes):
 
 
 class TestHigherDerivatives:
-    """``Phi^(k) = Phi @ D**k`` is exact, not approximate: each cardinal
+    """``Phi^(k) = Phi @ D**k`` is exact, not approximate. Each cardinal
     polynomial's k-th derivative has degree <= n-1 and so lies in the span
     of the basis itself. These check against exact polynomial derivatives
     rather than finite differences, which are far too noisy above k=1."""
@@ -278,10 +278,10 @@ def test_equispaced_nodes():
     "ctor", [LagrangeBasis.gauss_legendre, LagrangeBasis.equispaced]
 )
 def test_node_family_equality(ctor):
-    # A `node_family` built from an inline `lambda` (or a `functools.partial`,
-    # which also has no value-based `__eq__`) would make two otherwise-
-    # identical instances compare unequal, breaking `_product_basis` and
-    # basis equality between spaces built the same way.
+    # A `node_family` built from an inline `lambda` (or a `functools.partial`)
+    # has no value-based `__eq__`. That would make two otherwise-identical
+    # instances compare unequal, breaking basis equality between spaces
+    # built the same way.
     a, b = ctor(6), ctor(6)
     assert a == b
     assert hash(a) == hash(b)

@@ -43,11 +43,9 @@ X = np.linspace(0.07, 1.93, 15)
 # `jacobi` is deliberately not part of either fixture below: it exercises the
 # same `OrthogonalPolynomialBasis` code path as `modal` for every derivative
 # operation here, so sweeping it through generic tests would only duplicate
-# `modal`'s coverage. What's actually specific to Jacobi (measure/
-# normalization preservation across a derivative) is checked directly by
-# `test_polynomial_families_keep_their_measure_and_normalization` and
-# `test_jacobi_derivative_stays_orthonormal` below, without going through
-# either fixture.
+# `modal`'s coverage. What's actually specific to Jacobi -- measure/
+# normalization preservation across a derivative -- is checked directly,
+# without going through either fixture.
 
 # The "every family really works" anchor: full 4-way sweep, used only by the
 # two tests that most directly check exactness end-to-end.
@@ -146,8 +144,8 @@ def test_every_family_rejects_derivative_past_degree(basis, order):
 
 
 def test_pointwise_evaluation_past_degree_gives_zero():
-    # `evaluate` is asking for values, where zero is the right answer; only
-    # `derivative` needs a space and so has nowhere to put it.
+    # `evaluate` is asking for values, where zero is the right answer.
+    # `derivative` needs a space to put the result and has nowhere to put it.
     space = FunctionSpace(OrthogonalPolynomialBasis(LegendreMeasure(), 4), DOMAIN)
     np.testing.assert_allclose(space.project(f_)(X, deriv=4), 0.0, atol=1e-10)
 
@@ -380,6 +378,8 @@ def test_tensor_partial_derivatives(deriv, shape, exact):
 
 
 def test_tensor_derivative_validation():
+    # A per-dimension order past that dimension's degree raises with the
+    # offending dimension named in the message.
     basis = TensorBasis(
         (
             OrthogonalPolynomialBasis(LegendreMeasure(), 5),
@@ -389,6 +389,7 @@ def test_tensor_derivative_validation():
     with pytest.raises(ValueError, match="in dimension 1: .*at or past the degree"):
         basis._derivative_basis((1, 3))
 
+    # A scalar order is rejected: tensor bases require a multi-index.
     basis = TensorBasis((OrthogonalPolynomialBasis(LegendreMeasure(), 4),) * 2)
     with pytest.raises(ValueError, match="must be a multi-index"):
         basis._derivative_basis(1)
@@ -588,15 +589,18 @@ def test_fourier_sine_alternates_kind_by_parity(deriv):
         assert derived.n_basis == 4  # grows by 1: max_mode unchanged
 
 
-def test_fourier_derivative_never_exhausts_degree():
-    # Contrast with `test_derivative_past_the_degree_is_an_error`: a periodic
-    # family never runs out of room, however high the order.
-    for basis in (
+@pytest.mark.parametrize(
+    "basis",
+    [
         FourierBasis(5, kind="full"),
         FourierBasis(4, kind="cosine"),
         FourierBasis(4, kind="sine"),
-    ):
-        basis._derivative_basis(200)  # must not raise
+    ],
+    ids=["full", "cosine", "sine"],
+)
+def test_fourier_derivative_never_exhausts_degree(basis):
+    # A periodic family never runs out of room, however high the order.
+    basis._derivative_basis(200)  # must not raise
 
 
 def test_fourier_cosine_constant_only_has_no_odd_derivative_space():

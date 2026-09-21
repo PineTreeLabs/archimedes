@@ -180,7 +180,7 @@ def test_nonseparable_exactness(space):
     np.testing.assert_allclose(u(x), f_(x), atol=1e-11)
 
 
-def test_orthonormal_basis_has_identity_mass_matrix():
+def test_orthonormal_mass_matrix():
     space = FunctionSpace(TensorBasis((_modal(4), _modal(3))), domain=BOX)
     np.testing.assert_allclose(mass_matrix(space), np.eye(12), atol=1e-12)
 
@@ -208,7 +208,7 @@ def test_three_dimensional_space():
     np.testing.assert_allclose(space.project(g)(x), g(x), atol=1e-11)
 
 
-def test_coefficients_reshape_to_multi_index_grid():
+def test_coefficients_reshape():
     # Reshape logic reads only basis.shape (n_basis per factor), which is
     # family-agnostic -- one family suffices rather than the full 3-family
     # matrix used by the exactness/product tests.
@@ -240,12 +240,10 @@ _PARTIAL_DERIV_X = np.stack(
 
 @pytest.mark.parametrize("deriv,exact", DERIV_CASES)
 def test_partial_derivatives(deriv, exact):
-    # Full deriv/mixed-partial breadth checked on one family (modal): the
+    # Full deriv/mixed-partial breadth checked on one family (modal). The
     # multi-index distribution and _row_kron combination this exercises is
-    # family-agnostic machinery, and each factor's own derivative
-    # correctness is covered exhaustively in its own test file. See
-    # test_partial_derivative_on_piecewise_factor for a smoke check that the
-    # same machinery works with a factor that has element structure.
+    # family-agnostic machinery; each factor's own derivative correctness is
+    # covered exhaustively elsewhere.
     space = FunctionSpace(TensorBasis((_modal(4), _modal(4))), domain=BOX)
     u = space.project(f_)
     np.testing.assert_allclose(
@@ -301,7 +299,7 @@ def test_stiffness_matrix_matches_laplacian_entry():
 # -- mixed measures / PCE --
 
 
-def test_mixed_measures_with_density_give_moments():
+def test_density_moments():
     # Two independent Gaussians; with density=True the leading coefficient of
     # an orthonormal expansion is the mean and sum(c[1:]**2) the variance.
     basis = TensorBasis(
@@ -457,7 +455,7 @@ def test_quadrature_validation():
         FunctionSpace(basis, domain=BOX, reference_quad_rule=rule)
 
 
-def test_mismatched_weight_rejected_in_one_dimension():
+def test_mismatched_weight_one_dimension():
     # The same check applies to a plain 1-D space: a Legendre basis must
     # reject a Hermite quadrature rule.
     basis = _modal(3)
@@ -469,7 +467,7 @@ def test_mismatched_weight_rejected_in_one_dimension():
         )
 
 
-def test_weightless_basis_imposes_no_weight_constraint():
+def test_weightless_quadrature():
     # A nodal basis reports no measure, so any rule is structurally allowed.
     basis = TensorBasis((_nodal(3), _nodal(3)))
     space = FunctionSpace(
@@ -552,13 +550,13 @@ def test_product_parameters_validation():
         ProductParameters(dims=(1.0,))
 
 
-def test_domain_must_be_product_parameters():
+def test_domain_type():
     basis = TensorBasis((_modal(3), _modal(3)))
     with pytest.raises(TypeError, match="must be a ProductParameters"):
         FunctionSpace(basis, domain=UnitInterval.Parameters(0.0, 1.0))
 
 
-def test_piecewise_rejects_multivariate_element_basis():
+def test_piecewise_requires_univariate_element():
     inner = TensorBasis((_nodal(3), _nodal(3)))
     with pytest.raises(ValueError, match="element_basis must be univariate"):
         PiecewiseBasis(inner, BREAKS, continuity=-1)

@@ -1,8 +1,8 @@
 """Which element owns a point on a breakpoint.
 
 A piecewise basis is two-valued at its interior breakpoints -- always in the
-derivative, and in the value too when discontinuous -- so evaluating exactly
-on one requires deciding which element it belongs to. There are two
+derivative, and in the value too when discontinuous. Evaluating exactly on
+one requires deciding which element it belongs to. There are two
 mechanisms, and the point of these tests is that they are *different*:
 
 - Coordinate-only evaluation has nothing but the point, so it follows the
@@ -97,26 +97,23 @@ def test_stiffness_matrix_uses_recorded_ownership(continuity):
 @pytest.mark.parametrize("rule_name", ["lobatto", "radau_right"])
 def test_basis_matrix_uses_recorded_ownership(continuity, rule_name):
     # `basis_matrix` shares `basis._evaluate_at_nodes` with `mass_matrix`
-    # rather than evaluating the basis by coordinate, so contracting a smooth
-    # (coordinate-resolvable) integrand against it (via its adjoint) must be
-    # exact here too -- the same ownership issue
-    # `test_mass_matrix_uses_recorded_ownership` guards against, exercised
-    # through the promoted quadrature primitives instead. (The
-    # *trial* side -- the integrand's own dependence on x -- has no such
-    # guarantee: it only ever sees coordinates, so a discontinuous basis
-    # evaluated by coordinate can't resolve which copy of a duplicated
-    # breakpoint node it's at. That's not exercised here; `Function.__call__`
-    # resolves it via `side` instead.)
+    # rather than evaluating the basis by coordinate. Contracting a smooth
+    # (coordinate-resolvable) integrand against it (via its adjoint) must
+    # therefore be exact here too, through the promoted quadrature
+    # primitives. (The *trial* side -- the integrand's own dependence on x --
+    # has no such guarantee: it only ever sees coordinates, so a
+    # discontinuous basis evaluated by coordinate can't resolve which copy of
+    # a duplicated breakpoint node it's at. That's not exercised here;
+    # `Function.__call__` resolves it via `side` instead.)
     basis = _basis(continuity)
     space = FunctionSpace(
         basis, DOMAIN, reference_quad_rule=BOUNDARY_NODE_RULES[rule_name]
     )
     exact = FunctionSpace(basis, DOMAIN, reference_quad_rule=REFERENCE)
 
-    # Degree 2, matching `test_mass_matrix_is_exact_whatever_the_rules_nodes`:
-    # every rule in BOUNDARY_NODE_RULES is only guaranteed exact to degree 4,
-    # so f*phi (phi degree <= 2 for the quadratic local basis) must stay at
-    # or below that.
+    # Degree 2: every rule in BOUNDARY_NODE_RULES is only guaranteed exact to
+    # degree 4, so f*phi (phi degree <= 2 for the quadratic local basis) must
+    # stay at or below that.
     def f(x):
         return x**2 - 2 * x
 
@@ -160,12 +157,11 @@ def test_c0_derivative_integrates_exactly():
     )
 
 
-def test_falls_back_to_coordinates_without_recorded_ownership():
-    # A rule with no element structure has no provenance to use; the result
+def test_falls_back_without_ownership():
+    # A rule with no element structure has no provenance to use. The result
     # must still match plain coordinate evaluation. `_evaluate_at_nodes`
-    # expects an already-mapped rule (as `FunctionSpace.quad_rule`
-    # provides), consistent with the `a`/`b` domain kwargs used for the
-    # basis's own remap -- see `FunctionSpace.quad_rule`.
+    # expects an already-mapped rule, consistent with the `a`/`b` domain
+    # kwargs used for the basis's own remap.
     basis = _basis(-1)
     rule = gauss_legendre(8).map_to(A, B)
     assert rule.elements is None
@@ -175,7 +171,7 @@ def test_falls_back_to_coordinates_without_recorded_ownership():
     )
 
 
-def test_tensor_of_piecewise_factors_with_boundary_nodes():
+def test_tensor_piecewise_boundary_nodes():
     basis = TensorBasis((_basis(-1), _basis(-1)))
     domain = ProductParameters(dims=(DOMAIN, DOMAIN))
     lobatto = composite_quad(gauss_lobatto(4), BREAKS)

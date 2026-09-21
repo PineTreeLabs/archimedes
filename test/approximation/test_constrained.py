@@ -119,7 +119,7 @@ def test_projection(legendre8):
 
 def test_conditioning():
     # SVD null-space columns are orthonormal, and the base is already
-    # orthonormal, so the combination should stay perfectly conditioned
+    # orthonormal too. The combination should stay perfectly conditioned,
     # rather than drifting with n like a hand-derived combination would.
     base32 = OrthogonalPolynomialBasis(LegendreMeasure(), 32)
     dirichlet = ConstrainedBasis.dirichlet(base32)

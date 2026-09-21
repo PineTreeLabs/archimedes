@@ -1,3 +1,7 @@
+"""``Function``: evaluation, arithmetic, tracing, and gradients, independent
+of which basis produced it.
+"""
+
 import operator
 
 import numpy as np
@@ -75,7 +79,7 @@ def test_structurally_mismatched_space_raises(quadratic, quad_rule, op):
         op(quadratic, other)
 
 
-def test_add_numerically_mismatched_domain_is_not_caught(quadratic, quad_rule):
+def test_domain_mismatch_not_caught(quadratic, quad_rule):
     # Documented limitation: `_is_compatible_with` compares the domain only
     # structurally, since values are undecidable once traced. Two spaces
     # differing *only* in domain values are therefore accepted -- the caller

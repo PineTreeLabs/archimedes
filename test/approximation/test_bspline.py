@@ -56,10 +56,10 @@ def basis(case):
 
 
 # A two-case witness pair for tests whose branch coverage doesn't depend on
-# knot layout: a clamped/nonuniform case and a repeated-interior-knot case,
-# chosen because together they exercise the two edge-sensitive code paths in
-# `_local_values` -- clamped-boundary indexing, and the multiplicity-
-# stepping loop for a repeated interior knot.
+# knot layout: a clamped/nonuniform case and a repeated-interior-knot case.
+# Together they exercise the two edge-sensitive code paths in
+# `_local_values`: clamped-boundary indexing, and the multiplicity-stepping
+# loop for a repeated interior knot.
 WITNESS_CASES = [CLAMPED_NONUNIFORM, INTERIOR_MAX_MULT]
 WITNESS_CASE_IDS = ["clamped_nonuniform", "interior_max_mult"]
 
@@ -175,8 +175,8 @@ def test_first_derivative_matches_scipy(basis):
 
 @pytest.mark.parametrize("deriv", [2, 3])
 def test_higher_derivatives_match_scipy(witness_basis, deriv):
-    # The witness pair (both degree 3) is enough for deriv=2,3; see
-    # test_first_derivative_matches_scipy for the full-breadth deriv=1 check.
+    # The witness pair (both degree 3) is enough for deriv=2,3; the
+    # deriv=1 case gets the full 6-case breadth check separately.
     basis = witness_basis
     x = _sample_points(basis)
     phi = basis.evaluate(x, deriv=deriv)
@@ -199,9 +199,9 @@ def test_deriv_past_degree(witness_basis):
 
 
 def test_derivative_matches_finite_difference(witness_basis):
-    # An independent oracle alongside test_first_derivative_matches_scipy;
-    # doesn't depend on knot layout, so the witness pair (both degree 3,
-    # where a first derivative always exists) is enough.
+    # An independent finite-difference oracle for the first derivative.
+    # This doesn't depend on knot layout, so the witness pair (both
+    # degree 3, where a first derivative always exists) is enough.
     basis = witness_basis
     a, b = basis.knots[basis.degree], basis.knots[-1 - basis.degree]
     x = np.linspace(a + 0.05 * (b - a), b - 0.05 * (b - a), 25)
@@ -330,8 +330,8 @@ def test_evaluate_expansion_vector_valued(witness_basis):
 
 
 def test_evaluate_expansion_deriv_past_degree(witness_basis):
-    # Same early-return branch as test_deriv_past_degree_is_zero, via
-    # evaluate_expansion.
+    # Exercises the early-return branch through evaluate_expansion, when
+    # the derivative order exceeds the basis degree.
     basis = witness_basis
     x = _sample_points(basis)
     c = np.ones(basis.n_basis)
@@ -651,11 +651,11 @@ def test_gradient_through_traced_coefficients():
 
 # -- TensorBasis composition --
 #
-# Unlike every other family, a BSplineBasis's knots are physical and its
+# Unlike every other family, a BSplineBasis's knots are physical, and its
 # `evaluate` ignores the `a`/`b` domain kwargs `TensorBasis` forwards per
-# dimension (see the class docstring), so each dimension here needs its own
-# BSplineBasis instance already built on its own physical range, rather
-# than one basis reused and remapped across dimensions.
+# dimension (see the class docstring). Each dimension here therefore needs
+# its own BSplineBasis instance already built on its own physical range,
+# rather than one basis reused and remapped across dimensions.
 
 
 def test_tensor_composition_exactness():

@@ -308,10 +308,9 @@ def test_quadrature(space, quad_rule):
         expected_w = expected_w / np.sum(expected_w)
     np.testing.assert_allclose(w, expected_w)
 
-    # space's domain happens to be [-1, 1], the reference domain itself, so
-    # an unmapped override coincides numerically with one mapped onto it --
-    # see test_quadrature_override_on_non_reference_domain for the case
-    # where that's not true.
+    # space's domain happens to be [-1, 1], the reference domain itself. So
+    # an unmapped override coincides numerically with one mapped onto it,
+    # which is not true in general on a non-reference domain.
     coarse = gauss_legendre(6)
     x, w = space.quadrature(quad_rule=coarse)
     np.testing.assert_allclose(x, coarse.nodes)

@@ -95,7 +95,7 @@ class TestDomainMapping:
             (-5.0, -1.0, 3),
         ],
     )
-    def test_exact_on_mapped_domain(self, basis, poly, a, b, deriv):
+    def test_exact(self, basis, poly, a, b, deriv):
         coeffs = np.array([poly[0](a), poly[1](a), poly[0](b), poly[1](b)])
         x = np.linspace(a, b, 11)
         got = basis.evaluate(x, deriv=deriv, a=a, b=b) @ coeffs

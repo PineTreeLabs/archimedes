@@ -127,7 +127,7 @@ def test_derivative_on_mapped_domain():
     np.testing.assert_allclose(dphi, dphi_fd, atol=1e-6)
 
 
-def test_deriv_at_or_past_degree_is_zero():
+def test_deriv_past_degree():
     basis = MonomialBasis(4)
     x = np.linspace(-1, 1, 5)
     for deriv in (4, 5, 8):

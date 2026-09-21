@@ -43,9 +43,8 @@ BREAKS = np.linspace(-1.0, 1.0, 4)
 X = np.linspace(0.07, 1.93, 15)
 
 # `jacobi` is deliberately not part of either fixture below: it exercises
-# the same `OrthogonalPolynomialBasis` code path as `modal`, and what's
-# actually Jacobi-specific (measure/normalization preservation) is checked
-# directly by `test_polynomial_families_keep_their_measure_and_normalization`,
+# the same `OrthogonalPolynomialBasis` code path as `modal`. What's actually
+# Jacobi-specific (measure/normalization preservation) is checked directly,
 # without going through either fixture.
 
 # The "every family really works" anchor -- used only by test_integral_is_exact.
@@ -77,7 +76,7 @@ def f_right(x):
 
 def g_(x):
     # A separate, simpler integrand: with A = 0 the order=2 closed form
-    # (see test_order_two_matches_the_cauchy_repeated_integral) stays simple.
+    # stays simple.
     return x**2
 
 
@@ -138,12 +137,12 @@ def test_order_zero_is_identity():
 # -- boundary semantics --
 
 
-def test_left_boundary_vanishes_at_a(space2):
+def test_antiderivative_left_boundary(space2):
     antideriv = space2.project(f_).antiderivative(boundary="left")
     np.testing.assert_allclose(antideriv(np.array([A]))[0], 0.0, atol=1e-10)
 
 
-def test_right_boundary_vanishes_at_b(space2):
+def test_antiderivative_right_boundary(space2):
     antideriv = space2.project(f_).antiderivative(boundary="right")
     np.testing.assert_allclose(antideriv(np.array([B]))[0], 0.0, atol=1e-10)
     np.testing.assert_allclose(antideriv(X), f_right(X), atol=1e-10)
@@ -183,13 +182,17 @@ def test_integral_matrix_order_zero_is_identity():
     np.testing.assert_allclose(space._integral_matrix(order=0), np.eye(space.n_basis))
 
 
-def test_polynomial_families_keep_their_measure_and_normalization():
-    for measure in (LegendreMeasure(), JacobiMeasure(1.5, 0.5)):
-        basis = OrthogonalPolynomialBasis(measure, 5, density=True)
-        derived = basis._integral_basis()
-        assert derived.measure == measure
-        assert derived.density is True
-        assert derived.n_basis == 6
+@pytest.mark.parametrize(
+    "measure",
+    [LegendreMeasure(), JacobiMeasure(1.5, 0.5)],
+    ids=["legendre", "jacobi"],
+)
+def test_polynomial_families_keep_measure_and_normalization(measure):
+    basis = OrthogonalPolynomialBasis(measure, 5, density=True)
+    derived = basis._integral_basis()
+    assert derived.measure == measure
+    assert derived.density is True
+    assert derived.n_basis == 6
 
 
 def test_integral_basis_construction_does_not_require_finite_domain():
@@ -352,13 +355,17 @@ FOURIER_DOMAIN = UnitInterval.Parameters(a=-1.0, b=1.0)
 XF = np.linspace(-0.93, 0.93, 15)
 
 
-def test_fourier_full_and_cosine_integral_basis_raises():
+@pytest.mark.parametrize(
+    "basis",
+    [FourierBasis(5, kind="full"), FourierBasis(4, kind="cosine")],
+    ids=["full", "cosine"],
+)
+def test_fourier_full_and_cosine_integral_basis_raises(basis):
     # Both contain the constant/DC basis function, whose antiderivative is a
-    # non-periodic linear ramp -- a different reason than Hermite/piecewise
-    # raise for theirs.
-    for basis in (FourierBasis(5, kind="full"), FourierBasis(4, kind="cosine")):
-        with pytest.raises(NotImplementedError, match="linear ramp"):
-            basis._integral_basis()
+    # non-periodic linear ramp. This is a different reason than Hermite and
+    # piecewise raise for theirs.
+    with pytest.raises(NotImplementedError, match="linear ramp"):
+        basis._integral_basis()
 
 
 def test_fourier_sine_integral_basis_grows_by_one():
@@ -387,10 +394,11 @@ def test_fourier_sine_integral_dc_coefficient_is_generically_nonzero():
 
 @pytest.mark.parametrize("boundary", ["left", "right"])
 def test_fourier_sine_integral_matches_analytic_antiderivative(boundary):
-    # F(x) = -cos(pi*x)/pi + C. Since cos(theta(a)) == cos(theta(b)) always
-    # (cos is even and theta(a) = -pi, theta(b) = pi), both boundary choices
-    # pin the same C here -- both are checked to confirm the kwarg is honored
-    # at its own endpoint, not because the results are expected to differ.
+    # F(x) = -cos(pi*x)/pi + C. cos(theta(a)) == cos(theta(b)) always, since
+    # cos is even and theta(a) = -pi, theta(b) = pi. So both boundary choices
+    # pin the same C here. Both are checked anyway, to confirm the kwarg is
+    # honored at its own endpoint, not because the results are expected to
+    # differ.
     space = FunctionSpace(FourierBasis(3, kind="sine"), domain=FOURIER_DOMAIN)
     u = space.project(lambda x: np.sin(np.pi * x))
     antideriv = u.antiderivative(boundary=boundary)
@@ -418,14 +426,18 @@ def test_fourier_sine_integral_traces():
     )
 
 
-def test_unbounded_domain_rejected_for_integral():
-    for space, f in [
+@pytest.mark.parametrize(
+    "space, f",
+    [
         (FunctionSpace.hermite(6), lambda x: np.exp(-(x**2))),
         (FunctionSpace.laguerre(6), lambda x: np.exp(-x)),
-    ]:
-        u = space.project(f)
-        with pytest.raises(ValueError, match="finite endpoints"):
-            u.antiderivative()
+    ],
+    ids=["hermite", "laguerre"],
+)
+def test_unbounded_domain_rejected_for_integral(space, f):
+    u = space.project(f)
+    with pytest.raises(ValueError, match="finite endpoints"):
+        u.antiderivative()
 
 
 def test_order_zero_is_exempt_from_finite_domain_requirement():
@@ -462,9 +474,9 @@ def test_integrate_supports_arbitrary_sub_interval(space2):
 
 def test_integrate_is_unweighted_even_for_measure_weighted_family():
     # Jacobi/Chebyshev's own quadrature is calibrated to their orthogonality
-    # weight, not the plain Lebesgue measure -- `integrate()` must not leak
-    # that in, since "the integral of this function" should mean the
-    # ordinary calculus integral regardless of which family represents it.
+    # weight, not the plain Lebesgue measure. `integrate()` must not leak
+    # that in: "the integral of this function" should mean the ordinary
+    # calculus integral, regardless of which family represents it.
     space = FunctionSpace.chebyshev(8, a=-1.0, b=1.0)
     u = space.project(lambda x: x**2)
     np.testing.assert_allclose(u.integrate(), 2.0 / 3.0, atol=1e-9)
@@ -486,10 +498,10 @@ def test_piecewise_integrate():
 
 
 def test_unbounded_domain_rejected_for_integrate_even_whole_domain():
-    # `.antiderivative()` raises ValueError here, not NotImplementedError, so
-    # `integrate()`'s fallback (which only catches NotImplementedError)
-    # does not swallow it -- there is no well-defined fallback anyway, since
-    # an unweighted integral over an unbounded domain need not converge.
+    # `.antiderivative()` raises ValueError here, not NotImplementedError.
+    # `integrate()`'s fallback (which only catches NotImplementedError) does
+    # not swallow it. There is no well-defined fallback anyway: an unweighted
+    # integral over an unbounded domain need not converge.
     space = FunctionSpace.hermite(6)
     u = space.project(lambda x: np.exp(-(x**2)))
     with pytest.raises(ValueError, match="finite endpoints"):

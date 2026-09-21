@@ -71,9 +71,9 @@ M_COMPONENTS = len(COMPONENTS)
 
 
 # -- projection --
-# (Shape-only checks -- `test_evaluate_shapes`/`test_project_preserves_shape`
-# -- are cut: every exactness test below already implies the shape is right,
-# since a wrong shape would fail the value comparison too.)
+# (Dedicated shape-only checks are cut. Every exactness test below already
+# implies the shape is right, since a wrong shape would fail the value
+# comparison too.)
 
 
 def test_project_vector_is_exact_for_representable_components(space2):
@@ -83,18 +83,18 @@ def test_project_vector_is_exact_for_representable_components(space2):
 
 
 def test_project_vector_matches_per_component_projection(space):
-    """The whole point of the shared-space design: projecting all components
-    at once must give exactly what projecting each one separately gives."""
+    # The whole point of the shared-space design: projecting all components
+    # at once must give exactly what projecting each one separately gives.
     joint = space.project(f_vec).coefficients
     separate = np.stack([space.project(f).coefficients for f in COMPONENTS], axis=-1)
     np.testing.assert_allclose(joint, separate, atol=1e-12)
 
 
 def test_project_vector_respects_quad_rule_override(space):
-    # Same override path as the scalar case; just confirm it's plumbed
-    # through the vector branch too. An override rule is used exactly as
-    # given (no further domain mapping -- see `FunctionSpace.quad_rule`),
-    # so it must already be mapped onto this space's domain.
+    # Same override path as the scalar case. Confirm it is plumbed through
+    # the vector branch too. An override rule is used exactly as given, with
+    # no further domain mapping, so it must already be mapped onto this
+    # space's domain.
     rule = gauss_legendre(12, A, B)
     fn = space.project(f_vec, quad_rule=rule)
     x = np.linspace(A, B, 21)
@@ -102,8 +102,7 @@ def test_project_vector_respects_quad_rule_override(space):
 
 
 def test_project_single_column_is_not_scalar_case(space):
-    """An ``(npts, 1)`` target stays 2-D rather than collapsing to scalar."""
-
+    # An ``(npts, 1)`` target stays 2-D rather than collapsing to scalar.
     def f(x):
         return np.stack([x**2], axis=-1)
 
@@ -123,8 +122,8 @@ def test_derivative_of_vector_function(space2):
 
 
 def test_inner_product_is_scalar_and_contracts(space):
-    """<f, g> = int f . g w dx -- a scalar, equal to the sum of the
-    per-component inner products."""
+    # <f, g> = int f . g w dx -- a scalar, equal to the sum of the
+    # per-component inner products.
     fn = space.project(f_vec)
     gn = space.project(lambda x: f_vec(x) * np.array([2.0, -1.0, 0.5]))
 
@@ -206,8 +205,8 @@ def test_vector_evaluation_traces(space):
 
 
 def test_vector_projection_traces(space):
-    """``project`` unrolls the per-column solves at trace time; check the
-    traced result matches the numeric one."""
+    # ``project`` unrolls the per-column solves at trace time. Check the
+    # traced result matches the numeric one.
     expected = space.project(f_vec).coefficients
 
     @arc.compile
@@ -220,7 +219,7 @@ def test_vector_projection_traces(space):
 
 
 def test_vector_inner_product_traces(space):
-    """Exercises the symbolic contraction inside ``inner_product``."""
+    # Exercises the symbolic contraction inside ``inner_product``.
     fn = space.project(f_vec)
 
     @arc.compile
@@ -232,13 +231,11 @@ def test_vector_inner_product_traces(space):
 
 
 def test_gradient_of_vector_norm(space):
-    """``norm`` is a scalar for vector-valued coefficients, so it can be
-    differentiated -- which would fail outright if it returned an array.
-
-    ``arc.grad`` differentiates with respect to a *vector* argument, so the
-    coefficient matrix is passed flat and reshaped inside the objective;
-    this is also the shape a solver would hand back.
-    """
+    # ``norm`` is a scalar for vector-valued coefficients, so it can be
+    # differentiated. This would fail outright if it returned an array.
+    # ``arc.grad`` differentiates with respect to a *vector* argument, so the
+    # coefficient matrix is passed flat and reshaped inside the objective --
+    # the shape a solver would hand back too.
     fn = space.project(f_vec)
     shape = fn.coefficients.shape
 

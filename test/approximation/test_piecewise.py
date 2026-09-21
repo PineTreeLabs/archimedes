@@ -38,15 +38,15 @@ def hermite():
 
 def test_construction_validation(local, breakpoints):
     with pytest.raises(ValueError):
-        PiecewiseBasis(local, np.array([-1.0, 0.0, 0.5]))
+        PiecewiseBasis(local, np.array([-1.0, 0.0, 0.5]))  # wrong right endpoint
     with pytest.raises(ValueError):
-        PiecewiseBasis(local, np.array([-0.5, 0.0, 1.0]))
+        PiecewiseBasis(local, np.array([-0.5, 0.0, 1.0]))  # wrong left endpoint
     with pytest.raises(ValueError):
-        PiecewiseBasis(local, np.array([-1.0, 0.5, 0.0, 1.0]))
+        PiecewiseBasis(local, np.array([-1.0, 0.5, 0.0, 1.0]))  # not increasing
     with pytest.raises(ValueError):
-        PiecewiseBasis(local, np.array([-1.0]))
+        PiecewiseBasis(local, np.array([-1.0]))  # too few breakpoints
     with pytest.raises(ValueError):
-        PiecewiseBasis(local, breakpoints, continuity=-2)
+        PiecewiseBasis(local, breakpoints, continuity=-2)  # continuity below -1
 
 
 def test_c1_requires_order_one_boundary_dofs(hermite, local, breakpoints):
@@ -117,9 +117,9 @@ def test_boundary_dofs(local, breakpoints):
 
 
 def test_boundary_dofs_agree_with_evaluation(local, breakpoints):
-    # The DOF identified as the boundary must actually be the one whose
-    # coefficient equals the endpoint value: a unit coefficient there and
-    # zero elsewhere should evaluate to 1 at that end and 0 at the other.
+    # The DOF identified as the boundary must be the one whose coefficient
+    # equals the endpoint value. A unit coefficient there and zero
+    # elsewhere must evaluate to 1 at that end and 0 at the other.
     basis = PiecewiseBasis(local, breakpoints, continuity=0)
     left, right = basis.boundary_dofs()
 
@@ -332,10 +332,8 @@ class TestC1Continuity:
 
     def test_project_and_reconstruct_derivatives(self, hermite):
         # End-to-end: project a smooth function onto a C1 Hermite space on a
-        # non-uniform mesh and physical domain, then check that evaluating
-        # deriv=0..3 (not just deriv=0) reconstructs a sane, finite field --
-        # this is the direct FunctionSpace/Function-level analogue of the
-        # fused-vs-dense check above.
+        # non-uniform mesh and physical domain. Check that evaluating
+        # deriv=0..3 (not just deriv=0) reconstructs a sane, finite field.
         a, b = -2.0, 6.0
         basis = PiecewiseBasis(hermite, self.BP, continuity=1)
         space = FunctionSpace(
@@ -358,14 +356,16 @@ class TestC1Continuity:
 
 class TestModalDiscontinuous:
     """A modal (`OrthogonalPolynomialBasis`) element under `continuity=-1`,
-    the one continuity level a modal basis supports (see
-    `test_c0_requires_element_basis_with_boundary_dofs`). Unlike a nodal or
-    Hermite element, its `evaluate` normalizes by `measure.mass(a, b)`
-    (`Basis._reference_scale_exponent`), so the fused fast path must forward
-    each element's own physical domain to the shared per-element basis
-    rather than the reference interval. A single element spanning the whole
-    physical domain can't distinguish the two, so this needs a mesh with
-    more than one element."""
+    the one continuity level a modal basis supports. A modal basis has no
+    boundary DOFs to merge across elements, so higher continuity is
+    rejected.
+
+    Unlike a nodal or Hermite element, its `evaluate` normalizes by
+    `measure.mass(a, b)` (`Basis._reference_scale_exponent`). The fused fast
+    path must therefore forward each element's own physical domain to the
+    shared per-element basis rather than the reference interval. A single
+    element spanning the whole physical domain can't distinguish the two,
+    so the tests below use a mesh with more than one element."""
 
     BP = np.array([-1.0, -0.3, 0.4, 1.0])  # deliberately uneven, 3 elements
 
@@ -414,9 +414,8 @@ class TestModalDiscontinuous:
     def test_project_and_reconstruct(self, modal):
         # End-to-end via the public `FunctionSpace.piecewise` API: project a
         # polynomial (exactly representable per element) onto a
-        # multi-element discontinuous Legendre space and check it
-        # round-trips. The Function-level analogue of the fused-vs-dense
-        # check above.
+        # multi-element discontinuous Legendre space. Check that it
+        # round-trips.
         a, b = 0.0, 2 * np.pi
         space = FunctionSpace.piecewise(
             "legendre", 3, np.linspace(a, b, 9), continuity=-1
@@ -642,9 +641,7 @@ class TestPerElementOrder:
                 (self._lobatto(3), modal, self._lobatto(4)), self.BP, continuity=-1
             )
 
-    def test_default_quadrature_matches_per_element_composite_quad(
-        self, basis, element_bases
-    ):
+    def test_default_quadrature_matches_composite_quad(self, basis, element_bases):
         rule = basis.default_quadrature()
         expected = composite_quad(
             [b.default_quadrature() for b in element_bases], self.BP

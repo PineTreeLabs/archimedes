@@ -1,3 +1,7 @@
+"""``OrthogonalPolynomialBasis``: values, derivatives, and orthonormality
+against the measure each polynomial family is built on.
+"""
+
 # ruff: noqa: N806  (M is the conventional name for a Gram matrix)
 import numpy as np
 import pytest
