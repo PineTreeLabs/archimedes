@@ -63,7 +63,7 @@ Follow [`numpydoc`](https://numpydoc.readthedocs.io/en/latest/format.html) conve
 
 * Section order: short summary, deprecation warning (if any), extended summary, `Parameters`, `Returns`, `Yields`/`Receives`, `Other Parameters`, `Raises`, `Warns`, `Warnings`, `See Also`, `Notes`, `References`, `Examples`.
 * Triple double-quotes; wrap prose at roughly 75 characters.
-* The one-line summary uses **imperative, present-tense mood**: "Compute the norm," not "Computes the norm" or "This will compute...".
+* The one-line summary uses **imperative, present-tense mood**: "Compute the norm," not "Computes the norm" or "This will compute...". Exception: a noun-phrase summary is acceptable for a simple accessor/property-style method that just returns a described quantity.
 * `Parameters`/`Returns`/`Attributes` entries are noun-phrase fragments (`x : array_like` / `Input array.`), not full sentences or active-voice commands.
 * Minimize LaTeX; prefer plain Python pseudocode where an equation isn't essential.
 * Terminology: "indices" (not "indexes"), "matrices" (not "matrixes").
@@ -101,6 +101,35 @@ Borrowed from the aerospace [ASD-STE100 Simplified Technical English](https://ww
   | straightforwardly | directly |
 
 * **Consistent terminology**: pick one name per concept and use it everywhere.
+
+## Testing
+
+Archimedes tests are `pytest`-style: prefer a plain `assert` over an `assertEqual`-style helper.
+
+The file docstrings and comments should follow the "documentation" style guidelines above.
+Avoid cross-references between test files or test names in comments, since these can be brittle and hard to maintain.
+
+For examples of the style, see `test/core/test_array_ops.py`, `test/core/test_broadcasting.py` (covering low-level operations), and `test/optimize/test_minimize.py` (covering more complex high-level functions).
+
+### Test granularity
+
+Write one test function per *behavior*, not per *assertion*. A test's arrange-and-act can be followed by every assertion that's a direct consequence of it. For example shape, dtype, value, and a symbolic-vs-numeric equality check on one result are one fact ("the operation is correct"). Group closely related scenarios (varying only the input) into one test with a short comment marking each block, rather than one narrowly-scoped test per scenario.
+
+Use `@pytest.mark.parametrize` when only the data changes. Give a scenario its own test function when it has a different arrange-and-act, or needs to be named differently for documentation value.
+
+### Naming
+
+Name a test after the unit of behavior it covers (`test_solve`, `test_broadcasting_binary_op`). A test name should not be be a full sentence (fragment) describing the assertion. Prefer a short noun phrase (e.g. `test_conditioning`) over sentences (e.g. `test_matrix_is_well_conditioned`).
+A useful rule is avoiding articles (`a`/`an`/`the`) in the test name.
+There is no character limit on test names; instead, a useful test for each word is whether removing it could actually cause confusion with a similar sibling test.
+
+Inside a class, test names should not repeat the class name.
+
+Keep an error-path check in the same test as the success path it belongs to (`test_solve`'s trailing `# Error handling` block) unless the error path needs its own setup, in which case a separate `test_<name>_rejects_<condition>` function is fine.
+
+### Grouping into classes
+
+Use a `class Test...:` when its methods share some infrastructure (scoped fixture, helper method, etc.). When tests only share a topic, not setup, prefer flat functions under a `# -- topic --` comment banner.
 
 ## Security
 

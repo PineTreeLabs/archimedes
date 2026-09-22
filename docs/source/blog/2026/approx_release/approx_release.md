@@ -13,7 +13,7 @@ kernelspec:
 
 **_Two new modules, endless fun_**
 
-Jared Callaham • 1 Sep 2026
+Jared Callaham • 21 Sep 2026
 
 ---
 
@@ -38,7 +38,19 @@ $$
 f(x) \approx \sum_{i=1}^n c_i \phi_i(x).
 $$
 
-These two are nicely complementary; `quadrature` provides the numerical integration used to define inner products between function spaces in `approximation`, while `approximation` implements (among other things) the orthogonal polynomial families that Gaussian quadrature is built around.
+Currently supported basis families include:
+
+- [Orthogonal polynomials](#archimedes.approximation.OrthogonalPolynomialBasis), including Legendre, Laguerre, Jacobi, Chebyshev, Hermite, and custom measures.
+- [Cubic Hermite polynomials](#archimedes.approximation.CubicHermiteBasis)
+- [Fourier series expansions](#archimedes.approximation.FourierBasis)
+- [Lagrange polynomials](#archimedes.approximation.LagrangeBasis)
+- [Monomials](#archimedes.approximation.MonomialBasis)
+- [B-splines](#archimedes.approximation.BSplineBasis)
+- Piecewise tiling of (most of) the above families (i.e. finite or spectral elements)
+- Tensor bases for multivariate functions, supporting arbitrary combinations of the above per dimension
+- Custom bases constructed by constraining or concatenating other bases (e.g. bubble + vertex functions)
+
+These two modules are nicely complementary; `quadrature` provides the numerical integration used to define inner products between function spaces in `approximation`, while `approximation` implements (among other things) the orthogonal polynomial families that Gaussian quadrature is built around.
 
 Those two lines of math are much richer than they might appear, especially in terms of their potential applications.
 To get a sense of this, the rest of the post will walk through a few minimal examples covering PDE solving, trajectory optimization, system identification, and uncertainty quantification - all of which build on the same quadrature and function approximation infrastructure.
@@ -441,7 +453,7 @@ Similar recipes can be used for Hermite-Simpson trajectory optimization, $hp$-ad
 
 Eventually the plan is for Archimedes to provide some built-in functionality so you can just pass objective and constraint functions without hand-rolling the discretization, but for now the core quadrature and interpolation/differentiation machinery is there for you to write custom algorithms.
 
-And of course, this is all compatible with the [codegen system](../../tutorials/codegen/codegen00.md), so you can either deploy the optimized state/control functions and interpolate them online in a feedforward/feedback scheme, or re-solve the optimal control problem online for a model-predictive control scheme. (Although note that CasADi only supports codegen for certain NLP solvers: SQP but not IPOPT).
+And of course, this is all compatible with the [codegen system](../../../tutorials/codegen/codegen00.md), so you can either deploy the optimized state/control functions and interpolate them online in a feedforward/feedback scheme, or re-solve the optimal control problem online for a model-predictive control scheme. (Although note that CasADi only supports codegen for certain NLP solvers: SQP but not IPOPT).
 
 ### System identification
 
@@ -734,7 +746,7 @@ $$
 Higher moments can also be evaluated as needed, although the formulas are not as simple.
 
 In any case, `approximation` and `quadrature` make PCE almost trivial to implement.
-Let's take a simple example with a closed-form solution introduced by the the landmark [Xiu & Karniadakis (2002) paper](https://epubs.siam.org/doi/10.1137/S1064827501387826) that introduced the Wiener-Askey version of PCE that's dominant today.
+Let's take a simple example with a closed-form solution introduced by the landmark [Xiu & Karniadakis (2002) paper](https://epubs.siam.org/doi/10.1137/S1064827501387826) that introduced the Wiener-Askey version of PCE that's dominant today.
 
 The problem is a scalar linear ODE $\dot{y} = -k y$, with initial condition $y(0) = 1$ and an uncertain rate constant $k \sim \mathcal{N}(\mu_k, \sigma_k^2)$.
 The analytic solution at a fixed time $t_f$ is
@@ -818,21 +830,21 @@ orders = np.arange(9)
 pce_mean_err = np.zeros_like(orders, dtype=float)
 
 for p in orders:
-    fn_space = FunctionSpace.hermite(n_basis=p + 1, loc=k_mean, scale=k_std, density=True)
-    f_decay_pce = fn_space.project(f_decay)
+    V = FunctionSpace.hermite(n_basis=p + 1, loc=mu_k, scale=sigma_k, density=True)
+    f_decay_pce = V.project(f_decay)
     c = f_decay_pce.coefficients
 
-    pce_mean_err[p] = abs(c[0] - mu_k_ex)
+    pce_mean_err[p] = abs(c[0] - mu_y_ex)
 
 
 # Monte Carlo statistics
 rng = np.random.default_rng(0)
 n_samples_max = 1_000_000
-k_samples = rng.normal(k_mean, k_std, n_samples_max)
+k_samples = rng.normal(mu_k, sigma_k, n_samples_max)
 y_samples = f_decay(k_samples)
 
 n_conv = np.logspace(1, 6, num=13, dtype=int)
-mc_mean_err = np.array([abs(np.mean(y_samples[:n]) - mu_k_ex) for n in n_conv])
+mc_mean_err = np.array([abs(np.mean(y_samples[:n]) - mu_y_ex) for n in n_conv])
 
 # Compare convergence rates
 fig, ax = plt.subplots(1, 1, figsize=(7, 3))
@@ -905,7 +917,7 @@ If you do build something cool with this (and it's not sensitive or proprietary)
 ## Read On
 
 There's a lot of math and code that is barely covered here.
-For more background on what the new modules do and why, check out the "handbook" pages [quadrature](../../../handbook/quadrature.md) and [function approximation](../../../handbook/approximation.md).
+For more background on what the new modules do and why, check out the "handbook" pages on [quadrature](../../../handbook/quadrature.md) and [function approximation](../../../handbook/approximation.md).
 
 For more on system identification and how it works in Archimedes, start with the [parameter estimation tutorial](../../../tutorials/sysid/parameter-estimation.md) and [Li-ion battery modeling blog post](../battery_sysid/battery_sysid.md).
 
