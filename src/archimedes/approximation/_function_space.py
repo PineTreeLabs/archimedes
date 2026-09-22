@@ -47,12 +47,9 @@ def _normalize_breakpoints(breakpoints) -> tuple[float, float, np.ndarray]:
     ref)``, ``ref`` being the same partition on the reference domain
     ``[-1, 1]`` that :class:`PiecewiseBasis` itself expects.
 
-    ``a``/``b`` are read directly from the array's own endpoints -- the
-    caller never states them separately, so there is no second coordinate
-    system to keep in sync by hand. Validates ``breakpoints`` itself, then
-    defers the affine map (and its endpoint pinning) to
-    ``_reference_breakpoints``, shared with
-    :attr:`BSplineBasis.required_breakpoints`.
+    ``a``/``b`` are read directly from the array's own endpoints. Validates
+    ``breakpoints``, then defers the affine map (and its endpoint pinning) to
+    ``_reference_breakpoints``, shared with :attr:`BSplineBasis.required_breakpoints`.
     """
     bp = np.asarray(breakpoints, dtype=float)
     if bp.ndim != 1 or len(bp) < 2:
@@ -75,14 +72,11 @@ _NODE_FAMILIES = {
 
 
 def _resolve_lagrange_element(n_basis: int, nodes) -> LagrangeBasis:
-    """One :class:`LagrangeBasis` element with ``n_basis`` nodes for
-    :meth:`FunctionSpace.piecewise`'s ``nodes`` argument -- a node-family
-    name, an explicit callable/array, or (``None``) the family default.
+    """One :class:`LagrangeBasis` element with ``n_basis`` nodes
 
-    Dispatches on ``type(nodes)`` rather than comparing ``nodes`` against
-    each family name with ``==`` directly: once an array-like reaches this
-    function, ``array == "lobatto"`` is itself an elementwise comparison
-    (not a clean ``False``), so a string check must run first.
+    Used for the :meth:`FunctionSpace.piecewise` constructor. `nodes` can be
+    a node-family name, an explicit callable/array, or (``None``) for the
+    family default.
     """
     if nodes is None:
         return LagrangeBasis.gauss_lobatto(n_basis)
@@ -105,12 +99,13 @@ def _resolve_lagrange_element(n_basis: int, nodes) -> LagrangeBasis:
 
 
 def _resolve_element_basis(kind: str, degree, nodes) -> Basis | tuple[Basis, ...]:
-    """The (possibly per-element) local ``Basis`` for
+    """Resolve the local basis for a piecewise function space.
+
+    Computes the (possibly per-element) local ``Basis`` for
     :meth:`FunctionSpace.piecewise`'s ``kind``/``degree``/``nodes``.
 
     Returns a single ``Basis`` for a scalar ``degree`` (the common, uniform
-    case -- letting :class:`PiecewiseBasis` tile it, which also keeps its
-    ``_uniform`` fast path), or a tuple for a per-element ``degree`` tuple.
+    case), or a tuple for a per-element ``degree`` tuple.
     """
     degrees = degree if isinstance(degree, tuple) else (degree,)
     if kind == "legendre":
@@ -143,23 +138,13 @@ def _resolve_element_basis(kind: str, degree, nodes) -> Basis | tuple[Basis, ...
 def _orthogonal_space(
     cls, measure, n_basis: int, domain, density: bool, quad_rule
 ) -> FunctionSpace:
-    """Shared body for the ``OrthogonalPolynomialBasis``-backed classmethod
-    constructors (:meth:`FunctionSpace.legendre`, ``.chebyshev``, ``.jacobi``,
-    ``.hermite``, ``.laguerre``): only the measure and the domain-parameter
-    type differ between them.
-    """
+    """Shared body for the orthogonal polynomial constructors"""
     basis = OrthogonalPolynomialBasis(measure, n_basis, density=density)
     return cls(basis, domain, reference_quad_rule=quad_rule)
 
 
 def _is_superset(have: np.ndarray, required: np.ndarray, tol: float = 1e-12) -> bool:
-    """Whether every point of ``required`` appears in ``have``.
-
-    A superset, not equality: refining an element is harmless, since each
-    sub-element still lies inside one element of the basis. Conversely a
-    finer rule that is *not* aligned is still wrong, so comparing node
-    counts would prove nothing.
-    """
+    """Whether every point of ``required`` appears in ``have``"""
     return bool(np.all([np.any(np.abs(have - point) <= tol) for point in required]))
 
 
@@ -167,42 +152,36 @@ def _is_superset(have: np.ndarray, required: np.ndarray, tol: float = 1e-12) -> 
 class FunctionSpace:
     """The linear span of a :class:`Basis` on a fixed target domain.
 
-    Pairs a ``Basis`` (family + size) with a target domain and a "natural"
-    quadrature rule, and provides the operations that act on the *space*
-    rather than on any one element of it: evaluation, (Galerkin) projection,
-    and the quadrature nodes/weights lower-level assembly is built from.
+    Combines a ``Basis`` (family + size) with a target domain and a "natural"
+    quadrature rule, and provides the operations that act on the space, e.g.
+    evaluation, (Galerkin) projection, and quadrature nodes/weights.
 
     See :class:`Function` for a specific element of the space (a
     coefficient vector).
 
-    ``FunctionSpace`` is a ``@struct`` rather than a plain dataclass so that
-    ``domain`` is a pytree leaf: the domain parameters can be symbolically traced,
-    and so optimized over (moving the endpoints of an element, say) jointly
-    with a ``Function``'s coefficients. ``basis`` and the resolved
-    quadrature rule are static -- they carry structure, not numbers.
+    ``FunctionSpace`` is a :func:`~archimedes.struct` so that the domain
+    parameters can be symbolically traced and solved/optimized over jointly
+    with the coefficients of a ``Function``. The ``basis`` and default quadrature
+    rule are static and do not carry symbolic information.
 
     Parameters
     ----------
     basis : Basis
         Basis family and size. Static.
-    domain : basis.Parameters
-        Target-domain parameters, validated and typed per ``basis`` -- an
-        instance of ``basis.Parameters`` (e.g.
-        ``UnitInterval.Parameters(a=..., b=...)`` for a basis on an
-        interval, ``RealLine.Parameters(loc=..., scale=...)`` for a
-        Hermite-derived one). A pytree leaf, so it may be traced.
+    domain : Basis.Parameters
+        Target-domain parameters. An instance of ``basis.Parameters``, for example:
+            - ``UnitInterval.Parameters(a=..., b=...)`` for a basis on an interval
+            - ``RealLine.Parameters(loc=..., scale=...)`` for the entire real line
+
     reference_quad_rule : Quadrature | None, optional
-        The space's natural quadrature rule, given **on the basis's
-        reference domain**. Used unconditionally wherever the required accuracy is fully
-        determined by ``basis``, and as the default for ``project``. Every
-        classmethod constructor (:meth:`legendre`, :meth:`piecewise`, ...)
-        exposes this same argument under the friendlier name ``quad_rule``.
+        The space's natural quadrature rule, defined on the basis's **reference**
+        domain. Used unconditionally wherever the required accuracy is fully determined
+        by :attr:`basis` and as the default for :meth:`project`. Defaults to
+        ``basis.default_quadrature()``, which is exact by construction for that basis.
 
-        Defaults to ``basis.default_quadrature()``, which is exact for
-        those integrands by construction.
-
-        Read back via the :attr:`quad_rule` *property* instead, which maps
-        this onto ``domain`` first.
+        Should typically be accessed via the :attr:`quad_rule` property, which maps
+        from the reference domain (e.g. :math:`[0, 1]`) onto the actual ``domain``
+        parameters.
     """
 
     basis: Basis = tree.field(static=True)
@@ -227,12 +206,10 @@ class FunctionSpace:
     def quad_rule(self) -> Quadrature:
         """The space's quadrature rule mapped onto its ``domain``.
 
-        The domain mapping is recomputed on every access, since ``domain``
-        may be a traced/symbolic value for variable-endpoint problems.
-
         This property does not apply density-normalization, regardless
         of whether the space has ``density=True``. Call :meth:`quadrature`
-        to get optionally normalized quadrature weights and points.
+        to get optionally normalized quadrature weights and points, e.g. when
+        working with probability densities.
         """
         return self.reference_quad_rule.map_to(**self._domain_kwargs())
 
@@ -308,7 +285,9 @@ class FunctionSpace:
         density: bool = False,
         quad_rule: Quadrature | None = None,
     ) -> FunctionSpace:
-        """Global Legendre polynomial space on ``[a, b]``.
+        """Global Legendre polynomial space on ``[a, b]``; see
+        :class:`~archimedes.measure.LegendreMeasure` for the defining
+        weight and recurrence.
 
         Parameters
         ----------
@@ -317,8 +296,8 @@ class FunctionSpace:
         a, b : float, optional
             Bounds of the target interval. Default ``-1``, ``1``.
         density : bool, optional
-            Normalize against the probability density rather than the raw
-            weight; see :attr:`Basis.density`. Default ``False``.
+            Normalize against the probability density; see :attr:`Basis.density`.
+            Default ``False``.
         quad_rule : QuadratureRule, optional
             Forwarded to the underlying ``FunctionSpace`` constructor.
 
@@ -347,11 +326,26 @@ class FunctionSpace:
     ) -> FunctionSpace:
         r"""Global Chebyshev polynomial space on ``[a, b]``.
 
-        Chebyshev polynomials are the special case of
-        :class:`~archimedes.measure.JacobiMeasure` with
-        :math:`\alpha = \beta = -1/2` (first kind, the default) or
-        :math:`\alpha = \beta = 1/2` (``second_kind=True``); see
-        :class:`~archimedes.measure.JacobiMeasure`.
+        Chebyshev polynomials of the first kind satisfy
+
+        .. math::
+
+            T_n(x) = \cos(n \cos^{-1} x)
+
+        and are orthogonal on :math:`[-1, 1]` with respect to the weight
+        :math:`(1 - x^2)^{-1/2}`.
+
+        Chebyshev polynomials of the second kind satisfy
+
+        .. math::
+
+            U_n(x) = \sin((n+1) \cos^{-1} x) / \sin(\cos^{-1} x)
+
+        and are orthogonal with respect to :math:`(1 - x^2)^{1/2}`.
+
+        Both are special cases of :class:`~archimedes.measure.JacobiMeasure`,
+        with :math:`\alpha = \beta = -1/2` and :math:`\alpha = \beta = 1/2`,
+        respectively.
 
         Parameters
         ----------
@@ -360,8 +354,7 @@ class FunctionSpace:
         a, b : float, optional
             Bounds of the target interval. Default ``-1``, ``1``.
         second_kind : bool, optional
-            Use the second-kind convention (:math:`\alpha = \beta = 1/2`)
-            instead of the first-kind default. Default ``False``.
+            Construct second-kind Chebyshev polynomials. Default ``False``.
         density : bool, optional
             Normalize against the probability density rather than the raw
             weight; see :attr:`Basis.density`. Default ``False``.
@@ -393,8 +386,12 @@ class FunctionSpace:
         density: bool = False,
         quad_rule: Quadrature | None = None,
     ) -> FunctionSpace:
-        """Global Jacobi polynomial space on ``[a, b]``; see
-        :class:`~archimedes.measure.JacobiMeasure` for ``alpha``/``beta``.
+        r"""Global Jacobi polynomial space on ``[a, b]``.
+
+        Defined on an interval :math:`[a, b]` with weight function
+        :math:`(1 - x)^\alpha (1 + x)^\beta`. See
+        :class:`~archimedes.measure.JacobiMeasure` for details and
+        restrictions on ``alpha``/``beta``.
 
         Parameters
         ----------
@@ -438,23 +435,23 @@ class FunctionSpace:
 
         ``kind`` selects which classical Hermite convention:
 
-        - ``"prob"`` (default): the *probabilists'* convention, reference
+        - ``"prob"`` (default): the probabilists' convention, reference
           weight :math:`e^{-x^2/2}`
           (:class:`~archimedes.measure.ProbabilistsHermiteMeasure`), the
-          *un-normalized* standard normal density.
-        - ``"phys"``: the *physicists'* convention, reference weight
+          un-normalized standard normal density.
+        - ``"phys"``: the physicists' convention, reference weight
           :math:`e^{-x^2}` (:class:`~archimedes.measure.PhysicistsHermiteMeasure`).
 
         Neither weight integrates to 1 on its own for either ``kind``; for normalized
         (e.g. probability density models, polynomial chaos expansions), set
-        ``density=True`` to normalize for either convention.
+        ``density=True``.
 
         Parameters
         ----------
         n_basis : int
             Number of basis functions.
         loc, scale : float, optional
-            Location/scale of the target domain; see
+            Location/scale of the Hermite weight function; see
             :class:`~archimedes.measure.RealLine`. Default ``0``, ``1``.
         kind : {"phys", "prob"}, optional
             Classical Hermite convention, as above. Default ``"prob"``.
@@ -501,14 +498,12 @@ class FunctionSpace:
         Parameters
         ----------
         n_basis : int
-            Number of basis functions; see :class:`FourierBasis` for the
-            ``kind``-dependent convention (``kind="full"`` requires an odd
-            value).
+            Number of basis functions; see :class:`FourierBasis`. ``kind="full"``
+            requires an odd value.
         a, b : float, optional
             Bounds of the target period. Default ``-1``, ``1``.
         kind : {"full", "cosine", "sine"}, optional
-            Which trigonometric family; see :class:`FourierBasis`. Default
-            ``"full"``.
+            Which trigonometric family. Default ``"full"``.
         density : bool, optional
             Normalize against the probability density rather than the raw
             weight; see :attr:`Basis.density`. Default ``False``.
@@ -519,8 +514,7 @@ class FunctionSpace:
         ------
         ValueError
             If ``kind`` is not ``"full"``, ``"cosine"``, or ``"sine"``, or
-            if ``n_basis`` is invalid for the chosen ``kind`` (see
-            :class:`FourierBasis`).
+            if ``n_basis`` is invalid for the chosen ``kind``.
         """
         basis = FourierBasis(n_basis, kind=kind, density=density)
         return cls(
@@ -537,15 +531,12 @@ class FunctionSpace:
     ) -> FunctionSpace:
         """Global monomial (power series) space on ``[a, b]``.
 
-        See :class:`MonomialBasis` for the reference-mapping convention
-        and conditioning; prefer :meth:`legendre`/:meth:`chebyshev` for
-        higher degree or numerically sensitive work.
+        See :class:`MonomialBasis` for details.
 
         Parameters
         ----------
         n_basis : int
-            Number of basis functions (monomial degrees ``0`` through
-            ``n_basis - 1``).
+            Number of basis functions (degrees ``0`` through ``n_basis - 1``).
         a, b : float, optional
             Bounds of the target interval. Default ``-1``, ``1``.
         quad_rule : QuadratureRule, optional
@@ -565,18 +556,19 @@ class FunctionSpace:
         density: bool = False,
         quad_rule: Quadrature | None = None,
     ) -> FunctionSpace:
-        """Global Laguerre polynomial space on ``[start, inf)``; see
-        :class:`~archimedes.measure.LaguerreMeasure`.
+        """Global Laguerre polynomial space on ``[start, inf)``.
+        
+        See :class:`~archimedes.measure.LaguerreMeasure` for details.
 
         Parameters
         ----------
         n_basis : int
             Number of basis functions.
         rate : float, optional
-            Rate parameter of the target domain; see
+            Rate parameter for the exponential weight function; see
             :class:`~archimedes.measure.HalfLine`. Default ``1``.
         start : float, optional
-            Left endpoint of the target domain; see
+            Left endpoint of the exponential weight function; see
             :class:`~archimedes.measure.HalfLine`. Default ``0``.
         density : bool, optional
             Normalize against the probability density rather than the raw
@@ -608,15 +600,16 @@ class FunctionSpace:
         continuity: int = 0,
         quad_rule: Quadrature | None = None,
     ) -> FunctionSpace:
-        """A piecewise ``FunctionSpace``: a local basis tiled across
-        ``breakpoints``, on the domain those breakpoints themselves span.
+        """A piecewise function space created by tiling a local basis.
 
-        Convenience constructor for a :class:`PiecewiseBasis` for the common
-        cases listed below. For anything else (a heterogeneous per-element family, a
-        symbolic/traced domain independent of the mesh, an explicit
-        reference-domain ``quad_rule``), build a ``PiecewiseBasis`` directly
-        and pass it to the general ``FunctionSpace(basis, domain)``
-        constructor.
+        Constructs a ``FunctionSpace`` by tiling a local basis across
+        ``breakpoints``. The domain of the function space is determined by
+        the range ``[breakpoints[0], breakpoints[-1]]``.
+
+        This method is a convenience constructor for a :class:`PiecewiseBasis`
+        for some common cases. For more fine-grained control, construct a
+        ``PiecewiseBasis`` directly and pass it to the general
+        ``FunctionSpace(basis, domain)`` constructor.
 
         Parameters
         ----------
@@ -629,25 +622,18 @@ class FunctionSpace:
               on :class:`~archimedes.measure.LegendreMeasure`), which has
               no boundary degrees of freedom and so only supports
               ``continuity=-1``.
-            - ``"hermite"`` is :class:`CubicHermiteBasis`: value *and*
-              slope degrees of freedom at each end, fixed at ``degree=3``
-              (a cubic). Needed for ``continuity=1`` (:math:`C^1`); also
-              buildable at ``continuity=0`` or ``-1``, merging (or not)
-              only the value DOF.
+            - ``"hermite"`` is piecewise cubic, with value and slope degrees
+              of freedom at each end, requiring ``degree=3``. This is the only
+              option that supports ``continuity=1`` (:math:`C^1`), though also
+              supports ``continuity=0`` or ``-1``.
 
         degree : int or tuple of int
-            Polynomial degree of each element (one less than its number of
-            local degrees of freedom). A bare ``int`` is shared by every
-            element; a tuple gives one degree per element (p-refinement)
-            and must have one entry per element. Fixed at ``3`` for
-            ``kind="hermite"``.
+            Polynomial degree of each element. An ``int`` is shared by every
+            element; a tuple gives one degree per element and must length match
+            the number of elements. Must be ``3`` for ``kind="hermite"``.
         breakpoints : array_like
-            Element boundaries **on the physical (target) domain**, shape
-            ``(n_elements + 1,)``, strictly increasing. Unlike
-            ``PiecewiseBasis.breakpoints`` (which lives on the reference
-            domain ``[-1, 1]``), this spans the whole target domain --
-            ``breakpoints[0]``/``breakpoints[-1]`` *are* ``a``/``b``, read
-            directly from the array rather than given separately.
+            Element boundaries on the physical (not reference) domain, shape
+            ``(n_elements + 1,)``, strictly increasing.
         nodes : str, callable, or array_like, optional
             Node placement for a ``kind="lagrange"`` element, one of:
 
@@ -657,13 +643,12 @@ class FunctionSpace:
                 - An explicit array of reference nodes.
 
             Default (``None``) is Gauss-Lobatto, which keeps ``continuity=0``,
-            since Lobatto includes both endpoints. Meaningless (and rejected)
-            for non-Lagrange bases.
+            since Lobatto includes both endpoints. Meaningless for
+            non-Lagrange bases.
         continuity : int, optional
             ``0`` (the default) for value-continuity (:math:`C^0`), ``-1``
-            for a discontinuous (broken) basis. Forwarded to
-            :class:`PiecewiseBasis` unchanged; see there for what each
-            value requires of the element basis.
+            for a discontinuous basis. ``kind="hermite"`` additionally supports
+            ``continuity=1`` (:math:`C^1`).
         quad_rule : QuadratureRule, optional
             Forwarded to the underlying ``FunctionSpace`` constructor.
             Default ``basis.default_quadrature()``.
@@ -694,8 +679,7 @@ class FunctionSpace:
         *,
         quad_rule: Quadrature | None = None,
     ) -> FunctionSpace:
-        """A B-spline ``FunctionSpace`` on a general, explicit knot vector.
-
+        """A B-spline function space built from a general, explicit knot vector.
 
         Constructs a :class:`BSplineBasis` with ``domain`` derived automatically
         from ``knots``. For the common case of a clamped knot vector built from
@@ -731,27 +715,24 @@ class FunctionSpace:
         *,
         quad_rule: Quadrature | None = None,
     ) -> FunctionSpace:
-        """A B-spline ``FunctionSpace`` with a *clamped* knot vector built
-        from physical element boundaries.
+        """A B-spline space with a clamped knot vector built from element boundaries.
 
-        Builds a knot vector with multiplicity ``degree + 1`` at both ends
-        (so the first/last coefficients are exactly the endpoint values,
-        like a Bezier curve's) and simple interior knots at each breakpoint (the
-        smoothest possible interior continuity, :math:`C^{degree - 1}`).
-        Building a clamped knot vector this way is the common case. For
-        anything else (an open/non-clamped knot vector, non-simple interior
-        multiplicity, ...), call :meth:`bspline` directly with an explicit
-        knot vector.
+        The domain of the function space is determined by the range
+        ``[breakpoints[0], breakpoints[-1]]``.
+
+        Builds a knot vector with multiplicity ``degree + 1`` at both ends, so the
+        first/last coefficients are the endpoint values. Interior knots are simple,
+        preserving smoothest possible continuity (:math:`C^{degree - 1}`).
+
+        Use :meth:`bspline` with an explicit knot vector for more fine-grained control.
 
         Parameters
         ----------
         degree : int
             Polynomial degree of each piece.
         breakpoints : array_like
-            Element boundaries **on the physical (target) domain**, shape
+            Element boundaries on the physical (target) domain, shape
             ``(n_elements + 1,)``, strictly increasing.
-            ``breakpoints[0]``/``breakpoints[-1]`` become the two
-            ``degree + 1``-times-repeated end knots.
         quad_rule : QuadratureRule, optional
             Forwarded to the underlying ``FunctionSpace`` constructor.
             Default ``basis.default_quadrature()``.
@@ -776,14 +757,16 @@ class FunctionSpace:
     ) -> FunctionSpace:
         """The tensor-product space of independent univariate ``spaces``.
 
+        Constructs a :class:`TensorBasis` from the given univariate spaces.
+
         Parameters
         ----------
         *spaces : FunctionSpace
             One univariate space per dimension, in order.
         quad_rule : QuadratureRule, optional
             Forwarded to the underlying ``FunctionSpace`` constructor.
-            Default is the tensor product of the factors' own default
-            rules; see :meth:`TensorBasis.default_quadrature`.
+            Default is the tensor product of the factors' default rules,
+            a :class:`~archimedes.quadrature.TensorQuadratureRule`.
 
         Raises
         ------
@@ -815,7 +798,7 @@ class FunctionSpace:
         """Whether ``other`` denotes the same space, as far as is decidable.
 
         Compares ``basis`` and ``quad_rule`` by value, and ``domain`` only
-        *structurally* (via its treedef) -- deliberately not by value.
+        *structurally* (via its treedef).
 
         Domain values can't be compared once traced: two symbolic
         parametrizations raise ``TypeError`` under ``bool()`` unless they
@@ -825,9 +808,9 @@ class FunctionSpace:
         undecidable and prone to false rejection.
 
         As a result, a caller can add two ``Function`` objects whose domains
-        differ *numerically* -- e.g. ``(a=0, b=1)`` and ``(a=0, b=2)`` -- without
-        an error. **Callers are responsible for ensuring the domains agree
-        numerically**; only the structure is enforced here.
+        differ *numerically* without an error. **Callers are responsible for
+        ensuring the domains agree numerically**; only the structure can be
+        enforced here.
         """
         return (
             self.basis == other.basis
@@ -838,16 +821,6 @@ class FunctionSpace:
     def _product_space(self, other: FunctionSpace) -> FunctionSpace:
         """The space that represents products of elements of ``self`` and
         ``other`` exactly.
-
-        Uses ``basis._product_basis`` for the enlarged basis and this space's
-        ``domain``; the quadrature rule is the product basis's own default,
-        which is automatically exact for the product. With ``n_1 + n_2 - 1``
-        Gauss points that rule is exact through degree
-        ``2(n_1 + n_2) - 3``, and both the mass matrix and the load vector
-        of the projection have degree ``2(n_1 + n_2 - 2)``.
-
-        The domains are checked structurally only, for the same reason as
-        :meth:`_is_compatible_with`: they may be traced.
         """
         if tree.structure(self.domain) != tree.structure(other.domain):
             raise ValueError(
@@ -858,12 +831,6 @@ class FunctionSpace:
     def _derivative_space(self, deriv=1) -> FunctionSpace:
         """The smallest space that represents ``deriv``-th derivatives of
         this space's elements exactly.
-
-        Uses the domain and derivative basis from this space's ``domain`` and
-        ``basis``, with the derivative basis's own default quadrature. Smaller
-        than this space for a polynomial family (differentiating lowers the degree);
-        see :meth:`Basis._derivative_basis` for why the minimal space rather
-        than this one.
         """
         return FunctionSpace(self.basis._derivative_basis(deriv), domain=self.domain)
 
@@ -886,31 +853,14 @@ class FunctionSpace:
         ``order``-th antiderivative, pinned to vanish (along with its first
         ``order - 1`` derivatives) at the domain's ``boundary`` endpoint.
 
-        Built one order at a time. For a single order, the target space
-        :math:`W` (this space's :meth:`_integral_space`) is exactly one
-        derivative-order larger, so its own differentiation matrix ``D =
-        W._diff_matrix(1, space=self)`` (shape ``(n, n + 1)``) is *surjective*
-        onto this space with a 1-D nullspace (the constants). Appending one
-        row pinning :math:`F(\mathrm{boundary}) = 0` -- evaluating :math:`W`'s
-        basis at the chosen endpoint -- makes the system square and
-        determines the unique antiderivative that both differentiates back to
-        the input and vanishes there:
-
         .. math::
             \begin{bmatrix} D \\ \phi_W(x_{\mathrm{boundary}})^\top \end{bmatrix}
             F = \begin{bmatrix} I \\ 0 \end{bmatrix}
 
-        Composing this step ``order`` times gives the standard iterated
-        indefinite integral, vanishing together with its first ``order - 1``
-        derivatives at the anchor (the usual Cauchy-formula convention for
-        repeated integration) -- rather than solving one larger system with
-        ``order`` boundary rows, which would need deciding what those extra
-        rows should be instead of reusing this same one-condition step.
+        Composing this step ``order`` times gives an iterated indefinite integral,
+        vanishing along with its first ``order - 1`` derivatives at the anchor.
 
-        Requires a domain with finite, literal endpoints to evaluate at:
-        :class:`~archimedes.measure.RealLine`/:class:`~archimedes.measure.HalfLine`-
-        parametrized bases (Hermite, Laguerre) have no boundary to anchor at
-        and are rejected.
+        Requires a domain with finite, literal endpoints to evaluate at.
 
         Parameters
         ----------
@@ -922,9 +872,7 @@ class FunctionSpace:
         space : FunctionSpace, optional
             Target space, overriding the default minimal
             :meth:`_integral_space`. Must have exactly ``self.n_basis +
-            order`` basis functions -- unlike :meth:`_diff_matrix`, a
-            target of the "wrong" size has no well-defined exact (or
-            least-squares) antiderivative to fall back on here.
+            order`` basis functions.
 
         Returns
         -------
@@ -1003,9 +951,7 @@ class FunctionSpace:
         space : FunctionSpace, optional
             Target space, overriding the default. By default the target is
             **this** space, giving the square ``(n_basis, n_basis)``
-            differentiation matrix -- the form collocation and operator
-            assembly want, since it keeps the coefficients' meaning (nodal
-            values, modal amplitudes) unchanged. Use :meth:`Function.derivative`
+            differentiation matrix. Use :meth:`Function.derivative`
             for the minimal target.
 
             A target too small to hold the derivative gives its projection,
@@ -1048,14 +994,10 @@ class FunctionSpace:
     ) -> tuple[np.ndarray, np.ndarray]:
         """Quadrature nodes and weights mapped onto this space's domain.
 
-        An assembly like :meth:`project` is built from these nodes and
-        weights, together with :meth:`basis_matrix`.
-
-        Unlike :attr:`quad_rule`, the returned weights are density-adjusted
-        (see :attr:`Basis.density`) for this space. If the space has
-        ``density=True``, the returned weights sum to 1. If it has
-        ``density=False``, they sum to the integral of the weight function
-        over the domain.
+        Unlike :attr:`quad_rule`, the returned weights are normalized
+        if the space has ``density=True``, in which case the returned
+        weights sum to 1. Otherwise, weights sum to the integral of the weight
+        function over the domain.
 
         Parameters
         ----------
@@ -1066,6 +1008,12 @@ class FunctionSpace:
         -------
         nodes, weights : ndarray
             Nodes and weights on this space's target domain.
+
+        See Also
+        --------
+        :meth:`basis_matrix` : Get the basis matrix evaluated at the quadrature nodes.
+        :meth:`project` : L2 projection of a function onto this space.
+        :attr:`quad_rule` : The default quadrature rule for this space.
         """
         rule = quad_rule if quad_rule is not None else self.quad_rule
         # `density=self.basis.density` keeps the quadrature weights consistent
@@ -1080,32 +1028,30 @@ class FunctionSpace:
     def basis_matrix(
         self, deriv: int = 0, quad_rule: Quadrature | None = None
     ) -> BasisMatrix:
-        """This space's basis evaluated at its (or ``quad_rule``'s)
-        quadrature nodes, as a :class:`BasisMatrix`.
+        """This space's basis evaluated at its quadrature nodes.
 
-        Uses the quadrature rule's element ownership, so it is exact for a
-        piecewise basis even when discontinuous.
-
-        The returned :class:`BasisMatrix` carries its own nodes
-        (``Phi.nodes``), so a custom (Petrov-)Galerkin residual or
-        projection needs only this method. Evaluate pointwise expressions
-        at ``Phi.nodes`` and test them against ``Phi.T``. Call
-        :meth:`quadrature` directly only when weights are wanted without a
-        basis matrix (a plain integral). See :meth:`project` for a worked
-        example.
+        The basis matrix is a generalized Vandermonde matrix with shape
+        ``(n_nodes, n_basis)``. The returned :class:`BasisMatrix` object
+        also carries its quadrature nodes and weights.
 
         Parameters
         ----------
         deriv : int or tuple of int, optional
-            Derivative order; a multi-index for a :class:`TensorBasis`, a
-            plain order otherwise. Default 0.
+            Derivative order; a multi-index for a :class:`TensorBasis`, an
+            ``int`` otherwise. Default 0.
         quad_rule : QuadratureRule, optional
-            Quadrature rule to use instead of this space's own default.
+            Quadrature rule to use instead of the default for this space.
 
         Returns
         -------
         BasisMatrix
-            The design matrix, bundled with its nodes and weights.
+            The basis matrix together with its quadrature nodes and weights.
+
+        See Also
+        --------
+        :meth:`quadrature` : Get the quadrature nodes and weights for this space
+        :attr:`quad_rule` : The default quadrature rule for this space.
+        :meth:`project` : L2 projection of a function onto this space.
         """
         rule = quad_rule if quad_rule is not None else self.quad_rule
         matrix = self.basis._evaluate_at_nodes(
@@ -1157,13 +1103,7 @@ class FunctionSpace:
         ``c1``, ``c2``.
 
         For vector-valued coefficients (shape ``(n_basis, m)``) the
-        integrand is contracted over components, :math:`\langle f, g
-        \rangle = \int f \cdot g \, w \, dx`, so the result is a
-        scalar in that case too and :meth:`Function.norm` is the
-        :math:`L^2` norm of the whole vector-valued function rather than
-        an array of per-component norms. Both coefficient arrays must have
-        the same shape; for a per-component inner product, slice the
-        coefficients and call this once per component.
+        integrand is contracted over components.
         """
         rule = quad_rule if quad_rule is not None else self.quad_rule
         phi = self.basis_matrix(quad_rule=rule)  # (npts, n_basis)
@@ -1182,6 +1122,10 @@ class FunctionSpace:
     ) -> Function:
         """Galerkin (or Petrov-Galerkin) projection of ``f`` onto this space.
 
+        See the :doc:`function approximation guide </handbook/approximation>`
+        for mathematical details on the projection operation and how it is
+        implemented numerically.
+
         Solves ``M @ c = b`` for the coefficients ``c``, using this (trial)
         space's basis matrix ``Phi`` and ``test_space``'s basis matrix
         ``Psi`` (see :meth:`basis_matrix`). ``M = Psi.T @ Phi`` is the Gram
@@ -1192,22 +1136,17 @@ class FunctionSpace:
         exactness for either basis alone. Pass an explicit ``quad_rule`` to
         use something other than the space's natural default.
 
-        ``test_space`` defaults to this space (standard Galerkin, ``M`` the
-        mass matrix). Passing a different space performs Petrov-Galerkin
-        projection: the residual ``f - Phi @ c`` is made orthogonal to
-        ``test_space`` rather than to this space. ``test_space`` must have
-        the same ``n_basis`` as this space, so that ``M`` is square.
-        ``test_space`` must also denote the same physical domain (checked
-        structurally only, since domains may be traced). The result is
-        still returned **in this (trial) space**. ``test_space`` only
-        supplies the orthogonality condition used to solve for ``c``. It
-        does not change how ``c`` is interpreted, since ``c`` are always
-        coefficients of *this* space's basis functions.
+        ``test_space`` defaults to this space, performing a standard Galerkin
+        projection. Passing a different space performs Petrov-Galerkin
+        projection. In either case the residual ``f - Phi @ c`` is orthogonal to
+        ``test_space``. ``test_space`` must have the same ``n_basis`` as this
+        space and must denote the same physical domain. The resulting
+        :class:`Function` is an element of this (trial) space, not the test space.
 
-        ``f`` may be vector-valued: if ``f(x)`` has shape ``(npts, m)``,
+        ``f`` may be vector-valued. If ``f(x)`` has shape ``(npts, m)``, then
         each component is projected and the result has coefficients of
-        shape ``(n_basis, m)``. ``M`` is shared across components, so this
-        costs one basis evaluation rather than ``m`` of them.
+        shape ``(n_basis, m)``. The mass matrix is shared across components, so
+        this vector-valued projection still only requires one basis evaluation.
 
         Parameters
         ----------
@@ -1218,7 +1157,7 @@ class FunctionSpace:
         quad_rule : QuadratureRule, optional
             Quadrature rule to use instead of this space's own default.
         test_space : FunctionSpace, optional
-            Test space for a Petrov-Galerkin projection. Default this
+            Test space for a Petrov-Galerkin projection. Defaults to this
             (trial) space, giving standard Galerkin projection.
 
         Returns

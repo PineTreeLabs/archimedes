@@ -63,16 +63,14 @@ class TensorQuadratureRule:
     """Cartesian product of one-dimensional quadrature rules.
 
     Implements the :class:`~archimedes.quadrature.Quadrature` interface with
-    ``ndim > 1``: :attr:`nodes` is an ``(n, ndim)`` array (one row per node,
-    one column per dimension) rather than the ``(n,)`` of a one-dimensional
-    rule, while :attr:`weights` stays ``(n,)`` since each node still carries
-    a single scalar weight.
+    ``ndim > 1``. :attr:`nodes` is an ``(n, ndim)`` array with one row per node
+    and one column per dimension. Each node still has a single scalar weight, so
+    :attr:`weights` still has shape ``(n,)``.
 
-    Exactness follows dimension by dimension. If rule ``k`` is exact through
-    degree :math:`p_k` in its own variable, the product is exact for any
-    polynomial whose degree in :math:`x_k` is at most :math:`p_k` - i.e.
-    exact on the *tensor-product* (maximum-degree) polynomial space, which
-    strictly contains the total-degree space usually truncated to.
+    Exactness is preserved dimension by dimension: if rule ``k`` is exact through
+    degree :math:`p_k`, the product is exact for any polynomial whose degree in
+    :math:`x_k` is at most :math:`p_k`. In particular, the rule is exact for the
+    tensor-product polynomial space.
 
     The node count is :math:`\\prod_k n_k`, exponential in ``ndim``; sparse
     (Smolyak) quadrature is planned as a future alternative.
@@ -86,7 +84,7 @@ class TensorQuadratureRule:
     See Also
     --------
     tensor_quad : Constructor taking the per-dimension rules variadically.
-    composite_quad : Tile a rule across sub-elements *within* one dimension;
+    composite_quad : Tile a rule across sub-elements within one dimension;
         apply it per-dimension before tensoring to get a rectilinear mesh.
     """
 
