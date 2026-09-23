@@ -98,9 +98,9 @@ def test_dirichlet_and_neumann(legendre8):
 def test_delegates_to_base(legendre8):
     dirichlet = ConstrainedBasis.dirichlet(legendre8)
     assert dirichlet.Parameters is legendre8.Parameters
-    assert dirichlet.measures == legendre8.measures
-    assert dirichlet.required_breakpoints == legendre8.required_breakpoints
-    assert dirichlet.default_quadrature() == legendre8.default_quadrature()
+    assert dirichlet._measures == legendre8._measures
+    assert dirichlet._required_breakpoints == legendre8._required_breakpoints
+    assert dirichlet._default_quadrature() == legendre8._default_quadrature()
 
     with pytest.raises(ValueError, match="side must be"):
         dirichlet.evaluate(np.array([0.0]), side="up")

@@ -58,8 +58,8 @@ def test_construction_validation(vertex, rule):
 def test_properties(combo, vertex, bubble, rule):
     assert combo.n_basis == vertex.n_basis + bubble.n_basis
     assert combo.Parameters is vertex.Parameters
-    assert combo.measures == (None,)
-    assert combo.default_quadrature() is rule
+    assert combo._measures == (None,)
+    assert combo._default_quadrature() is rule
 
 
 # -- evaluate --
@@ -120,21 +120,22 @@ def test_boundary_dofs_conflict_rejected(rule):
 # -- required_breakpoints --
 
 
-def test_required_breakpoints_none_when_no_piece_has_any(combo):
-    assert combo.required_breakpoints is None
+def test_required_breakpoints(combo, vertex, rule):
+    # Should be None when no piece has any required breakpoints.
+    assert combo._required_breakpoints is None
 
 
-def test_required_breakpoints_is_union(vertex, rule):
+    # Should be a union of the required breakpoints of the individual pieces.
     a = PiecewiseBasis(vertex, np.array([-1.0, 0.0, 1.0]), continuity=-1)
     b = PiecewiseBasis(vertex, np.array([-1.0, 0.5, 1.0]), continuity=-1)
     combo = ConcatBasis((a, b), quad_rule=rule)
-    np.testing.assert_array_equal(combo.required_breakpoints, [-1.0, 0.0, 0.5, 1.0])
+    np.testing.assert_array_equal(combo._required_breakpoints, [-1.0, 0.0, 0.5, 1.0])
 
 
 # -- _dof_order --
 
 
-def test_dof_order_concatenates_pieces(vertex, bubble, combo):
+def test_dof_order(vertex, bubble, combo):
     np.testing.assert_array_equal(
         combo._dof_order,
         np.concatenate([vertex._dof_order, bubble._dof_order]),
@@ -144,7 +145,7 @@ def test_dof_order_concatenates_pieces(vertex, bubble, combo):
 # -- end-to-end: vertex + bubble reproduces the full polynomial space --
 
 
-def test_vertex_bubble_reproduces_full_space_projection(legendre6, combo):
+def test_vertex_bubble(legendre6, combo):
     def target(x):
         return 2 - 3 * x + x**2 - 0.5 * x**3 + 0.2 * x**4 - 0.1 * x**5
 
@@ -154,15 +155,12 @@ def test_vertex_bubble_reproduces_full_space_projection(legendre6, combo):
     f_full = space_full.project(target)
     f_combo = space_combo.project(target)
 
+    # Check that the full space and combination are the same
     xs = np.linspace(-1.0, 1.0, 25)
     np.testing.assert_allclose(f_combo(xs), f_full(xs), atol=1e-10)
     np.testing.assert_allclose(f_combo(xs), target(xs), atol=1e-10)
 
-
-def test_vertex_coefficients_equal_boundary_values(legendre6, combo):
-    def target(x):
-        return 2 - 3 * x + x**2 - 0.5 * x**3 + 0.2 * x**4 - 0.1 * x**5
-
+    # Check that the vertex coefficients match the boundary values
     space_combo = FunctionSpace(combo, UnitInterval.Parameters(a=-1.0, b=1.0))
     f_combo = space_combo.project(target)
     np.testing.assert_allclose(f_combo.coefficients[0], target(-1.0), atol=1e-10)

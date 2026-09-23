@@ -63,9 +63,7 @@ class ConstrainedBasis(Basis):
     Parameters
     ----------
     base : Basis
-        The underlying basis being combined. Its own domain-mapping,
-        ``default_quadrature``, and ``measures`` continue to apply
-        unchanged.
+        The underlying basis being combined.
     matrix : ndarray
         Shape ``(base.n_basis, n_basis)``; ``matrix[:, i]`` is the
         coefficient vector (in ``base``) of this basis's ``i``-th
@@ -189,21 +187,20 @@ class ConstrainedBasis(Basis):
         return self.base.Parameters
 
     @property
-    def measures(self):
-        """Delegates to ``base``: recombining ``base``'s functions linearly
-        does not change which quadrature weight matches them, so
-        ``base``'s own ``measures`` still apply unchanged."""
-        return self.base.measures
+    def _measures(self):
+        # Delegates to `base`, since a linear combination of the
+        # functions from `base` don't change the right quadrature weight.
+        return self.base._measures
 
     @property
-    def required_breakpoints(self):
-        return self.base.required_breakpoints
+    def _required_breakpoints(self):
+        return self.base._required_breakpoints
 
-    def default_quadrature(self):
+    def _default_quadrature(self):
         """Delegates to ``base``: the combination spans a subspace of the
         same polynomials (or elements), never a larger one, so any rule
         exact for ``base`` remains exact here."""
-        return self.base.default_quadrature()
+        return self.base._default_quadrature()
 
     def evaluate(self, x, deriv: int = 0, side: str = RIGHT, **domain_kwargs):
         _check_side(side)

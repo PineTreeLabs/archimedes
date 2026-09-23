@@ -1,9 +1,4 @@
-"""Abstract base class for finite-dimensional bases.
-
-Defines the :class:`Basis` interface implemented by each basis family
-(orthogonal polynomials, Lagrange/nodal interpolants, piecewise/local
-bases, etc.).
-"""
+"""Abstract base class for finite-dimensional bases."""
 
 from __future__ import annotations
 
@@ -29,37 +24,37 @@ LEFT = "left"
 
 @tree.struct
 class BasisMatrix:
-    r"""A basis evaluated at a fixed set of quadrature nodes.
+    r"""A :class:`Basis` evaluated at a set of quadrature nodes.
+
+    Also called a "design matrix" or "generalized Vandermonde matrix".
 
     The basis matrix is bundled with the matching quadrature weights to
     provide proper weighted inner product semantics for matrix multiplication.
+    In particular, ``Phi.T`` gives the adjoint of :math:`\Phi` under the weighted
+    inner product: :math:`\langle \Phi c, r\rangle_w = \langle c, \Phi^\top r\rangle`.
+    That is, ``Phi.T @ r`` is not plain matrix multiplication but includes the
+    weights: ``Phi.T @ r == Phi.matrix.T @ np.diag(Phi.weights) @ r``.
 
-    ``matrix[n, i]`` is the ``deriv``-th derivative of basis function ``i``
-    at node ``n``; see :meth:`FunctionSpace.basis_matrix`, which builds one.
+    This definition of the transpose operation ``.T`` as an adjoint means that
+    the Gram (mass) matrix is implemented as ``Phi.T @ Phi``, and a Galerkin
+    projection of a function ``f`` is implemented as ``Phi.T @ f(x)``, where
+    ``x = Phi.nodes``.
 
     Parameters
     ----------
     matrix : ndarray
         The design matrix :math:`\Phi`, shape ``(npts, n_basis)`` -- a
         generalized Vandermonde matrix, :math:`\Phi_{ni} = \phi_i(x_n)` for
-        an arbitrary basis rather than monomials. Maps coefficients to
-        sampled values, :math:`\Phi c = \phi \cdot c`.
+        an arbitrary basis :math:`\{\phi_i\}`.
     weights : ndarray
-        Quadrature weights matching ``matrix``'s node axis, shape
-        ``(npts,)``.
+        Quadrature weights for the associated inner product, shape ``(npts,)``.
     nodes : ndarray
-        Points ``matrix``'s rows were evaluated at, shape ``(npts,)``.
+        Quadrature nodes at which the basis was evaluated, shape ``(npts,)``.
 
-    Notes
-    -----
-    ``.T`` gives the adjoint of :math:`\Phi` under the Euclidean inner
-    product on coefficients and the weighted inner product on sampled
-    values: :math:`\langle \Phi c, r\rangle_w = \langle c, \Phi^\top
-    r\rangle`. That adjoint relation gives :math:`\Phi^\top r = \phi^\top
-    (w \odot r)`, so a Galerkin projection reads almost like the math it
-    approximates: ``phi.T @ phi`` is the Gram (mass) matrix
-    :math:`\Phi^\top\Phi`, and ``phi.T @ f(x)`` is the load vector
-    :math:`\Phi^\top f` -- see :meth:`FunctionSpace.project`.
+    See Also
+    --------
+    FunctionSpace.basis_matrix : Builds a :class:`BasisMatrix` for a given basis
+        and quadrature rule.
     """
 
     matrix: np.ndarray
@@ -90,11 +85,7 @@ class _BasisMatrixAdjoint:
         r""":math:`\Phi^\top r = \phi^\top (w \odot r)`.
 
         ``values`` (``r``) must already be sampled at the same quadrature
-        nodes as ``self.basis_matrix`` -- shape ``(npts,)`` for a scalar
-        integrand, or ``(npts, m)`` for a vector-valued one (contracted
-        independently per component), or ``(npts, k)`` to apply the adjoint
-        to another design matrix at once (as in the Gram matrix
-        ``phi.T @ phi``).
+        nodes as ``self.basis_matrix`` and have shape ``(npts, ...)``.
         """
         if isinstance(values, BasisMatrix):
             values = values.matrix
@@ -110,48 +101,36 @@ class _BasisMatrixAdjoint:
 
 
 def _check_side(side: str) -> str:
-    """Validate a ``side`` value.
-
-    Checked by every family, including the smooth ones for which the two
-    sides coincide: a typo should fail the same way regardless of which
-    basis it is handed to.
-    """
     if side not in (LEFT, RIGHT):
         raise ValueError(f"side must be {LEFT!r} or {RIGHT!r}, got {side!r}")
     return side
 
 
 class Basis(metaclass=abc.ABCMeta):
-    r"""A finite family of basis functions :math:`\{\phi_i\}_{i=1}^n`.
+    r"""A finite-dimensional family of basis functions :math:`\{\phi_i\}_{i=1}^n`.
 
-    Concrete subclasses implement one basis family each (Legendre, Lagrange,
-    ...), always with a fixed ``n_basis``.
-
-    ``Basis`` only evaluates -- it has no notion of a coefficient vector or
-    a fixed target domain. See :class:`FunctionSpace`, which combines a
-    ``Basis`` with a domain and quadrature-based operations, and
-    :class:`Function`, which further combines a ``FunctionSpace`` with
+    ``Basis`` only defines the basis functions and evaluates them, without any
+    notion of a target domain or coefficient vector. :class:`FunctionSpace` combines
+    a ``Basis`` with a domain and quadrature rule to define an inner product space,
+    and :class:`Function` further combines a ``FunctionSpace`` with expansion
     coefficients.
     """
 
     ndim: int = 1
     """Number of independent variables the basis functions take.
 
-    Nearly every family here is univariate; :class:`TensorBasis` is the
-    exception, taking one variable per tensored factor. ``evaluate``'s ``x``
-    is ``(npts,)`` when this is 1 and ``(npts, ndim)`` otherwise, and
-    ``deriv`` is a plain order in the first case and a multi-index in the
-    second.
+    Typically 1, since most bases are univariate. :class:`TensorBasis` is
+    the exception, with one variable per tensored factor.
     """
 
     density: bool = False
-    """Whether this basis is orthonormal with respect to a *probability*
-    measure (unit mass) rather than its associated
-    :class:`~archimedes.measure.Measure`'s raw weight.
+    """Whether this basis is orthonormal with respect to a probability
+    measure (unit mass) rather than the raw weight of the associated
+    :class:`~archimedes.measure.Measure`.
 
-    Only meaningful for families built on a classical-orthogonal-polynomial
-    ``Measure`` (see :class:`OrthogonalPolynomialBasis`); other families
-    (nodal, piecewise) have no such notion and leave this ``False``.
+    Only meaningful for orthogonal polynomial families based on a
+    ``Measure`` (in particular :class:`OrthogonalPolynomialBasis`);
+    other families should leave this ``False``.
     """
 
     @property
@@ -161,22 +140,20 @@ class Basis(metaclass=abc.ABCMeta):
         raise NotImplementedError
 
     @property
-    def measures(self) -> tuple[Measure | None, ...]:
-        """The orthogonality weight this basis is built against, per
-        dimension -- always a tuple of length ``ndim``, with ``None`` for a
-        family that has no weight of its own (nodal, piecewise).
+    def _measures(self) -> tuple[Measure | None, ...]:
+        """The :class:`Measure`(s) this basis is defined from, if applicable.
 
-        Used by :class:`FunctionSpace` to reject a quadrature rule whose
-        weight does not match the basis's. ``None`` disables that
-        check for a dimension, since there is then nothing to disagree with.
+        A tuple of length ``ndim``, with ``None`` for a family that has
+        no defining measure (e.g. nodal, piecewise).
         """
         return (None,) * self.ndim
 
     @property
-    def required_breakpoints(self) -> np.ndarray | None:
+    def _required_breakpoints(self) -> np.ndarray | None:
         """Points on the reference domain where this basis is not smooth, or
         ``None`` if it is smooth throughout.
 
+        Used for checking consistency of quadrature rules with the basis.
         A quadrature rule integrates products of basis functions exactly
         only if none of its subintervals straddles one of these kinks --
         equivalently, if the rule's own breakpoints are a *superset* of
@@ -184,25 +161,23 @@ class Basis(metaclass=abc.ABCMeta):
         and a finer rule that is not aligned is still wrong, so node count
         is beside the point.
 
-        Returns ``None`` by default (a globally smooth family, e.g. a
-        polynomial basis); :class:`PiecewiseBasis` overrides it.
+        Returns ``None`` by default, which skips the consistency check.
         """
         return None
 
     @abc.abstractmethod
-    def default_quadrature(self) -> "QuadratureRule":
+    def _default_quadrature(self) -> "QuadratureRule":
         """A quadrature rule that integrates this basis's mass and stiffness
         integrands exactly.
 
         Fully determined by the basis: the degree requirement follows from
-        ``n_basis``, and any element structure from the basis's own
-        breakpoints. :class:`FunctionSpace` uses this when no explicit rule
-        is given.
+        ``n_basis``, and any element structure from the basis's breakpoints.
+        :class:`FunctionSpace` uses this when no explicit rule is given.
 
         That default rule is *not* generally sufficient for
-        :meth:`FunctionSpace.project`, whose accuracy requirement depends on
-        the target function rather than on the space -- ``project`` takes an
-        explicit override for that case.
+        :meth:`FunctionSpace.project`, where the accuracy depends on the
+        target function rather than on the space. ``project`` takes an explicit
+        override to manually control accuracy in that case.
         """
         raise NotImplementedError
 

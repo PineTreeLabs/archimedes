@@ -117,7 +117,7 @@ class FourierBasis(Basis):
         return self.n_basis  # "sine"
 
     @property
-    def measures(self) -> tuple[LegendreMeasure]:
+    def _measures(self) -> tuple[LegendreMeasure]:
         """Orthogonal under the uniform (Lebesgue) weight."""
         return (LegendreMeasure(),)
 
@@ -125,7 +125,7 @@ class FourierBasis(Basis):
     def Parameters(self) -> type:  # noqa: N802
         return UnitInterval.Parameters
 
-    def default_quadrature(self):
+    def _default_quadrature(self):
         r"""Periodic-trapezoidal rule of ``2 * max_mode + 1`` points.
 
         Exact for trigonometric polynomials of mode :math:`\leq 2 \cdot

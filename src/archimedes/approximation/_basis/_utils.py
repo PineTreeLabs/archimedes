@@ -26,7 +26,7 @@ def _reference_breakpoints(breakpoints) -> tuple[float, float, np.ndarray]:
 
     Shared by :class:`PiecewiseBasis`'s ``FunctionSpace.piecewise``
     constructor, which adds its own shape/monotonicity validation on top,
-    and by :attr:`BSplineBasis.required_breakpoints`. Both independently
+    and by :attr:`BSplineBasis._required_breakpoints`. Both independently
     needed the identical affine-map-plus-pin recipe.
 
     The two endpoints of ``ref`` are pinned exactly to :math:`\pm 1.0`

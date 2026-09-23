@@ -145,8 +145,7 @@ def family_builders(
         Continuity for "piecewise". Default 0 (:math:`C^0`).
     quad_rule : Quadrature, optional
         Explicit reference-domain quadrature shared by "modal", "jacobi",
-        "nodal", and "bspline" (default each basis's own
-        ``default_quadrature()``).
+        "nodal", and "bspline".
     piecewise_quad_rule : Quadrature, optional
         Explicit reference-domain quadrature for "piecewise" specifically,
         since a piecewise rule generally needs its own element structure

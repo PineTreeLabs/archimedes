@@ -67,10 +67,10 @@ class MonomialBasis(Basis):
         # whose Gaussian/exponential weights do.
         return UnitInterval.Parameters
 
-    def default_quadrature(self):
+    def _default_quadrature(self):
         """Gauss-Legendre rule of ``n_basis`` points, exact for this basis's
         mass and stiffness integrands (degree :math:`2n - 1`, the same
-        sizing :meth:`OrthogonalPolynomialBasis.default_quadrature` uses).
+        sizing :meth:`OrthogonalPolynomialBasis._default_quadrature` uses).
         """
         from archimedes.quadrature import gauss_legendre
 

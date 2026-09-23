@@ -1,17 +1,17 @@
-"""Basis family: the ``Basis`` interface and every concrete or composite
-implementation.
+"""Basis family: the ``Basis`` interface and concrete implementations.
 
-- :class:`Basis`, :class:`BasisMatrix` -- the abstract interface; a basis
-  only evaluates, with no notion of a target domain or coefficients.
-- Concrete basis implementations: :class:`OrthogonalPolynomialBasis`,
+- :class:`Basis` -- the abstract interface; a basis only defines and evaluates
+  the basis functions, independent of a target domain or expansion coefficients.
+- :class:`BasisMatrix` -- a :class:`Basis` evaluated at a set of quadrature
+  nodes, bundled with the matching quadrature weights.
+- Concrete basis implementations, e.g.: :class:`OrthogonalPolynomialBasis`,
   :class:`LagrangeBasis`, :class:`CubicHermiteBasis`, :class:`FourierBasis`,
   :class:`MonomialBasis`, :class:`PiecewiseBasis`, :class:`BSplineBasis`.
-- Composition primitives, each building a new ``Basis`` out of existing
-  ones: :class:`ConstrainedBasis` recombines *one* basis's functions by a
-  fixed matrix, :class:`ConcatBasis` stacks functions from *several* bases
-  side by side, and :class:`TensorBasis` combines one basis per dimension
-  into a multivariate basis (with :class:`ProductParameters` carrying the
-  per-dimension target domains).
+- Composition primitives that build a new ``Basis`` from existing ones:
+  :class:`ConstrainedBasis` recombines one basis's functions by a
+  fixed matrix (e.g. eliminating a nullspace associated with a boundary condition),
+  :class:`ConcatBasis` stacks functions from several bases, and :class:`TensorBasis`
+  combines one basis per dimension into a multivariate basis.
 """
 
 from ._base import RIGHT, Basis, BasisMatrix

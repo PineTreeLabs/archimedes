@@ -252,7 +252,7 @@ class LagrangeBasis(Basis):
     def Parameters(self) -> type:  # noqa: N802
         return UnitInterval.Parameters
 
-    def default_quadrature(self):
+    def _default_quadrature(self):
         """Gauss-Legendre rule of ``n_basis`` points.
 
         This family carries no weight function of its own (see the class

@@ -100,13 +100,13 @@ def test_measures():
             _nodal(3),
         )
     )
-    assert basis.measures == (ProbabilistsHermiteMeasure(), LegendreMeasure(), None)
+    assert basis._measures == (ProbabilistsHermiteMeasure(), LegendreMeasure(), None)
 
     # Weightless families (nodal, and piecewise built from one) report None.
-    assert _nodal(3).measures == (None,)
-    assert _piecewise(3).measures == (None,)
+    assert _nodal(3)._measures == (None,)
+    assert _piecewise(3)._measures == (None,)
     # A discontinuous piecewise element still reports its own basis's weight.
-    assert PiecewiseBasis(_modal(3), BREAKS, continuity=-1).measures == (
+    assert PiecewiseBasis(_modal(3), BREAKS, continuity=-1)._measures == (
         LegendreMeasure(),
     )
 
@@ -139,7 +139,7 @@ def test_equality_and_hash():
 
 def test_default_quadrature():
     basis = TensorBasis((_modal(3), _modal(4)))
-    rule = basis.default_quadrature()
+    rule = basis._default_quadrature()
     assert rule.ndim == 2
     assert len(rule) == 12
 
@@ -166,7 +166,7 @@ def test_node_and_basis_orderings_agree():
     # Both the quadrature nodes and the basis multi-index use C order, which
     # is what lets a coefficient array be reshaped against either.
     basis = TensorBasis((_modal(3), _modal(4)))
-    rule = basis.default_quadrature()
+    rule = basis._default_quadrature()
     assert rule.nodes.shape == (12, 2)
     assert basis.evaluate(rule.nodes).shape == (12, 12)
 
@@ -491,7 +491,7 @@ def test_aligned_composite_rule_accepted():
 
 def test_required_breakpoints_per_dimension():
     basis = TensorBasis((_piecewise(3), _modal(3)))
-    required = basis.required_breakpoints
+    required = basis._required_breakpoints
     np.testing.assert_allclose(required[0], BREAKS)
     assert required[1] is None
 

@@ -43,7 +43,7 @@ class ConcatBasis(Basis):
         derived. Unlike a single family, a concatenation's pieces have no
         one shared notion of "enough points" or "the natural weight": pass
         something adequate (e.g. the finest of the pieces' own
-        ``default_quadrature()``, or a plain Gauss-Legendre rule with
+        default, or a plain Gauss-Legendre rule with
         enough points for the combined degree).
     """
 
@@ -72,14 +72,14 @@ class ConcatBasis(Basis):
         return self.pieces[0].Parameters
 
     @property
-    def measures(self):
+    def _measures(self):
         """Always ``(None,)``. See the class docstring for why."""
         return (None,)
 
     @property
-    def required_breakpoints(self):
+    def _required_breakpoints(self):
         """Union of every piece's own, or ``None`` if none has any."""
-        per_piece = [piece.required_breakpoints for piece in self.pieces]
+        per_piece = [piece._required_breakpoints for piece in self.pieces]
         present = [bp for bp in per_piece if bp is not None]
         if not present:
             return None
@@ -89,7 +89,7 @@ class ConcatBasis(Basis):
     def _dof_order(self) -> np.ndarray:
         return np.concatenate([piece._dof_order for piece in self.pieces])
 
-    def default_quadrature(self):
+    def _default_quadrature(self):
         """The ``quad_rule`` given at construction. See the class
         docstring for why this is required rather than derived."""
         return self.quad_rule

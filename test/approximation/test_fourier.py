@@ -48,7 +48,7 @@ def test_max_mode(kind, n_basis, expected):
 
 def test_measures_and_density_defaults():
     basis = FourierBasis(5)
-    assert basis.measures == (LegendreMeasure(),)
+    assert basis._measures == (LegendreMeasure(),)
     assert basis.density is False
 
 
@@ -122,7 +122,7 @@ def test_derivative_matches_finite_difference(kind, n_basis, deriv):
 )
 def test_orthonormal_on_reference_domain(kind, n_basis, density):
     basis = FourierBasis(n_basis, kind=kind, density=density)
-    rule = basis.default_quadrature()
+    rule = basis._default_quadrature()
     phi = basis.evaluate(rule.nodes)
     w = rule.weights
     if density:
@@ -143,7 +143,7 @@ def test_orthonormal_on_reference_domain(kind, n_basis, density):
 def test_orthonormal_on_mapped_domain(kind, n_basis, density):
     a, b = 2.0, 7.0
     basis = FourierBasis(n_basis, kind=kind, density=density)
-    rule = basis.default_quadrature().map_to(a, b)
+    rule = basis._default_quadrature().map_to(a, b)
     x = rule.nodes
     w = rule.weights
     if density:

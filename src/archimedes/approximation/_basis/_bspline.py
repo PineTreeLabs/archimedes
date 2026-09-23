@@ -121,19 +121,19 @@ class BSplineBasis(Basis):
         return UnitInterval.Parameters
 
     @property
-    def required_breakpoints(self) -> np.ndarray:
+    def _required_breakpoints(self) -> np.ndarray:
         """Distinct interior knots, on the reference domain ``[-1, 1]``"""
         interior = self.knots[self.degree : len(self.knots) - self.degree]
         distinct = np.unique(interior)
         _, _, ref = _reference_breakpoints(distinct)
         return ref
 
-    def default_quadrature(self):
+    def _default_quadrature(self):
         """``degree + 1`` Gauss-Legendre points per distinct knot span."""
         from archimedes.quadrature import composite_quad, gauss_legendre
 
         rule = gauss_legendre(self.degree + 1)
-        return composite_quad(rule, self.required_breakpoints)
+        return composite_quad(rule, self._required_breakpoints)
 
     def boundary_dofs(self, order: int = 0) -> tuple[int | None, int | None]:
         """Indices of the degrees of freedom that *are* the ``order``-th

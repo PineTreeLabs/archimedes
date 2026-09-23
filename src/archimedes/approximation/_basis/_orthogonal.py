@@ -79,8 +79,8 @@ class OrthogonalPolynomialBasis(Basis):
             raise ValueError(f"n_basis must be >= 1, got {self.n_basis}")
 
     @property
-    def measures(self) -> tuple[Measure, ...]:
-        """This basis's orthogonality weight; see :attr:`Basis.measures`."""
+    def _measures(self) -> tuple[Measure, ...]:
+        """This basis's orthogonality weight; see :attr:`Basis._measures`."""
         return (self.measure,)
 
     @property
@@ -102,7 +102,7 @@ class OrthogonalPolynomialBasis(Basis):
         entirely."""
         return 0.0 if self.density else 0.5
 
-    def default_quadrature(self):
+    def _default_quadrature(self):
         r"""Gauss rule of ``n_basis`` points for this basis's own measure.
 
         A rule of :math:`n` Gauss points is exact to degree :math:`2n - 1`,

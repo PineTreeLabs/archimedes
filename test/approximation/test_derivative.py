@@ -653,7 +653,7 @@ def test_basis_without_derivative_support_raises():
         def Parameters(self):  # noqa: N802
             return UnitInterval.Parameters
 
-        def default_quadrature(self):
+        def _default_quadrature(self):
             return gauss_lobatto(2)
 
         def evaluate(self, x, deriv=0, a=None, b=None):

@@ -46,7 +46,7 @@ def test_monomial_constructor():
     # quadrature at n_basis points.
     space = FunctionSpace.monomial(5)
     assert space.domain == UnitInterval.Parameters(a=-1.0, b=1.0)
-    rule = space.basis.default_quadrature()
+    rule = space.basis._default_quadrature()
     expected = gauss_legendre(5)
     np.testing.assert_allclose(rule.nodes, expected.nodes)
     np.testing.assert_allclose(rule.weights, expected.weights)

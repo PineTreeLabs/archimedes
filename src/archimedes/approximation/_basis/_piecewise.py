@@ -141,8 +141,8 @@ class PiecewiseBasis(Basis):
         # One coherent per-dimension weight for the whole assembled basis --
         # otherwise `measures` (and the quadrature-rule checks built on it)
         # would have to pick one element's weight arbitrarily.
-        measures = element_bases[0].measures
-        if any(eb.measures != measures for eb in element_bases):
+        measures = element_bases[0]._measures
+        if any(eb._measures != measures for eb in element_bases):
             raise ValueError(
                 "every element's basis must share the same measures, so the "
                 "assembled piecewise basis has one coherent per-dimension "
@@ -218,17 +218,17 @@ class PiecewiseBasis(Basis):
         return UnitInterval.Parameters
 
     @property
-    def measures(self):
+    def _measures(self):
         """The element bases' shared weight
 
         Verified at construction to be the same across elements.
         Tiling rescales the reference weight onto each element but
         does not change which family it is.
         """
-        return self.element_basis[0].measures
+        return self.element_basis[0]._measures
 
     @property
-    def required_breakpoints(self) -> np.ndarray:
+    def _required_breakpoints(self) -> np.ndarray:
         """This basis is only piecewise smooth: it kinks (or, for
         ``continuity=-1``, jumps) at every interior breakpoint."""
         return self.breakpoints
@@ -256,12 +256,12 @@ class PiecewiseBasis(Basis):
             int(np.argmax(self._assembly[last_offset + right])),
         )
 
-    def default_quadrature(self):
+    def _default_quadrature(self):
         """Each element's own rule, tiled across the same breakpoints."""
         from archimedes.quadrature import composite_quad
 
         return composite_quad(
-            [eb.default_quadrature() for eb in self.element_basis], self.breakpoints
+            [eb._default_quadrature() for eb in self.element_basis], self.breakpoints
         )
 
     def _product_basis(self, other):
@@ -483,7 +483,7 @@ class PiecewiseBasis(Basis):
         ``rule.elements`` distinguishes them exactly.
 
         The rule's breakpoints need only be a *superset* of this basis's
-        (see :meth:`required_breakpoints`), so a rule element is mapped to
+        (see :meth:`_required_breakpoints`), so a rule element is mapped to
         the basis element containing it. That map is static, which also
         makes the resulting masks static -- one fewer runtime comparison in
         the traced graph, and one fewer branch point for autodiff.

@@ -49,7 +49,7 @@ def _normalize_breakpoints(breakpoints) -> tuple[float, float, np.ndarray]:
 
     ``a``/``b`` are read directly from the array's own endpoints. Validates
     ``breakpoints``, then defers the affine map (and its endpoint pinning) to
-    ``_reference_breakpoints``, shared with :attr:`BSplineBasis.required_breakpoints`.
+    ``_reference_breakpoints``, shared with :attr:`BSplineBasis._required_breakpoints`.
     """
     bp = np.asarray(breakpoints, dtype=float)
     if bp.ndim != 1 or len(bp) < 2:
@@ -162,7 +162,7 @@ class FunctionSpace:
     ``FunctionSpace`` is a :func:`~archimedes.struct` so that the domain
     parameters can be symbolically traced and solved/optimized over jointly
     with the coefficients of a ``Function``. The ``basis`` and default quadrature
-    rule are static and do not carry symbolic information.
+    rule are static (do not carry symbolic information).
 
     Parameters
     ----------
@@ -177,7 +177,7 @@ class FunctionSpace:
         The space's natural quadrature rule, defined on the basis's **reference**
         domain. Used unconditionally wherever the required accuracy is fully determined
         by :attr:`basis` and as the default for :meth:`project`. Defaults to
-        ``basis.default_quadrature()``, which is exact by construction for that basis.
+        a rule that is exact by for that basis.
 
         Should typically be accessed via the :attr:`quad_rule` property, which maps
         from the reference domain (e.g. :math:`[0, 1]`) onto the actual ``domain``
@@ -197,7 +197,7 @@ class FunctionSpace:
 
         if self.reference_quad_rule is None:
             object.__setattr__(
-                self, "reference_quad_rule", self.basis.default_quadrature()
+                self, "reference_quad_rule", self.basis._default_quadrature()
             )
         else:
             self._validate_quad_rule(self.reference_quad_rule)
@@ -240,7 +240,7 @@ class FunctionSpace:
         # no weight of its own (nodal, piecewise) reports None and imposes
         # no constraint.
         for d, (basis_measure, rule_measure) in enumerate(
-            zip(self.basis.measures, rule.measures)
+            zip(self.basis._measures, rule.measures)
         ):
             if basis_measure is not None and basis_measure != rule_measure:
                 where = "" if ndim == 1 else f" in dimension {d}"
@@ -252,11 +252,11 @@ class FunctionSpace:
                     f"describe different inner products"
                 )
 
-        required = self.basis.required_breakpoints
+        required = self.basis._required_breakpoints
         if required is None:
             return
 
-        # `required_breakpoints`/`breakpoints` are per-dimension tuples for a
+        # `_required_breakpoints`/`breakpoints` are per-dimension tuples for a
         # tensor basis/rule and bare values otherwise.
         per_dim_required = required if ndim > 1 else (required,)
         per_dim_have = rule.breakpoints if ndim > 1 else (rule.breakpoints,)
@@ -271,7 +271,7 @@ class FunctionSpace:
                     f"quadrature elements must not straddle them; got a rule "
                     f"with breakpoints {have}. Use `composite_quad(rule, "
                     f"breakpoints)` over a superset of the basis breakpoints, "
-                    f"or omit `quad_rule` to use `basis.default_quadrature()`."
+                    f"or omit `quad_rule` to use the default."
                 )
 
     # --- constructors ---
@@ -651,7 +651,7 @@ class FunctionSpace:
             ``continuity=1`` (:math:`C^1`).
         quad_rule : QuadratureRule, optional
             Forwarded to the underlying ``FunctionSpace`` constructor.
-            Default ``basis.default_quadrature()``.
+            Defaults to a rule that is exact for the basis.
 
         Returns
         -------
@@ -694,7 +694,7 @@ class FunctionSpace:
             :class:`BSplineBasis` for what makes a knot vector valid.
         quad_rule : QuadratureRule, optional
             Forwarded to the underlying ``FunctionSpace`` constructor.
-            Default ``basis.default_quadrature()``.
+            Defaults to a rule that is exact for the basis.
 
         Returns
         -------
@@ -735,7 +735,7 @@ class FunctionSpace:
             ``(n_elements + 1,)``, strictly increasing.
         quad_rule : QuadratureRule, optional
             Forwarded to the underlying ``FunctionSpace`` constructor.
-            Default ``basis.default_quadrature()``.
+            Defaults to a rule that is exact for the basis.
 
         Returns
         -------

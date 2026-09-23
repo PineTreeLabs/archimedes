@@ -49,8 +49,7 @@ class Quadrature(Protocol):
         """Element boundaries, for a rule assembled from sub-elements.
 
         ``np.ndarray | None`` for a one-dimensional rule; a per-dimension
-        tuple of those for a multi-dimensional one. Consumers that care
-        (see ``Basis.required_breakpoints``) dispatch on ``ndim``.
+        tuple of those for a multi-dimensional one.
         """
 
     @property
@@ -59,12 +58,11 @@ class Quadrature(Protocol):
         no element structure.
 
         Shape ``(n,)`` for a one-dimensional rule and ``(n, ndim)`` for a
-        multi-dimensional one, mirroring ``nodes``. Present exactly when
-        ``breakpoints`` is.
+        multi-dimensional one, mirroring ``nodes``.
 
-        This is *provenance* that coordinates cannot recover. A composite
-        rule places nodes on its element boundaries and a basis that is
-        discontinuous there needs to know which element each copy belongs to.
+        This is provenance that can't be determined by coordinates alone. A
+        composite rule places nodes on its element boundaries, so a basis that is
+        discontinuous needs to know which element each copy belongs to.
         """
 
     @property

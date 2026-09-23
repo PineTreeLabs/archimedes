@@ -83,23 +83,20 @@ class CubicHermiteBasis(Basis):
         physical derivatives. See the class docstring."""
         return np.array([0, 1, 0, 1], dtype=int)
 
-    def default_quadrature(self):
+    def _default_quadrature(self):
         """Gauss-Legendre rule of 4 points.
 
         These are cardinal cubics (degree 3), so their products have degree
-        6; 4 Gauss points integrate exactly through degree 7. Same formula
-        as :meth:`LagrangeBasis.default_quadrature`, with the same
-        ``n_basis`` by coincidence (both are degree-3 families of 4
-        functions).
+        6; 4 Gauss points integrate exactly through degree 7.
         """
         from archimedes.quadrature import gauss_legendre
 
         return gauss_legendre(self.n_basis)
 
     def boundary_dofs(self, order: int = 0) -> tuple[int | None, int | None]:
-        """``(0, 2)`` for ``order=0`` (the value DOFs), ``(1, 3)`` for
-        ``order=1`` (the physical-derivative DOFs), ``(None, None)``
-        otherwise -- this family has no curvature (or higher) DOF."""
+        # ``(0, 2)`` for ``order=0`` (the value DOFs), ``(1, 3)`` for
+        # ``order=1`` (the physical-derivative DOFs), ``(None, None)``
+        # otherwise -- this family has no curvature (or higher) DOF.
         if order == 0:
             return (0, 2)
         if order == 1:

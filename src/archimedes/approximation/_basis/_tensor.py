@@ -223,11 +223,10 @@ class TensorBasis(Basis):
         return self.bases[0].density
 
     @property
-    def measures(self) -> tuple[Measure | None, ...]:
-        """The per-dimension orthogonality weights; see
-        :attr:`Basis.measures`. There is no single weight -- the dimensions
-        are independent and may use different families."""
-        return sum((basis.measures for basis in self.bases), ())
+    def _measures(self) -> tuple[Measure | None, ...]:
+        # The per-dimension orthogonality weights. The dimensions
+        # are independent and may use different families.
+        return sum((basis._measures for basis in self.bases), ())
 
     @property
     def Parameters(self) -> type:  # noqa: N802
@@ -236,7 +235,7 @@ class TensorBasis(Basis):
         return ProductParameters
 
     @property
-    def required_breakpoints(self) -> tuple:
+    def _required_breakpoints(self) -> tuple:
         """Per-dimension breakpoints, one entry per dimension, each ``None``
         unless that factor is only piecewise smooth.
 
@@ -245,15 +244,15 @@ class TensorBasis(Basis):
         :class:`~archimedes.quadrature.TensorQuadratureRule`'s own
         per-dimension breakpoints.
         """
-        return tuple(basis.required_breakpoints for basis in self.bases)
+        return tuple(basis._required_breakpoints for basis in self.bases)
 
-    def default_quadrature(self):
+    def _default_quadrature(self):
         """The tensor product of the factors' own default rules, which is
         therefore exact for this basis's mass and stiffness integrands in
         each variable separately."""
         from archimedes.quadrature import tensor_quad
 
-        return tensor_quad(*[basis.default_quadrature() for basis in self.bases])
+        return tensor_quad(*[basis._default_quadrature() for basis in self.bases])
 
     def _product_basis(self, other):
         """Tensor of the factors' product bases.

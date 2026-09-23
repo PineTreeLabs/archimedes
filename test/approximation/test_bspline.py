@@ -511,7 +511,7 @@ def test_bspline_constructor():
     knots = np.array([0.0, 0.0, 0.0, 1.0, 2.0, 2.0, 2.0])
     degree = 2
     basis = BSplineBasis(degree, knots)
-    rule = composite_quad(gauss_legendre(5), basis.required_breakpoints)
+    rule = composite_quad(gauss_legendre(5), basis._required_breakpoints)
     space = FunctionSpace.bspline(degree, knots, quad_rule=rule)
     assert space.reference_quad_rule is rule
 
@@ -561,7 +561,7 @@ def test_clamped_bspline_constructor():
 
     # Default quadrature is one Gauss-Legendre rule per element.
     space = FunctionSpace.clamped_bspline(3, [0.0, 1.0, 2.0, 3.0, 4.0])
-    rule = space.basis.default_quadrature()
+    rule = space.basis._default_quadrature()
     assert len(rule) == 4 * len(gauss_legendre(4))
 
     # Projection is exact for a polynomial within the basis's own degree.

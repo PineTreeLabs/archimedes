@@ -523,18 +523,19 @@ class TestQuadratureCompatibility:
         return PiecewiseBasis(local, self.BP, continuity=0)
 
     def test_required_breakpoints(self, basis, local):
-        np.testing.assert_array_equal(basis.required_breakpoints, self.BP)
+        np.testing.assert_array_equal(basis._required_breakpoints, self.BP)
         # A globally smooth family imposes no constraint
-        assert local.required_breakpoints is None
+        assert local._required_breakpoints is None
 
-    def test_default_quadrature_is_composite(self, basis):
-        rule = basis.default_quadrature()
+    def test_default_quadrature(self, basis):
+        # Check that the default is a composite
+        rule = basis._default_quadrature()
         np.testing.assert_array_equal(rule.breakpoints, self.BP)
         # `element_basis` is always normalized to a per-element tuple, even
         # in the (here, uniform) scalar-constructor case.
         assert len(rule) == sum(len(b.reference_nodes) for b in basis.element_basis)
 
-    def test_default_quadrature_integrates_mass_matrix_exactly(self, basis):
+        # Check that the default integrates the mass matrix exactly
         default = FunctionSpace(basis, domain=self.DOMAIN)
         # A much higher-order aligned rule must give the same mass matrix.
         exact = FunctionSpace(
@@ -543,6 +544,13 @@ class TestQuadratureCompatibility:
             reference_quad_rule=composite_quad(gauss_legendre(8), self.BP),
         )
         np.testing.assert_allclose(mass_matrix(default), mass_matrix(exact), atol=1e-12)
+
+    @pytest.mark.parametrize("continuity", [-1, 0])
+    def test_piecewise_default_quadrature(self, local, continuity):
+        # The mass matrix is singular if the rule has fewer points than
+        # n_basis; the default must never trip that guard.
+        basis = PiecewiseBasis(local, self.BP, continuity=continuity)
+        assert len(basis._default_quadrature()) >= basis.n_basis
 
     def test_compatible_rules_accepted(self, basis):
         rule = composite_quad(gauss_legendre(4), self.BP)
@@ -581,13 +589,6 @@ class TestQuadratureCompatibility:
             local, domain=self.DOMAIN, reference_quad_rule=gauss_legendre(7)
         )
         assert len(space.quad_rule) == 7
-
-    @pytest.mark.parametrize("continuity", [-1, 0])
-    def test_default_quadrature_satisfies_n_basis_guard(self, local, continuity):
-        # The mass matrix is singular if the rule has fewer points than
-        # n_basis; the default must never trip that guard.
-        basis = PiecewiseBasis(local, self.BP, continuity=continuity)
-        assert len(basis.default_quadrature()) >= basis.n_basis
 
 
 # -- per-element order (heterogeneous element_basis) --
@@ -642,9 +643,9 @@ class TestPerElementOrder:
             )
 
     def test_default_quadrature_matches_composite_quad(self, basis, element_bases):
-        rule = basis.default_quadrature()
+        rule = basis._default_quadrature()
         expected = composite_quad(
-            [b.default_quadrature() for b in element_bases], self.BP
+            [b._default_quadrature() for b in element_bases], self.BP
         )
         assert rule == expected
 
@@ -938,7 +939,7 @@ def test_legendre_kind_builds_modal_dg_space():
     assert all(
         isinstance(eb, OrthogonalPolynomialBasis) for eb in space.basis.element_basis
     )
-    assert all(eb.measures[0] == LegendreMeasure() for eb in space.basis.element_basis)
+    assert all(eb._measures[0] == LegendreMeasure() for eb in space.basis.element_basis)
     assert space.n_basis == 12
 
 
