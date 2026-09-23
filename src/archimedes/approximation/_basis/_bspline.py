@@ -318,13 +318,13 @@ class BSplineBasis(Basis):
             total = contribution if total is None else total + contribution
         return total
 
-    def evaluate_expansion(
+    def _evaluate_expansion(
         self, coefficients, x, deriv: int = 0, side: str = RIGHT, **domain_kwargs
     ):
         r"""Evaluate :math:`\sum_i c_i \, N_i(x)` (or its derivative) directly."""
         # Gathers only the ``degree + 1`` locally relevant coefficients per point
         # rather than materializing the full ``(npts, n_basis)`` design matrix: the
-        # local-support analogue of PiecewiseBasis.evaluate_expansion.
+        # local-support analogue of PiecewiseBasis._evaluate_expansion.
         _check_side(side)
         if deriv < 0:
             raise ValueError(f"deriv must be >= 0, got {deriv}")

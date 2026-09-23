@@ -68,7 +68,7 @@ BOUNDARY_NODE_RULES = {
 
 @pytest.mark.parametrize("continuity", [-1, 0])
 @pytest.mark.parametrize("rule_name", sorted(BOUNDARY_NODE_RULES))
-def test_mass_matrix_uses_recorded_ownership(continuity, rule_name):
+def test_mass_matrix(continuity, rule_name):
     # A node placed exactly on an element boundary belongs to the element
     # the quadrature rule recorded it against, not to whichever element the
     # half-open coordinate convention would pick. Check this for every rule
@@ -83,7 +83,7 @@ def test_mass_matrix_uses_recorded_ownership(continuity, rule_name):
 
 
 @pytest.mark.parametrize("continuity", [-1, 0])
-def test_stiffness_matrix_uses_recorded_ownership(continuity):
+def test_stiffness_matrix(continuity):
     basis = _basis(continuity, n=4)
     expected = stiffness_matrix(
         FunctionSpace(basis, DOMAIN, reference_quad_rule=REFERENCE)
@@ -95,7 +95,7 @@ def test_stiffness_matrix_uses_recorded_ownership(continuity):
 
 @pytest.mark.parametrize("continuity", [-1, 0])
 @pytest.mark.parametrize("rule_name", ["lobatto", "radau_right"])
-def test_basis_matrix_uses_recorded_ownership(continuity, rule_name):
+def test_basis_matrix(continuity, rule_name):
     # `basis_matrix` shares `basis._evaluate_at_nodes` with `mass_matrix`
     # rather than evaluating the basis by coordinate. Contracting a smooth
     # (coordinate-resolvable) integrand against it (via its adjoint) must
@@ -124,7 +124,7 @@ def test_basis_matrix_uses_recorded_ownership(continuity, rule_name):
     np.testing.assert_allclose(got, expected, rtol=1e-10, atol=1e-12)
 
 
-def test_projection_is_exact_with_boundary_nodes():
+def test_projection_boundary_nodes():
     basis = _basis(-1, n=4)
     space = FunctionSpace(
         basis, DOMAIN, reference_quad_rule=composite_quad(gauss_lobatto(6), BREAKS)
@@ -135,7 +135,7 @@ def test_projection_is_exact_with_boundary_nodes():
     )
 
 
-def test_refined_rule_accepted():
+def test_refined_rule():
     # Ownership maps rule elements to the basis element containing them, so a
     # rule refined beyond the basis is still handled exactly.
     basis = _basis(-1)
@@ -145,7 +145,7 @@ def test_refined_rule_accepted():
     np.testing.assert_allclose(got, expected, rtol=1e-10, atol=1e-12)
 
 
-def test_c0_derivative_integrates_exactly():
+def test_c0_derivative():
     # `derivative()` always lands in a discontinuous space, so this is the
     # path that made the issue reachable from ordinary use.
     space = FunctionSpace(_basis(0, n=4), DOMAIN)
@@ -157,7 +157,7 @@ def test_c0_derivative_integrates_exactly():
     )
 
 
-def test_falls_back_without_ownership():
+def test_fallback_without_ownership():
     # A rule with no element structure has no provenance to use. The result
     # must still match plain coordinate evaluation. `_evaluate_at_nodes`
     # expects an already-mapped rule, consistent with the `a`/`b` domain
@@ -186,7 +186,7 @@ def test_tensor_piecewise_boundary_nodes():
     np.testing.assert_allclose(got, expected, rtol=1e-10, atol=1e-12)
 
 
-def test_tensor_mixes_piecewise_and_smooth_factors():
+def test_tensor_mixed_factors():
     basis = TensorBasis((_basis(-1), OrthogonalPolynomialBasis(LegendreMeasure(), 3)))
     domain = ProductParameters(dims=(DOMAIN, DOMAIN))
     got = mass_matrix(
@@ -210,7 +210,7 @@ def test_tensor_mixes_piecewise_and_smooth_factors():
 
 
 @pytest.mark.parametrize("continuity,jump", [(-1, True), (0, False)])
-def test_side_gives_one_sided_limits(continuity, jump):
+def test_side_limits(continuity, jump):
     space = FunctionSpace(_basis(continuity), DOMAIN)
     u = space.project(lambda x: np.where(x < KNOT, x, 2 * x - 0.25))
     eps = 1e-9
@@ -224,7 +224,7 @@ def test_side_gives_one_sided_limits(continuity, jump):
 
 
 @pytest.mark.parametrize("continuity", [-1, 0])
-def test_derivative_jumps_when_value_does_not(continuity):
+def test_derivative_jump(continuity):
     # The gradient-jump error indicator for a C0 space needs exactly this.
     space = FunctionSpace(_basis(continuity), DOMAIN)
     u = space.project(lambda x: np.where(x < KNOT, x, 2 * x - 0.25))
@@ -234,7 +234,7 @@ def test_derivative_jumps_when_value_does_not(continuity):
     )
 
 
-def test_right_is_default():
+def test_default_side():
     space = FunctionSpace(_basis(-1), DOMAIN)
     u = space.project(lambda x: np.where(x < KNOT, 1.0, 2.0))
     at = np.array([KNOT])
@@ -243,8 +243,8 @@ def test_right_is_default():
 
 @pytest.mark.parametrize("side", ["left", "right"])
 @pytest.mark.parametrize("deriv", [0, 1])
-def test_dense_and_fused_paths_agree_on_both_sides(side, deriv):
-    # `evaluate` and `evaluate_expansion` resolve breakpoints independently
+def test_dense_and_fused_paths(side, deriv):
+    # `evaluate` and `_evaluate_expansion` resolve breakpoints independently
     # (masking vs. locate-and-gather), so they must be checked to agree.
     # continuity=-1 (discontinuous) is the more informative fixture here,
     # since both the value and the derivative are two-valued at breakpoints.
@@ -252,7 +252,7 @@ def test_dense_and_fused_paths_agree_on_both_sides(side, deriv):
     coefficients = np.arange(basis.n_basis, dtype=float)
     x = np.concatenate([np.linspace(A, B, 11), [KNOT]])
     dense = basis.evaluate(x, deriv=deriv, a=A, b=B, side=side) @ coefficients
-    fused = basis.evaluate_expansion(coefficients, x, deriv=deriv, a=A, b=B, side=side)
+    fused = basis._evaluate_expansion(coefficients, x, deriv=deriv, a=A, b=B, side=side)
     np.testing.assert_allclose(dense, fused, atol=1e-10)
 
 
@@ -261,11 +261,11 @@ def test_side_traces_symbolically(side):
     basis = _basis(-1)
     coefficients = np.arange(basis.n_basis, dtype=float)
     x = np.array([KNOT])
-    expected = basis.evaluate_expansion(coefficients, x, a=A, b=B, side=side)
+    expected = basis._evaluate_expansion(coefficients, x, a=A, b=B, side=side)
 
     @arc.compile
     def traced(xx):
-        return basis.evaluate_expansion(coefficients, xx, a=A, b=B, side=side)
+        return basis._evaluate_expansion(coefficients, xx, a=A, b=B, side=side)
 
     np.testing.assert_allclose(np.asarray(traced(x)).ravel(), expected, atol=1e-12)
 
@@ -284,13 +284,13 @@ def test_side_at_outer_endpoints():
     "call",
     [
         lambda b: b.evaluate(np.array([KNOT]), a=A, b=B, side="up"),
-        lambda b: b.evaluate_expansion(
+        lambda b: b._evaluate_expansion(
             np.zeros(b.n_basis), np.array([KNOT]), a=A, b=B, side="up"
         ),
     ],
     ids=["evaluate", "evaluate_expansion"],
 )
-def test_invalid_side_rejected(call):
+def test_invalid_side(call):
     with pytest.raises(ValueError, match="side must be 'left' or 'right'"):
         call(_basis(-1))
 
@@ -306,7 +306,7 @@ def _smooth_spaces():
 
 
 @pytest.mark.parametrize("name", sorted(_smooth_spaces()))
-def test_smooth_family_side_limits_agree(name):
+def test_smooth_family_side_limits(name):
     # Not "allow and ignore": a one-sided limit is well posed for any
     # function, and where the basis is smooth the two limits are equal, so
     # returning the ordinary value *is* the right answer. That is what lets
@@ -319,7 +319,7 @@ def test_smooth_family_side_limits_agree(name):
 
 
 @pytest.mark.parametrize("name", sorted(_smooth_spaces()))
-def test_smooth_families_still_validate_side(name):
+def test_smooth_family_side_validation(name):
     # A typo must fail the same way whichever basis it is handed to, rather
     # than being quietly accepted where the argument has no effect.
     space = _smooth_spaces()[name]
@@ -344,7 +344,7 @@ def _corner_space():
         (("right", "left"), 20.0),
     ],
 )
-def test_tensor_side_is_per_dimension(side, expected):
+def test_tensor_side_per_dimension(side, expected):
     # At a corner where both coordinates land on breakpoints there are four
     # one-sided limits, so a scalar cannot express all of them; a bare string
     # broadcasts to every dimension.

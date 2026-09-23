@@ -181,7 +181,7 @@ class Basis(metaclass=abc.ABCMeta):
         """
         raise NotImplementedError
 
-    def evaluate_expansion(
+    def _evaluate_expansion(
         self,
         coefficients: np.ndarray,
         x: np.ndarray,
@@ -192,28 +192,16 @@ class Basis(metaclass=abc.ABCMeta):
         r"""Evaluate :math:`\sum_i c_i \, \phi_i(x)` directly.
 
         Mathematically equivalent to ``evaluate(x, deriv) @ coefficients``,
-        which is the default implementation, but allows families with local
-        support (e.g. piecewise polynomials) to fuse the two steps.
+        which is the default implementation, but lets a family with local
+        support (e.g. piecewise polynomials) fuse the two steps and avoid
+        materializing the full ``(npts, n_basis)`` design matrix. Used by
+        :class:`FunctionSpace` (via its own private ``_evaluate``), which is
+        how a :class:`Function` call reaches this; not something a caller
+        needs directly.
 
-        Parameters
-        ----------
-        coefficients : ndarray
-            Shape ``(n_basis,)`` or ``(n_basis, m)`` for a vector-valued
-            expansion.
-        x : array_like
-            Evaluation points, shape ``(npts,)``.
-        deriv : int, optional
-            Derivative order. Default 0.
-        side : {"right", "left"}, optional
-            One-sided limit to take at a point of discontinuity, as for
-            :meth:`evaluate`.
-        **domain_kwargs
-            Target-domain parameters, as for :meth:`evaluate`.
-
-        Returns
-        -------
-        ndarray
-            Shape ``(npts,)`` or ``(npts, m)``, matching ``coefficients``.
+        ``coefficients`` has shape ``(n_basis,)`` or ``(n_basis, m)`` for a
+        vector-valued expansion, and the return shape matches: ``(npts,)``
+        or ``(npts, m)``.
         """
         return self.evaluate(x, deriv=deriv, side=side, **domain_kwargs) @ coefficients
 
@@ -238,7 +226,7 @@ class Basis(metaclass=abc.ABCMeta):
         ``domain_kwargs`` is still needed for this basis's *own*
         (independent) coefficient/breakpoint remap. Evaluation at
         *user-supplied* points goes through
-        :meth:`evaluate`/:meth:`evaluate_expansion` instead, which have no
+        :meth:`evaluate`/``_evaluate_expansion`` instead, which have no
         provenance to draw on and resolve breakpoints by the documented
         ``side`` convention.
         """
@@ -363,7 +351,7 @@ class Basis(metaclass=abc.ABCMeta):
         Purely an implementation detail of that remapping -- not something
         a caller needs, only the small set of families and internals
         (:class:`PiecewiseBasis`'s fused
-        :meth:`~PiecewiseBasis.evaluate_expansion` path) that must apply a
+        ``_evaluate_expansion`` path) that must apply a
         *per-column* power of ``scale`` rather than one factor for the whole
         matrix. A family whose coefficients are not all the same *kind* of
         quantity --
@@ -396,7 +384,7 @@ class Basis(metaclass=abc.ABCMeta):
         entirely, in which case there is no such extra factor.
 
         Purely an implementation detail of :class:`PiecewiseBasis`'s fused
-        :meth:`~PiecewiseBasis.evaluate_expansion` path, not something a
+        ``_evaluate_expansion`` path, not something a
         caller needs directly.
         """
         return 0.0

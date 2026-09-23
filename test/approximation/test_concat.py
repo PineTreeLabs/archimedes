@@ -65,7 +65,7 @@ def test_properties(combo, vertex, bubble, rule):
 # -- evaluate --
 
 
-def test_evaluate_concatenates_pieces(combo, vertex, bubble):
+def test_evaluate(combo, vertex, bubble):
     x = np.linspace(-1.0, 1.0, 9)
     got = combo.evaluate(x)
     expected = np.concatenate(
@@ -85,7 +85,7 @@ def test_evaluate_concatenates_pieces(combo, vertex, bubble):
     np.testing.assert_allclose(got, expected)
 
 
-def test_side_argument_is_validated(combo):
+def test_side_validation(combo):
     with pytest.raises(ValueError, match="side must be"):
         combo.evaluate(np.array([0.0]), side="up")
 
@@ -103,7 +103,7 @@ def test_boundary_dofs(combo, vertex):
     assert combo.boundary_dofs(1) == (None, None)
 
 
-def test_boundary_dofs_conflict_rejected(rule):
+def test_boundary_dofs_rejects_conflict(rule):
     left_claimer = LagrangeBasis(reference_nodes=np.array([-1.0, 0.0]))
     other_left_claimer = LagrangeBasis(reference_nodes=np.array([-1.0, 0.5]))
     combo = ConcatBasis((left_claimer, other_left_claimer), quad_rule=rule)
@@ -123,7 +123,6 @@ def test_boundary_dofs_conflict_rejected(rule):
 def test_required_breakpoints(combo, vertex, rule):
     # Should be None when no piece has any required breakpoints.
     assert combo._required_breakpoints is None
-
 
     # Should be a union of the required breakpoints of the individual pieces.
     a = PiecewiseBasis(vertex, np.array([-1.0, 0.0, 1.0]), continuity=-1)
@@ -171,7 +170,7 @@ def test_vertex_bubble(legendre6, combo):
 
 
 @pytest.mark.parametrize("deriv", [0, 1])
-def test_static_and_dynamic_evaluation_agree(combo, deriv):
+def test_static_and_dynamic_evaluation(combo, deriv):
     x = np.array([-1.0, -0.4, 0.0, 0.55, 1.0])
     static_phi = combo.evaluate(x, deriv=deriv)
 

@@ -111,7 +111,7 @@ def test_measures():
     )
 
 
-def test_density_is_shared_across_factors():
+def test_density():
     plain = TensorBasis((_modal(3), _modal(3)))
     assert plain.density is False
     normalized = TensorBasis(
@@ -162,7 +162,7 @@ def test_multi_index_c_order():
             np.testing.assert_allclose(phi[:, flat], phi_x[:, i] * phi_y[:, j])
 
 
-def test_node_and_basis_orderings_agree():
+def test_node_basis_ordering():
     # Both the quadrature nodes and the basis multi-index use C order, which
     # is what lets a coefficient array be reshaped against either.
     basis = TensorBasis((_modal(3), _modal(4)))
@@ -251,7 +251,7 @@ def test_partial_derivatives(deriv, exact):
     )
 
 
-def test_partial_derivative_on_piecewise_factor():
+def test_partial_derivative_piecewise():
     # Smoke check (one representative deriv) that the multi-index/row_kron
     # machinery above also works when a factor has local support / element
     # structure, not just a globally smooth modal basis.
@@ -287,7 +287,7 @@ def test_stiffness_matrix_gradient_form():
     np.testing.assert_allclose(stiffness_matrix(space), sum(blocks), atol=1e-12)
 
 
-def test_stiffness_matrix_matches_laplacian_entry():
+def test_stiffness_matrix_laplacian_value():
     # <grad u, grad u> for u = x*y on [0,1]^2 is int (y^2 + x^2) = 2/3.
     basis = TensorBasis((_modal(3), _modal(3)))
     domain = ProductParameters(dims=(UnitInterval.Parameters(0.0, 1.0),) * 2)
@@ -346,7 +346,7 @@ def test_vector_valued_projection(vector_space):
     np.testing.assert_allclose(u(x), fv(x), atol=1e-11)
 
 
-def test_products_factorize_dimension_by_dimension(space):
+def test_product_factorization(space):
     f = space.project(lambda x: x[:, 0] * x[:, 1])
     g = space.project(lambda x: x[:, 0] + x[:, 1])
     product = f * g
@@ -358,7 +358,7 @@ def test_products_factorize_dimension_by_dimension(space):
     )
 
 
-def test_product_basis_sizes_per_dimension():
+def test_product_basis_shape():
     a = TensorBasis((_modal(3), _modal(4)))
     b = TensorBasis((_modal(2), _modal(2)))
     assert a._product_basis(b).shape == (3 + 2 - 1, 4 + 2 - 1)
@@ -398,7 +398,7 @@ def test_dims_validation():
 # -- symbolic --
 
 
-def test_traces_and_differentiates(space):
+def test_symbolic_evaluation(space):
     u = space.project(f_)
     x = _grid(3, 3)
     expected = u(x)
@@ -478,7 +478,7 @@ def test_weightless_quadrature():
     assert space.n_basis == 9
 
 
-def test_aligned_composite_rule_accepted():
+def test_aligned_composite_rule():
     basis = TensorBasis((_piecewise(3), _modal(3)))
     rule = tensor_quad(composite_quad(gauss_legendre(3), BREAKS), gauss_legendre(4))
     space = FunctionSpace(basis, domain=BOX, reference_quad_rule=rule)
@@ -556,7 +556,7 @@ def test_domain_type():
         FunctionSpace(basis, domain=UnitInterval.Parameters(0.0, 1.0))
 
 
-def test_piecewise_requires_univariate_element():
+def test_piecewise_univariate_element():
     inner = TensorBasis((_nodal(3), _nodal(3)))
     with pytest.raises(ValueError, match="element_basis must be univariate"):
         PiecewiseBasis(inner, BREAKS, continuity=-1)

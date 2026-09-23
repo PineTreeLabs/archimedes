@@ -153,7 +153,7 @@ def test_pointwise_evaluation_past_degree_gives_zero():
 # -- the space is the minimal one --
 
 
-def test_derivative_space_is_smaller(space2):
+def test_derivative_space_smaller(space2):
     u = space2.project(f_)
     du = u.derivative()
     if isinstance(space2.basis, PiecewiseBasis):
@@ -165,7 +165,7 @@ def test_derivative_space_is_smaller(space2):
         assert du.space.n_basis == space2.n_basis - 1
 
 
-def test_polynomial_families_keep_their_measure_and_normalization():
+def test_derivative_measure_and_normalization():
     for measure in (
         LegendreMeasure(),
         JacobiMeasure(1.5, 0.5),
@@ -189,7 +189,7 @@ def test_jacobi_derivative_stays_orthonormal():
     np.testing.assert_allclose(mass_matrix(derived), np.eye(5), atol=1e-12)
 
 
-def test_projecting_back_up_is_exact():
+def test_project_back_up():
     # The documented way to get `f + f.derivative()`: the derivative lives in
     # a subspace, so projecting it up loses nothing.
     space = modal_space(6, A, B)
@@ -203,14 +203,14 @@ def test_projecting_back_up_is_exact():
 # -- piecewise --
 
 
-def test_piecewise_derivative_becomes_discontinuous():
+def test_piecewise_derivative_discontinuity():
     basis = PiecewiseBasis(_lobatto(4), BREAKS, continuity=0)
     derived = basis._derivative_basis()
     assert derived.continuity == -1
     np.testing.assert_allclose(derived.breakpoints, BREAKS)
 
 
-def test_piecewise_derivative_with_varying_order():
+def test_piecewise_derivative_variable_order():
     # Per-element bases of different order each shrink by their own local
     # degree, and the result is still forced discontinuous.
     basis = PiecewiseBasis(
@@ -221,7 +221,7 @@ def test_piecewise_derivative_with_varying_order():
     assert [b.n_basis for b in derived.element_basis] == [2, 4, 3]
 
 
-def test_piecewise_derivative_of_p1_elements_is_dg_p0():
+def test_p1_derivative_dg_p0():
     # The concrete FEM case: P1 continuous -> piecewise constant, one DOF per
     # element, and products of those stay at one DOF per element.
     breaks = np.linspace(-1.0, 1.0, 5)
@@ -235,12 +235,12 @@ def test_piecewise_derivative_of_p1_elements_is_dg_p0():
     assert (du * du).space.n_basis == 4
 
 
-def test_already_discontinuous_stays_discontinuous():
+def test_derivative_preserves_discontinuity():
     basis = PiecewiseBasis(_lobatto(4), BREAKS, continuity=-1)
     assert basis._derivative_basis().continuity == -1
 
 
-def test_zeroth_derivative_returns_same_basis():
+def test_zeroth_derivative_identity():
     basis = PiecewiseBasis(_lobatto(4), BREAKS, continuity=0)
     assert basis._derivative_basis(0) is basis
 
@@ -291,14 +291,14 @@ def test_square_diff_matrix_matches_classical():
     )
 
 
-def test_square_diff_matrix_is_exact_in_same_space(space2):
+def test_square_diff_matrix_same_space(space2):
     # The same-space form collocation wants: coefficients keep their meaning.
     u = space2.project(f_)
     du = Function(space2._diff_matrix() @ u.coefficients, space2)
     np.testing.assert_allclose(du(X), df_(X), atol=1e-10)
 
 
-def test_diff_matrix_shape_follows_target(space2):
+def test_diff_matrix_shape(space2):
     target = space2._derivative_space()
     assert space2._diff_matrix().shape == (space2.n_basis, space2.n_basis)
     assert space2._diff_matrix(space=target).shape == (target.n_basis, space2.n_basis)
@@ -336,7 +336,7 @@ def test_explicit_result_space():
 # -- weak forms --
 
 
-def test_stiffness_matrix_agrees_with_derivative_inner_products():
+def test_stiffness_matrix_inner_product():
     # The end-to-end check that matters for FEM: assembling <u', v'> from
     # derivative Functions gives the same answer as the stiffness matrix.
     space = nodal_space(6, A, B)
@@ -429,7 +429,7 @@ def test_derivative_traces():
     )
 
 
-def test_gradient_through_traced_domain_parameter():
+def test_gradient_traced_domain_parameter():
     basis = _lobatto(5)
     coefficients = np.array([0.0, 1.0, 2.0, 3.0, 4.0])
 
@@ -478,7 +478,7 @@ def test_default_node_family_is_lobatto():
     np.testing.assert_allclose(derived.reference_nodes, gauss_lobatto(4).nodes)
 
 
-def test_node_family_is_used_and_propagated():
+def test_node_family_propagation():
     basis = LagrangeBasis(reference_nodes=_radau_left(5), node_family=_radau_left)
     derived = basis._derivative_basis()
     np.testing.assert_allclose(derived.reference_nodes, _radau_left(4))
@@ -492,7 +492,7 @@ def test_node_family_is_used_and_propagated():
     )
 
 
-def test_node_family_does_not_change_exactness():
+def test_node_family_exactness():
     # Any n distinct nodes span the same P_{n-1}, so the choice cannot affect
     # whether the derivative is exact -- only conditioning and which DOFs are
     # nodal.
@@ -501,7 +501,7 @@ def test_node_family_does_not_change_exactness():
     np.testing.assert_allclose(space.project(f_).derivative()(X), df_(X), atol=1e-10)
 
 
-def test_zeroth_derivative_keeps_explicit_nodes():
+def test_zeroth_derivative_explicit_nodes():
     # Regenerating from the family would silently move nodes that were given
     # explicitly; TensorBasis asks for order 0 on undifferentiated factors.
     nodes = np.array([-1.0, -0.3, 0.4, 1.0])
@@ -509,14 +509,14 @@ def test_zeroth_derivative_keeps_explicit_nodes():
     assert basis._derivative_basis(0) is basis
 
 
-def test_tensor_derivative_preserves_undifferentiated_factor_nodes():
+def test_tensor_derivative_undifferentiated_factor_nodes():
     nodes = np.array([-1.0, -0.3, 0.4, 1.0])
     basis = TensorBasis((LagrangeBasis(reference_nodes=nodes), _lobatto(4)))
     derived = basis._derivative_basis((0, 1))
     np.testing.assert_allclose(derived.bases[0].reference_nodes, nodes)
 
 
-def test_bases_with_different_node_families_are_unequal():
+def test_node_family_inequality():
     a = LagrangeBasis(reference_nodes=_radau_left(4))
     b = LagrangeBasis(reference_nodes=_radau_left(4), node_family=_radau_left)
     assert a != b
@@ -530,7 +530,7 @@ def test_product_requires_matching_node_families():
         a._product_basis(b)
 
 
-def test_node_family_returning_wrong_count_is_rejected():
+def test_node_family_wrong_count_rejected():
     basis = LagrangeBasis(
         reference_nodes=_radau_left(5), node_family=lambda n: np.zeros(2)
     )
@@ -560,7 +560,7 @@ def df_periodic(x):
 
 
 @pytest.mark.parametrize("deriv", [0, 1, 2, 3, 4, 7, 50, 101])
-def test_fourier_full_derivative_basis_is_self_at_every_order(deriv):
+def test_fourier_full_derivative_closed_under_order(deriv):
     # Never shrinks, never raises -- closed under differentiation at every
     # order, unlike every polynomial family.
     basis = FourierBasis(5, kind="full")
@@ -568,7 +568,7 @@ def test_fourier_full_derivative_basis_is_self_at_every_order(deriv):
 
 
 @pytest.mark.parametrize("deriv", [0, 1, 2, 3, 4, 5, 50, 101])
-def test_fourier_cosine_alternates_kind_by_parity(deriv):
+def test_fourier_cosine_kind_parity(deriv):
     basis = FourierBasis(4, kind="cosine")  # max_mode = 3
     derived = basis._derivative_basis(deriv)
     if deriv % 2 == 0:
@@ -579,7 +579,7 @@ def test_fourier_cosine_alternates_kind_by_parity(deriv):
 
 
 @pytest.mark.parametrize("deriv", [0, 1, 2, 3, 4, 5, 50, 101])
-def test_fourier_sine_alternates_kind_by_parity(deriv):
+def test_fourier_sine_kind_parity(deriv):
     basis = FourierBasis(3, kind="sine")  # max_mode = 3
     derived = basis._derivative_basis(deriv)
     if deriv % 2 == 0:
@@ -598,12 +598,12 @@ def test_fourier_sine_alternates_kind_by_parity(deriv):
     ],
     ids=["full", "cosine", "sine"],
 )
-def test_fourier_derivative_never_exhausts_degree(basis):
+def test_fourier_derivative_unbounded_order(basis):
     # A periodic family never runs out of room, however high the order.
     basis._derivative_basis(200)  # must not raise
 
 
-def test_fourier_cosine_constant_only_has_no_odd_derivative_space():
+def test_fourier_cosine_constant_odd_derivative():
     # The one genuinely degenerate case: differentiating a bare constant an
     # odd number of times is identically zero, with no space of its own.
     basis = FourierBasis(1, kind="cosine")
@@ -645,7 +645,7 @@ def test_fourier_derivative_traces():
     )
 
 
-def test_basis_without_derivative_support_raises():
+def test_missing_derivative_support_raises():
     class Constant(Basis):
         n_basis = 1
 

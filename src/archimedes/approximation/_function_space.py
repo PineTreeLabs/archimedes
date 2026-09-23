@@ -1084,11 +1084,11 @@ class FunctionSpace:
         ndarray
             Shape ``(npts,)`` or ``(npts, m)``, matching ``coefficients``.
         """
-        # `evaluate_expansion` rather than `_basis_eval(...) @ coefficients`:
+        # `_evaluate_expansion` rather than `_basis_eval(...) @ coefficients`:
         # a locally-supported basis can fuse the two and avoid materializing
         # the full (npts, n_basis) matrix. The default implementation is
         # exactly that matrix product.
-        return self.basis.evaluate_expansion(
+        return self.basis._evaluate_expansion(
             coefficients, x, deriv=deriv, side=side, **self._domain_kwargs()
         )
 

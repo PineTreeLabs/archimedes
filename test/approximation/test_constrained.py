@@ -133,7 +133,7 @@ def test_conditioning():
 
 
 @pytest.mark.parametrize("deriv", [0, 1])
-def test_static_and_dynamic_evaluation_agree(legendre8, deriv):
+def test_static_and_dynamic_evaluation(legendre8, deriv):
     dirichlet = ConstrainedBasis.dirichlet(legendre8)
     x = np.array([-1.0, -0.4, 0.0, 0.55, 1.0])
     static_phi = dirichlet.evaluate(x, deriv=deriv)

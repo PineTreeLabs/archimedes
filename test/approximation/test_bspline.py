@@ -132,7 +132,7 @@ def test_negative_deriv_rejected(witness_basis):
     with pytest.raises(ValueError, match="deriv must be >= 0"):
         basis.evaluate(x, deriv=-1)
     with pytest.raises(ValueError, match="deriv must be >= 0"):
-        basis.evaluate_expansion(np.zeros(basis.n_basis), x, deriv=-1)
+        basis._evaluate_expansion(np.zeros(basis.n_basis), x, deriv=-1)
 
 
 def test_invalid_side_rejected(witness_basis):
@@ -143,7 +143,7 @@ def test_invalid_side_rejected(witness_basis):
     with pytest.raises(ValueError, match="side must be"):
         basis.evaluate(x, side="up")
     with pytest.raises(ValueError, match="side must be"):
-        basis.evaluate_expansion(np.zeros(basis.n_basis), x, side="up")
+        basis._evaluate_expansion(np.zeros(basis.n_basis), x, side="up")
 
 
 # -- values against the scipy oracle --
@@ -302,7 +302,7 @@ def test_evaluate_expansion_matches_dense(witness_basis):
     x = _sample_points(basis)
     c = rng.normal(size=basis.n_basis)
     phi = basis.evaluate(x)
-    np.testing.assert_allclose(basis.evaluate_expansion(c, x), phi @ c, atol=1e-9)
+    np.testing.assert_allclose(basis._evaluate_expansion(c, x), phi @ c, atol=1e-9)
 
 
 @pytest.mark.parametrize("deriv", [1, 2, 3])
@@ -314,7 +314,7 @@ def test_evaluate_expansion_matches_dense_derivative(witness_basis, deriv):
     c = rng.normal(size=basis.n_basis)
     phi = basis.evaluate(x, deriv=deriv)
     np.testing.assert_allclose(
-        basis.evaluate_expansion(c, x, deriv=deriv), phi @ c, atol=1e-7
+        basis._evaluate_expansion(c, x, deriv=deriv), phi @ c, atol=1e-7
     )
 
 
@@ -326,7 +326,7 @@ def test_evaluate_expansion_vector_valued(witness_basis):
     x = _sample_points(basis)
     c = rng.normal(size=(basis.n_basis, 3))
     phi = basis.evaluate(x)
-    np.testing.assert_allclose(basis.evaluate_expansion(c, x), phi @ c, atol=1e-9)
+    np.testing.assert_allclose(basis._evaluate_expansion(c, x), phi @ c, atol=1e-9)
 
 
 def test_evaluate_expansion_deriv_past_degree(witness_basis):
@@ -335,11 +335,11 @@ def test_evaluate_expansion_deriv_past_degree(witness_basis):
     basis = witness_basis
     x = _sample_points(basis)
     c = np.ones(basis.n_basis)
-    result = basis.evaluate_expansion(c, x, deriv=basis.degree + 1)
+    result = basis._evaluate_expansion(c, x, deriv=basis.degree + 1)
     np.testing.assert_allclose(result, 0.0, atol=1e-12)
 
     cvec = np.ones((basis.n_basis, 2))
-    result_vec = basis.evaluate_expansion(cvec, x, deriv=basis.degree + 1)
+    result_vec = basis._evaluate_expansion(cvec, x, deriv=basis.degree + 1)
     assert result_vec.shape == (len(x), 2)
     np.testing.assert_allclose(result_vec, 0.0, atol=1e-12)
 
@@ -601,7 +601,7 @@ def test_degree_zero(ctor):
 # -- symbolic tracing --
 
 
-def test_static_and_dynamic_evaluation_agree(basis):
+def test_static_and_dynamic_evaluation(basis):
     x = _sample_points(basis, extrapolate=False)
     static_phi = basis.evaluate(x)
 

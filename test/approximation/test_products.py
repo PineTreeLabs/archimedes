@@ -54,7 +54,7 @@ def g_(x):
 # -- exactness --
 
 
-def test_product_is_exact(space):
+def test_product(space):
     f, g = space.project(f_), space.project(g_)
     x = np.linspace(A, B, 61)
     np.testing.assert_allclose(
@@ -75,7 +75,7 @@ def test_product_space_size(space):
         assert product.space.n_basis == n1 + n2 - 1
 
 
-def test_multiply_is_commutative():
+def test_multiply_commutative():
     # Commutativity of `*` is generic Function-level behavior (built on
     # `multiply`, which projects the same pointwise product either way), not
     # family-specific, so one representative family suffices.
@@ -85,7 +85,7 @@ def test_multiply_is_commutative():
     np.testing.assert_allclose((f * g)(x), (g * f)(x), atol=1e-12)
 
 
-def test_repeated_products_stay_exact_and_grow(space):
+def test_repeated_products(space):
     f = space.project(f_)
     x = np.linspace(A, B, 41)
     squared = f * f
@@ -96,7 +96,7 @@ def test_repeated_products_stay_exact_and_grow(space):
     assert cubed.space.n_basis > squared.space.n_basis > f.space.n_basis
 
 
-def test_project_back_down_after_product(space):
+def test_reduce_product(space):
     # The documented way to control growth.
     f, g = space.project(f_), space.project(g_)
     product = f * g
@@ -110,7 +110,7 @@ def test_project_back_down_after_product(space):
 # -- scalars still work --
 
 
-def test_scalar_multiplication_stays_in_space():
+def test_scalar_multiplication():
     # Scalar multiplication is generic Function-level behavior (the
     # `__mul__`/`__rmul__` branch that never leaves `self.space`), not
     # family-specific, so one representative family suffices.
@@ -125,7 +125,7 @@ def test_scalar_multiplication_stays_in_space():
 # -- vector-valued --
 
 
-def test_vector_times_vector_is_elementwise(space):
+def test_vector_times_vector(space):
     def fv(x):
         return np.stack([x**2, 1.0 - x], axis=-1)
 
@@ -137,7 +137,7 @@ def test_vector_times_vector_is_elementwise(space):
     np.testing.assert_allclose((f * g)(x), fv(x) * gv(x), atol=1e-11)
 
 
-def test_scalar_valued_times_vector_valued_broadcasts(space):
+def test_scalar_times_vector_broadcast(space):
     def gv(x):
         return np.stack([x, x**3], axis=-1)
 
@@ -207,14 +207,14 @@ def test_product_basis_validation():
         interval._product_space(line)
 
 
-def test_matching_density_forwarded_to_product():
+def test_matching_density_forwarded():
     left = OrthogonalPolynomialBasis(PhysicistsHermiteMeasure(), 3, density=True)
     right = OrthogonalPolynomialBasis(PhysicistsHermiteMeasure(), 4, density=True)
     product = left._product_basis(right)
     assert product.density is True
 
 
-def test_basis_without_product_support_rejected():
+def test_basis_without_product_support():
     class Constant(Basis):
         n_basis = 1
 
@@ -254,14 +254,14 @@ def test_hermite_has_no_product_basis():
     "left,right,expected",
     [(0, 0, 0), (-1, -1, -1), (0, -1, -1), (-1, 0, -1)],
 )
-def test_piecewise_product_takes_weaker_continuity(left, right, expected):
+def test_piecewise_product_continuity(left, right, expected):
     # A product is only as smooth as its least smooth factor.
     a = PiecewiseBasis(_lobatto(3), BREAKPOINTS, continuity=left)
     b = PiecewiseBasis(_lobatto(3), BREAKPOINTS, continuity=right)
     assert a._product_basis(b).continuity == expected
 
 
-def test_product_basis_with_varying_order():
+def test_product_basis_varying_order():
     # Per-element product sizes follow the same n_1 + n_2 - 1 rule as the
     # scalar case, applied element by element.
     left = PiecewiseBasis((_lobatto(3), _lobatto(5)), BREAKPOINTS, continuity=-1)
@@ -270,7 +270,7 @@ def test_product_basis_with_varying_order():
     assert [b.n_basis for b in product.element_basis] == [3 + 2 - 1, 5 + 4 - 1]
 
 
-def test_discontinuous_product_is_exact():
+def test_discontinuous_product():
     basis = PiecewiseBasis(_lobatto(4), BREAKPOINTS, continuity=-1)
     space = FunctionSpace(basis, domain=DOMAIN)
     f, g = space.project(f_), space.project(g_)
@@ -315,7 +315,7 @@ def test_fourier_product_closure_table(kind1, n1, kind2, n2, expected_kind, expe
     assert product.n_basis == expected_n
 
 
-def test_fourier_product_is_exact():
+def test_fourier_product_exact():
     domain = UnitInterval.Parameters(a=-1.0, b=1.0)
     space = FunctionSpace(FourierBasis(5, kind="full"), domain=domain)
 
@@ -360,7 +360,7 @@ def test_fourier_product_validation():
         modal._product_basis(fourier)
 
 
-def test_fourier_matching_density_forwarded_to_product():
+def test_fourier_matching_density_forwarded():
     left = FourierBasis(3, kind="cosine", density=True)
     right = FourierBasis(4, kind="cosine", density=True)
     product = left._product_basis(right)

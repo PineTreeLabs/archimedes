@@ -170,7 +170,7 @@ class PiecewiseBasis(Basis):
         object.__setattr__(self, "element_basis", element_bases)
         object.__setattr__(self, "breakpoints", bp)
         # Whether every element shares the same basis.
-        # Lets `evaluate_expansion` keep its fused O(1)-in-
+        # Lets `_evaluate_expansion` keep its fused O(1)-in-
         # `n_elements` fast path in the common case; see that method.
         object.__setattr__(
             self, "_uniform", all(eb == element_bases[0] for eb in element_bases)
@@ -510,7 +510,7 @@ class PiecewiseBasis(Basis):
         masks = [owner == e for e in range(self.n_elements)]
         return self._blocks(x, masks, knots, deriv)
 
-    def evaluate_expansion(
+    def _evaluate_expansion(
         self, coefficients, x, deriv: int = 0, a=None, b=None, side: str = RIGHT
     ):
         r"""Evaluate the coefficient expansion :math:`\sum_i c_i \,
@@ -526,19 +526,14 @@ class PiecewiseBasis(Basis):
         advantage doesn't apply, and this costs the same as the dense
         ``evaluate(x) @ coefficients`` path.
 
-        Parameters
-        ----------
-        coefficients, x, deriv : array_like, array_like, int, optional
-            As for :meth:`evaluate_expansion <Basis.evaluate_expansion>`.
-        a, b : float, optional
-            Target-domain endpoints; see :meth:`evaluate`.
-        side : {"right", "left"}, optional
-            Which one-sided limit to take at a point lying exactly on an
-            interior breakpoint, where this basis is two-valued -- see
-            :meth:`evaluate`. Default ``"right"``.
+        ``coefficients``, ``x``, ``deriv`` are as for
+        ``Basis._evaluate_expansion``; ``a``, ``b`` are target-domain
+        endpoints and ``side`` the one-sided limit to take at a point lying
+        exactly on an interior breakpoint, where this basis is two-valued --
+        both as for :meth:`evaluate`.
         """
         if not self._uniform:
-            return super().evaluate_expansion(
+            return super()._evaluate_expansion(
                 coefficients, x, deriv=deriv, side=side, a=a, b=b
             )
 

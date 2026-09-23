@@ -29,7 +29,7 @@ def test_construction_validation(nodes):
         basis.evaluate(np.array([0.0]), deriv=-1)
 
 
-def test_not_equal_to_other_type(nodes):
+def test_type_mismatch(nodes):
     basis = LagrangeBasis(reference_nodes=nodes)
     assert basis != "not a basis"
 
@@ -220,7 +220,7 @@ class TestHigherDerivatives:
         np.testing.assert_allclose(actual, expected, atol=1e-10)
 
     @pytest.mark.parametrize("deriv", [2, 3])
-    def test_piecewise_inherits_higher_derivatives(self, basis, deriv):
+    def test_piecewise_inherits(self, basis, deriv):
         # Stiffness-like operators on a piecewise space need element
         # derivatives above first order.
         bp = np.linspace(-1.0, 1.0, 3)
@@ -306,14 +306,14 @@ def test_gauss_radau_node_family():
         lambda n: LagrangeBasis.gauss_radau(n, endpoint="left"),
     ],
 )
-def test_derivative_basis_preserves_family(ctor):
+def test_derivative_basis_family(ctor):
     basis = ctor(6)
     derived = basis._derivative_basis(2)
     assert derived.node_family == basis.node_family
     assert derived.n_basis == 4
 
 
-def test_product_basis_preserves_family():
+def test_product_basis_family():
     a = LagrangeBasis.gauss_legendre(4)
     b = LagrangeBasis.gauss_legendre(5)
     prod = a._product_basis(b)

@@ -76,13 +76,13 @@ M_COMPONENTS = len(COMPONENTS)
 # comparison too.)
 
 
-def test_project_vector_is_exact_for_representable_components(space2):
+def test_project_vector_exact(space2):
     fn = space2.project(f_vec)
     x = np.linspace(A, B, 41)
     np.testing.assert_allclose(fn(x), f_vec(x), atol=1e-9)
 
 
-def test_project_vector_matches_per_component_projection(space):
+def test_project_vector_matches_components(space):
     # The whole point of the shared-space design: projecting all components
     # at once must give exactly what projecting each one separately gives.
     joint = space.project(f_vec).coefficients
@@ -90,7 +90,7 @@ def test_project_vector_matches_per_component_projection(space):
     np.testing.assert_allclose(joint, separate, atol=1e-12)
 
 
-def test_project_vector_respects_quad_rule_override(space):
+def test_project_vector_quad_rule(space):
     # Same override path as the scalar case. Confirm it is plumbed through
     # the vector branch too. An override rule is used exactly as given, with
     # no further domain mapping, so it must already be mapped onto this
@@ -101,7 +101,7 @@ def test_project_vector_respects_quad_rule_override(space):
     np.testing.assert_allclose(fn(x), f_vec(x), atol=1e-9)
 
 
-def test_project_single_column_is_not_scalar_case(space):
+def test_project_single_column(space):
     # An ``(npts, 1)`` target stays 2-D rather than collapsing to scalar.
     def f(x):
         return np.stack([x**2], axis=-1)
@@ -111,7 +111,7 @@ def test_project_single_column_is_not_scalar_case(space):
     assert fn(np.linspace(A, B, 5)).shape == (5, 1)
 
 
-def test_derivative_of_vector_function(space2):
+def test_vector_derivative(space2):
     fn = space2.project(f_vec)
     x = np.linspace(A + 0.1, B - 0.1, 11)
     expected = np.stack([2 * x, 2 * np.ones_like(x), -np.ones_like(x)], axis=-1)
@@ -121,7 +121,7 @@ def test_derivative_of_vector_function(space2):
 # -- inner product / norm contract over components --
 
 
-def test_inner_product_is_scalar_and_contracts(space):
+def test_inner_product_contraction(space):
     # <f, g> = int f . g w dx -- a scalar, equal to the sum of the
     # per-component inner products.
     fn = space.project(f_vec)
@@ -137,7 +137,7 @@ def test_inner_product_is_scalar_and_contracts(space):
     np.testing.assert_allclose(joint, per_component, rtol=1e-10)
 
 
-def test_norm_is_scalar_l2_norm_of_whole_function(space):
+def test_norm_contraction(space):
     fn = space.project(f_vec)
     norm = fn.norm()
     assert np.ndim(norm) == 0
@@ -161,7 +161,7 @@ def test_inner_product_matches_mass_matrix_contraction(space):
     np.testing.assert_allclose(fn.dot(gn), expected, rtol=1e-9)
 
 
-def test_scalar_inner_product_still_scalar(space):
+def test_inner_product_scalar_case(space):
     # The contraction branch must not perturb the scalar path.
     fn = space.project(f0)
     assert np.ndim(fn.dot(fn)) == 0
@@ -171,7 +171,7 @@ def test_scalar_inner_product_still_scalar(space):
 # -- arithmetic --
 
 
-def test_add_and_scale_vector_functions(space):
+def test_vector_arithmetic(space):
     fn = space.project(f_vec)
     gn = space.project(lambda x: 3.0 * f_vec(x))
     total = fn + 2.0 * gn
@@ -183,7 +183,7 @@ def test_add_and_scale_vector_functions(space):
 # -- pytree / symbolic --
 
 
-def test_vector_function_is_pytree(space):
+def test_vector_function_pytree(space):
     fn = space.project(f_vec)
     flat, unravel = tree.ravel(fn)
     # coefficients (n_basis * m) + the two domain endpoints
@@ -230,7 +230,7 @@ def test_vector_inner_product_traces(space):
     np.testing.assert_allclose(traced(fn.coefficients), fn.dot(fn), rtol=1e-10)
 
 
-def test_gradient_of_vector_norm(space):
+def test_vector_norm_gradient(space):
     # ``norm`` is a scalar for vector-valued coefficients, so it can be
     # differentiated. This would fail outright if it returned an array.
     # ``arc.grad`` differentiates with respect to a *vector* argument, so the

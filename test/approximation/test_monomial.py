@@ -94,7 +94,7 @@ def test_values_on_mapped_domain():
 
 
 @pytest.mark.parametrize("deriv", [1, 2, 3])
-def test_derivative_matches_finite_difference_and_closed_form(deriv):
+def test_derivative_formula(deriv):
     basis = MonomialBasis(6)
     x = np.linspace(-0.9, 0.9, 13)
     h = 1e-6

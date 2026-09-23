@@ -88,25 +88,22 @@ def test_integral_is_exact(space):
     np.testing.assert_allclose(antideriv(X), f_left(X), atol=1e-10)
 
 
-def test_integral_undoes_derivative_up_to_dropped_constant(space2):
-    # The FTC round trip: integrating the derivative back up recovers f_,
-    # shifted so it vanishes at the left endpoint (which the derivative
-    # itself has no memory of).
+def test_ftc_round_trip(space2):
+    # Integrating the derivative back up recovers f_, shifted so it vanishes
+    # at the left endpoint (which the derivative itself has no memory of).
     u = space2.project(f_)
     np.testing.assert_allclose(
         u.derivative().antiderivative()(X), f_(X) - f_(A), atol=1e-9
     )
 
-
-def test_derivative_undoes_integral():
-    # The other direction of the round trip: differentiating the
-    # antiderivative recovers the original function exactly.
+    # The other direction: differentiating the antiderivative recovers the
+    # original function exactly.
     space = nodal_space(6, A, B)
     u = space.project(f_)
     np.testing.assert_allclose(u.antiderivative().derivative()(X), f_(X), atol=1e-9)
 
 
-def test_repeated_integration_matches_single_call_at_higher_order():
+def test_repeated_integration_matches_single_call():
     space = nodal_space(6, A, B)
     u = space.project(g_)
     np.testing.assert_allclose(
@@ -124,7 +121,7 @@ def test_order_two_matches_cauchy_repeated_integral():
     np.testing.assert_allclose(antideriv2(np.array([A]), deriv=1)[0], 0.0, atol=1e-10)
 
 
-def test_order_zero_is_identity():
+def test_antiderivative_order_zero_identity():
     # Generic FunctionSpace-level plumbing (order=0 is the identity map),
     # not family-specific, so one representative family suffices.
     space = nodal_space(6, A, B)
@@ -137,18 +134,16 @@ def test_order_zero_is_identity():
 # -- boundary semantics --
 
 
-def test_antiderivative_left_boundary(space2):
-    antideriv = space2.project(f_).antiderivative(boundary="left")
-    np.testing.assert_allclose(antideriv(np.array([A]))[0], 0.0, atol=1e-10)
+@pytest.mark.parametrize("boundary", ["left", "right"])
+def test_antiderivative_boundary(space2, boundary):
+    antideriv = space2.project(f_).antiderivative(boundary=boundary)
+    endpoint = np.array([A if boundary == "left" else B])
+    np.testing.assert_allclose(antideriv(endpoint)[0], 0.0, atol=1e-10)
+    if boundary == "right":
+        np.testing.assert_allclose(antideriv(X), f_right(X), atol=1e-10)
 
 
-def test_antiderivative_right_boundary(space2):
-    antideriv = space2.project(f_).antiderivative(boundary="right")
-    np.testing.assert_allclose(antideriv(np.array([B]))[0], 0.0, atol=1e-10)
-    np.testing.assert_allclose(antideriv(X), f_right(X), atol=1e-10)
-
-
-def test_left_and_right_differ_by_whole_domain_integral(space2):
+def test_boundary_choice_difference(space2):
     u = space2.project(f_)
     total = u.integrate()
     left = u.antiderivative(boundary="left")
@@ -177,7 +172,7 @@ def test_integral_matrix_shape():
     assert space._integral_matrix(order=2).shape == (space.n_basis + 2, space.n_basis)
 
 
-def test_integral_matrix_order_zero_is_identity():
+def test_integral_matrix_order_zero_identity():
     space = nodal_space(6, A, B)
     np.testing.assert_allclose(space._integral_matrix(order=0), np.eye(space.n_basis))
 
@@ -187,7 +182,7 @@ def test_integral_matrix_order_zero_is_identity():
     [LegendreMeasure(), JacobiMeasure(1.5, 0.5)],
     ids=["legendre", "jacobi"],
 )
-def test_polynomial_families_keep_measure_and_normalization(measure):
+def test_integral_measure_and_normalization(measure):
     basis = OrthogonalPolynomialBasis(measure, 5, density=True)
     derived = basis._integral_basis()
     assert derived.measure == measure
@@ -195,7 +190,7 @@ def test_polynomial_families_keep_measure_and_normalization(measure):
     assert derived.n_basis == 6
 
 
-def test_integral_basis_construction_does_not_require_finite_domain():
+def test_integral_basis_unbounded_domain():
     # Basis construction is purely about span/degree and doesn't know about
     # a target domain; the finite-endpoint requirement only bites once
     # `FunctionSpace._integral_matrix` needs somewhere to evaluate at.
@@ -285,13 +280,13 @@ def test_negative_integral_order_rejected(basis):
         basis._integral_basis(-1)
 
 
-def test_integral_matrix_rejects_negative_order():
+def test_integral_matrix_negative_order_rejected():
     space = nodal_space(6, A, B)
     with pytest.raises(ValueError, match="order must be >= 0"):
         space._integral_matrix(order=-1)
 
 
-def test_zeroth_integral_returns_same_basis():
+def test_zeroth_integral_identity():
     basis = OrthogonalPolynomialBasis(LegendreMeasure(), 4)
     assert basis._integral_basis(0) is basis
     lagrange = _lobatto(4)
@@ -300,7 +295,7 @@ def test_zeroth_integral_returns_same_basis():
     assert fourier._integral_basis(0) is fourier
 
 
-def test_basis_without_integral_support_raises():
+def test_missing_integral_support_raises():
     class Constant(Basis):
         n_basis = 1
 
@@ -319,7 +314,7 @@ def test_basis_without_integral_support_raises():
         Constant()._integral_basis()
 
 
-def test_hermite_has_no_integral_basis():
+def test_hermite_integral_unsupported():
     # CubicHermiteBasis doesn't override `_integral_basis`, so this is the
     # base class's NotImplementedError, propagated unchanged through
     # PiecewiseBasis's own (differently-worded) override.
@@ -328,7 +323,7 @@ def test_hermite_has_no_integral_basis():
         hermite._integral_basis()
 
 
-def test_piecewise_has_no_integral_basis():
+def test_piecewise_integral_unsupported():
     basis = PiecewiseBasis(_lobatto(4), BREAKS, continuity=0)
     with pytest.raises(
         NotImplementedError, match="running constant carried across elements"
@@ -336,7 +331,7 @@ def test_piecewise_has_no_integral_basis():
         basis._integral_basis()
 
 
-def test_piecewise_function_integral_raises():
+def test_piecewise_integral_raises():
     space = FunctionSpace(
         PiecewiseBasis(_lobatto(4), BREAKS, continuity=0), domain=DOMAIN
     )
@@ -360,7 +355,7 @@ XF = np.linspace(-0.93, 0.93, 15)
     [FourierBasis(5, kind="full"), FourierBasis(4, kind="cosine")],
     ids=["full", "cosine"],
 )
-def test_fourier_full_and_cosine_integral_basis_raises(basis):
+def test_fourier_integral_dc_raises(basis):
     # Both contain the constant/DC basis function, whose antiderivative is a
     # non-periodic linear ramp. This is a different reason than Hermite and
     # piecewise raise for theirs.
@@ -368,7 +363,7 @@ def test_fourier_full_and_cosine_integral_basis_raises(basis):
         basis._integral_basis()
 
 
-def test_fourier_sine_integral_basis_grows_by_one():
+def test_fourier_sine_integral_growth():
     basis = FourierBasis(3, kind="sine")
     grown = basis._integral_basis(1)
     assert grown.kind == "cosine"
@@ -382,7 +377,7 @@ def test_fourier_sine_integral_order_two_raises():
         basis._integral_basis(2)
 
 
-def test_fourier_sine_integral_dc_coefficient_is_generically_nonzero():
+def test_fourier_sine_integral_dc_coefficient():
     # Documents *why* the integral basis must grow: pinning the antiderivative
     # to vanish at a boundary forces a nonzero constant term back in, since
     # cos(k*theta(boundary)) = (-1)**k != 0 for every mode.
@@ -434,13 +429,13 @@ def test_fourier_sine_integral_traces():
     ],
     ids=["hermite", "laguerre"],
 )
-def test_unbounded_domain_rejected_for_integral(space, f):
+def test_integral_unbounded_domain_rejected(space, f):
     u = space.project(f)
     with pytest.raises(ValueError, match="finite endpoints"):
         u.antiderivative()
 
 
-def test_order_zero_is_exempt_from_finite_domain_requirement():
+def test_order_zero_unbounded_domain():
     # order=0 needs no boundary condition at all, so it should work even on
     # a space with no finite endpoint to anchor at.
     space = FunctionSpace.hermite(6)
@@ -451,7 +446,7 @@ def test_order_zero_is_exempt_from_finite_domain_requirement():
 # -- integrate() --
 
 
-def test_integrate_matches_whole_domain_analytic_value(space2):
+def test_integrate_whole_domain(space2):
     u = space2.project(f_)
     np.testing.assert_allclose(
         u.integrate(), f_antideriv(B) - f_antideriv(A), atol=1e-9
@@ -463,7 +458,7 @@ def test_integrate_matches_whole_domain_analytic_value(space2):
     np.testing.assert_allclose(u.integrate(), antideriv(np.array([B]))[0], atol=1e-10)
 
 
-def test_integrate_supports_arbitrary_sub_interval(space2):
+def test_integrate_sub_interval(space2):
     u = space2.project(f_)
     lo, hi = 0.3, 1.7
     np.testing.assert_allclose(
@@ -472,7 +467,7 @@ def test_integrate_supports_arbitrary_sub_interval(space2):
     np.testing.assert_allclose(u.integrate(lo, hi), quadint(u, lo, hi), atol=1e-8)
 
 
-def test_integrate_is_unweighted_even_for_measure_weighted_family():
+def test_integrate_ignores_measure_weight():
     # Jacobi/Chebyshev's own quadrature is calibrated to their orthogonality
     # weight, not the plain Lebesgue measure. `integrate()` must not leak
     # that in: "the integral of this function" should mean the ordinary
@@ -497,7 +492,7 @@ def test_piecewise_integrate():
         u.integrate(0.3, 1.7)
 
 
-def test_unbounded_domain_rejected_for_integrate_even_whole_domain():
+def test_integrate_unbounded_domain_rejected():
     # `.antiderivative()` raises ValueError here, not NotImplementedError.
     # `integrate()`'s fallback (which only catches NotImplementedError) does
     # not swallow it. There is no well-defined fallback anyway: an unweighted

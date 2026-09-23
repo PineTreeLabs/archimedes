@@ -66,7 +66,7 @@ def test_add_and_subtract_same_space(quadratic):
 @pytest.mark.parametrize(
     "op", [operator.add, operator.sub, Function.dot], ids=["add", "sub", "dot"]
 )
-def test_structurally_mismatched_space_raises(quadratic, quad_rule, op):
+def test_structural_mismatch(quadratic, quad_rule, op):
     # __add__/__sub__/dot all guard on the same `_is_compatible_with` check;
     # different n_basis -> different basis -> genuinely incompatible.
     other_space = FunctionSpace(
@@ -79,7 +79,7 @@ def test_structurally_mismatched_space_raises(quadratic, quad_rule, op):
         op(quadratic, other)
 
 
-def test_domain_mismatch_not_caught(quadratic, quad_rule):
+def test_domain_mismatch(quadratic, quad_rule):
     # Documented limitation: `_is_compatible_with` compares the domain only
     # structurally, since values are undecidable once traced. Two spaces
     # differing *only* in domain values are therefore accepted -- the caller
@@ -120,7 +120,7 @@ def test_division_by_function_raises(quadratic):
         quadratic / quadratic
 
 
-def test_is_struct_pytree(quadratic):
+def test_pytree(quadratic):
     # coefficients + the domain's (a, b): `basis`/`quad_rule` are static, but
     # the domain parameters are leaves so they can be traced/optimized.
     leaves, treedef = arc.tree.flatten(quadratic)
@@ -133,7 +133,7 @@ def test_is_struct_pytree(quadratic):
     assert rebuilt.space._is_compatible_with(quadratic.space)
 
 
-def test_domain_parameters_are_traceable(space, quadratic):
+def test_domain_parameter_gradients(space, quadratic):
     # The point of making FunctionSpace a struct: the domain endpoints are
     # pytree leaves, so they can be traced and differentiated through.
     x0 = 0.4
@@ -167,7 +167,7 @@ def test_domain_parameters_are_traceable(space, quadratic):
 # -- symbolic tracing / autodiff --
 
 
-def test_static_and_dynamic_evaluation_agree(space, quadratic):
+def test_static_and_dynamic_evaluation(space, quadratic):
     x = np.linspace(-1, 1, 9)
     static_vals = np.array([quadratic(xi) for xi in x])
 
@@ -190,7 +190,7 @@ def test_grad_wrt_x(space, quadratic):
     np.testing.assert_allclose(computed, 2 * x, atol=1e-10)
 
 
-def test_grad_wrt_coefficients_matches_basis_values(space, quadratic):
+def test_grad_wrt_coefficients(space, quadratic):
     @arc.compile
     def traced(x, c):
         return Function(c, space)(x)
@@ -205,13 +205,13 @@ def test_grad_wrt_coefficients_matches_basis_values(space, quadratic):
 # -- dot / norm --
 
 
-def test_dot_matches_space_inner_product(space, quadratic):
+def test_dot(space, quadratic):
     cubic = space.project(lambda x: x**3)
     expected = space._inner_product(quadratic.coefficients, cubic.coefficients)
     np.testing.assert_allclose(quadratic.dot(cubic), expected)
 
 
-def test_dot_of_odd_and_even_function_on_symmetric_domain_vanishes(space):
+def test_dot_orthogonality(space):
     # x^2 (even) and x^3 (odd) are L2-orthogonal on [-1, 1].
     even_fn = space.project(lambda x: x**2)
     odd_fn = space.project(lambda x: x**3)

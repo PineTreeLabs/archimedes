@@ -57,10 +57,12 @@ def test_exact_cubic_on_reference_domain(basis):
     np.testing.assert_allclose(basis.evaluate(t, deriv=1) @ coeffs, df(t), atol=1e-9)
 
 
-def test_derivative_order_edge_cases(basis):
+def test_negative_deriv_rejected(basis):
     with pytest.raises(ValueError, match="deriv must be >= 0"):
         basis.evaluate(np.array([0.0]), deriv=-1)
 
+
+def test_deriv_past_degree(basis):
     # Degree 3, so the 4th derivative and beyond are identically zero.
     x = np.linspace(-0.9, 0.9, 5)
     for deriv in (4, 7):
@@ -126,36 +128,37 @@ def test_boundary_dofs(basis):
 # -- derivative basis: the one family that crosses into a different kind --
 
 
-class TestDerivativeBasis:
-    def test_validation(self, basis):
-        assert basis._derivative_basis(0) is basis
+def test_derivative_basis_validation(basis):
+    assert basis._derivative_basis(0) is basis
 
-        with pytest.raises(ValueError, match="deriv must be >= 0"):
-            basis._derivative_basis(-1)
-        with pytest.raises(ValueError, match="at or past the degree"):
-            basis._derivative_basis(4)
+    with pytest.raises(ValueError, match="deriv must be >= 0"):
+        basis._derivative_basis(-1)
+    with pytest.raises(ValueError, match="at or past the degree"):
+        basis._derivative_basis(4)
 
-    @pytest.mark.parametrize("deriv,expected_n", [(1, 3), (2, 2), (3, 1)])
-    def test_crosses_into_lagrange(self, basis, deriv, expected_n):
-        derived = basis._derivative_basis(deriv)
-        assert isinstance(derived, LagrangeBasis)
-        assert derived.n_basis == expected_n
 
-    def test_polynomial_derivative(self, basis):
-        # The crossed-into Lagrange basis should still exactly represent
-        # the cubic's first derivative (a quadratic) at its own nodes.
-        def f(t):
-            return 1.0 - 2.0 * t + 3.0 * t**2 - 4.0 * t**3
+@pytest.mark.parametrize("deriv,expected_n", [(1, 3), (2, 2), (3, 1)])
+def test_crosses_into_lagrange(basis, deriv, expected_n):
+    derived = basis._derivative_basis(deriv)
+    assert isinstance(derived, LagrangeBasis)
+    assert derived.n_basis == expected_n
 
-        def df(t):
-            return -2.0 + 6.0 * t - 12.0 * t**2
 
-        coeffs = np.array([f(-1.0), df(-1.0), f(1.0), df(1.0)])
-        derived = basis._derivative_basis(1)
-        t = np.linspace(-1.0, 1.0, 9)
-        deriv_values = basis.evaluate(derived.reference_nodes, deriv=1) @ coeffs
-        got = derived.evaluate(t) @ deriv_values
-        np.testing.assert_allclose(got, df(t), atol=1e-9)
+def test_derivative_basis_polynomial(basis):
+    # The crossed-into Lagrange basis should still exactly represent
+    # the cubic's first derivative (a quadratic) at its own nodes.
+    def f(t):
+        return 1.0 - 2.0 * t + 3.0 * t**2 - 4.0 * t**3
+
+    def df(t):
+        return -2.0 + 6.0 * t - 12.0 * t**2
+
+    coeffs = np.array([f(-1.0), df(-1.0), f(1.0), df(1.0)])
+    derived = basis._derivative_basis(1)
+    t = np.linspace(-1.0, 1.0, 9)
+    deriv_values = basis.evaluate(derived.reference_nodes, deriv=1) @ coeffs
+    got = derived.evaluate(t) @ deriv_values
+    np.testing.assert_allclose(got, df(t), atol=1e-9)
 
 
 def test_product_basis_not_implemented(basis):

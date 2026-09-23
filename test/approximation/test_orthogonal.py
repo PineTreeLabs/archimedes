@@ -33,7 +33,7 @@ def test_construction_validation():
 
 
 @pytest.mark.parametrize("n_basis", [1, 2, 6])
-def test_legendre_values_match_scipy_up_to_orthonormal_scale(n_basis):
+def test_legendre_values_match_scipy(n_basis):
     # Orthonormal p_k = P_k / ||P_k||, with ||P_k||^2 = 2 / (2k + 1) on [-1, 1]
     # (the classical Legendre normalization constant).
     basis = OrthogonalPolynomialBasis(LegendreMeasure(), n_basis=n_basis)

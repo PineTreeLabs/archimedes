@@ -60,7 +60,7 @@ def test_measures_and_density_defaults():
 # so x=(0, 0.5, 1.0)  ==>  theta=(0, pi/2, pi)
 
 
-def test_full_values_at_known_points():
+def test_full_values():
     basis = FourierBasis(5, kind="full")  # N=2: {1, cos, sin, cos2, sin2}
     x = np.array([0.0, 0.5, 1.0])
     phi = basis.evaluate(x)
@@ -75,7 +75,7 @@ def test_full_values_at_known_points():
     np.testing.assert_allclose(phi, expected, atol=1e-12)
 
 
-def test_cosine_values_at_known_points():
+def test_cosine_values():
     basis = FourierBasis(3, kind="cosine")  # N=2: {1, cos, cos2}
     x = np.array([0.0, 0.5, 1.0])
     phi = basis.evaluate(x)
@@ -84,7 +84,7 @@ def test_cosine_values_at_known_points():
     np.testing.assert_allclose(phi, expected, atol=1e-12)
 
 
-def test_sine_values_at_known_points():
+def test_sine_values():
     basis = FourierBasis(2, kind="sine")  # N=2: {sin, sin2}
     x = np.array([0.0, 0.5, 1.0])
     phi = basis.evaluate(x)
@@ -196,7 +196,7 @@ def test_fourier_constructor():
 
 
 @pytest.mark.parametrize("deriv", [0, 1])
-def test_static_and_dynamic_evaluation_agree(deriv):
+def test_static_and_dynamic_evaluation(deriv):
     basis = FourierBasis(5, kind="full")
     x = np.linspace(-1, 1, 9)
     static_phi = basis.evaluate(x, deriv=deriv)

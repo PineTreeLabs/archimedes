@@ -47,6 +47,8 @@ def test_construction_validation(local, breakpoints):
         PiecewiseBasis(local, np.array([-1.0]))  # too few breakpoints
     with pytest.raises(ValueError):
         PiecewiseBasis(local, breakpoints, continuity=-2)  # continuity below -1
+    with pytest.raises(ValueError):
+        PiecewiseBasis((local, local), breakpoints, continuity=0)  # 3 elements, not 2
 
 
 def test_c1_requires_order_one_boundary_dofs(hermite, local, breakpoints):
@@ -91,11 +93,6 @@ def test_uniform_tuple_equals_scalar(local, breakpoints):
     assert hash(tupled) == hash(scalar)
 
 
-def test_tuple_length_must_match_n_elements(local, breakpoints):
-    with pytest.raises(ValueError):
-        PiecewiseBasis((local, local), breakpoints, continuity=0)  # 3 elements
-
-
 # -- global boundary DOFs --
 
 
@@ -126,13 +123,13 @@ def test_boundary_dofs_agree_with_evaluation(local, breakpoints):
     c_left = np.zeros(basis.n_basis)
     c_left[left] = 1.0
     np.testing.assert_allclose(
-        basis.evaluate_expansion(c_left, np.array([-1.0, 1.0])), [1.0, 0.0], atol=1e-10
+        basis._evaluate_expansion(c_left, np.array([-1.0, 1.0])), [1.0, 0.0], atol=1e-10
     )
 
     c_right = np.zeros(basis.n_basis)
     c_right[right] = 1.0
     np.testing.assert_allclose(
-        basis.evaluate_expansion(c_right, np.array([-1.0, 1.0])), [0.0, 1.0], atol=1e-10
+        basis._evaluate_expansion(c_right, np.array([-1.0, 1.0])), [0.0, 1.0], atol=1e-10
     )
 
 
@@ -162,7 +159,7 @@ def test_no_dead_dofs(local, breakpoints):
         assert np.all(np.abs(phi).max(axis=0) > 1e-10)
 
 
-def test_merged_vertex_dof_spans_both_elements(local, breakpoints):
+def test_merged_vertex_dof(local, breakpoints):
     basis = PiecewiseBasis(local, breakpoints, continuity=0)
     x = np.linspace(-1, 1, 801)
     phi = basis.evaluate(x)
@@ -190,29 +187,25 @@ def test_partition_of_unity(local, breakpoints, continuity, side):
     np.testing.assert_allclose(phi.sum(axis=1), 1.0, atol=1e-10)
 
 
-def test_c0_is_continuous_at_breakpoints(local, breakpoints):
-    basis = PiecewiseBasis(local, breakpoints, continuity=0)
+def test_continuity_at_breakpoints(local, breakpoints):
     eps = 1e-9
+
+    # C0 values must agree across every interior breakpoint.
+    basis = PiecewiseBasis(local, breakpoints, continuity=0)
     for knot in breakpoints[1:-1]:
         left = basis.evaluate(np.array([knot - eps]))
         right = basis.evaluate(np.array([knot + eps]))
         np.testing.assert_allclose(left, right, atol=1e-6)
 
-
-def test_discontinuous_basis_jumps_at_breakpoints(local, breakpoints):
+    # C-1 (independent elements) must jump instead.
     basis = PiecewiseBasis(local, breakpoints, continuity=-1)
-    eps = 1e-9
     knot = breakpoints[1]
     left = basis.evaluate(np.array([knot - eps]))
     right = basis.evaluate(np.array([knot + eps]))
     assert not np.allclose(left, right, atol=1e-6)
 
-
-def test_c0_derivative_is_discontinuous_at_breakpoints(local, breakpoints):
     # C0 constrains values, not slopes: deriv=1 is one-sided at a breakpoint.
     basis = PiecewiseBasis(local, breakpoints, continuity=0)
-    eps = 1e-9
-    knot = breakpoints[1]
     left = basis.evaluate(np.array([knot - eps]), deriv=1)
     right = basis.evaluate(np.array([knot + eps]), deriv=1)
     assert not np.allclose(left, right, atol=1e-3)
@@ -252,31 +245,31 @@ class TestC1Continuity:
         rng = np.random.default_rng(0)
         coefficients = rng.normal(size=basis.n_basis)
         for knot in self.BP[1:-1]:
-            left0 = basis.evaluate_expansion(
+            left0 = basis._evaluate_expansion(
                 coefficients, np.array([knot - eps]), side="left"
             )
-            right0 = basis.evaluate_expansion(
+            right0 = basis._evaluate_expansion(
                 coefficients, np.array([knot + eps]), side="right"
             )
             np.testing.assert_allclose(left0, right0, atol=1e-4)
 
-            left1 = basis.evaluate_expansion(
+            left1 = basis._evaluate_expansion(
                 coefficients, np.array([knot - eps]), deriv=1, side="left"
             )
-            right1 = basis.evaluate_expansion(
+            right1 = basis._evaluate_expansion(
                 coefficients, np.array([knot + eps]), deriv=1, side="right"
             )
             np.testing.assert_allclose(left1, right1, atol=1e-3)
 
-            left2 = basis.evaluate_expansion(
+            left2 = basis._evaluate_expansion(
                 coefficients, np.array([knot - eps]), deriv=2, side="left"
             )
-            right2 = basis.evaluate_expansion(
+            right2 = basis._evaluate_expansion(
                 coefficients, np.array([knot + eps]), deriv=2, side="right"
             )
             assert not np.allclose(left2, right2, atol=1e-2)
 
-    def test_merged_value_dof_spans_both_elements(self, basis):
+    def test_merged_value_dof(self, basis):
         x = np.linspace(-1, 1, 801)
         phi = basis.evaluate(x)
         knot = self.BP[1]
@@ -285,7 +278,7 @@ class TestC1Continuity:
         assert np.abs(col[x < knot]).max() > 1e-6
         assert np.abs(col[x > knot]).max() > 1e-6
 
-    def test_merged_slope_dof_spans_both_elements(self, basis):
+    def test_merged_slope_dof(self, basis):
         x = np.linspace(-1, 1, 801)
         dphi = basis.evaluate(x, deriv=1)
         knot = self.BP[1]
@@ -311,7 +304,7 @@ class TestC1Continuity:
         coefficients = rng.normal(size=basis.n_basis)
 
         dense = basis.evaluate(x, deriv=deriv, a=a, b=b) @ coefficients
-        fused = basis.evaluate_expansion(coefficients, x, deriv=deriv, a=a, b=b)
+        fused = basis._evaluate_expansion(coefficients, x, deriv=deriv, a=a, b=b)
         np.testing.assert_allclose(fused, dense, atol=1e-8)
 
     def test_evaluate_expansion_symbolic_matches_numeric(self, basis):
@@ -319,12 +312,12 @@ class TestC1Continuity:
         rng = np.random.default_rng(2)
         coefficients = rng.normal(size=basis.n_basis)
         x = np.linspace(a, b, 11)
-        expected = basis.evaluate_expansion(coefficients, x, deriv=1, a=a, b=b)
+        expected = basis._evaluate_expansion(coefficients, x, deriv=1, a=a, b=b)
 
         @arc.compile
         def traced(xx, cc):
             assert isinstance(xx, SymbolicArray)
-            return basis.evaluate_expansion(cc, xx, deriv=1, a=a, b=b)
+            return basis._evaluate_expansion(cc, xx, deriv=1, a=a, b=b)
 
         np.testing.assert_allclose(
             np.asarray(traced(x, coefficients)).ravel(), expected, atol=1e-9
@@ -391,7 +384,7 @@ class TestModalDiscontinuous:
         coefficients = rng.normal(size=basis.n_basis)
 
         dense = basis.evaluate(x, deriv=deriv, a=a, b=b) @ coefficients
-        fused = basis.evaluate_expansion(coefficients, x, deriv=deriv, a=a, b=b)
+        fused = basis._evaluate_expansion(coefficients, x, deriv=deriv, a=a, b=b)
         np.testing.assert_allclose(fused, dense, atol=1e-8)
 
     @pytest.mark.parametrize("deriv", [0, 1, 2])
@@ -408,7 +401,7 @@ class TestModalDiscontinuous:
         coefficients = rng.normal(size=basis.n_basis)
 
         dense = basis.evaluate(x, deriv=deriv, a=a, b=b) @ coefficients
-        fused = basis.evaluate_expansion(coefficients, x, deriv=deriv, a=a, b=b)
+        fused = basis._evaluate_expansion(coefficients, x, deriv=deriv, a=a, b=b)
         np.testing.assert_allclose(fused, dense, atol=1e-8)
 
     def test_project_and_reconstruct(self, modal):
@@ -448,7 +441,7 @@ def test_domain_mapping(local, breakpoints):
 # -- composition with FunctionSpace --
 
 
-def test_mass_and_stiffness_matrices_of_assembled_basis(local, breakpoints):
+def test_mass_and_stiffness_matrices(local, breakpoints):
     # The DOF-merge assembly must not introduce rank deficiency (mass matrix
     # nonsingular) or break the classic FEM/Neumann structure: the constant
     # function lies in the C0 space and has zero derivative, so the
@@ -491,7 +484,7 @@ def test_equality_and_hash(local, breakpoints):
 
 
 @pytest.mark.parametrize("continuity", [-1, 0])
-def test_static_and_dynamic_evaluation_agree(local, breakpoints, continuity):
+def test_static_and_dynamic_evaluation(local, breakpoints, continuity):
     basis = PiecewiseBasis(local, breakpoints, continuity=continuity)
     # Interior points plus exact breakpoints, where the `side` convention
     # decides ownership (default "right").
@@ -649,7 +642,7 @@ class TestPerElementOrder:
         )
         assert rule == expected
 
-    def test_heterogeneous_basis_reproduces_uniform_case_properties(self, basis):
+    def test_properties(self, basis):
         # The properties checked at module level for a uniform element_basis
         # -- exact mass matrix via the default quadrature, partition of
         # unity from either side, and C0 continuity at interior breakpoints
@@ -681,25 +674,25 @@ class TestPerElementOrder:
         coefficients = rng.normal(size=basis.n_basis)
         x = np.concatenate([np.linspace(-1.3, 1.3, 23), self.BP])
         dense = basis.evaluate(x) @ coefficients
-        fused = basis.evaluate_expansion(coefficients, x)
+        fused = basis._evaluate_expansion(coefficients, x)
         np.testing.assert_allclose(fused, dense, atol=1e-9)
 
     def test_evaluate_expansion_symbolic_matches_numeric(self, basis):
         rng = np.random.default_rng(1)
         coefficients = rng.normal(size=basis.n_basis)
         x = np.concatenate([np.linspace(-1.3, 1.3, 23), self.BP])
-        expected = basis.evaluate_expansion(coefficients, x)
+        expected = basis._evaluate_expansion(coefficients, x)
 
         @arc.compile
         def traced(xx, cc):
             assert isinstance(xx, SymbolicArray)
-            return basis.evaluate_expansion(cc, xx)
+            return basis._evaluate_expansion(cc, xx)
 
         np.testing.assert_allclose(
             np.asarray(traced(x, coefficients)).ravel(), expected, atol=1e-10
         )
 
-    def test_evaluate_expansion_fast_path_used_when_uniform(self):
+    def test_evaluate_expansion_uniform_tuple(self):
         # A uniform *tuple* (not just the scalar form) must still agree with
         # the scalar-constructed basis -- the fast path is keyed on value
         # equality across elements, not on how the basis was constructed.
@@ -713,8 +706,8 @@ class TestPerElementOrder:
         coefficients = rng.normal(size=scalar.n_basis)
         x = np.linspace(-1.0, 1.0, 11)
         np.testing.assert_allclose(
-            uniform.evaluate_expansion(coefficients, x),
-            scalar.evaluate_expansion(coefficients, x),
+            uniform._evaluate_expansion(coefficients, x),
+            scalar._evaluate_expansion(coefficients, x),
             atol=1e-12,
         )
 
@@ -767,7 +760,7 @@ class TestEvaluateExpansion:
         x = self._points(bp)
 
         dense = basis.evaluate(x, deriv=deriv, a=self.A, b=self.B) @ coefficients
-        fused = basis.evaluate_expansion(
+        fused = basis._evaluate_expansion(
             coefficients, x, deriv=deriv, a=self.A, b=self.B
         )
         np.testing.assert_allclose(fused, dense, atol=1e-9)
@@ -779,45 +772,45 @@ class TestEvaluateExpansion:
         basis = PiecewiseBasis(local, breakpoints, continuity=0)
         coefficients = np.ones(basis.n_basis)
         outside = np.array([self.A - 1.0, self.B + 1.0])
-        got = basis.evaluate_expansion(coefficients, outside, a=self.A, b=self.B)
+        got = basis._evaluate_expansion(coefficients, outside, a=self.A, b=self.B)
         np.testing.assert_array_equal(got, 0.0)
 
     @pytest.mark.parametrize("deriv", [0, 1, 2])
-    def test_symbolic_matches_numeric(self, local, breakpoints, deriv):
+    def test_symbolic_points(self, local, breakpoints, deriv):
         basis = PiecewiseBasis(local, breakpoints, continuity=0)
         coefficients = np.random.default_rng(1).normal(size=basis.n_basis)
         x = self._points(breakpoints)
-        expected = basis.evaluate_expansion(
+        expected = basis._evaluate_expansion(
             coefficients, x, deriv=deriv, a=self.A, b=self.B
         )
 
         @arc.compile
         def traced(xx, cc):
             assert isinstance(xx, SymbolicArray)
-            return basis.evaluate_expansion(cc, xx, deriv=deriv, a=self.A, b=self.B)
+            return basis._evaluate_expansion(cc, xx, deriv=deriv, a=self.A, b=self.B)
 
         np.testing.assert_allclose(
             np.asarray(traced(x, coefficients)).ravel(), expected, atol=1e-10
         )
 
-    def test_symbolic_coefficients_with_numeric_points(self, local, breakpoints):
+    def test_symbolic_coefficients(self, local, breakpoints):
         # The gather must also work the other way round: numeric element
         # indices into a symbolic coefficient vector.
         basis = PiecewiseBasis(local, breakpoints, continuity=0)
         coefficients = np.random.default_rng(2).normal(size=basis.n_basis)
         x = np.array([0.4, 1.5, 2.7])
-        expected = basis.evaluate_expansion(coefficients, x, a=self.A, b=self.B)
+        expected = basis._evaluate_expansion(coefficients, x, a=self.A, b=self.B)
 
         @arc.compile
         def traced(cc):
             assert isinstance(cc, SymbolicArray)
-            return basis.evaluate_expansion(cc, x, a=self.A, b=self.B)
+            return basis._evaluate_expansion(cc, x, a=self.A, b=self.B)
 
         np.testing.assert_allclose(
             np.asarray(traced(coefficients)).ravel(), expected, atol=1e-10
         )
 
-    def test_cost_is_independent_of_element_count(self, local):
+    def test_graph_size(self, local):
         # The whole point: graph size must not grow with n_elements.
         sizes = []
         for n_elements in (4, 16, 64):
@@ -828,7 +821,7 @@ class TestEvaluateExpansion:
             x = np.array([1.7])
 
             def fused(xx, cc, basis=basis):
-                return basis.evaluate_expansion(cc, xx, a=self.A, b=self.B)
+                return basis._evaluate_expansion(cc, xx, a=self.A, b=self.B)
 
             compiled = arc.compile(fused, static_argnames=("basis",))
             sizes.append(compiled._specialize(x, coefficients)[0].func.n_nodes())
@@ -931,7 +924,7 @@ def test_nodes_as_callable_or_array():
     assert space.n_basis == 5  # 2 elements * 3 nodes - 1 shared
 
 
-def test_legendre_kind_builds_modal_dg_space():
+def test_legendre_kind():
     space = FunctionSpace.piecewise(
         "legendre", 3, np.linspace(-1.0, 1.0, 4), continuity=-1
     )
@@ -980,7 +973,7 @@ def test_classmethod_validation():
         FunctionSpace.piecewise("lagrange", (1, 2), np.linspace(0.0, 1.0, 4))
 
 
-def test_normalize_breakpoints_pins_reference_endpoints_exactly():
+def test_normalize_breakpoints():
     a, b, ref = _normalize_breakpoints([0.0, 0.3, 1.0])
     assert a == 0.0
     assert b == 1.0

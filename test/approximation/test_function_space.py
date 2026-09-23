@@ -38,7 +38,7 @@ def test_n_basis_forwarded(space):
     assert space.n_basis == 5
 
 
-def test_domain_must_match_basis_parameters_type(quad_rule):
+def test_domain_type_validation(quad_rule):
     basis = OrthogonalPolynomialBasis(LegendreMeasure(), n_basis=5)
     with pytest.raises(TypeError):
         FunctionSpace(basis, domain=(-1.0, 1.0), reference_quad_rule=quad_rule)
@@ -50,7 +50,7 @@ def test_domain_must_match_basis_parameters_type(quad_rule):
         )
 
 
-def test_evaluate_matches_direct_basis_contraction(space):
+def test_evaluate(space):
     coefficients = np.array([1.0, -2.0, 0.5, 0.0, 3.0])
     x = np.linspace(-1, 1, 9)
     phi = space.basis.evaluate(x, a=-1.0, b=1.0)  # (npts, n_basis)
@@ -58,19 +58,12 @@ def test_evaluate_matches_direct_basis_contraction(space):
     np.testing.assert_allclose(space._evaluate(coefficients, x), expected)
 
 
-def test_mass_matrix_is_identity_on_reference_domain(space):
+def test_mass_matrix(space, quad_rule):
     # OrthogonalPolynomialBasis is orthonormal by construction, so the mass
     # matrix should be the identity (not merely diagonal).
     M = mass_matrix(space)
     np.testing.assert_allclose(M, np.eye(space.n_basis), atol=1e-10)
 
-
-def test_stiffness_matrix_is_symmetric(space):
-    K = stiffness_matrix(space)
-    np.testing.assert_allclose(K, K.T, atol=1e-10)
-
-
-def test_mass_matrix_is_identity_on_non_reference_domain(quad_rule):
     # The basis renormalizes to stay orthonormal w.r.t. the *target* domain's
     # measure (not just the reference one), so this holds for any domain --
     # unlike a fixed classical normalization, it isn't Jacobian-scaled.
@@ -83,7 +76,15 @@ def test_mass_matrix_is_identity_on_non_reference_domain(quad_rule):
     np.testing.assert_allclose(M, np.eye(4), atol=1e-10)
 
 
-def test_project_recovers_exact_polynomial(space):
+def test_stiffness_matrix(space):
+    K = stiffness_matrix(space)
+    np.testing.assert_allclose(K, K.T, atol=1e-10)
+
+
+# -- project() --
+
+
+def test_project_exact_polynomial(space):
     # x^2 is even and degree 2, so -- regardless of the basis normalization
     # -- its expansion in a Legendre-derived basis has nonzero coefficients
     # only at (even) degrees 0 and 2.
@@ -128,7 +129,7 @@ def test_function(space):
     np.testing.assert_array_equal(fn.coefficients, np.zeros(space.n_basis))
 
 
-def test_project_rejects_quad_rule_with_too_few_points(space):
+def test_project_quad_rule_too_few_points(space):
     # Fewer quadrature points than n_basis makes the mass matrix exactly
     # singular (phi is (npts, n_basis), rank <= npts) -- should raise
     # cleanly rather than hand back garbage from np.linalg.solve.
@@ -137,7 +138,7 @@ def test_project_rejects_quad_rule_with_too_few_points(space):
         space.project(lambda x: x**2, quad_rule=too_coarse)
 
 
-def test_project_on_non_reference_domain(quad_rule):
+def test_project_non_reference_domain(quad_rule):
     space = FunctionSpace(
         OrthogonalPolynomialBasis(LegendreMeasure(), n_basis=5),
         domain=UnitInterval.Parameters(a=0.0, b=4.0),
@@ -213,7 +214,7 @@ def test_quad_rule_shared_across_spaces_lands_on_physical_nodes(quad_rule):
     assert np.all(Phi_a.nodes <= 6.0)
 
 
-def test_project_rejects_mismatched_test_space(space, quad_rule):
+def test_project_test_space_validation(space, quad_rule):
     test_space = FunctionSpace(
         OrthogonalPolynomialBasis(LegendreMeasure(), n_basis=3),
         domain=UnitInterval.Parameters(a=-1.0, b=1.0),
@@ -230,7 +231,7 @@ def test_project_rejects_mismatched_test_space(space, quad_rule):
         space.project(lambda x: x**2, test_space=test_space)
 
 
-def test_project_petrov_galerkin_recovers_exact_polynomial(space):
+def test_project_petrov_galerkin(space):
     # A genuinely different test space -- 5 discontinuous piecewise-constant
     # "bumps", not another basis for the same degree-4 polynomial span --
     # still recovers x^2 exactly: the true expansion's residual is
@@ -253,7 +254,7 @@ def test_project_petrov_galerkin_recovers_exact_polynomial(space):
     np.testing.assert_allclose(fn(x), x**2, atol=1e-10)
 
 
-def test_project_of_function_outside_basis_degree_is_approximate(quad_rule):
+def test_project_outside_basis_degree(quad_rule):
     # n_basis=2 (degree <= 1) can't exactly represent x^2; the L2 projection
     # should be a genuine (inexact) least-squares fit, not a crash.
     space = FunctionSpace(
@@ -284,8 +285,7 @@ def test_inner_product(space):
         atol=1e-10,
     )
 
-
-def test_inner_product_of_orthonormal_basis_vectors_is_kronecker_delta(space):
+    # Orthonormal basis vectors give the Kronecker delta.
     for i in range(space.n_basis):
         for j in range(space.n_basis):
             ci = np.eye(space.n_basis)[i]
@@ -320,7 +320,7 @@ def test_quadrature(space, quad_rule):
     np.testing.assert_allclose(w, expected_w)
 
 
-def test_quadrature_override_on_non_reference_domain(quad_rule):
+def test_quadrature_non_reference_domain(quad_rule):
     # An explicit override is used exactly as given, with no further domain
     # mapping applied -- so on a genuinely non-reference domain, an
     # unmapped override rule gives *reference*-domain nodes back, not nodes
@@ -364,7 +364,7 @@ def test_basis_matrix_of_derivative(space):
     np.testing.assert_allclose(space.basis_matrix(deriv=1).matrix, expected)
 
 
-def test_basis_matrix_matmul_applies_to_coefficients(space):
+def test_basis_matrix_matmul(space):
     c = np.array([1.0, -2.0, 0.5, 0.0, 3.0])
     phi = space.basis_matrix()
     np.testing.assert_allclose(phi @ c, phi.matrix @ c)
@@ -392,7 +392,7 @@ def test_basis_matrix_adjoint(space):
     np.testing.assert_allclose(R[:, 1], phi.T @ x**2, atol=1e-12)
 
 
-def test_basis_matrix_adjoint_round_trips_via_transpose():
+def test_basis_matrix_adjoint_round_trip():
     space_local = FunctionSpace(
         OrthogonalPolynomialBasis(LegendreMeasure(), n_basis=5),
         domain=UnitInterval.Parameters(a=-1.0, b=1.0),
@@ -401,7 +401,7 @@ def test_basis_matrix_adjoint_round_trips_via_transpose():
     assert phi.T.T is phi
 
 
-def test_basis_matrix_is_petrov_galerkin_agnostic(space, quad_rule):
+def test_basis_matrix_petrov_galerkin(space, quad_rule):
     # The adjoint doesn't require the "trial side" to have anything to do
     # with phi's own column count -- a differently-sized test basis on the
     # same quadrature nodes (a stand-in for a genuinely different test
@@ -428,7 +428,7 @@ def hermite_space():
     return FunctionSpace(basis, domain=basis.Parameters(loc=0.0, scale=2.0))
 
 
-def test_density_mass_matrix_is_identity(hermite_space):
+def test_density_mass_matrix(hermite_space):
     # Same identity result as the (density=False) Legendre case above, but
     # now against the probability measure rather than the raw weight.
     np.testing.assert_allclose(
@@ -436,7 +436,7 @@ def test_density_mass_matrix_is_identity(hermite_space):
     )
 
 
-def test_density_project_gives_mean_and_variance_directly(hermite_space):
+def test_density_project(hermite_space):
     # For X ~ N(0, scale^2): E[X^2] = scale^2, Var(X^2) = 2 * scale^4. With
     # density=True, project's c_0 and sum(c[k>=1]^2) recover these directly
     # -- no rescaling by the measure's mass, unlike a density=False basis.
@@ -448,7 +448,7 @@ def test_density_project_gives_mean_and_variance_directly(hermite_space):
     )
 
 
-def test_density_false_project_does_not_give_moments_directly(hermite_space):
+def test_density_false_project(hermite_space):
     # Contrast case: the default (density=False) convention is orthonormal
     # against the *raw* weight, so c_0 is off from the true mean by a factor
     # of sqrt(mass) -- confirming the two conventions really do differ.
