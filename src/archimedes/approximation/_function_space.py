@@ -557,7 +557,7 @@ class FunctionSpace:
         quad_rule: Quadrature | None = None,
     ) -> FunctionSpace:
         """Global Laguerre polynomial space on ``[start, inf)``.
-        
+
         See :class:`~archimedes.measure.LaguerreMeasure` for details.
 
         Parameters

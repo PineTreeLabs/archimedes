@@ -10,7 +10,7 @@ import numpy as np
 from archimedes import tree
 
 if TYPE_CHECKING:
-    from archimedes.measure import Measure
+    from archimedes.measure import Measure, ReferenceDomain
     from archimedes.quadrature import QuadratureRule
 
 __all__ = ["Basis", "BasisMatrix"]
@@ -135,8 +135,18 @@ class Basis(metaclass=abc.ABCMeta):
 
     @property
     @abc.abstractmethod
-    def Parameters(self) -> type:  # noqa: N802
-        """The domain parameters this basis expects."""
+    def Parameters(self) -> type[ReferenceDomain.Parameters]:  # noqa: N802
+        """The target-domain parameters this basis expects.
+
+        A :class:`~archimedes.measure.ReferenceDomain.Parameters` subclass
+        (e.g. ``UnitInterval.Parameters``). Returns the type, not an instance.
+
+        Determines which reference domain the basis is defined on, for example:
+
+        - :class:`~archimedes.measure.UnitInterval` for :math:`[-1, 1]`.
+        - :class:`~archimedes.measure.HalfLine` for :math:`[0, \infty)`.
+        - :class:`~archimedes.measure.RealLine` for :math:`(-\infty, \infty)`.
+        """
         raise NotImplementedError
 
     @property
@@ -209,43 +219,25 @@ class Basis(metaclass=abc.ABCMeta):
         """Design matrix at a quadrature rule's nodes.
 
         Equivalent to ``evaluate(rule.nodes, deriv)``, which is the default
-        implementation, but lets a family use the *provenance* a rule
-        carries and coordinates do not: which sub-element each node came
-        from (see :attr:`~archimedes.quadrature.Quadrature.elements`).
-
-        Only :class:`PiecewiseBasis` needs this, and only because it is
-        discontinuous at its breakpoints: a rule may legitimately place
-        nodes exactly there, where the value depends on which element the
-        node belongs to and the coordinate cannot say. Every smooth family
-        is single-valued everywhere, so the default is exact for them.
-
-        Used by :class:`FunctionSpace` wherever it integrates (``basis_matrix``,
-        ``project``, and their private counterparts), which pass an already
-        domain-mapped ``rule`` (see ``FunctionSpace.quad_rule``) --
-        ``rule.nodes`` is read as-is, with no further mapping here.
-        ``domain_kwargs`` is still needed for this basis's *own*
-        (independent) coefficient/breakpoint remap. Evaluation at
-        *user-supplied* points goes through
-        :meth:`evaluate`/``_evaluate_expansion`` instead, which have no
-        provenance to draw on and resolve breakpoints by the documented
-        ``side`` convention.
+        implementation, but lets a family use the provenance from a rule to
+        override. For example, discontinuous piecewise bases need to track
+        which nodes belong to which element, since the coordinates alone don't
+        determine this. Smooth bases don't have this ambiguity and don't need
+        to override this.
         """
         return self.evaluate(rule.nodes, deriv=deriv, **domain_kwargs)
 
     def _product_basis(self, other: "Basis") -> "Basis":
-        """A basis large enough to represent products from this basis and
-        ``other`` *exactly*.
+        """A basis sufficient to represent products exactly.
 
-        For polynomial families the requirement is purely a degree count:
-        a degree-:math:`(n_1 - 1)` polynomial times a degree-:math:`(n_2 -
-        1)` one has degree :math:`n_1 + n_2 - 2`, so the product space needs
-        :math:`n_1 + n_2 - 1` functions. That number is *static*, which is
-        what makes products expressible here at all -- the space cannot be
-        sized from the data the way an adaptive system would.
+        For polynomial families the requirement is purely a degree count.
+        For example, a degree-:math:`(n_1 - 1)` polynomial times a
+        degree-:math:`(n_2 - 1)` polynomial in general has degree
+        :math:`n_1 + n_2 - 2`, so the product space needs
+        :math:`n_1 + n_2 - 1` functions.
 
-        Raising ``NotImplementedError`` is the correct default: whether
-        products are closed in an enlarged version of the same family is a
-        per-family fact, not something that can be assumed.
+        Raises ``NotImplementedError`` by default, since this can't be
+        known in general for non-polynomial families.
 
         Raises
         ------
@@ -261,17 +253,14 @@ class Basis(metaclass=abc.ABCMeta):
         )
 
     def _derivative_basis(self, deriv=1) -> "Basis":
-        r"""The smallest basis that represents this family's ``deriv``-th
-        derivatives *exactly*.
+        r"""The smallest basis that represents this family's derivatives exactly.
 
-        Note this is a strictly smaller space, not merely a different one:
-        :math:`P_{n-2} \subset P_{n-1}`, so the derivative would also be
-        exactly representable in the *original* basis. Returning the minimal
-        space keeps the rule uniform so that every closed operation gives
-        the tightest exact space and keeps downstream products from carrying
-        extra unnecessary degrees of freedom. See also
-        :meth:`Function.derivative`, whose square (same-space) form is
-        built from the classical differentiation matrix.
+        Note that for polynomial families, this is a strictly smaller space than
+        the original. Returning the minimal space keeps downstream operations
+        from carrying extra unnecessary degrees of freedom.
+
+        Raises ``NotImplementedError`` by default, since this can't be
+        known in general for non-polynomial families.
 
         Raises
         ------
@@ -279,18 +268,6 @@ class Basis(metaclass=abc.ABCMeta):
             If ``deriv`` is not a valid derivative order for this basis.
         NotImplementedError
             If this family has no derivative-space construction.
-
-        Notes
-        -----
-        The result is usually, but not necessarily, in the *same family*
-        at a lower order. A family whose degrees of freedom are not all the
-        same *kind* of quantity (e.g.
-        :class:`CubicHermiteBasis`,
-        whose coefficients are a mix of values and physical derivatives) may
-        have no derivative-space construction *of its own kind*: the
-        derivative of a cubic Hermite element is a plain polynomial with no
-        value/slope split, so its derivative basis is a quadratic
-        :class:`LagrangeBasis`.
         """
         raise NotImplementedError(
             f"{type(self).__name__} does not define a derivative basis; "
@@ -299,17 +276,14 @@ class Basis(metaclass=abc.ABCMeta):
         )
 
     def _integral_basis(self, order: int = 1) -> "Basis":
-        """The smallest basis whose ``order``-th derivatives span this
-        family's elements exactly -- the dual of differentiation.
+        """The smallest basis whose derivatives span this basis exactly.
 
-        Differentiating returns a *smaller* space, since it lowers
-        polynomial degree; this returns a *larger* one instead: integrating
-        raises degree by one per order. Unlike
-        differentiation, this never runs out of room -- there is always a
-        space big enough to hold the antiderivative exactly -- so the only
-        real question is which one, not whether one exists. See
-        :meth:`Function.integral`, whose boundary condition pins the
-        extra degree(s) of freedom this introduces.
+        For polynomial families this returns a larger basis, since integrating
+        raises degree by one per order. The expanded basis usually has an extra
+        degree of freedom for the integral constant; see :meth:`Function.integral`.
+
+        Raises ``NotImplementedError`` by default, since this can't be
+        known in general for non-polynomial families.
 
         Raises
         ------
@@ -317,81 +291,41 @@ class Basis(metaclass=abc.ABCMeta):
             If ``order`` is not a valid integration order for this basis.
         NotImplementedError
             If this family has no integral-space construction.
-
-        Notes
-        -----
-        Not every family has one, even though a derivative basis is more
-        often definable: a family whose degrees of freedom mix different
-        *kinds* of quantity (e.g. :class:`CubicHermiteBasis`,
-        value and physical-derivative DOFs) has no larger member of its own
-        kind to grow into, unlike a plain polynomial family, which always
-        does. :class:`PiecewiseBasis`
-        raises for a different reason: an exact piecewise antiderivative
-        needs a running constant carried across elements, which is a
-        different (not yet implemented) construction from anything here.
         """
         raise NotImplementedError(
-            f"{type(self).__name__} does not define an integral basis; "
-            f"approximate instead by projecting the target function onto a "
-            f"FunctionSpace that does (e.g. FunctionSpace.legendre) and "
-            f"calling `.antiderivative()` on that projection"
+            f"{type(self).__name__} does not define an integral basis."
         )
 
     @property
     def _dof_order(self) -> np.ndarray:
-        """The intrinsic derivative order of each basis function's
-        coefficient, shape ``(n_basis,)``.
+        """The intrinsic derivative order of each basis function's coefficient
 
-        Every family so far is *homogeneous*: each coefficient is a plain
-        value (a nodal value, a modal amplitude), which is why a single
-        ``scale`` factor per requested ``deriv`` (see :meth:`evaluate`) is
-        enough to remap a whole basis onto a different target domain. The
-        default here reflects that: all zeros.
+        Most commonly zero, meaning each coefficient corresponds to the function
+        itself rather than its derivatives. A counterexample is a cubic Hermite
+        basis, where some coefficients correspond to derivatives rather than the
+        function itself.
 
-        Purely an implementation detail of that remapping -- not something
-        a caller needs, only the small set of families and internals
-        (:class:`PiecewiseBasis`'s fused
-        ``_evaluate_expansion`` path) that must apply a
-        *per-column* power of ``scale`` rather than one factor for the whole
-        matrix. A family whose coefficients are not all the same *kind* of
-        quantity --
-        :class:`CubicHermiteBasis`
-        is the first example, whose odd-indexed coefficients are physical
-        derivatives rather than values -- overrides this so that
-        :meth:`evaluate` can apply ``scale ** (dof_order - deriv)`` per column.
+        Returns an array of shape ``(n_basis,)``.
         """
         return np.zeros(self.n_basis, dtype=int)  # type: ignore[attr-defined]
 
     @property
     def _reference_scale_exponent(self) -> float:
-        r"""Extra, *uniform* (same for every column) power of ``scale`` needed
-        on top of the per-column ``(2/width) ** (deriv - dof_order[k])``
-        chain-rule factor to turn a *reference*-domain ``evaluate(t, deriv)``
-        call (``t`` already mapped into ``[-1, 1]``, no domain kwargs) into
-        the correct *physical*-domain value.
+        r"""Optional extra, uniform scaling exponent for the reference domain.
 
         Zero by default: a family whose coefficients are plain values with no
         domain-dependent normalization of their own.
 
-        :class:`OrthogonalPolynomialBasis` overrides this to ``0.0`` (with
-        ``density=True``) or ``0.5`` (``density=False``): its ``evaluate``
-        normalizes by :math:`\sqrt{\mathrm{mass}(a, b) \cdot \beta_1 \cdots
-        \beta_k}`, and since ``mass`` scales as one power of ``scale`` (see
-        ``Measure.mass``) while each ``beta`` scales as two, the physical
-        basis function picks up a uniform extra factor of
-        :math:`\mathrm{scale}^{-1/2}` relative to the reference one --
-        *unless* ``density=True`` folds ``mass`` out of the normalization
-        entirely, in which case there is no such extra factor.
-
-        Purely an implementation detail of :class:`PiecewiseBasis`'s fused
-        ``_evaluate_expansion`` path, not something a
-        caller needs directly.
+        Applied on top of the ``(2/width) ** (deriv - dof_order[k])`` Jacobian
+        factor for the reference-to-physical domain transformation.
         """
         return 0.0
 
     def boundary_dofs(self, order: int = 0) -> tuple[int | None, int | None]:
-        r"""Indices of the degrees of freedom that *are* the ``order``-th
-        derivative at the left and right ends of the domain.
+        r"""Indices of the degrees of freedom at the left/right ends of the domain.
+
+        Can be used for example to set boundary conditions or enforce continuity
+        at the domain endpoints.
 
         Parameters
         ----------
@@ -406,22 +340,10 @@ class Basis(metaclass=abc.ABCMeta):
 
         Notes
         -----
-        Only meaningful for nodal families: a Lagrange basis whose nodes
-        include both endpoints has :math:`\ell_i(x_{\mathrm{left}}) =
-        \delta_{i,\mathrm{left}}`, so coefficient ``left`` is exactly the
-        endpoint value (``order=0``). A modal family (e.g.
-        :class:`OrthogonalPolynomialBasis`) has no such DOF -- its endpoint
-        value is a combination of every coefficient -- and neither does a
-        nodal basis whose nodes are all interior (Gauss-Legendre points).
-        ``order=1`` asks instead for the DOF that *is* the physical first
-        derivative at that endpoint -- meaningful only for a family with
-        derivative-type degrees of freedom, e.g. :class:`CubicHermiteBasis`.
-
-        Used by :class:`PiecewiseBasis` to impose continuity by identifying
-        adjacent elements' endpoint DOFs, one ``order`` at a time up to its
-        ``continuity``. The default returns ``(None, None)`` for every
-        ``order``, i.e. "no continuity of any order supported"; families
-        that can support it override this.
+        Only meaningful for nodal families (e.g. :class:`LagrangeBasis`) with
+        nodes at the endpoints. Modal families (e.g.
+        :class:`OrthogonalPolynomialBasis`) and nodal bases with interior-only
+        nodes (Gauss-Legendre points, for instance) do not have boundary DOFs.
         """
         return (None, None)
 
@@ -434,30 +356,18 @@ class Basis(metaclass=abc.ABCMeta):
         Parameters
         ----------
         x : array_like
-            Evaluation points, shape ``(npts,)``. May be a NumPy array or a
-            symbolic array (e.g. inside ``@arc.compile``); implementations
-            must not branch in Python on which.
+            Evaluation points, shape ``(npts,)``.
         deriv : int, optional
-            Order of derivative to evaluate. Default 0 (the basis functions
-            themselves). Not every family supports every order -- see the
-            subclass docstring for what's implemented.
+            Order of derivative to evaluate. Default 0.
         side : {"right", "left"}, optional
             Which one-sided limit to take where the basis is two-valued.
             Default ``"right"``.  Irrelevant for smooth bases.
         **domain_kwargs
-            Target-domain parameters. Families built on a classical
-            orthogonal-polynomial :class:`~archimedes.measure.Measure`
-            forward these to that measure's ``affine_params`` (e.g. ``a``,
-            ``b`` for Legendre); families with no natural reference domain
-            may ignore them. See the subclass docstring.
+            Target-domain parameters; see the subclass docstring.
 
         Returns
         -------
         phi : ndarray
-            Basis values (or ``deriv``-th derivatives), shape
-            ``(npts, n_basis)`` -- points first, basis index last (see
-            :class:`BasisMatrix`), rather than
-            ``archimedes.quadrature.QuadratureRule``'s points-last axis
-            convention.
+            Basis values (or ``deriv``-th derivatives), shape ``(npts, n_basis)``.
         """
         raise NotImplementedError

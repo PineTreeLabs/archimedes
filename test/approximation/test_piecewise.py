@@ -129,7 +129,9 @@ def test_boundary_dofs_agree_with_evaluation(local, breakpoints):
     c_right = np.zeros(basis.n_basis)
     c_right[right] = 1.0
     np.testing.assert_allclose(
-        basis._evaluate_expansion(c_right, np.array([-1.0, 1.0])), [0.0, 1.0], atol=1e-10
+        basis._evaluate_expansion(c_right, np.array([-1.0, 1.0])),
+        [0.0, 1.0],
+        atol=1e-10,
     )
 
 
@@ -289,7 +291,7 @@ class TestC1Continuity:
 
     @pytest.mark.parametrize("deriv", [0, 1, 2, 3])
     def test_evaluate_expansion_matches_dense(self, basis, deriv):
-        # `evaluate_expansion`'s fused path (taken because every element
+        # `_evaluate_expansion`'s fused path (taken because every element
         # shares one `CubicHermiteBasis` instance) must agree with the dense
         # `evaluate(...) @ coefficients` path on a non-uniform mesh whose
         # physical domain isn't (-1, 1). Value and derivative DOFs need
@@ -716,7 +718,7 @@ class TestPerElementOrder:
 
 
 class TestEvaluateExpansion:
-    """``evaluate_expansion`` locates each point's element and gathers only
+    """``_evaluate_expansion`` locates each point's element and gathers only
     that element's coefficients, so its cost is independent of the number of
     elements. It must agree exactly with the dense
     ``evaluate(...) @ coefficients`` path it replaces."""
@@ -829,7 +831,7 @@ class TestEvaluateExpansion:
         assert len(set(sizes)) == 1, f"graph size varied with n_elements: {sizes}"
 
     def test_function_call_uses_fused_path(self, local, breakpoints):
-        # FunctionSpace.evaluate routes through evaluate_expansion, so a
+        # FunctionSpace.evaluate routes through _evaluate_expansion, so a
         # Function's __call__ gets this for free.
         basis = PiecewiseBasis(local, breakpoints, continuity=0)
         space = FunctionSpace(basis, domain=UnitInterval.Parameters(a=self.A, b=self.B))

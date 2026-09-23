@@ -291,7 +291,7 @@ def test_side_at_c1_knot():
     np.testing.assert_allclose(left, right, atol=1e-8)
 
 
-# -- evaluate_expansion (fused local-support path) --
+# -- _evaluate_expansion (fused local-support path) --
 
 
 def test_evaluate_expansion_matches_dense(witness_basis):
@@ -330,7 +330,7 @@ def test_evaluate_expansion_vector_valued(witness_basis):
 
 
 def test_evaluate_expansion_deriv_past_degree(witness_basis):
-    # Exercises the early-return branch through evaluate_expansion, when
+    # Exercises the early-return branch through _evaluate_expansion, when
     # the derivative order exceeds the basis degree.
     basis = witness_basis
     x = _sample_points(basis)

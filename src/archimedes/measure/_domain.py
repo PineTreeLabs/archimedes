@@ -32,6 +32,7 @@ class ReferenceDomain(metaclass=abc.ABCMeta):
     pairs one of these with a weight function.
     """
 
+    @tree.struct
     class Parameters:
         """Base for a domain's affine-reparametrization parameters.
 
@@ -40,7 +41,8 @@ class ReferenceDomain(metaclass=abc.ABCMeta):
         accepts. This base is never instantiated directly -- it exists so
         code that doesn't know which domain it's working with can still
         refer to "the parameters of some reference domain" as a single
-        type.
+        type. It's itself an (empty) ``@struct`` only so that type checkers
+        recognize every subclass as a dataclass through this common base.
 
         Because these are ``@struct`` types, their fields are pytree
         leaves: a domain parametrization can be symbolically traced (and
