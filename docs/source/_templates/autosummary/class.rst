@@ -2,7 +2,15 @@
 
 .. currentmodule:: {{ module }}
 
+{# Methods and attributes are documented inline on the class page (listed
+    explicitly so autodoc picks the right documenter for each and includes
+    inherited members); the summary tables link to those inline entries.
+    Nested classes still get their own pages. #}
 .. autoclass:: {{ module }}::{{ objname }}
+   :members: __init__
+   {%- for item in methods if item != '__init__' %}, {{ item }}{% endfor %}
+   {%- for item in attributes %}, {{ item }}{% endfor %}
+   :member-order: groupwise
 
    {% block classes %}
    {% set nested_classes = nested_classes.get(module ~ "." ~ objname, []) %}
@@ -18,13 +26,10 @@
    {% endblock %}
 
    {% block methods %}
-   .. automethod:: {{ module }}::{{ objname }}.__init__
-
-   {% if methods %}
+   {% if methods | reject('equalto', '__init__') | list %}
    .. rubric:: {{ _('Methods') }}
 
    .. autosummary::
-      :toctree:
    {% for item in methods %}
       {%- if item != '__init__' %}
       ~{{ name }}.{{ item }}
@@ -38,7 +43,6 @@
    .. rubric:: {{ _('Attributes') }}
 
    .. autosummary::
-      :toctree:
    {% for item in attributes %}
       ~{{ name }}.{{ item }}
    {%- endfor %}
