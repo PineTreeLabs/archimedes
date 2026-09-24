@@ -16,16 +16,19 @@ __all__ = ["CubicHermiteBasis"]
 
 @dataclasses.dataclass(frozen=True)
 class CubicHermiteBasis(Basis):
-    r"""Cubic Hermite shape functions: value *and* derivative degrees of
+    r"""A basis of cubic Hermite shape functions
+
+    This basis includes both value and derivative degrees of
     freedom at each of the two element endpoints.
 
     The basis functions are :math:`\{\phi_{00}, \phi_{10}, \phi_{01},
     \phi_{11}\}`, where :math:`\phi_{i0}` is the value-type function at
     endpoint :math:`i` and :math:`\phi_{i1}` the derivative-type one, so a
-    ``Function`` on this basis has coefficients ``[u(a), u'(a), u(b),
-    u'(b)]``. Used as an element of a :class:`PiecewiseBasis` with
-    ``continuity=1``, this gives a globally :math:`C^1` piecewise-cubic
-    space.
+    :class:`Function` ``u`` on this basis has coefficients ``[u(a), u'(a), u(b),
+    u'(b)]``. See [1]_ for more details.
+
+    Typically used to construct piecewise-cubic bases, in which case it
+    can produce a globally :math:`C^1` space. See :class:`PiecewiseBasis`.
 
     Derivatives leave this family: for a piecewise cubic Hermite
     ``Function`` ``f``, ``f.derivative()`` is a piecewise *quadratic*
@@ -39,32 +42,16 @@ class CubicHermiteBasis(Basis):
     (t+1)/2`),
 
     .. math::
-        H_{00}(\tau) = 2\tau^3 - 3\tau^2 + 1, \quad
+        H_{00}(\tau) = 2\tau^3 - 3\tau^2 + 1, \\
         H_{10}(\tau) = \tau^3 - 2\tau^2 + \tau, \\
-        H_{01}(\tau) = -2\tau^3 + 3\tau^2, \quad
+        H_{01}(\tau) = -2\tau^3 + 3\tau^2, \\
         H_{11}(\tau) = \tau^3 - \tau^2,
 
-    via :math:`\phi_{00} = H_{00}(\tau)`, :math:`\phi_{01} = H_{01}(\tau)`
-    and :math:`\phi_{10} = 2 H_{10}(\tau)`, :math:`\phi_{11} = 2
-    H_{11}(\tau)`. The factor of 2 cancels the internal :math:`d\tau/dt =
-    1/2`, so :math:`d\phi_{10}/dt = 1` exactly at the node it belongs to.
+    via :math:`\phi_{i0}(t) = H_{i0}(\tau)` and :math:`\phi_{i1}(t) = 2 H_{i1}(\tau)`.
 
-    For a target element :math:`[a, b]` with ``scale = (b-a)/2``
-    (:class:`~archimedes.measure.UnitInterval`), each basis function's
-    *intrinsic* derivative order (``[0, 1, 0, 1]`` here) determines an
-    *extra* power of ``scale`` on top of the usual output-derivative
-    chain-rule factor:
-
-    .. math::
-        \phi_i^{(k)}(x) = \mathrm{scale}^{\,m_i - k} \, \phi_i^{(k)}(t(x)),
-        \qquad m_i \in \{0, 1\}.
-
-    At :math:`k=0` this makes coefficient :math:`c_1` (say) the *physical*
-    derivative :math:`du/dx` at the left endpoint, independent of
-    ``scale``: :math:`d/dx[c_1 \cdot \mathrm{scale} \cdot \phi_{10}(t)] =
-    c_1 \cdot \mathrm{scale} \cdot d\phi_{10}/dt \cdot dt/dx = c_1 \cdot
-    d\phi_{10}/dt`, which is :math:`c_1` at the owning node since
-    :math:`d\phi_{10}/dt = 1` there by construction.
+    References
+    ----------
+    .. [1] Wikipedia, "Cubic Hermite spline," https://en.wikipedia.org/wiki/Cubic_Hermite_spline
     """
 
     @property
@@ -107,16 +94,9 @@ class CubicHermiteBasis(Basis):
     def _derivative_basis(self, deriv=1):
         """A :class:`LagrangeBasis` of ``4 - deriv`` Gauss-Lobatto nodes.
 
-        See the class docstring: unlike every other family here, the
-        derivative crosses into a different family entirely, since a
-        cubic's derivative is a plain polynomial with no value/slope DOF
-        structure of its own. Gauss-Lobatto nodes are chosen (rather than
-        e.g. Gauss-Legendre) specifically so the result's own
-        :meth:`~LagrangeBasis.boundary_dofs` stays populated -- e.g. the
-        first derivative of a :math:`C^1`-assembled Hermite function is
-        itself exactly :math:`C^0`, and needs endpoint DOFs to be
-        reassembled as such when a piecewise basis differentiates its
-        elements.
+        The derivative must live in a different family, since the derivative
+        of a cubic is a plain polynomial with no value/slope DOF structure.
+        Gauss-Lobatto nodes are chosen to preserve the boundary DOFs.
         """
         if deriv < 0:
             raise ValueError(f"deriv must be >= 0, got {deriv}")
@@ -126,9 +106,7 @@ class CubicHermiteBasis(Basis):
             raise ValueError(
                 f"deriv={deriv} is at or past the degree of a {self.n_basis}-"
                 f"function basis, whose elements are polynomials of degree "
-                f"{self.n_basis - 1}; the derivative is identically zero and "
-                f"has no space of its own. Use `f(x, deriv={deriv})` if the "
-                f"zero values are what you want."
+                f"{self.n_basis - 1}; the derivative is identically zero."
             )
         return LagrangeBasis(reference_nodes=_lobatto_nodes(self.n_basis - deriv))
 
