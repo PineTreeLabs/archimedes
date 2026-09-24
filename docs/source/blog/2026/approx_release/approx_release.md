@@ -3,6 +3,8 @@ jupytext:
   text_representation:
     extension: .md
     format_name: myst
+mystnb:
+  execution_timeout: 180
 kernelspec:
   display_name: Python 3
   language: python
