@@ -16,7 +16,7 @@ __all__ = ["ProductParameters", "TensorBasis"]
 @tree.struct
 class ProductParameters(ReferenceDomain.Parameters):
     """Target-domain parameters for a :class:`TensorBasis`
-    
+
     Represents a multi-dimensional domain as one
     :class:`~archimedes.measure.ReferenceDomain.Parameters` per dimension.
 
@@ -43,8 +43,7 @@ class ProductParameters(ReferenceDomain.Parameters):
 
 # TODO: Is this redundant with quadrature._tensor._dim_args?
 def _dim_kwargs(basis: Basis, spec: Any) -> dict:
-    """Normalize  domain parameters into keyword arguments for ``basis.evaluate``.
-    """
+    """Normalize  domain parameters into keyword arguments for ``basis.evaluate``."""
     if spec is None:
         return {}
     if isinstance(spec, ReferenceDomain.Parameters):
@@ -87,7 +86,7 @@ class _DimensionView:
         return self._rule.nodes[:, self._dim]
 
 
-def _row_kron(mats: list) -> np.ndarray:
+def _row_kron(mats: list[np.ndarray]) -> np.ndarray:
     """Row-wise Kronecker (Khatri-Rao) product of design matrices.
 
     Given ``(npts, p)`` and ``(npts, q)``, returns ``(npts, p * q)`` with
@@ -205,7 +204,7 @@ class TensorBasis(Basis):
         return sum((basis._measures for basis in self.bases), ())
 
     @property
-    def Parameters(self) -> type[ProductParameters]:  # noqa: N802
+    def Parameters(self) -> type[ProductParameters]:
         return ProductParameters
 
     @property
@@ -283,14 +282,16 @@ class TensorBasis(Basis):
     def _dim_specs(self, dims) -> tuple:
         if dims is None:
             return (None,) * self.ndim
-        dims = tuple(dims)
-        if len(dims) != self.ndim:
+        specs = tuple(dims)
+        if len(specs) != self.ndim:
             raise ValueError(
-                f"expected {self.ndim} per-dimension parameters, got {len(dims)}"
+                f"expected {self.ndim} per-dimension parameters, got {len(specs)}"
             )
-        return dims
+        return specs
 
-    def evaluate(self, x, deriv=0, dims=None, side=RIGHT):
+    # Explicit domain parameters narrow the base's `**domain_kwargs`, which
+    # mypy reports as an incompatible override.
+    def evaluate(self, x, deriv=0, *, dims=None, side=RIGHT):  # type: ignore[override]
         """Evaluate all ``n_basis`` product functions at ``x``.
 
         Parameters
@@ -335,7 +336,9 @@ class TensorBasis(Basis):
             ]
         )
 
-    def _evaluate_at_nodes(self, rule, deriv=0, dims=None):
+    # Explicit domain parameters narrow the base's `**domain_kwargs`, which
+    # mypy reports as an incompatible override.
+    def _evaluate_at_nodes(self, rule, deriv=0, *, dims=None):  # type: ignore[override]
         """Per-dimension evaluation at the rule's nodes."""
         alpha = self._multi_index(deriv)
         specs = self._dim_specs(dims)

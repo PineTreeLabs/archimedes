@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import dataclasses
+from typing import Any
 
 import numpy as np
 
@@ -66,7 +67,7 @@ class OrthogonalPolynomialBasis(Basis):
         return (self.measure,)
 
     @property
-    def Parameters(self) -> type:  # noqa: N802
+    def Parameters(self) -> type:
         return type(self.measure.domain).Parameters
 
     @property
@@ -122,7 +123,7 @@ class OrthogonalPolynomialBasis(Basis):
             self.measure, self.n_basis + order, density=self.density
         )
 
-    def evaluate(self, x, deriv: int = 0, side: str = RIGHT, **domain_kwargs):
+    def evaluate(self, x, deriv: int = 0, *, side: str = RIGHT, **domain_kwargs):
         # `side` is validated but unused: these polynomials are smooth, so
         # both one-sided limits agree everywhere. See `Basis.evaluate`.
         _check_side(side)
@@ -150,7 +151,7 @@ class OrthogonalPolynomialBasis(Basis):
         # pi[m][k] = the m-th derivative of the k-th monic polynomial, for
         # every m <= deriv simultaneously (computing derivatives is nearly
         # free once the recurrence is being evaluated regardless).
-        pi = [[None] * self.n_basis for _ in range(deriv + 1)]
+        pi: list[list[Any]] = [[None] * self.n_basis for _ in range(deriv + 1)]
         pi[0][0] = np.ones_like(x)
         for m in range(1, deriv + 1):
             pi[m][0] = np.zeros_like(x)

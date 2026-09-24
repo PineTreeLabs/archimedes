@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import dataclasses
+from typing import cast
 
 import numpy as np
 
@@ -73,6 +74,14 @@ class PiecewiseBasis(Basis):
     first-derivative continuity.
     """
 
+    # Derived in `__post_init__`. `_element_bases` is `element_basis` with
+    # its type narrowed to the per-element tuple it is normalized to.
+    _element_bases: tuple[Basis, ...] = dataclasses.field(
+        init=False, repr=False, compare=False
+    )
+    _uniform: bool = dataclasses.field(init=False, repr=False, compare=False)
+    _assembly: np.ndarray = dataclasses.field(init=False, repr=False, compare=False)
+
     def __post_init__(self):
         bp = np.asarray(self.breakpoints, dtype=float)
         if bp.ndim != 1 or len(bp) < 2:
@@ -144,6 +153,7 @@ class PiecewiseBasis(Basis):
                         )
 
         object.__setattr__(self, "element_basis", element_bases)
+        object.__setattr__(self, "_element_bases", element_bases)
         object.__setattr__(self, "breakpoints", bp)
         # Whether every element shares the same basis.
         # Lets `_evaluate_expansion` keep its fused O(1)-in-
@@ -180,19 +190,19 @@ class PiecewiseBasis(Basis):
     @property
     def _n_broken(self) -> int:
         """Degrees of freedom before continuity is imposed."""
-        return sum(eb.n_basis for eb in self.element_basis)
+        return sum(eb.n_basis for eb in self._element_bases)
 
     @property
     def n_basis(self) -> int:
-        return self._assembly.shape[1]
+        return int(self._assembly.shape[1])
 
     @property
-    def Parameters(self) -> type:  # noqa: N802
+    def Parameters(self) -> type:
         return UnitInterval.Parameters
 
     @property
     def _measures(self):
-        return self.element_basis[0]._measures
+        return self._element_bases[0]._measures
 
     @property
     def _required_breakpoints(self) -> np.ndarray:
@@ -201,11 +211,11 @@ class PiecewiseBasis(Basis):
     def boundary_dofs(self, order: int = 0) -> tuple[int | None, int | None]:
         if self.continuity == DISCONTINUOUS:
             return (None, None)
-        left, _ = self.element_basis[0].boundary_dofs(order)
-        _, right = self.element_basis[-1].boundary_dofs(order)
+        left, _ = self._element_bases[0].boundary_dofs(order)
+        _, right = self._element_bases[-1].boundary_dofs(order)
         if left is None or right is None:
             return (None, None)
-        last_offset = self._n_broken - self.element_basis[-1].n_basis
+        last_offset = self._n_broken - self._element_bases[-1].n_basis
         return (
             int(np.argmax(self._assembly[left])),
             int(np.argmax(self._assembly[last_offset + right])),
@@ -215,7 +225,7 @@ class PiecewiseBasis(Basis):
         from archimedes.quadrature import composite_quad
 
         return composite_quad(
-            [eb._default_quadrature() for eb in self.element_basis], self.breakpoints
+            [eb._default_quadrature() for eb in self._element_bases], self.breakpoints
         )
 
     def _product_basis(self, other):
@@ -232,7 +242,7 @@ class PiecewiseBasis(Basis):
         return PiecewiseBasis(
             tuple(
                 e1._product_basis(e2)
-                for e1, e2 in zip(self.element_basis, other.element_basis)
+                for e1, e2 in zip(self._element_bases, other._element_bases)
             ),
             self.breakpoints,
             continuity=min(self.continuity, other.continuity),
@@ -244,7 +254,7 @@ class PiecewiseBasis(Basis):
         if deriv == 0:
             return self
         return PiecewiseBasis(
-            tuple(eb._derivative_basis(deriv) for eb in self.element_basis),
+            tuple(eb._derivative_basis(deriv) for eb in self._element_bases),
             self.breakpoints,
             continuity=max(self.continuity - deriv, DISCONTINUOUS),
         )
@@ -258,7 +268,7 @@ class PiecewiseBasis(Basis):
         r"""Build the assembly map ``T``, shape ``(n_broken, n_basis)``, such
         that :math:`\Phi_{\mathrm{global}}(x) = \Phi_{\mathrm{broken}}(x) T`.
         """
-        element_bases = self.element_basis
+        element_bases = self._element_bases
         if self.continuity == DISCONTINUOUS:
             return np.eye(self._n_broken)
 
@@ -273,7 +283,10 @@ class PiecewiseBasis(Basis):
         for e, eb in enumerate(element_bases):
             n_loc = eb.n_basis
             left_by_order = [eb.boundary_dofs(o)[0] for o in range(n_orders)]
-            right_by_order = [eb.boundary_dofs(o)[1] for o in range(n_orders)]
+            # Never `None`: `__post_init__` checks every order has boundary DOFs.
+            right_by_order = [
+                cast(int, eb.boundary_dofs(o)[1]) for o in range(n_orders)
+            ]
             # Local index -> which order it's the "left" DOF for, so a plain
             # membership test below can dispatch to the right previous-global
             # tracker regardless of how many orders are being merged.
@@ -301,14 +314,18 @@ class PiecewiseBasis(Basis):
         basis, then assembled."""
         blocks = []
         for e in range(self.n_elements):
-            block = self.element_basis[e].evaluate(
+            block = self._element_bases[e].evaluate(
                 x, deriv=deriv, a=knots[e], b=knots[e + 1]
             )
             blocks.append(np.where(masks[e][:, None], block, np.zeros_like(block)))
         broken = np.concatenate(blocks, axis=-1)  # (npts, n_broken)
         return broken @ self._assembly
 
-    def evaluate(self, x, deriv: int = 0, a=None, b=None, side: str = RIGHT):
+    # Explicit domain parameters narrow the base's `**domain_kwargs`, which
+    # mypy reports as an incompatible override.
+    def evaluate(  # type: ignore[override]
+        self, x, deriv: int = 0, *, a=None, b=None, side: str = RIGHT
+    ):
         r"""Evaluate at arbitrary points, resolving breakpoints by ``side``.
 
         Parameters
@@ -347,7 +364,9 @@ class PiecewiseBasis(Basis):
 
         return self._blocks(x, masks, knots, deriv)
 
-    def _evaluate_at_nodes(self, rule, deriv=0, a=None, b=None):
+    # Explicit domain parameters narrow the base's `**domain_kwargs`, which
+    # mypy reports as an incompatible override.
+    def _evaluate_at_nodes(self, rule, deriv=0, *, a=None, b=None):  # type: ignore[override]
         """Evaluate at a quadrature rule's nodes, using the rule's recorded
         element ownership instead of the coordinate convention."""
         x = rule.nodes
@@ -372,8 +391,10 @@ class PiecewiseBasis(Basis):
         masks = [owner == e for e in range(self.n_elements)]
         return self._blocks(x, masks, knots, deriv)
 
-    def _evaluate_expansion(
-        self, coefficients, x, deriv: int = 0, a=None, b=None, side: str = RIGHT
+    # Explicit domain parameters narrow the base's `**domain_kwargs`, which
+    # mypy reports as an incompatible override.
+    def _evaluate_expansion(  # type: ignore[override]
+        self, coefficients, x, deriv: int = 0, *, a=None, b=None, side: str = RIGHT
     ):
         r"""Evaluate the coefficient expansion :math:`\sum_i c_i \,
         \phi_i(x)` (or its ``deriv``-th derivative), for coefficients ``c``
@@ -408,7 +429,7 @@ class PiecewiseBasis(Basis):
         # Reference coordinate within the owning element, t in [-1, 1]
         width = hi - lo
         t = 2.0 * (x - lo) / width - 1.0
-        shared = self.element_basis[0]
+        shared = self._element_bases[0]
         phi = shared.evaluate(t, deriv=deriv)  # (npts, n_loc)
 
         # Expanding to per-element coefficients once makes each element's
@@ -426,7 +447,7 @@ class PiecewiseBasis(Basis):
         # reference-domain shape functions are already the physical ones up to
         # the chain rule alone. See `Basis._reference_scale_exponent`.
         scale_exponent = shared._reference_scale_exponent
-        total = None
+        terms = []
         for k in range(n_loc):
             c_k = _gather(broken, element * n_loc + k, symbolic, npts)
             # Chain rule for the map into the reference coordinate: dt/dx =
@@ -439,8 +460,8 @@ class PiecewiseBasis(Basis):
             # to the single scalar factor every column used to share.
             col_scale = (2.0 / width) ** (deriv - dof_order[k] + scale_exponent)
             phi_k = phi[:, k] * col_scale
-            term = phi_k[:, None] * c_k if vector_valued else phi_k * c_k
-            total = term if total is None else total + term
+            terms.append(phi_k[:, None] * c_k if vector_valued else phi_k * c_k)
+        total = sum(terms[1:], start=terms[0])
 
         # `evaluate` masks every element, so a point outside the domain
         # contributes nothing; `low`/`searchsorted` instead clamp to the end

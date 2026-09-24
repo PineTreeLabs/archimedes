@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import functools
-from typing import TYPE_CHECKING, Any, Callable, Literal
+from typing import TYPE_CHECKING, Any, Callable, Literal, cast
 
 import numpy as np
 
@@ -13,6 +13,7 @@ from archimedes.measure import (
     JacobiMeasure,
     LaguerreMeasure,
     LegendreMeasure,
+    Measure,
     PhysicistsHermiteMeasure,
     ProbabilistsHermiteMeasure,
     RealLine,
@@ -62,7 +63,7 @@ def _normalize_breakpoints(breakpoints) -> tuple[float, float, np.ndarray]:
     return _reference_breakpoints(bp)
 
 
-_NODE_FAMILIES = {
+_NODE_FAMILIES: dict[str, Callable[[int], LagrangeBasis]] = {
     "lobatto": LagrangeBasis.gauss_lobatto,
     "legendre": LagrangeBasis.gauss_legendre,
     "radau_left": functools.partial(LagrangeBasis.gauss_radau, endpoint="left"),
@@ -108,6 +109,7 @@ def _resolve_element_basis(kind: str, degree, nodes) -> Basis | tuple[Basis, ...
     case), or a tuple for a per-element ``degree`` tuple.
     """
     degrees = degree if isinstance(degree, tuple) else (degree,)
+    bases: tuple[Basis, ...]
     if kind == "legendre":
         if nodes is not None:
             raise ValueError("nodes is only meaningful for kind='lagrange'")
@@ -136,7 +138,7 @@ def _resolve_element_basis(kind: str, degree, nodes) -> Basis | tuple[Basis, ...
 
 
 def _orthogonal_space(
-    cls, measure, n_basis: int, domain, density: bool, quad_rule
+    cls: type[FunctionSpace], measure, n_basis: int, domain, density: bool, quad_rule
 ) -> FunctionSpace:
     """Shared body for the orthogonal polynomial constructors"""
     basis = OrthogonalPolynomialBasis(measure, n_basis, density=density)
@@ -184,9 +186,11 @@ class FunctionSpace:
         parameters.
     """
 
-    basis: Basis = tree.field(static=True)
+    basis: Basis = tree.field(static=True)  # type: ignore[assignment]
     domain: Any
-    reference_quad_rule: Quadrature | None = tree.field(static=True, default=None)
+    reference_quad_rule: Quadrature | None = tree.field(  # type: ignore[assignment]
+        static=True, default=None
+    )
 
     def __post_init__(self):
         if not isinstance(self.domain, self.basis.Parameters):
@@ -211,7 +215,9 @@ class FunctionSpace:
         to get optionally normalized quadrature weights and points, e.g. when
         working with probability densities.
         """
-        return self.reference_quad_rule.map_to(**self._domain_kwargs())
+        # Never `None`: `__post_init__` fills in the default rule.
+        rule = cast(Quadrature, self.reference_quad_rule)
+        return rule.map_to(**self._domain_kwargs())
 
     def _validate_quad_rule(self, rule: Quadrature) -> None:
         """Reject a rule that cannot integrate this basis correctly.
@@ -466,6 +472,7 @@ class FunctionSpace:
         ValueError
             If ``kind`` is not ``"phys"`` or ``"prob"``.
         """
+        measure: Measure
         if kind == "prob":
             measure = ProbabilistsHermiteMeasure()
         elif kind == "phys":
@@ -909,9 +916,9 @@ class FunctionSpace:
             step_target._check_quad_rule_size(rule)
             # (current.n_basis, step_target.n_basis): D @ F recovers the
             # derivative of F's coefficients in this (smaller) space.
-            D = step_target._diff_matrix(1, space=current)
+            diff_mat = step_target._diff_matrix(1, space=current)
             phi_bnd = step_target._basis_eval(x_bnd)[0]  # (step_target.n_basis,)
-            system = np.concatenate([D, phi_bnd[None, :]], axis=0)
+            system = np.concatenate([diff_mat, phi_bnd[None, :]], axis=0)
             rhs = np.concatenate(
                 [np.eye(current.n_basis), np.zeros((1, current.n_basis))], axis=0
             )
@@ -967,8 +974,8 @@ class FunctionSpace:
         target._check_quad_rule_size(rule)
         phi = target.basis_matrix(quad_rule=rule)  # (npts, n_target)
         dphi = self.basis_matrix(deriv=deriv, quad_rule=rule)  # (npts, n_basis)
-        M = phi.T @ phi
-        return np.linalg.solve(M, phi.T @ dphi)  # type: ignore[no-any-return]
+        mass = phi.T @ phi
+        return np.linalg.solve(mass, phi.T @ dphi)  # type: ignore[no-any-return]
 
     def _domain_kwargs(self) -> dict:
         return {f.name: getattr(self.domain, f.name) for f in tree.fields(self.domain)}
@@ -1197,14 +1204,14 @@ class FunctionSpace:
         x, _ = self.quadrature(rule)
         phi = self.basis_matrix(quad_rule=rule)  # (npts, n_basis) trial
         psi = test.basis_matrix(quad_rule=rule)  # (npts, n_basis) test
-        M = psi.T @ phi
+        mass = psi.T @ phi
         # `f` is an ordinary function of position, so it needs the
         # coordinates and has no breakpoint ambiguity of its own to resolve.
         # In the vector-valued case the right-hand side is the (n_basis, m)
         # matrix of stacked component loads, which `solve` handles with a
         # single factorization of the shared Gram matrix.
         rhs = psi.T @ f(x)
-        return Function(np.linalg.solve(M, rhs), self)
+        return Function(np.linalg.solve(mass, rhs), self)
 
     def function(self, coefficients: np.ndarray | None = None) -> Function:
         """A :class:`Function` on this space with known ``coefficients``.

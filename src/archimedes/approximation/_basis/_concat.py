@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import dataclasses
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 import numpy as np
 
@@ -93,7 +93,7 @@ class ConcatBasis(Basis):
         return sum(piece.n_basis for piece in self.pieces)
 
     @property
-    def Parameters(self) -> type:  # noqa: N802
+    def Parameters(self) -> type:
         return self.pieces[0].Parameters
 
     @property
@@ -102,7 +102,11 @@ class ConcatBasis(Basis):
 
     @property
     def _required_breakpoints(self):
-        per_piece = [piece._required_breakpoints for piece in self.pieces]
+        # Every piece is univariate, so none returns a per-dimension tuple.
+        per_piece = [
+            cast("np.ndarray | None", piece._required_breakpoints)
+            for piece in self.pieces
+        ]
         present = [bp for bp in per_piece if bp is not None]
         if not present:
             return None
@@ -137,7 +141,7 @@ class ConcatBasis(Basis):
             offset += piece.n_basis
         return left, right
 
-    def evaluate(self, x, deriv: int = 0, side: str = RIGHT, **domain_kwargs):
+    def evaluate(self, x, deriv: int = 0, *, side: str = RIGHT, **domain_kwargs):
         _check_side(side)
         return np.concatenate(
             [

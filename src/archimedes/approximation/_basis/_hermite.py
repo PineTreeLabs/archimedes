@@ -67,7 +67,7 @@ class CubicHermiteBasis(Basis):
         return 4
 
     @property
-    def Parameters(self) -> type:  # noqa: N802
+    def Parameters(self) -> type:
         return UnitInterval.Parameters
 
     @property
@@ -117,7 +117,11 @@ class CubicHermiteBasis(Basis):
             )
         return LagrangeBasis(reference_nodes=_lobatto_nodes(self.n_basis - deriv))
 
-    def evaluate(self, x, deriv: int = 0, a=None, b=None, side: str = RIGHT):
+    # Explicit domain parameters narrow the base's `**domain_kwargs`, which
+    # mypy reports as an incompatible override.
+    def evaluate(  # type: ignore[override]
+        self, x, deriv: int = 0, *, a=None, b=None, side: str = RIGHT
+    ):
         # `side` is validated but unused: a single Hermite element is smooth,
         # so both one-sided limits agree everywhere. See `Basis.evaluate`.
         _check_side(side)

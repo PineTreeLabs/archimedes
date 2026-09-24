@@ -84,6 +84,14 @@ class Quadrature(Protocol):
         """Weights including the Jacobian of the currently-mapped target
         domain (see ``map_to``), shape ``(n,)``."""
 
+    def sum(
+        self, values: np.ndarray, *, axis: int = ..., density: bool = False
+    ) -> np.ndarray:
+        """Quadrature applied to values already sampled at the nodes.
+
+        The default ``axis`` is rule-specific; see each rule's ``sum``.
+        """
+
     def map_to(self, *params: Any, **kwparams: Any) -> Quadrature:
         """A new rule mapped onto the target domain."""
 

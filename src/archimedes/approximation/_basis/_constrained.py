@@ -214,10 +214,10 @@ class ConstrainedBasis(Basis):
 
     @property
     def n_basis(self) -> int:
-        return self.matrix.shape[1]
+        return int(self.matrix.shape[1])
 
     @property
-    def Parameters(self) -> type:  # noqa: N802
+    def Parameters(self) -> type:
         return self.base.Parameters
 
     @property
@@ -236,7 +236,7 @@ class ConstrainedBasis(Basis):
         exact for ``base`` remains exact here."""
         return self.base._default_quadrature()
 
-    def evaluate(self, x, deriv: int = 0, side: str = RIGHT, **domain_kwargs):
+    def evaluate(self, x, deriv: int = 0, *, side: str = RIGHT, **domain_kwargs):
         _check_side(side)
         return (
             self.base.evaluate(x, deriv=deriv, side=side, **domain_kwargs) @ self.matrix

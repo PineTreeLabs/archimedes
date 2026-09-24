@@ -48,7 +48,7 @@ class MonomialBasis(Basis):
             raise ValueError(f"n_basis must be >= 1, got {self.n_basis}")
 
     @property
-    def Parameters(self) -> type:  # noqa: N802
+    def Parameters(self) -> type:
         # A finite target interval is required even though the monomials
         # themselves are defined on all of R: FunctionSpace's mass-matrix
         # and projection integrals have no decaying weight to make them
@@ -90,7 +90,7 @@ class MonomialBasis(Basis):
             return self
         return MonomialBasis(self.n_basis + order)
 
-    def evaluate(self, x, deriv: int = 0, side: str = RIGHT, **domain_kwargs):
+    def evaluate(self, x, deriv: int = 0, *, side: str = RIGHT, **domain_kwargs):
         # `side` is validated but unused: monomials are smooth, so both
         # one-sided limits agree everywhere. See `Basis.evaluate`.
         _check_side(side)

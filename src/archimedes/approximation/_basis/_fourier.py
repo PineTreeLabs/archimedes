@@ -101,7 +101,7 @@ class FourierBasis(Basis):
         return (LegendreMeasure(),)
 
     @property
-    def Parameters(self) -> type:  # noqa: N802
+    def Parameters(self) -> type:
         return UnitInterval.Parameters
 
     def _default_quadrature(self):
@@ -134,11 +134,11 @@ class FourierBasis(Basis):
                 f"product requires the same normalization, got "
                 f"density={self.density} and density={other.density}"
             )
-        N = self.max_mode + other.max_mode
+        n = self.max_mode + other.max_mode
         if self.kind == "full" or other.kind == "full":
-            return FourierBasis(2 * N + 1, kind="full", density=self.density)
+            return FourierBasis(2 * n + 1, kind="full", density=self.density)
         kind = _PRODUCT_KIND[(self.kind, other.kind)]
-        n_basis = N + 1 if kind == "cosine" else N
+        n_basis = n + 1 if kind == "cosine" else n
         return FourierBasis(n_basis, kind=kind, density=self.density)
 
     def _derivative_basis(self, deriv=1):
@@ -159,7 +159,7 @@ class FourierBasis(Basis):
 
     def _integral_basis(self, order=1):
         r"""Minimal basis to contain the integral of functions in this basis.
-        
+
         ``"full"``/``"cosine"`` raise since both contain the constant/DC
         basis function, whose antiderivative is a non-periodic linear ramp
         with no representation in any Fourier-type space.
@@ -193,7 +193,7 @@ class FourierBasis(Basis):
             )
         return FourierBasis(self.max_mode + 1, kind="cosine", density=self.density)
 
-    def evaluate(self, x, deriv: int = 0, side: str = RIGHT, **domain_kwargs):
+    def evaluate(self, x, deriv: int = 0, *, side: str = RIGHT, **domain_kwargs):
         # `side` is validated but unused: this family is smooth everywhere,
         # so both one-sided limits agree. See `Basis.evaluate`.
         _check_side(side)
@@ -205,15 +205,15 @@ class FourierBasis(Basis):
         theta = omega * (x - shift)  # (npts,)
         mass = 1.0 if self.density else LegendreMeasure().mass(**domain_kwargs)
         phase = deriv * np.pi / 2
-        N = self.max_mode
+        n = self.max_mode
 
         parts = []
         if self.kind in ("full", "cosine"):
             const = np.ones_like(x) / np.sqrt(mass) if deriv == 0 else np.zeros_like(x)
             parts.append(const[:, None])  # (npts, 1)
 
-        if N > 0:
-            k = np.arange(1, N + 1, dtype=float)  # (N,) -- static, not traced
+        if n > 0:
+            k = np.arange(1, n + 1, dtype=float)  # (N,) -- static, not traced
             factor = np.sqrt(2.0 / mass) * (k * omega) ** deriv  # (N,)
             k_theta = theta[:, None] * k[None, :]  # (npts, N), one broadcast
             cos_terms = factor * np.cos(k_theta + phase)  # (npts, N)
@@ -228,7 +228,7 @@ class FourierBasis(Basis):
                 # symbolic-safe operation (like every differentiation-matrix
                 # product elsewhere in this module).
                 combined = np.concatenate([cos_terms, sin_terms], axis=-1)
-                parts.append(combined @ _interleave_matrix(N))
+                parts.append(combined @ _interleave_matrix(n))
             elif self.kind == "cosine":
                 parts.append(cos_terms)
             else:  # "sine"

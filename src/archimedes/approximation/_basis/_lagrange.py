@@ -131,6 +131,10 @@ class LagrangeBasis(Basis):
     reference_nodes: np.ndarray
     node_family: Callable[[int], np.ndarray] | None = None
 
+    # Derived from `reference_nodes` in `__post_init__`.
+    _weights: np.ndarray = dataclasses.field(init=False, repr=False, compare=False)
+    _diff_matrix: np.ndarray = dataclasses.field(init=False, repr=False, compare=False)
+
     def __post_init__(self):
         nodes = np.asarray(self.reference_nodes, dtype=float)
         if nodes.ndim != 1 or len(nodes) < 1:
@@ -169,7 +173,7 @@ class LagrangeBasis(Basis):
     @classmethod
     def gauss_lobatto(cls, n: int) -> LagrangeBasis:
         """Construct a Lagrange basis using Gauss-Lobatto nodes
-        
+
         Parameters
         ----------
         n : int
@@ -186,7 +190,7 @@ class LagrangeBasis(Basis):
     @classmethod
     def gauss_legendre(cls, n: int) -> LagrangeBasis:
         """Construct a Lagrange basis using Gauss-Legendre nodes.
-        
+
         Parameters
         ----------
         n : int
@@ -205,7 +209,7 @@ class LagrangeBasis(Basis):
     @classmethod
     def gauss_radau(cls, n: int, endpoint: str = "left") -> LagrangeBasis:
         """Construct a Lagrange basis using Gauss-Radau nodes.
-        
+
         Parameters
         ----------
         n : int
@@ -279,7 +283,7 @@ class LagrangeBasis(Basis):
         return len(self.reference_nodes)
 
     @property
-    def Parameters(self) -> type:  # noqa: N802
+    def Parameters(self) -> type:
         return UnitInterval.Parameters
 
     def _default_quadrature(self):
@@ -352,7 +356,11 @@ class LagrangeBasis(Basis):
             right if np.isclose(nodes[right], 1.0) else None,
         )
 
-    def evaluate(self, x, deriv: int = 0, a=None, b=None, side: str = RIGHT):
+    # Explicit domain parameters narrow the base's `**domain_kwargs`, which
+    # mypy reports as an incompatible override.
+    def evaluate(  # type: ignore[override]
+        self, x, deriv: int = 0, *, a=None, b=None, side: str = RIGHT
+    ):
         # `side` is validated but unused: cardinal polynomials are smooth, so
         # both one-sided limits agree everywhere. See `Basis.evaluate`.
         _check_side(side)

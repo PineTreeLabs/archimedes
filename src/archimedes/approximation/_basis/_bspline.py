@@ -54,9 +54,9 @@ class BSplineBasis(Basis):
         f(x) \approx \sum_j c_j B_{j, k}(x)
 
     The knot vector can contain any interior or end multiplicity from :math:`1`
-    through :math:`k + 1`, clamped or open. A knot of multiplicity :math:`k + 1` produces
-    a true discontinuity, while a knot of multiplicity :math:`m < k + 1` produces
-    :math:`C^{k - m}` continuity.
+    through :math:`k + 1`, clamped or open. A knot of multiplicity :math:`k + 1`
+    produces a true discontinuity, while a knot of multiplicity :math:`m < k + 1`
+    produces :math:`C^{k - m}` continuity.
 
     Parameters
     ----------
@@ -149,7 +149,7 @@ class BSplineBasis(Basis):
         return len(self.knots) - self.degree - 1
 
     @property
-    def Parameters(self) -> type:  # noqa: N802
+    def Parameters(self) -> type:
         """Type of the parameters for the B-spline basis (ignored for this class)."""
         return UnitInterval.Parameters
 
@@ -324,7 +324,11 @@ class BSplineBasis(Basis):
 
         return biatx, base
 
-    def evaluate(self, x, deriv: int = 0, a=None, b=None, side: str = RIGHT):
+    # Explicit domain parameters narrow the base's `**domain_kwargs`, which
+    # mypy reports as an incompatible override.
+    def evaluate(  # type: ignore[override]
+        self, x, deriv: int = 0, *, a=None, b=None, side: str = RIGHT
+    ):
         """Evaluate all ``n_basis`` B-splines at ``x`` using de Boor's BSPLVB algorithm.
 
         The domain endpoints ``a`` and ``b`` are accepted for compatibility
@@ -351,7 +355,7 @@ class BSplineBasis(Basis):
         return total
 
     def _evaluate_expansion(
-        self, coefficients, x, deriv: int = 0, side: str = RIGHT, **domain_kwargs
+        self, coefficients, x, deriv: int = 0, *, side: str = RIGHT, **domain_kwargs
     ):
         r"""Evaluate :math:`\sum_i c_i \, N_i(x)` (or its derivative) directly."""
         # Gathers only the ``degree + 1`` locally relevant coefficients per point

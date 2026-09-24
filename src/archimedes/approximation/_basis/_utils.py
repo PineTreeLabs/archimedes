@@ -61,6 +61,7 @@ def _locate(knots, x, symbolic: bool, side: str = RIGHT):
     """
     _check_side(side)
     n_elements = len(knots) - 1
+    index: SymbolicArray | np.ndarray
     if symbolic:
         index = SymbolicArray(
             cs.low(_as_mx(knots), _as_mx(x)), shape=np.shape(x), dtype=int

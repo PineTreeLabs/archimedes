@@ -1,17 +1,4 @@
-"""Antiderivatives and definite integrals of Functions.
-
-Integrating raises the degree, so the exact result lives in a *larger*
-space -- the mirror of a derivative, which needs a smaller one (and the same
-direction as a product). ``boundary`` pins the extra degree(s) of freedom
-that introduces by requiring the antiderivative (and its lower derivatives,
-for ``order > 1``) to vanish at one end of the domain, rather than leaving it
-ambiguous the way a bare "constant of integration" would.
-
-``integrate()`` is the scalar/definite counterpart -- the
-``scipy.interpolate.PPoly`` ``antiderivative()``/``integrate(a, b)`` split --
-built directly on ``antiderivative()`` wherever that is defined, with a
-whole-domain-only fallback where it isn't.
-"""
+"""Antiderivatives and definite integrals of Functions."""
 
 import numpy as np
 import pytest
@@ -325,9 +312,7 @@ def test_hermite_integral_unsupported():
 
 def test_piecewise_integral_unsupported():
     basis = PiecewiseBasis(_lobatto(4), BREAKS, continuity=0)
-    with pytest.raises(
-        NotImplementedError, match="running constant carried across elements"
-    ):
+    with pytest.raises(NotImplementedError, match="does not define an integral basis"):
         basis._integral_basis()
 
 
@@ -335,9 +320,7 @@ def test_piecewise_integral_raises():
     space = FunctionSpace(
         PiecewiseBasis(_lobatto(4), BREAKS, continuity=0), domain=DOMAIN
     )
-    with pytest.raises(
-        NotImplementedError, match="running constant carried across elements"
-    ):
+    with pytest.raises(NotImplementedError, match="does not define an integral basis"):
         space.project(f_).antiderivative()
 
 
@@ -486,9 +469,7 @@ def test_piecewise_integrate():
         u.integrate(), f_antideriv(B) - f_antideriv(A), atol=1e-9
     )
 
-    with pytest.raises(
-        NotImplementedError, match="running constant carried across elements"
-    ):
+    with pytest.raises(NotImplementedError, match="does not define an integral basis"):
         u.integrate(0.3, 1.7)
 
 

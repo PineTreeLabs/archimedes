@@ -71,7 +71,7 @@ class Function:
     operations. The "children" of the struct are the coefficients and the space
     and the space itself. Note that function spaces are themselves structs, so
     **flattening the function may include boundary endpoint data**.
-    
+
     This is useful for variable-endpoint problems, but not desirable when the
     domain endpoints are fixed. In this case, a typical approach is to work
     directly with the coefficient array, reconstructing or replacing the full
@@ -135,7 +135,7 @@ class Function:
         return Function(-self.coefficients, self.space)
 
     def __mul__(self, other) -> Function:
-        """Scalar multiple, or the pointwise product of two ``Function`` objects. """
+        """Scalar multiple, or the pointwise product of two ``Function`` objects."""
         if isinstance(other, Function):
             return self.multiply(other)
         return Function(other * self.coefficients, self.space)
@@ -148,7 +148,7 @@ class Function:
                 "explicitly instead, e.g. "
                 "f.space.project(lambda x: f(x) / g(x))"
             )
-        return self * (1 / other)
+        return Function((1 / other) * self.coefficients, self.space)
 
     __rmul__ = __mul__
 

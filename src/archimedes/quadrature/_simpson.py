@@ -16,7 +16,7 @@ def simpson(n: int, a: float, b: float) -> QuadratureRule:
     Simpson's rule fits a parabola through the two ends and the midpoint
     of an interval:
     :math:`\int_a^b f(x) \, dx \approx \tfrac{h}{3}(f_0 + 4 f_1 + f_2)`
-    
+
     The quadrature rule tiles ``n`` equal-width segments across the domain
     :math:`[a, b]`, with each segment using the Simpson quadrature rule.
 

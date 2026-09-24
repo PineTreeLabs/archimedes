@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import abc
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 import numpy as np
 
@@ -70,7 +70,7 @@ class BasisMatrix:
         return self.matrix @ coefficients  # type: ignore[no-any-return]
 
     @property
-    def T(self) -> _BasisMatrixAdjoint:  # noqa: N802
+    def T(self) -> _BasisMatrixAdjoint:
         r"""The adjoint :math:`\Phi^\top`; see the class docstring."""
         return _BasisMatrixAdjoint(self)
 
@@ -96,7 +96,7 @@ class _BasisMatrixAdjoint:
         return phi.T @ (w[:, None] * values)  # type: ignore[no-any-return]
 
     @property
-    def T(self) -> BasisMatrix:  # noqa: N802
+    def T(self) -> BasisMatrix:
         return self.basis_matrix
 
 
@@ -116,7 +116,7 @@ class Basis(metaclass=abc.ABCMeta):
     coefficients.
 
     Available implementations include:
-    
+
     - :class:`BSplineBasis`: B-spline basis functions
     - :class:`ConcatBasis`: Concatenation of multiple bases
     - :class:`ConstrainedBasis`: Constrained linear combination of another basis
@@ -169,7 +169,7 @@ class Basis(metaclass=abc.ABCMeta):
 
     @property
     @abc.abstractmethod
-    def Parameters(self) -> type[ReferenceDomain.Parameters]:  # noqa: N802
+    def Parameters(self) -> type[ReferenceDomain.Parameters]:
         r"""The target-domain parameters this basis expects.
 
         A :class:`~archimedes.measure.ReferenceDomain.Parameters` subclass
@@ -193,9 +193,12 @@ class Basis(metaclass=abc.ABCMeta):
         return (None,) * self.ndim
 
     @property
-    def _required_breakpoints(self) -> np.ndarray | None:
+    def _required_breakpoints(
+        self,
+    ) -> np.ndarray | tuple[np.ndarray | None, ...] | None:
         """Points on the reference domain where this basis is not smooth, or
-        ``None`` if it is smooth throughout.
+        ``None`` if it is smooth throughout. A multivariate basis returns a
+        per-dimension tuple instead.
 
         Used for checking consistency of quadrature rules with the basis.
         A quadrature rule integrates products of basis functions exactly
@@ -230,6 +233,7 @@ class Basis(metaclass=abc.ABCMeta):
         coefficients: np.ndarray,
         x: np.ndarray,
         deriv: int = 0,
+        *,
         side: str = RIGHT,
         **domain_kwargs,
     ) -> np.ndarray:
@@ -247,7 +251,8 @@ class Basis(metaclass=abc.ABCMeta):
         vector-valued expansion, and the return shape matches: ``(npts,)``
         or ``(npts, m)``.
         """
-        return self.evaluate(x, deriv=deriv, side=side, **domain_kwargs) @ coefficients
+        phi = self.evaluate(x, deriv=deriv, side=side, **domain_kwargs)
+        return cast(np.ndarray, phi @ coefficients)
 
     def _evaluate_at_nodes(self, rule, deriv=0, **domain_kwargs) -> np.ndarray:
         """Design matrix at a quadrature rule's nodes.
@@ -383,7 +388,7 @@ class Basis(metaclass=abc.ABCMeta):
 
     @abc.abstractmethod
     def evaluate(
-        self, x: np.ndarray, deriv: int = 0, side: str = RIGHT, **domain_kwargs
+        self, x: np.ndarray, deriv: int = 0, *, side: str = RIGHT, **domain_kwargs
     ) -> np.ndarray:
         """Evaluate all ``n_basis`` basis functions at ``x``.
 
