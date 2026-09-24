@@ -17,14 +17,9 @@ __all__ = ["MonomialBasis"]
 class MonomialBasis(Basis):
     r"""Monomial (power series) basis on an interval.
 
-    The basis functions are :math:`\{1, t, t^2, \ldots, t^{n-1}\}`, the
-    ordinary power basis evaluated at :math:`t`, the point ``x`` affinely
-    mapped from the target interval :math:`[a, b]` onto the reference
-    interval :math:`[-1, 1]` -- the same role played by the
-    ``domain``/``window`` arguments of ``numpy.polynomial.Polynomial``.
-    One consequence: ``coefficients`` in this basis are defined relative
-    to :math:`[-1, 1]`, not literal Taylor coefficients of ``x`` about a
-    fixed point.
+    The basis functions are :math:`\{1, t, t^2, \ldots, t^{n-1}\}`, with
+    reference domain :math:`[-1, 1]`. Other intervals :math:`x \in [a, b]` are
+    affinely mapped onto the reference domain.
 
     Parameters
     ----------
@@ -34,20 +29,14 @@ class MonomialBasis(Basis):
 
     Warnings
     --------
-    Unlike an orthogonal polynomial basis, a monomial basis has no way to
-    stay well-conditioned as ``n_basis`` grows: high-degree monomials
-    become nearly linearly dependent on :math:`[-1, 1]`, so fitting,
-    projecting onto, or solving with this basis grows increasingly
-    ill-conditioned even at modest degree (roughly ``n_basis`` in the
-    teens). Prefer :meth:`FunctionSpace.legendre` or
-    :meth:`FunctionSpace.chebyshev` unless matching a monomial/power-series
-    convention is specifically what you need.
+    Monomial bases are inherently ill-conditioned for high degrees; prefer
+    orthogonal polynomial bases for high-degree polynomial approximation.
 
     See Also
     --------
     OrthogonalPolynomialBasis : Orthogonal polynomial families (Legendre,
-        Chebyshev, Jacobi, Hermite, Laguerre); prefer these over a
-        monomial basis for anything beyond low degree.
+        Chebyshev, Jacobi, Hermite, Laguerre); preferred for numerical
+        conditioning and spectral accuracy.
     FunctionSpace.monomial : Convenience constructor for a
         :class:`FunctionSpace` built on this basis.
     """
@@ -68,21 +57,12 @@ class MonomialBasis(Basis):
         return UnitInterval.Parameters
 
     def _default_quadrature(self):
-        """Gauss-Legendre rule of ``n_basis`` points, exact for this basis's
-        mass and stiffness integrands (degree :math:`2n - 1`, the same
-        sizing :meth:`OrthogonalPolynomialBasis._default_quadrature` uses).
-        """
+        """Gauss-Legendre rule of ``n_basis`` points."""
         from archimedes.quadrature import gauss_legendre
 
         return gauss_legendre(self.n_basis)
 
     def _product_basis(self, other):
-        r"""``t^i \cdot t^j`` spans degree ``0`` through
-        ``(n_1 - 1) + (n_2 - 1)``, so the product space needs
-        ``n_1 + n_2 - 1`` functions -- the same degree-counting argument
-        used for other polynomial bases' product spaces, with no
-        measure-compatibility check since this family has no measure.
-        """
         if not isinstance(other, MonomialBasis):
             raise ValueError(
                 f"cannot form a product basis between "
@@ -91,8 +71,6 @@ class MonomialBasis(Basis):
         return MonomialBasis(self.n_basis + other.n_basis - 1)
 
     def _derivative_basis(self, deriv=1):
-        """``n_basis - deriv`` functions, shrinking the same way
-        differentiation shrinks other polynomial bases."""
         if deriv < 0:
             raise ValueError(f"deriv must be >= 0, got {deriv}")
         if deriv == 0:
@@ -101,15 +79,11 @@ class MonomialBasis(Basis):
             raise ValueError(
                 f"deriv={deriv} is at or past the degree of a {self.n_basis}-"
                 f"function basis, whose elements are polynomials of degree "
-                f"{self.n_basis - 1}; the derivative is identically zero and "
-                f"has no space of its own. Use `f(x, deriv={deriv})` if the "
-                f"zero values are what you want."
+                f"{self.n_basis - 1}; the derivative is identically zero."
             )
         return MonomialBasis(self.n_basis - deriv)
 
     def _integral_basis(self, order=1):
-        """``n_basis + order`` functions, growing the same way
-        integration grows other polynomial bases."""
         if order < 0:
             raise ValueError(f"order must be >= 0, got {order}")
         if order == 0:
