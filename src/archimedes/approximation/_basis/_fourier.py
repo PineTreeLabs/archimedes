@@ -34,60 +34,39 @@ def _interleave_matrix(n: int) -> np.ndarray:
 class FourierBasis(Basis):
     r"""Trigonometric basis on a periodic interval.
 
-    :math:`\{1, \cos(\theta), \sin(\theta), \ldots,
-    \cos(N\theta), \sin(N\theta)\}` on :math:`[a, b]`, where :math:`a` and :math:`b`
-    are identified as the same point.
+    Basis functions are:
 
-    **``kind``** selects which trigonometric family:
+    .. math::
+        \{1, \cos(\theta), \sin(\theta), \ldots, \cos(N\theta), \sin(N\theta)\},
+        \qquad \theta \in [a, b],
 
-    - ``"full"`` (default): :math:`\{1, \cos(\theta), \sin(\theta),
-      \ldots, \cos(N\theta), \sin(N\theta)\}`, so ``n_basis = 2N + 1``
-      (must be odd).
-    - ``"cosine"``: :math:`\{1, \cos(\theta), \ldots, \cos(N\theta)\}`,
-      ``n_basis = N + 1``.
-    - ``"sine"``: :math:`\{\sin(\theta), \ldots, \sin(N\theta)\}` (no
-      constant term -- :math:`\sin(0) = 0` is trivial), ``n_basis = N``.
+    where :math:`a` and :math:`b` are identified as the same point (periodic domain).
+
+    ``kind`` selects which trigonometric family:
+
+    - ``"full"`` (default): both sines and cosines; ``n_basis = 2N + 1`` (odd)
+    - ``"cosine"``: cosines, and the constant term; ``n_basis = N + 1``.
+    - ``"sine"``: sines only; ``n_basis = N``.
 
     :attr:`max_mode` gives :math:`N` uniformly across all three.
 
-    **Normalization** mirrors :attr:`Basis.density` exactly as
-    :class:`OrthogonalPolynomialBasis` does, reusing
-    ``LegendreMeasure().mass(a, b)`` (:math:`= \mathrm{scale} \cdot 2 = b -
-    a`, the period length :math:`L`) as the raw-weight mass: with
-    ``mass = 1.0 if density else LegendreMeasure().mass(a, b)``, the
-    constant term is :math:`1/\sqrt{\mathrm{mass}}` and each :math:`\cos`/
-    :math:`\sin` term is :math:`\sqrt{2/\mathrm{mass}} \, \cos(k\theta)` /
-    :math:`\sqrt{2/\mathrm{mass}} \, \sin(k\theta)`. ``density=False`` (the
-    default) gives a basis orthonormal under the raw Lebesgue weight on
-    :math:`[a, b]`; ``density=True`` gives one orthonormal under the
-    *probability* density :math:`1/L`.
-
     **Derivatives** are closed-form and exact to arbitrary order via the
-    cyclic identity :math:`d^m \cos(k\theta)/dx^m = (k\omega)^m
-    \cos(k\theta + m\pi/2)` (and the same for :math:`\sin`) -- there is no
-    recurrence or differentiation matrix.
+    cyclic identity, e.g. :math:`d^m \cos(k\theta)/dx^m = (k\omega)^m
+    \cos(k\theta + m\pi/2)` for cosines.
 
     **Integrals.** ``"full"``/``"cosine"`` both contain the constant basis
     function, whose antiderivative is a non-periodic linear ramp with no
     representation in any Fourier-type space, so its antiderivative cannot
     be represented in the basis. ``"sine"`` has no constant term, so its
     first integral is well-defined, but higher orders raise the same error.
-
-    Parameters
-    ----------
-    n_basis : int
-        Number of basis functions; see the ``kind``-dependent conventions
-        above. Must be ``>= 1``; ``kind="full"`` additionally requires an
-        odd value.
-    kind : {"full", "cosine", "sine"}, optional
-        Which trigonometric family. Default ``"full"``.
-    density : bool, optional
-        Normalize against the probability density :math:`1/L` instead of
-        the raw weight; see :attr:`Basis.density`. Default ``False``.
     """
 
     n_basis: int
+    """Number of basis functions; constrained by ``kind``."""
+
     kind: Literal["full", "cosine", "sine"] = "full"
+    """The type of trigonometric family: ``"full"``, ``"cosine"``, or ``"sine"``."""
+
     density: bool = False
 
     def __post_init__(self):
@@ -99,9 +78,7 @@ class FourierBasis(Basis):
             raise ValueError(f"n_basis must be >= 1, got {self.n_basis}")
         if self.kind == "full" and self.n_basis % 2 == 0:
             raise ValueError(
-                f"kind='full' requires an odd n_basis (a constant term plus "
-                f"paired cos/sin terms, n_basis = 2*max_mode + 1), got "
-                f"n_basis={self.n_basis}"
+                f"kind='full' requires an odd n_basis, got n_basis={self.n_basis}"
             )
 
     @property
@@ -125,29 +102,22 @@ class FourierBasis(Basis):
     def _default_quadrature(self):
         r"""Periodic-trapezoidal rule of ``2 * max_mode + 1`` points.
 
-        Exact for trigonometric polynomials of mode :math:`\leq 2 \cdot
-        \mathrm{max\_mode}`, which covers this basis's own mass-matrix
-        integrand (products of modes up to :math:`\mathrm{max\_mode}`
-        each).
+        Exact for trigonometric polynomials of mode <= 2 * self.max_mode.
         """
         from archimedes.quadrature import trapezoidal
 
         return trapezoidal(2 * self.max_mode + 1, periodic=True)
 
     def _product_basis(self, other):
-        r"""Product-to-sum closure table (``N = self.max_mode +
-        other.max_mode``):
+        r"""Product-to-sum closure table (``N = self.max_mode + other.max_mode``).
+
+        Determines a suitable Fourier basis for the product of two functions
+        represented in Fourier bases.
 
         - either operand ``"full"`` -> ``"full"``, mode ``N``
         - ``"cosine" x "cosine"`` -> ``"cosine"``, mode ``N``
-        - ``"sine" x "sine"`` -> ``"cosine"``, mode ``N`` (not ``"sine"``:
-          :math:`\sin(a)\sin(b) = \tfrac12[\cos(a-b) - \cos(a+b)]` has
-          no sine term, and includes a DC term whenever the two modes
-          match)
+        - ``"sine" x "sine"`` -> ``"cosine"``, mode ``N``
         - ``"cosine" x "sine"`` (either order) -> ``"sine"``, mode ``N``
-
-        Requires the same ``density``, as other polynomial bases' product
-        spaces do.
         """
         if not isinstance(other, FourierBasis):
             raise ValueError(
@@ -177,27 +147,24 @@ class FourierBasis(Basis):
                 raise ValueError(
                     "kind='cosine' with n_basis=1 is just the constant "
                     "function; its derivative is identically zero and has "
-                    "no (odd-order) space of its own. Use `f(x, "
-                    "deriv=...)` if the zero values are what you want."
+                    "no (odd-order) space. Use `f(x, deriv=...)` for zero values."
                 )
             return FourierBasis(self.max_mode, kind="sine", density=self.density)
         return FourierBasis(self.max_mode + 1, kind="cosine", density=self.density)
 
     def _integral_basis(self, order=1):
-        r"""``"full"``/``"cosine"`` raise -- both contain the constant/DC
+        r"""Minimal basis to contain the integral of functions in this basis.
+        
+        ``"full"``/``"cosine"`` raise since both contain the constant/DC
         basis function, whose antiderivative is a non-periodic linear ramp
-        with no representation in any Fourier-type space (a different
-        reason than :class:`PiecewiseBasis`/:class:`CubicHermiteBasis`
-        raise for theirs).
+        with no representation in any Fourier-type space.
 
         ``"sine"`` has no constant term, so its first integral is
-        well-defined -- but since :math:`\theta(a) = -\pi`,
+        well-defined. However, since :math:`\theta(a) = -\pi`,
         :math:`\theta(b) = \pi` exactly, pinning the antiderivative to
-        vanish at either endpoint (this module's convention for building
-        integral matrices) always forces a nonzero constant term back in,
-        so ``order=1`` **grows** into ``"cosine"`` at the same
-        ``max_mode`` rather than staying ``"sine"``. Any ``order >= 2``
-        raises, since that intermediate ``"cosine"`` result can't itself
+        vanish at either endpoint always forces a nonzero constant,
+        the integral basis is ``"cosine"`` at the same ``max_mode``.
+        Any ``order >= 2`` raises, since the ``"cosine"`` result can't
         be integrated.
         """
         if order < 0:
@@ -215,7 +182,7 @@ class FourierBasis(Basis):
             )
         if order >= 2:
             raise NotImplementedError(
-                "FourierBasis(kind='sine')'s order-1 integral is "
+                "The order-1 integral of FourierBasis(kind='sine') is "
                 "kind='cosine', which cannot itself be integrated (it "
                 "contains a DC term); only order=1 is supported here."
             )

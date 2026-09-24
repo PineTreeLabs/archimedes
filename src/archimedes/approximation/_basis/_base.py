@@ -114,6 +114,18 @@ class Basis(metaclass=abc.ABCMeta):
     a ``Basis`` with a domain and quadrature rule to define an inner product space,
     and :class:`Function` further combines a ``FunctionSpace`` with expansion
     coefficients.
+
+    Available implementations include:
+    
+    - :class:`BSplineBasis`: B-spline basis functions
+    - :class:`ConcatBasis`: Concatenation of multiple bases
+    - :class:`ConstrainedBasis`: Constrained linear combination of another basis
+    - :class:`FourierBasis`: Trigonometric basis functions on a periodic interval
+    - :class:`LagrangeBasis`: Lagrange polynomial basis functions
+    - :class:`MonomialBasis`: Monomial (power series) basis functions
+    - :class:`OrthogonalPolynomialBasis`: Classical orthogonal polynomial bases
+    - :class:`PiecewiseBasis`: Basis constructed by tiling multiple local bases
+    - :class:`TensorBasis`: Multi-dimensional basis formed by a tensor product
     """
 
     # Each attribute below is declared twice. The type checker sees a
