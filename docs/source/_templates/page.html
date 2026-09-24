@@ -1,0 +1,17 @@
+{% extends "!page.html" %}
+
+{#- Breadcrumb trail built from the toctree ancestors of the current page.
+    API page titles are fully qualified names, so only the last dotted
+    component is shown (e.g. "approximation › BSplineBasis › evaluate"). -#}
+{% block content %}
+{%- if parents %}
+<nav class="breadcrumbs" aria-label="Breadcrumb">
+  {%- for p in parents %}
+  <a href="{{ p.link|e }}">{{ (p.title|striptags).split('.')[-1] }}</a>
+  <span class="breadcrumbs-sep" aria-hidden="true">›</span>
+  {%- endfor %}
+  <span class="breadcrumbs-current" aria-current="page">{{ (title|striptags).split('.')[-1] }}</span>
+</nav>
+{%- endif %}
+{{ super() }}
+{% endblock %}

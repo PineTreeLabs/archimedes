@@ -5,11 +5,7 @@
 
 import importlib
 import inspect
-import os
 import pkgutil
-import sys
-
-sys.path.insert(0, os.path.abspath("_ext"))
 
 # -- Project information -----------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
@@ -31,7 +27,6 @@ extensions = [
     "sphinx.ext.intersphinx",
     "sphinx.ext.mathjax",
     "sphinxcontrib.googleanalytics",
-    "linkify_signatures",
 ]
 
 intersphinx_mapping = {
