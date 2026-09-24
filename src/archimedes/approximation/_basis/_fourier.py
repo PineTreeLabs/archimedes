@@ -59,6 +59,11 @@ class FourierBasis(Basis):
     representation in any Fourier-type space, so its antiderivative cannot
     be represented in the basis. ``"sine"`` has no constant term, so its
     first integral is well-defined, but higher orders raise the same error.
+
+    See Also
+    --------
+    FunctionSpace.fourier : Convenience constructor for a :class:`FunctionSpace`
+        built from a Fourier basis.
     """
 
     n_basis: int

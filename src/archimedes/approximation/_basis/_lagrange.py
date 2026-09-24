@@ -1,5 +1,3 @@
-"""Lagrange (nodal) interpolating polynomial basis."""
-
 from __future__ import annotations
 
 import dataclasses
@@ -76,27 +74,18 @@ def _differentiation_matrix(nodes: np.ndarray, weights: np.ndarray) -> np.ndarra
 
 @dataclasses.dataclass(frozen=True)
 class LagrangeBasis(Basis):
-    r"""Lagrange cardinal polynomials :math:`\{\ell_0, \ldots, \ell_{n-1}\}`
-    for a fixed set of nodes: :math:`\ell_i(x_j) = \delta_{ij}`.
+    r"""Lagrange (nodal) interpolating polynomial basis
 
-    Evaluated via the (first, "true") barycentric formula
+    The basis is constructed from  Lagrange cardinal polynomials
+    :math:`\{\ell_0, \ldots, \ell_{n-1}\}` for a fixed set of nodes.
+
+    Evaluated via the first, "true" barycentric formula ([1]_, [2]_):
 
     .. math::
         \ell_i(x) = \frac{w_i / (x - x_i)}{\sum_j w_j / (x - x_j)},
         \qquad w_i = \frac{1}{\prod_{j \neq i} (x_i - x_j)}
 
-    with the usual special-case handling at :math:`x = x_k` (where
-    :math:`\ell_i(x_k) = \delta_{ik}` directly, avoiding 0/0).
-
-    .. warning::
-        That special case is selected by a runtime comparison, so it is a
-        branch point for automatic differentiation. Differentiating with
-        respect to a *domain parameter* (``a``/``b``, which move the nodes)
-        at a point that coincides *exactly* with a node returns the
-        derivative of the constant :math:`\delta_{ik}` branch, i.e. zero,
-        rather than the true value -- the underlying function is smooth
-        there, but this formula is not. Off-node points, and derivatives
-        with respect to ``x``, are unaffected.
+    where :math:`\ell_i(x_k) = \delta_{ik}` at :math:`x = x_k`.
 
     Derivatives of every order are supported and exact: :math:`\ell_j^{(k)}`
     is itself a polynomial of degree :math:`\leq n - 1` and so is
@@ -106,35 +95,37 @@ class LagrangeBasis(Basis):
         \ell_j^{(k)}(x) = \sum_i D^k_{ij} \, \ell_i(x),
 
     where :math:`D_{ij} = \ell_j'(x_i)` is the classical differentiation
-    matrix -- so every derivative order reduces to the ``deriv=0``
-    evaluation above followed by a matrix product, :math:`\Phi^{(k)} =
-    \Phi \, D^k`, with no repeated 0/0 handling.
+    matrix.
+
+    Typically not constructed directly; instead, one usually works with
+    a :class:`PiecewiseBasis` based on Lagrange elements or the higher-level
+    :class:`FunctionSpace` constructed from
+    ``FunctionSpace.piecewise(kind="lagrange", ...)``.
 
     Parameters
     ----------
     reference_nodes : array_like
-        Interpolation nodes on the reference domain ``[-1, 1]``. Must be
-        distinct. Order determines the meaning of a ``Function``'s
-        coefficients (``coefficients[i]`` is the value at
-        ``reference_nodes[i]``, once mapped to the target domain), but not
-        the basis itself.
+        Distinct interpolation nodes on the reference domain ``[-1, 1]``.
     node_family : callable, optional
         ``n -> nodes``, used internally to pick the node set whenever a
-        *differently sized* basis of the same kind is needed. Not applied
-        to ``reference_nodes``, which are taken as given.
-
-        Defaults to Gauss-Lobatto, the conventional nodal set (Chebyshev
-        points of the second kind and the spectral-element method's
-        standard GLL), which keeps :meth:`boundary_dofs` populated so the
-        result can still be tiled with :math:`C^0` continuity.
+        differently sized basis of the same kind is needed. Defaults to
+        Gauss-Lobatto.
 
         Any ``n`` distinct nodes span the same :math:`P_{n-1}`, so the
         choice affects only conditioning and which degrees of freedom are
-        nodal. Supply one to keep a derived basis's node family intact
-        where that matters, e.g. ``lambda n: gauss_radau(n,
-        endpoint="left").nodes`` for a Radau-based pseudospectral scheme.
-        A family with no endpoint node leaves :meth:`boundary_dofs` empty,
-        so the derived basis cannot be tiled with :math:`C^0` continuity.
+        nodal.
+
+    See Also
+    --------
+    FunctionSpace.piecewise : Convenience constructor for a :class:`FunctionSpace`
+        that supports piecewise Lagrange elements.
+
+    References
+    ----------
+    .. [1] Wikipedia, "Lagrange polynomial,"
+        https://en.wikipedia.org/wiki/Lagrange_polynomial
+    .. [2] J-P. Berrut and L. N. Trefethen, "Barycentric Lagrange Interpolation,"
+        SIAM Review, 2004, https://doi.org/10.1137/S0036144502417715
     """
 
     reference_nodes: np.ndarray
@@ -159,13 +150,7 @@ class LagrangeBasis(Basis):
         )
 
     def __eq__(self, other: object) -> bool:
-        """Compare elementwise on ``reference_nodes``.
-
-        Defined explicitly because the ``@dataclass``-generated ``__eq__``
-        compares the array field with ``==``, which yields an array and
-        raises "truth value of an array is ambiguous" whenever the two
-        instances don't happen to hold the *same* array object.
-        """
+        """Compare elementwise on ``reference_nodes``"""
         if not isinstance(other, LagrangeBasis):
             return NotImplemented
         return (
@@ -182,23 +167,57 @@ class LagrangeBasis(Basis):
     # --- constructors ---
 
     @classmethod
-    def gauss_lobatto(cls, n: int) -> "LagrangeBasis":
-        """``n`` Gauss-Lobatto nodes -- this family's default, so
-        ``node_family`` is left at ``None`` rather than set explicitly."""
+    def gauss_lobatto(cls, n: int) -> LagrangeBasis:
+        """Construct a Lagrange basis using Gauss-Lobatto nodes
+        
+        Parameters
+        ----------
+        n : int
+            Number of Gauss-Lobatto quadrature nodes. Also the number of
+            Lagrange basis functions.
+
+        Returns
+        -------
+        LagrangeBasis
+            Lagrange basis with Gauss-Lobatto nodes.
+        """
         return cls(reference_nodes=_lobatto_nodes(n))
 
     @classmethod
-    def gauss_legendre(cls, n: int) -> "LagrangeBasis":
-        """``n`` Gauss-Legendre nodes (no endpoints); pseudospectral
-        collocation at Gauss points."""
+    def gauss_legendre(cls, n: int) -> LagrangeBasis:
+        """Construct a Lagrange basis using Gauss-Legendre nodes.
+        
+        Parameters
+        ----------
+        n : int
+            Number of Gauss-Legendre quadrature nodes. Also the number of
+            Lagrange basis functions.
+
+        Returns
+        -------
+        LagrangeBasis
+            Lagrange basis with Gauss-Legendre nodes.
+        """
         return cls(
             reference_nodes=_gauss_legendre_nodes(n), node_family=_gauss_legendre_nodes
         )
 
     @classmethod
-    def gauss_radau(cls, n: int, endpoint: str = "left") -> "LagrangeBasis":
-        """``n`` Gauss-Radau nodes, fixing ``endpoint`` (``"left"`` or
-        ``"right"``); see :func:`archimedes.quadrature.gauss_radau`.
+    def gauss_radau(cls, n: int, endpoint: str = "left") -> LagrangeBasis:
+        """Construct a Lagrange basis using Gauss-Radau nodes.
+        
+        Parameters
+        ----------
+        n : int
+            Number of Gauss-Radau quadrature nodes. Also the number of
+            Lagrange basis functions.
+        endpoint : str, default "left"
+            Which endpoint to fix ("left" or "right").
+
+        Returns
+        -------
+        LagrangeBasis
+            Lagrange basis with Gauss-Radau nodes.
         """
         # Dispatches to one of two named module-level functions rather than
         # parametrizing a single one with a closure or `functools.partial`
@@ -220,8 +239,20 @@ class LagrangeBasis(Basis):
         raise ValueError(f"endpoint must be 'left' or 'right', got {endpoint!r}")
 
     @classmethod
-    def equispaced(cls, n: int) -> "LagrangeBasis":
-        """``n`` evenly spaced nodes, including both endpoints."""
+    def equispaced(cls, n: int) -> LagrangeBasis:
+        """Construct a Lagrange basis using evenly spaced nodes.
+
+        Parameters
+        ----------
+        n : int
+            Number of evenly spaced nodes. Also the number of
+            Lagrange basis functions.
+
+        Returns
+        -------
+        LagrangeBasis
+            Lagrange basis with evenly spaced nodes.
+        """
         return cls(reference_nodes=_equispaced_nodes(n), node_family=_equispaced_nodes)
 
     # --- implementation ---
@@ -237,16 +268,14 @@ class LagrangeBasis(Basis):
             )
         return nodes
 
-    def _derived(self, n: int) -> "LagrangeBasis":
-        """A basis of ``n`` nodes from this one's family, family preserved so
-        repeated operations don't drift back to the default."""
+    def _derived(self, n: int) -> LagrangeBasis:
+        """A basis of ``n`` nodes from this one's family."""
         return LagrangeBasis(
             reference_nodes=self._nodes_for(n), node_family=self.node_family
         )
 
     @property
     def n_basis(self) -> int:
-        """Number of interpolation nodes."""
         return len(self.reference_nodes)
 
     @property
@@ -254,15 +283,7 @@ class LagrangeBasis(Basis):
         return UnitInterval.Parameters
 
     def _default_quadrature(self):
-        """Gauss-Legendre rule of ``n_basis`` points.
-
-        This family carries no weight function of its own (see the class
-        docstring), so the relevant inner product is the unweighted one on
-        :math:`[-1, 1]`, i.e. Legendre. Each cardinal polynomial has degree
-        ``n_basis - 1``, so their products have degree
-        ``2 * (n_basis - 1)``, which ``n_basis`` Gauss points integrate
-        exactly.
-        """
+        """Gauss-Legendre rule of ``n_basis`` points."""
         from archimedes.quadrature import gauss_legendre
 
         return gauss_legendre(self.n_basis)
@@ -284,12 +305,9 @@ class LagrangeBasis(Basis):
     def _derivative_basis(self, deriv=1):
         """``n_basis - deriv`` nodes from this basis's ``node_family``.
 
-        The nodes necessarily *move*: a smaller nodal space is a different
-        set of points, so the result's coefficients are values at the new
-        nodes rather than at this basis's. Collocation methods that need the
-        derivative sampled at the *original* nodes want
-        ``Function.derivative(space=self_space)`` instead, which for this
-        family is exactly the classical barycentric differentiation matrix.
+        The nodes move since a smaller nodal space is a different
+        set of points. Collocation methods that need the derivative sampled
+        at the original nodes should use ``Function.derivative(space=self_space)``.
         """
         if deriv < 0:
             raise ValueError(f"deriv must be >= 0, got {deriv}")
@@ -303,20 +321,12 @@ class LagrangeBasis(Basis):
             raise ValueError(
                 f"deriv={deriv} is at or past the degree of a {self.n_basis}-"
                 f"node basis, whose elements are polynomials of degree "
-                f"{self.n_basis - 1}; the derivative is identically zero and "
-                f"has no space of its own. Use `f(x, deriv={deriv})` if the "
-                f"zero values are what you want."
+                f"{self.n_basis - 1}; the derivative is identically zero."
             )
         return self._derived(self.n_basis - deriv)
 
     def _integral_basis(self, order=1):
-        """``n_basis + order`` nodes from this basis's ``node_family``.
-
-        Dual of differentiation: growing rather than shrinking the node
-        set, so (unlike differentiation) this is always defined. As with
-        taking a derivative, the result's nodes -- and so the meaning of
-        its coefficients -- differ from this basis's own.
-        """
+        """``n_basis + order`` nodes from this basis's ``node_family``"""
         if order < 0:
             raise ValueError(f"order must be >= 0, got {order}")
         if order == 0:
@@ -324,18 +334,14 @@ class LagrangeBasis(Basis):
         return self._derived(self.n_basis + order)
 
     def boundary_dofs(self, order: int = 0) -> tuple[int | None, int | None]:
-        r"""Indices of the nodes at :math:`t = \pm 1`, or ``None`` if the
-        corresponding endpoint isn't a node.
+        # Gauss-Lobatto nodes include both endpoints; Gauss-Radau includes
+        # one; Gauss-Legendre includes neither. Since ``ell_i(x_j) =
+        # delta_ij``, an endpoint node's coefficient *is* the endpoint value,
+        # which is what :math:`C^0` assembly identifies across elements.
 
-        Gauss-Lobatto nodes include both endpoints; Gauss-Radau includes
-        one; Gauss-Legendre includes neither. Since ``ell_i(x_j) =
-        delta_ij``, an endpoint node's coefficient *is* the endpoint value,
-        which is what :math:`C^0` assembly identifies across elements.
-
-        Every degree of freedom here is a plain nodal value (``order=0``);
-        this family has no derivative-type DOF, so any other ``order``
-        returns ``(None, None)``.
-        """
+        # Every degree of freedom here is a plain nodal value (``order=0``);
+        # this family has no derivative-type DOF, so any other ``order``
+        # returns ``(None, None)``.
         if order != 0:
             return (None, None)
         nodes = self.reference_nodes

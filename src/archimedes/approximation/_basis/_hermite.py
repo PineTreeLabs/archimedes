@@ -35,6 +35,11 @@ class CubicHermiteBasis(Basis):
     function in a :class:`LagrangeBasis` (Gauss-Lobatto nodes), since there
     is no smaller Hermite space for the derivative to live in.
 
+    See Also
+    --------
+    FunctionSpace.piecewise : Convenience constructor for a :class:`FunctionSpace`
+        that supports piecewise cubic Hermite elements.
+
     Notes
     -----
     The reference functions on :math:`t \in [-1, 1]` are built from the
@@ -42,10 +47,12 @@ class CubicHermiteBasis(Basis):
     (t+1)/2`),
 
     .. math::
-        H_{00}(\tau) = 2\tau^3 - 3\tau^2 + 1, \\
-        H_{10}(\tau) = \tau^3 - 2\tau^2 + \tau, \\
-        H_{01}(\tau) = -2\tau^3 + 3\tau^2, \\
-        H_{11}(\tau) = \tau^3 - \tau^2,
+        \begin{align}
+        H_{00}(\tau) &= 2\tau^3 - 3\tau^2 + 1, \\
+        H_{10}(\tau) &= \tau^3 - 2\tau^2 + \tau, \\
+        H_{01}(\tau) &= -2\tau^3 + 3\tau^2, \\
+        H_{11}(\tau) &= \tau^3 - \tau^2,
+        \end{align}
 
     via :math:`\phi_{i0}(t) = H_{i0}(\tau)` and :math:`\phi_{i1}(t) = 2 H_{i1}(\tau)`.
 

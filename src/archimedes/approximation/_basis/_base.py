@@ -120,6 +120,7 @@ class Basis(metaclass=abc.ABCMeta):
     - :class:`BSplineBasis`: B-spline basis functions
     - :class:`ConcatBasis`: Concatenation of multiple bases
     - :class:`ConstrainedBasis`: Constrained linear combination of another basis
+    - :class:`CubicHermiteBasis`: Cubic Hermite basis functions
     - :class:`FourierBasis`: Trigonometric basis functions on a periodic interval
     - :class:`LagrangeBasis`: Lagrange polynomial basis functions
     - :class:`MonomialBasis`: Monomial (power series) basis functions
