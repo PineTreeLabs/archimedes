@@ -1,9 +1,4 @@
-"""Shared symbolic-safe indexing helpers for knot/breakpoint-based families.
-
-Utilities for locating which interval of a nondecreasing array owns a point,
-gathering rows by a (possibly symbolic) integer index, and mapping a
-physical-domain breakpoint partition onto the reference domain.
-"""
+"""Shared symbolic-safe indexing helpers for knot/breakpoint-based families"""
 
 from __future__ import annotations
 
@@ -23,21 +18,6 @@ def _reference_breakpoints(breakpoints) -> tuple[float, float, np.ndarray]:
     (breakpoints[0], breakpoints[-1])``) to ``(a, b, ref)``, where ``ref``
     is the same partition mapped onto the reference domain ``[-1, 1]`` via
     :class:`~archimedes.measure.UnitInterval`'s affine map.
-
-    Shared by :class:`PiecewiseBasis`'s ``FunctionSpace.piecewise``
-    constructor, which adds its own shape/monotonicity validation on top,
-    and by :attr:`BSplineBasis._required_breakpoints`. Both independently
-    needed the identical affine-map-plus-pin recipe.
-
-    The two endpoints of ``ref`` are pinned exactly to :math:`\pm 1.0`
-    rather than trusted to the affine round-trip. ``composite_quad`` (and
-    ``PiecewiseBasis``) check a rule's or basis's endpoints by exact
-    equality against :math:`\pm 1.0`, which floating-point arithmetic is
-    not guaranteed to reproduce from an arbitrary ``a``, ``b``.
-
-    Callers are responsible for validating ``breakpoints`` themselves (1-D,
-    at least 2 entries, strictly increasing) -- this assumes a valid array
-    and only performs the affine map.
     """
     bp = np.asarray(breakpoints, dtype=float)
     a, b = float(bp[0]), float(bp[-1])
@@ -60,8 +40,8 @@ def _locate(knots, x, symbolic: bool, side: str = RIGHT):
     """Index of the interval owning each point of ``x``, by coordinate.
 
     With ``side="right"`` (the default) ownership is half-open ``[lo, hi)``,
-    so a point on a breakpoint belongs to the interval above it -- the limit
-    from the right. ``side="left"`` gives ``(lo, hi]`` and the limit from
+    so a point on a breakpoint belongs to the interval above it (the limit
+    from the right). ``side="left"`` gives ``(lo, hi]`` and the limit from
     the left. Both clamp out-of-range points into the end intervals.
 
     ``cs.low`` is CasADi's ``std::lower_bound`` and has exactly the
@@ -76,9 +56,8 @@ def _locate(knots, x, symbolic: bool, side: str = RIGHT):
     convention is needed there.
 
     A caller whose valid range is a strict subset of ``[0, len(knots) - 2]``
-    (e.g. a B-spline's basic interval, which excludes the padding knots
-    outside ``[knots[degree], knots[-1-degree]]``) should clip the result
-    itself. This always returns an index into the *full* ``knots`` array.
+    should clip the result itself. This always returns an index into the
+    full ``knots`` array.
     """
     _check_side(side)
     n_elements = len(knots) - 1
@@ -101,8 +80,7 @@ def _locate(knots, x, symbolic: bool, side: str = RIGHT):
 
 
 def _gather(values, index, symbolic: bool, npts: int):
-    """``values[index]`` (rows, if ``values`` is 2-D) for a possibly
-    symbolic integer ``index``."""
+    """``values[index]`` for a possibly symbolic integer ``index``."""
     if not symbolic:
         return values[index]
     shape = (npts,) if np.ndim(values) == 1 else (npts, np.shape(values)[1])

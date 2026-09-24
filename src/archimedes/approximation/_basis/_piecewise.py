@@ -1,5 +1,3 @@
-"""Piecewise basis: a local Basis tiled across elements, with a continuity rule."""
-
 from __future__ import annotations
 
 import dataclasses
@@ -22,80 +20,58 @@ C0 = 0
 """``continuity`` value for value-continuity at element boundaries ("CG")."""
 
 C1 = 1
-"""``continuity`` value additionally matching first derivatives at element
-boundaries -- what a cubic Hermite element needs for a 4th-order
-(Euler-Bernoulli-type) weak form."""
+"""``continuity`` value for value and derivative continuity at element boundaries."""
 
 
 @dataclasses.dataclass(frozen=True)
 class PiecewiseBasis(Basis):
-    """A local :class:`Basis` tiled across elements of the reference interval.
+    """A :class:`Basis` constructed by tiling a local basis across elements.
 
-    ``breakpoints`` partition the reference domain :math:`[-1, 1]`,
-    ``element_basis`` is affinely mapped onto each subinterval, and the
-    result is itself a ``Basis`` on :math:`[-1, 1]` that can be mapped
-    onto any target :math:`[a, b]` by :class:`~archimedes.measure.UnitInterval`
-    parameters. Breakpoints are *structural* data (they determine ``n_basis``),
-    so they live here rather than in ``Parameters``.
+    This constructs a finite (or spectral) element basis by partitioning the
+    domain into subintervals, each of which has a basis of local support.
 
-    **Continuity.** Tiling alone produces a "broken" (discontinuous) basis
-    with ``n_elements * element_basis.n_basis`` degrees of freedom.
-    ``continuity=-1`` keeps it that way; a nonnegative ``continuity=q``
-    merges each pair of adjacent elements' DOFs of every order ``0``
-    through ``q`` into one shared DOF -- values at ``q=0`` (the usual
-    "C0"/"CG" finite-element basis), additionally first derivatives at
-    ``q=1`` ("C1", what a cubic Hermite element needs to represent a
-    4th-order, Euler-Bernoulli-type weak form), and so on. The merge is a
-    linear *assembly* map, a plain right-multiplication on the broken
-    basis's design matrix, so everything built on ``Basis``
-    (mass/stiffness matrices, projection, inner products) works through it
-    unchanged. :class:`CubicHermiteBasis` is the kind of element basis a
-    ``q=1`` continuity generalizes to.
+    The domain partitioning is determined by ``breakpoints``, defined on
+    the reference domain :math:`[-1, 1]`.
 
-    **Element ownership at a breakpoint.** This basis can be two-valued at its
-    interior breakpoints (always for the derivatives of :math:`C^0` functions,
-    and also the value when ``continuity=-1``) so evaluating exactly *on* one
-    requires choosing a side. **Evaluation** follows the ``side`` argument: ``"right"``
-    (the default) makes ownership half-open ``[lo, hi)``, giving the limit
-    from above, and ``"left"`` gives ``(lo, hi]`` and the limit from
-    below.
+    **Continuity.** Tiling alone produces a discontinuous (:math:`C^{-1}`) basis.
+    A :math:`C^0` basis is continuous at element boundaries, i.e. neighboring
+    elements share endpoint DOFs. A :math:`C^1` basis additionally has
+    continuous first derivatives at element boundaries. These choices correspond
+    to ``continuity={-1, 0, 1}``.
 
-    Two-sided access is what discontinuous methods need: a DG numerical
-    flux is built from :math:`u^-` and :math:`u^+` at each interface, and
-    a gradient-jump error indicator for a :math:`C^0` space needs the same
-    of ``deriv=1``. In one dimension an interface *is* a point, so these
-    are ordinary evaluations with different ``side`` arguments.
+    **Element ownership at a breakpoint.** When the basis functions are two-valued
+    at interior breakpoints (e.g. the value of a :math:`C^{-1}` function or the
+    derivative of a :math:`C^0` function), the ``side`` argument
+    (``"left"`` or ``"right"``) of evaluation determines which value is returned.
+    This is useful for instance with discontinuous Galerkin (DG) numerical flux
+    construction, which uses :math:`u^-` and :math:`u^+` at each interface.
 
-    Parameters
-    ----------
-    element_basis : Basis or tuple of Basis
-        Local basis, defined on the reference interval ``[-1, 1]``, mapped
-        onto each element. A single ``Basis`` is shared across every
-        element (the common case); a ``tuple`` gives one basis per element
-        -- possibly of different order, or even a different family -- for
-        per-element ("p-refined") accuracy. A tuple must have exactly one
-        entry per element and every entry must agree on ``measures`` (so the
-        assembled basis has one coherent per-dimension weight). For
-        ``continuity=q`` every element's basis must expose endpoint DOFs of
-        every order ``0`` through ``q`` via ``boundary_dofs`` (e.g. a
-        :class:`LagrangeBasis` whose nodes include both endpoints, for
-        ``q=0``; a :class:`CubicHermiteBasis` for ``q=1``). Always stored
-        (and compared/hashed) as a per-element tuple, regardless of which
-        form was passed in.
-    breakpoints : array_like
-        Element boundaries on the reference domain, shape ``(k + 1,)`` for
-        ``k`` elements. Must be strictly increasing and span ``[-1, 1]``
-        exactly.
-    continuity : int, optional
-        ``-1`` for a discontinuous basis; a nonnegative ``q`` for
-        continuity through order ``q`` (``0`` for value continuity, ``1``
-        additionally for first-derivative continuity, and so on -- see
-        the class docstring). Default ``0``.
+    This class is typically not used directly; instead, it is constructed as part
+    of the :meth:`FunctionSpace.piecewise` constructor. However, it can be used
+    for customized piecewise bases not supported by that high-level constructor.
+
+    See Also
+    --------
+    FunctionSpace.piecewise : Convenience constructor for a :class:`FunctionSpace`
+        using common piecewise bases (e.g. "lagrange", "legendre", "hermite").
     """
 
     element_basis: Basis | tuple[Basis, ...]
+    """Local basis, defined on the reference interval ``[-1, 1]``."""
+
     breakpoints: np.ndarray
+    """Element boundaries on the reference domain
+
+    Shape ``(k + 1,)`` for ``k`` elements. Must be strictly increasing
+    and span ``[-1, 1]`` exactly.
+    """
+
     continuity: int = C0
+    """Continuity at element boundaries.
+    
+    ``-1`` for discontinuous, ``0`` for value continuity, ``1`` for
+    first-derivative continuity.
+    """
 
     def __post_init__(self):
         bp = np.asarray(self.breakpoints, dtype=float)
@@ -144,7 +120,7 @@ class PiecewiseBasis(Basis):
         measures = element_bases[0]._measures
         if any(eb._measures != measures for eb in element_bases):
             raise ValueError(
-                "every element's basis must share the same measures, so the "
+                "every element's basis must share the same measures so the "
                 "assembled piecewise basis has one coherent per-dimension "
                 "weight"
             )
@@ -208,42 +184,21 @@ class PiecewiseBasis(Basis):
 
     @property
     def n_basis(self) -> int:
-        """Degrees of freedom after continuity is imposed."""
         return self._assembly.shape[1]
 
     @property
     def Parameters(self) -> type:  # noqa: N802
-        """The outer affine map of the whole tiled pattern onto ``[a, b]``;
-        the breakpoints themselves are structural, not parameters."""
         return UnitInterval.Parameters
 
     @property
     def _measures(self):
-        """The element bases' shared weight
-
-        Verified at construction to be the same across elements.
-        Tiling rescales the reference weight onto each element but
-        does not change which family it is.
-        """
         return self.element_basis[0]._measures
 
     @property
     def _required_breakpoints(self) -> np.ndarray:
-        """This basis is only piecewise smooth: it kinks (or, for
-        ``continuity=-1``, jumps) at every interior breakpoint."""
         return self.breakpoints
 
     def boundary_dofs(self, order: int = 0) -> tuple[int | None, int | None]:
-        """Global indices of the DOFs at the two ends of the tiled domain.
-
-        ``None`` where the element basis has no such DOF.
-
-        The left end belongs entirely to element 0 and the right end to the
-        last element, so this maps each end element's own
-        ``boundary_dofs(order)``. Under ``continuity=-1`` there is no shared/global
-        endpoint identity (every element's DOFs are independent), so this returns
-        ``(None, None)`` regardless of the element basis.
-        """
         if self.continuity == DISCONTINUOUS:
             return (None, None)
         left, _ = self.element_basis[0].boundary_dofs(order)
@@ -257,7 +212,6 @@ class PiecewiseBasis(Basis):
         )
 
     def _default_quadrature(self):
-        """Each element's own rule, tiled across the same breakpoints."""
         from archimedes.quadrature import composite_quad
 
         return composite_quad(
@@ -265,17 +219,6 @@ class PiecewiseBasis(Basis):
         )
 
     def _product_basis(self, other):
-        """Same breakpoints, per-element product basis, weaker continuity.
-
-        The breakpoints must match exactly: a product across two different
-        partitions kinks at the union of both, which neither operand's
-        partition can represent. Products are formed element by element.
-
-        Continuity is the *minimum* of the two. A product is only as smooth
-        as its least smooth factor -- continuous times discontinuous is
-        discontinuous -- so taking the maximum would claim a smoothness the
-        result does not have.
-        """
         if not isinstance(other, PiecewiseBasis):
             raise ValueError(
                 f"cannot form a product basis between "
@@ -296,21 +239,6 @@ class PiecewiseBasis(Basis):
         )
 
     def _derivative_basis(self, deriv=1):
-        """Same breakpoints, per-element derivative basis, weaker continuity.
-
-        The derivative can in general leave the original space, rather than
-        being contained in a subspace of it. Differentiating ``deriv`` times
-        can only be relied on for continuity down to ``q - deriv``.
-
-        For example, a :math:`C^0` (``q=0``) function's derivative jumps at
-        every breakpoint. A :math:`C^1` (``q=1``, e.g. cubic Hermite)
-        function's *first* derivative is still continuous
-        (``max(1 - 1, -1) = 0``), while its *second* derivative need not be
-        (``max(1 - 2, -1) = -1``). Within each element, the derivative is
-        still a polynomial of degree ``n_loc - 1 - deriv``. That element's
-        basis shrinks in the usual way, so the representation stays exact
-        whether or not the elements share an order.
-        """
         if deriv < 0:
             raise ValueError(f"deriv must be >= 0, got {deriv}")
         if deriv == 0:
@@ -322,62 +250,13 @@ class PiecewiseBasis(Basis):
         )
 
     def _integral_basis(self, order=1):
-        """Not implemented: unlike differentiating, growing each element's
-        basis is not enough on its own to integrate.
-
-        A derivative is exact element-by-element with no cross-element
-        bookkeeping. Differentiating cannot lower continuity below ``-1``,
-        and the DOF-merge assembly this basis builds at construction time
-        already handles whatever continuity remains.
-
-        An antiderivative instead needs continuity to go *up*, which that
-        assembly cannot produce by itself. It merges DOFs that are already
-        the same shared quantity in both elements, but a modal family like
-        Legendre has no boundary DOF to merge in the first place
-        (:meth:`boundary_dofs` returns ``(None, None)`` regardless of
-        order). Even so, the antiderivative of a Legendre element genuinely
-        must be continuous with its neighbor.
-
-        What's needed instead is a running constant carried from each
-        element into the next -- the piecewise analogue of
-        :meth:`Function.integral`'s single boundary pin, but applied once
-        per element rather than once globally. That construction doesn't
-        exist yet.
-        """
         raise NotImplementedError(
-            f"{type(self).__name__} does not define an integral basis: an "
-            f"exact piecewise antiderivative needs a running constant "
-            f"carried across elements to stay continuous, not just a "
-            f"larger per-element basis, and that construction isn't "
-            f"implemented. Project onto a global (non-piecewise) space "
-            f"first if you need an exact `.antiderivative()`."
+            f"{type(self).__name__} does not define an integral basis."
         )
 
     def _build_assembly(self) -> np.ndarray:
         r"""Build the assembly map ``T``, shape ``(n_broken, n_basis)``, such
-        that :math:`\Phi_{\mathrm{global}}(x) = \Phi_{\mathrm{broken}}(x) \,
-        T`. Because continuity is just this right-multiplication, everything
-        built on ``Basis`` (mass/stiffness matrices, projection, inner
-        products) works through it unchanged.
-
-        - ``continuity=-1`` -- ``T`` is the identity; element DOFs are
-          independent and the basis jumps at interior breakpoints.
-        - ``continuity=q >= 0`` -- ``T`` merges each element's ``order``-th
-          boundary DOF (see :meth:`Basis.boundary_dofs`) with the next
-          element's same-``order`` DOF, for every ``order`` from ``0``
-          through ``q``, giving ``_n_broken - (n_elements - 1) * (q + 1)``
-          continuous DOFs. Each merged DOF is a single basis function
-          supported on *both* adjacent elements -- the standard "hat" for
-          finite elements, generalized to slope-matching and beyond.
-
-        The merge itself is always a bare identity, including for a
-        derivative-type DOF (``order >= 1``). Any rescaling needed to make
-        such a DOF comparable across elements of different width is the
-        element basis's own responsibility, not this assembly's. So
-        generalizing from one merged order (``C0``) to
-        several is purely bookkeeping -- track one "previous element's
-        global index" per order instead of one overall, keyed by which
-        local index each order's ``boundary_dofs`` reports.
+        that :math:`\Phi_{\mathrm{global}}(x) = \Phi_{\mathrm{broken}}(x) T`.
         """
         element_bases = self.element_basis
         if self.continuity == DISCONTINUOUS:
@@ -419,8 +298,7 @@ class PiecewiseBasis(Basis):
 
     def _blocks(self, x, masks, knots, deriv):
         """Per-element evaluations, masked and concatenated to the broken
-        basis, then assembled. ``masks[e]`` selects the points element ``e``
-        owns; where that ownership comes from is the callers' business."""
+        basis, then assembled."""
         blocks = []
         for e in range(self.n_elements):
             block = self.element_basis[e].evaluate(
@@ -438,13 +316,12 @@ class PiecewiseBasis(Basis):
         x, deriv : array_like, int, optional
             As for :meth:`Basis.evaluate`.
         a, b : float, optional
-            Target-domain endpoints; default the reference domain
-            ``[-1, 1]``.
+            Target-domain endpoints; default the reference domain ``[-1, 1]``.
         side : {"right", "left"}, optional
             Which one-sided limit to take at a point lying exactly on an
             interior breakpoint, where this basis is two-valued. ``"right"``
             (default) makes ownership half-open ``[lo, hi)``; ``"left"``
-            makes it ``(lo, hi]``. Immaterial away from breakpoints, and for
+            makes it ``(lo, hi]``. Irrelevant away from breakpoints and for
             ``deriv=0`` on a :math:`C^0` basis. See the class docstring.
         """
         _check_side(side)
@@ -472,22 +349,7 @@ class PiecewiseBasis(Basis):
 
     def _evaluate_at_nodes(self, rule, deriv=0, a=None, b=None):
         """Evaluate at a quadrature rule's nodes, using the rule's recorded
-        element ownership instead of the coordinate convention.
-
-        A composite rule may place nodes exactly on interior breakpoints --
-        a Lobatto sub-rule places one there from *each* side, so the
-        breakpoint appears twice in ``nodes`` with identical coordinates but
-        different provenance. Locating by coordinate assigns both copies to
-        the same element, which drops one element's endpoint contribution
-        and silently mis-integrates a discontinuous basis. Using
-        ``rule.elements`` distinguishes them exactly.
-
-        The rule's breakpoints need only be a *superset* of this basis's
-        (see :meth:`_required_breakpoints`), so a rule element is mapped to
-        the basis element containing it. That map is static, which also
-        makes the resulting masks static -- one fewer runtime comparison in
-        the traced graph, and one fewer branch point for autodiff.
-        """
+        element ownership instead of the coordinate convention."""
         x = rule.nodes
         if rule.elements is None:
             # No element structure to draw on (a plain, non-composite rule).
@@ -525,12 +387,6 @@ class PiecewiseBasis(Basis):
         per-element (a different order or family per element) that
         advantage doesn't apply, and this costs the same as the dense
         ``evaluate(x) @ coefficients`` path.
-
-        ``coefficients``, ``x``, ``deriv`` are as for
-        ``Basis._evaluate_expansion``; ``a``, ``b`` are target-domain
-        endpoints and ``side`` the one-sided limit to take at a point lying
-        exactly on an interior breakpoint, where this basis is two-valued --
-        both as for :meth:`evaluate`.
         """
         if not self._uniform:
             return super()._evaluate_expansion(

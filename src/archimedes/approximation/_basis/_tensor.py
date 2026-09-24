@@ -1,5 +1,3 @@
-"""Tensor-product basis: one univariate Basis per dimension."""
-
 from __future__ import annotations
 
 import dataclasses
@@ -17,23 +15,15 @@ __all__ = ["ProductParameters", "TensorBasis"]
 
 @tree.struct
 class ProductParameters(ReferenceDomain.Parameters):
-    """Target-domain parameters for a :class:`TensorBasis`: one
+    """Target-domain parameters for a :class:`TensorBasis`
+    
+    Represents a multi-dimensional domain as one
     :class:`~archimedes.measure.ReferenceDomain.Parameters` per dimension.
-
-    A single nested field rather than one flattened set of parameters per
-    dimension, because the names would otherwise collide -- two interval
-    dimensions both want ``a``/``b``. Keeping them nested also means
-    ``FunctionSpace``'s existing ``**domain_kwargs`` convention carries
-    them through unchanged, as the single keyword ``dims``.
-
-    The entries are ordinary ``@struct`` types, so their fields remain
-    pytree leaves: a tensor domain can be traced and optimized over exactly
-    like a one-dimensional one.
 
     Parameters
     ----------
     dims : tuple of ReferenceDomain.Parameters
-        One entry per dimension, in the same order as the basis's factors.
+        One entry per dimension, in the same order as the basis factors.
     """
 
     dims: tuple = ()
@@ -53,14 +43,7 @@ class ProductParameters(ReferenceDomain.Parameters):
 
 # TODO: Is this redundant with quadrature._tensor._dim_args?
 def _dim_kwargs(basis: Basis, spec: Any) -> dict:
-    """Normalize one dimension's domain parameters into keyword arguments
-    for that dimension's ``basis.evaluate``.
-
-    Accepts the reference domain (``None``), a ``ReferenceDomain.Parameters``
-    struct (what a ``FunctionSpace`` domain holds), a kwargs dict, or a
-    positional tuple matched against ``basis.Parameters``' field order.
-    These are the same forms ``TensorQuadratureRule`` accepts, so the two
-    ``dims`` conventions stay identical.
+    """Normalize  domain parameters into keyword arguments for ``basis.evaluate``.
     """
     if spec is None:
         return {}
@@ -84,18 +67,7 @@ def _dim_kwargs(basis: Basis, spec: Any) -> dict:
 
 
 class _DimensionView:
-    """One dimension of a tensor rule, presented as a 1-D quadrature rule.
-
-    A tensor rule's ``nodes``/``elements`` are ``(n, ndim)``. A univariate
-    factor needs column ``d`` of each, at the *full* node count (every
-    combination), not the ``n_d`` of the underlying per-dimension rule.
-    So this is a view of the expanded arrays rather than ``rule.rules[d]``.
-
-    Only the attributes a per-dimension node evaluation needs are provided,
-    which is why this is a plain adapter and not a ``Quadrature``.
-    Weights are meaningless here, since they do not factor per dimension
-    row-wise, and nothing downstream asks for them.
-    """
+    """One dimension of a tensor rule, presented as a 1-D quadrature rule."""
 
     def __init__(self, rule, dim: int):
         self._rule = rule
@@ -120,11 +92,10 @@ def _row_kron(mats: list) -> np.ndarray:
 
     Given ``(npts, p)`` and ``(npts, q)``, returns ``(npts, p * q)`` with
     ``out[:, i * q + j] = a[:, i] * b[:, j]``. The first factor varies
-    slowest, matching C order and ``TensorQuadratureRule``'s node ordering.
+    slowest, matching C order and ``TensorQuadratureRule`` node ordering.
 
     Built column by column rather than as ``a[:, :, None] * b[:, None, :]``,
-    since ``SymbolicArray`` supports no more than two dimensions. The
-    broadcasting form is therefore unavailable under tracing.
+    since ``SymbolicArray`` supports no more than two dimensions.
     """
     out = mats[0]
     for phi in mats[1:]:
@@ -141,42 +112,50 @@ class TensorBasis(Basis):
     The basis functions are all products of one factor from each dimension,
 
     .. math::
-        \Phi_{(i_1, \ldots, i_d)}(x) = \phi^{(1)}_{i_1}(x_1) \cdots
+        \Phi_{(i_1, \ldots, i_d)}(\mathbf{x}) = \phi^{(1)}_{i_1}(x_1) \cdots
             \phi^{(d)}_{i_d}(x_d),
 
-    so ``n_basis`` is the product of the factors' sizes and a ``Function``
-    on this basis spans the full ``(n_1, ..., n_d)`` coefficient array.
+    The number of basis functions ``n_basis`` is the product of ``n_basis``
+    for each factor. A :class:`Function` on this basis spans the full
+    ``(n_1, ..., n_d)`` coefficient array.
 
-    The multi-index is flattened in **C order** -- last dimension varying
-    fastest, i.e. ``np.ravel_multi_index``'s default -- matching
-    :class:`~archimedes.quadrature.TensorQuadratureRule`'s node ordering.
-    So ``coefficients.reshape(n_1, ..., n_d)`` recovers the natural array
-    layout.
+    The multi-index is flattened in C order, with last dimension varying
+    fastest (the default of ``np.ravel_multi_index``). This matches the node
+    ordering of :class:`~archimedes.quadrature.TensorQuadratureRule`.
+    As a result, ``coefficients.reshape(n_1, ..., n_d)`` recovers the natural
+    array layout.
 
     **Derivatives are multi-indices.** In more than one dimension "the
-    derivative" is ambiguous, so ``deriv`` is a tuple giving the order in
-    each variable: ``(1, 0)`` is :math:`\partial_x`, ``(1, 1)`` is
-    :math:`\partial_x \partial_y`. The scalar ``0`` is accepted as shorthand
-    for no derivative at all; any other integer is rejected.
+    derivative" is ambiguous, so ``deriv`` is a tuple specifying the order in
+    each variable. For example, ``deriv=(1, 0)`` specifies :math:`\partial_x`
+    and ``deriv=(1, 1)`` specifies :math:`\partial_x \partial_y`. The scalar
+    ``0`` is accepted as shorthand for no derivative at all; any other integer
+    is rejected as ambiguous.
 
     **Factors must be univariate.** Tensor products are associative, so
     nesting adds no expressive power; write ``TensorBasis((a, b, c))``
     rather than ``TensorBasis((a, TensorBasis((b, c))))``.
 
-    Parameters
-    ----------
-    bases : tuple of Basis
-        One univariate basis per dimension, in order. The families may
-        differ, and so may their reference domains. All factors must agree on
-        ``density``, since quadrature weights are normalized (or not) for
-        the product measure as a whole.
+    This class is typically not used directly; instead a set of
+    :class:`FunctionSpace` factors can be constructed and combined using
+    the :meth:`FunctionSpace.tensor` constructor, which internally creates
+    an instance of this class.
 
     See Also
     --------
     archimedes.quadrature.tensor_quad : The matching quadrature construction.
+    FunctionSpace.tensor : Construct a tensor product of multiple function spaces,
+        which internally creates a :class:`TensorBasis` instance.
     """
 
     bases: tuple[Basis, ...]
+    """The factors comprising this tensor basis.
+    
+    One univariate basis per dimension, in order. The families may
+    differ, and so may their reference domains. All factors must have the
+    same value of ``density`` since quadrature weights are normalized
+    (or not) for the product measure as a whole.
+    """
 
     def __post_init__(self):
         bases = tuple(self.bases)
@@ -203,12 +182,10 @@ class TensorBasis(Basis):
 
     @property
     def ndim(self) -> int:
-        """Number of dimensions, i.e. the number of factors."""
         return len(self.bases)
 
     @property
     def n_basis(self) -> int:
-        """Product of the factors' sizes."""
         return int(np.prod([basis.n_basis for basis in self.bases]))
 
     @property
@@ -219,7 +196,6 @@ class TensorBasis(Basis):
 
     @property
     def density(self) -> bool:
-        """The factors' common ``density``; see :attr:`Basis.density`."""
         return self.bases[0].density
 
     @property
@@ -229,38 +205,22 @@ class TensorBasis(Basis):
         return sum((basis._measures for basis in self.bases), ())
 
     @property
-    def Parameters(self) -> type:  # noqa: N802
-        """:class:`ProductParameters`, holding one dimension's parameters
-        per factor."""
+    def Parameters(self) -> type[ProductParameters]:  # noqa: N802
         return ProductParameters
 
     @property
     def _required_breakpoints(self) -> tuple:
-        """Per-dimension breakpoints, one entry per dimension, each ``None``
-        unless that factor is only piecewise smooth.
-
-        Always a length-``ndim`` tuple rather than a bare ``None``, so a
-        consumer can zip it against a
-        :class:`~archimedes.quadrature.TensorQuadratureRule`'s own
-        per-dimension breakpoints.
-        """
+        """Per-dimension breakpoints, one entry per dimension."""
         return tuple(basis._required_breakpoints for basis in self.bases)
 
     def _default_quadrature(self):
-        """The tensor product of the factors' own default rules, which is
-        therefore exact for this basis's mass and stiffness integrands in
-        each variable separately."""
+        """The tensor product of the default rules for each factor."""
         from archimedes.quadrature import tensor_quad
 
         return tensor_quad(*[basis._default_quadrature() for basis in self.bases])
 
     def _product_basis(self, other):
-        """Tensor of the factors' product bases.
-
-        A product of tensor-product functions factorizes dimension by
-        dimension, so the enlarged space does too -- there is no coupling
-        across dimensions to resolve.
-        """
+        """Tensor basis of the product bases of the factors."""
         if not isinstance(other, TensorBasis):
             raise ValueError(
                 f"cannot form a product basis between "
@@ -276,12 +236,7 @@ class TensorBasis(Basis):
         )
 
     def _derivative_basis(self, deriv=1):
-        """Tensor of the factors' derivative bases.
-
-        ``deriv`` is a multi-index, as everywhere else here, so each factor
-        is differentiated to its own order and shrinks independently --
-        there is no coupling across dimensions.
-        """
+        """Tensor basis of the derivative bases of the factors."""
         alpha = self._multi_index(deriv)
         derived = []
         for d, (basis, order) in enumerate(zip(self.bases, alpha)):
@@ -314,10 +269,7 @@ class TensorBasis(Basis):
         return alpha
 
     def _side_specs(self, side) -> tuple:
-        """Normalize ``side`` into one entry per dimension.
-
-        A bare string broadcasts to all dimensions.
-        """
+        """Normalize ``side`` into one entry per dimension."""
         if isinstance(side, str):
             return (_check_side(side),) * self.ndim
         specs = tuple(side)
@@ -344,15 +296,13 @@ class TensorBasis(Basis):
         Parameters
         ----------
         x : array_like
-            Evaluation points, shape ``(npts, ndim)`` -- one row per point,
-            one column per dimension, matching :attr:`TensorQuadratureRule.nodes`.
+            Evaluation points, shape ``(npts, ndim)`` with one row per point and
+            one column per dimension.
         deriv : tuple of int, optional
             Multi-index of derivative orders, one per dimension. The scalar
             ``0`` (the default) means no derivative.
         dims : sequence, optional
-            Per-dimension target-domain parameters; see :func:`_dim_kwargs`
-            for the accepted forms. Omitted, every dimension uses its
-            reference domain.
+            Per-dimension target-domain parameters.
         side : str or sequence of str, optional
             One-sided limit per dimension, where a factor is two-valued. A
             bare string broadcasts to every dimension. Default ``"right"``.
@@ -360,8 +310,7 @@ class TensorBasis(Basis):
         Returns
         -------
         phi : ndarray
-            Shape ``(npts, n_basis)``, with the multi-index flattened in C
-            order.
+            Shape ``(npts, n_basis)``, with the multi-index flattened in C order.
         """
         alpha = self._multi_index(deriv)
         specs = self._dim_specs(dims)
@@ -387,13 +336,7 @@ class TensorBasis(Basis):
         )
 
     def _evaluate_at_nodes(self, rule, deriv=0, dims=None):
-        """Per-dimension evaluation at the rule's nodes, so a factor that
-        needs element provenance (a :class:`PiecewiseBasis`) gets its own
-        dimension's slice of it.
-
-        ``rule.elements`` is ``(n, ndim)`` alongside ``rule.nodes``, so each
-        factor is handed a one-dimensional view of both.
-        """
+        """Per-dimension evaluation at the rule's nodes."""
         alpha = self._multi_index(deriv)
         specs = self._dim_specs(dims)
         return _row_kron(
