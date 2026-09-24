@@ -52,7 +52,7 @@ Currently supported basis families include:
 
 These two modules are nicely complementary; `quadrature` provides the numerical integration used to define inner products between function spaces in `approximation`, while `approximation` implements (among other things) the orthogonal polynomial families that Gaussian quadrature is built around.
 
-Those two lines of math are much richer than they might appear, especially in terms of their potential applications.
+Those two lines of math are richer than they might appear, especially in terms of their potential applications.
 To get a sense of this, the rest of the post will walk through a few minimal examples covering PDE solving, trajectory optimization, system identification, and uncertainty quantification - all of which build on the same quadrature and function approximation infrastructure.
 
 ## Application examples
@@ -716,7 +716,7 @@ But again, that's not the point for today, which is that the `approximation` mod
 ### Uncertainty quantification
 
 One other application that might not be immediately obvious is uncertainty quantification.
-[Polynomial chaos](https://en.wikipedia.org/wiki/Polynomial_chaos) in particular relies on function approximations and quadrature in a very fundamental way.
+[Polynomial chaos](https://en.wikipedia.org/wiki/Polynomial_chaos) in particular relies on function approximations and quadrature in a fundamental way.
 
 The basic idea is to represent a random variable as a function of other random variables using - you guessed it - a linear basis expansion.
 From Wikipedia directly, for a random variable $Y$ that depends on other random variables $X$, the polynomial chaos expansion (PCE) is simply:
@@ -888,7 +888,7 @@ for theme in {"light", "dark"}:
 It's like magic... at least for a univariate function.
 Again, the number of quadrature points scales exponentially with the dimension of the space $\sim n^d$ (number of random inputs), so Monte Carlo becomes competitive again after a point.
 
-Still, PCE is very useful for cases where function evaluations are expensive, or for applications like optimization under uncertainty where you need tight statistical convergence quickly.
+Still, PCE is useful for cases where function evaluations are expensive, or for applications like optimization under uncertainty where you need tight statistical convergence quickly.
 And with the `quadrature` and `approximation` modules, you get it almost for free!
 
 ## A Little History
@@ -903,7 +903,7 @@ The original `coco` code is still on the [Archimedes GitHub](https://github.com/
 So after all this time, why hasn't there been a single trajectory optimization example published in Archimedes?
 
 One reason was just priority; as satisfying as it is to see a trajectory optimization work, there are a lot of great open-source trajectory optimization codes already: [acados](https://docs.acados.org/), [Dymos](https://openmdao.github.io/dymos/), and [PSOPT](https://www.psopt.net/), to name a few.
-As a consequence, I thought that a [smooth path to hardware](../../../tutorials/deployment/deployment00.md) for basic control algorithms and real-time simulation could be much more impactful than one more trajopt code.
+As a consequence, I thought that a [smooth path to hardware](../../../tutorials/deployment/deployment00.md) for basic control algorithms and real-time simulation could be more impactful than one more trajopt code.
 As a friend with a lot of experience in automotive controls says, "nobody optimizes anything; in real life it's all just state machines and lookup tables".
 
 But more relevant here, the second reason was the coding equivalent of writer's block.  `coco` included a lot of one-off implementations of things like Gauss-Radau quadrature, barycentric interpolation, and collocation on spectral elements.

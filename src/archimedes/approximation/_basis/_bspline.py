@@ -1,17 +1,3 @@
-r"""B-spline basis on a general knot vector.
-
-Evaluation follows de Boor's BSPLVB algorithm (*A Practical Guide to
-Splines*, Revised Ed., Ch. X). It is a stable triangular recurrence that
-builds all ``degree + 1`` nonzero B-splines at a point column by column,
-with no special-casing for repeated knots. Denominators stay bounded below
-by the local knot spacing.
-
-Derivatives reuse the same recurrence at a lower order. They then apply
-the classical knot-difference derivative formula one order at a time --
-the basis-function analogue of BVALUE's stage-1 coefficient differencing
-(Ch. IX-X).
-"""
-
 from __future__ import annotations
 
 import dataclasses
@@ -29,38 +15,56 @@ __all__ = ["BSplineBasis"]
 
 @dataclasses.dataclass(frozen=True)
 class BSplineBasis(Basis):
-    r"""B-splines :math:`\{N_{i,p}\}_{i=1}^n` on a general knot vector.
+    r"""Univariate B-spline basis on a general knot vector.
 
-    ``knots`` is a nondecreasing sequence in _physical_ units. Unlike
-    piecewise polynomials (e.g. Lagrange), a B-spline's knot vector has no
-    canonical reference form to remap.
+    The :math:`j`-th B-spline basis function is :math:`B_{j, k; \mathbf{x}}` for
+    degree :math:`k` and nondecreasing knot vector :math:`\mathbf{x}`. Following
+    de Boor's conventions in [1]_ and [2]_, the :math:`\mathbf{x}` subscript will
+    be dropped in the following notation. The basis functions are defined recursively
+    starting from the zeroth degree as
 
-    The knot vector can contain any interior or end multiplicity from ``1``
-    through ``degree + 1``, clamped or open. A knot of multiplicity
-    ``degree + 1`` gives a true discontinuity; one of multiplicity
-    ``m < degree + 1`` gives :math:`C^{degree - m}` continuity there.
-    Periodic (closed-curve) B-splines are a different construction and are
-    not supported.
+    .. math::
 
-    Outside the basic interval ``[knots[degree], knots[-1-degree]]``,
-    :meth:`evaluate` extrapolates via the boundary span's polynomial piece.
+        B_{j, 0}(x) = \begin{cases}
+        1 & \text{if } x_j \le x < x_{j+1}, \\
+        0 & \text{otherwise},
+        \end{cases}
+
+    and for higher degrees :math:`k \ge 1` as
+
+    .. math::
+
+        B_{j, k}(x) = \omega_{j, k}(x) B_{j, k-1}(x)
+            + (1 - \omega_{j+1, k}(x)) B_{j+1, k-1}(x),
+
+    with weight functions
+
+    .. math::
+
+        \omega_{j, k}(x) = \begin{cases}
+        \frac{x - x_j}{x_{j+k} - x_j} & \text{if } x_{j+k} \neq x_j, \\
+        0 & \text{otherwise}.
+        \end{cases}
+
+    A function approximated in the B-spline basis for a given knot vector
+    can be expressed in the usual basis expansion:
+
+    .. math::
+
+        f(x) \approx \sum_j c_j B_{j, k}(x)
+
+    The knot vector can contain any interior or end multiplicity from :math:`1`
+    through :math:`k + 1`, clamped or open. A knot of multiplicity :math:`k + 1` produces
+    a true discontinuity, while a knot of multiplicity :math:`m < k + 1` produces
+    :math:`C^{k - m}` continuity.
 
     Parameters
     ----------
     degree : int
-        Polynomial degree of each piece. ``0`` gives piecewise-constant
-        indicator functions.
+        Polynomial degree :math:`k` of each piece.
     knots : array_like
-        Nondecreasing knot vector, physical units, length
+        Nondecreasing knot vector :math:`\mathbf{x}` in physical units, length
         ``n_basis + degree + 1``.
-
-    Raises
-    ------
-    ValueError
-        If ``degree < 0``; if ``knots`` is not 1-D, not nondecreasing, or
-        has fewer than ``2 * degree + 2`` entries; if any value repeats
-        more than ``degree + 1`` times; or if the implied basic interval
-        ``[knots[degree], knots[-1-degree]]`` is degenerate.
 
     See Also
     --------
@@ -68,10 +72,37 @@ class BSplineBasis(Basis):
         automatically from an explicit knot vector.
     FunctionSpace.clamped_bspline : Convenience constructor building a
         clamped knot vector from physical breakpoints (the common case).
+
+    Notes
+    -----
+    Unlike the piecewise polynomial basis, the knot vector is defined in
+    *physical* space (not a normalized reference domain).
+
+    Periodic (closed-curve) B-splines are not supported.
+
+    On the basic interval :math:`[x_k, x_n]` (:math:`n` = ``n_basis``), the
+    basis functions are nonnegative and form a partition of unity,
+    :math:`\sum_j B_{j, k}(x) = 1`. Outside it, evaluation extrapolates
+    using the polynomial piece of the boundary span, matching the default
+    behavior of ``scipy.interpolate.BSpline`` [3]_.
+
+    In this implementation the knot vector must be static, i.e. the values cannot
+    be traced symbolically or optimized over.
+
+    References
+    ----------
+    .. [1] Carl de Boor, A practical guide to splines, Springer, 2001.
+    .. [2] Carl de Boor, B(asic)-Spline Basics:
+        https://ftp.cs.wisc.edu/Approx/bsplbasic.pdf
+    .. [3] SciPy documentation on B-splines:
+        https://docs.scipy.org/doc/scipy/reference/generated/scipy.interpolate.BSpline.html
     """
 
     degree: int
+    """Polynomial degree of the B-spline basis."""
+
     knots: np.ndarray
+    """Nondecreasing knot vector."""
 
     def __post_init__(self):
         if self.degree < 0:
@@ -114,10 +145,12 @@ class BSplineBasis(Basis):
 
     @property
     def n_basis(self) -> int:
+        """Number of B-spline basis functions."""
         return len(self.knots) - self.degree - 1
 
     @property
     def Parameters(self) -> type:  # noqa: N802
+        """Type of the parameters for the B-spline basis (ignored for this class)."""
         return UnitInterval.Parameters
 
     @property
@@ -136,14 +169,14 @@ class BSplineBasis(Basis):
         return composite_quad(rule, self._required_breakpoints)
 
     def boundary_dofs(self, order: int = 0) -> tuple[int | None, int | None]:
-        """Indices of the degrees of freedom that *are* the ``order``-th
+        """Indices of the boundary degrees of freedom for a given derivative order.
+
+        Returns indices of the degrees of freedom corresponding to the ``order``-th
         derivative at the left and right ends of the domain.
 
-        Returns ``(0, n_basis - 1)`` when ``knots`` is clamped (multiplicity
-        ``degree + 1`` at both ends, so the first/last coefficients *are*
-        the endpoint values); ``(None, None)`` otherwise, since an interior
-        B-spline coefficient is a control point, not a value the basis
-        interpolates at any point of its own support.
+        If ``knots`` is clamped (multiplicity ``degree + 1`` at both ends), the
+        first and last coefficients correspond to the endpoint values. Otherwise,
+        returns ``(None, None)``, since interior coefficients are control points.
         """
         if order != 0:
             return (None, None)
@@ -292,12 +325,11 @@ class BSplineBasis(Basis):
         return biatx, base
 
     def evaluate(self, x, deriv: int = 0, a=None, b=None, side: str = RIGHT):
-        """Evaluate all ``n_basis`` B-splines at ``x``.
+        """Evaluate all ``n_basis`` B-splines at ``x`` using de Boor's BSPLVB algorithm.
 
-        ``a``/``b`` are accepted (every ``Basis.evaluate`` must accept the
-        domain kwargs ``FunctionSpace`` forwards) but ignored -- ``knots``
-        are already physical, so there is nothing to remap; see the class
-        docstring.
+        The domain endpoints ``a`` and ``b`` are accepted for compatibility
+        with the base class :meth:`Basis.evaluate`, but are ignored here, since
+        the domain is already determined by the knot vector.
         """
         _check_side(side)
         if deriv < 0:

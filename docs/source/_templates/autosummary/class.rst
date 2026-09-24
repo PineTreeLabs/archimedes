@@ -2,10 +2,23 @@
 
 .. currentmodule:: {{ module }}
 
-.. autoclass:: {{ objname }}
+.. autoclass:: {{ module }}::{{ objname }}
+
+   {% block classes %}
+   {% set nested_classes = nested_classes.get(module ~ "." ~ objname, []) %}
+   {% if nested_classes %}
+   .. rubric:: {{ _('Classes') }}
+
+   .. autosummary::
+      :toctree:
+   {% for item in nested_classes %}
+      ~{{ name }}.{{ item }}
+   {%- endfor %}
+   {% endif %}
+   {% endblock %}
 
    {% block methods %}
-   .. automethod:: __init__
+   .. automethod:: {{ module }}::{{ objname }}.__init__
 
    {% if methods %}
    .. rubric:: {{ _('Methods') }}

@@ -3,7 +3,10 @@
 # For the full list of built-in configuration values, see the documentation:
 # https://www.sphinx-doc.org/en/master/usage/configuration.html
 
+import importlib
+import inspect
 import os
+import pkgutil
 import sys
 
 sys.path.insert(0, os.path.abspath("_ext"))
@@ -70,6 +73,62 @@ nb_execution_excludepatterns = [
 
 autosummary_generate = True
 autosummary_imported_members = True
+
+
+def _build_nested_classes_map() -> dict[str, list[str]]:
+    """Public classes defined directly in each documented class's own body
+    (e.g. ``UnitInterval.Parameters``), for ``class.rst``'s Classes section.
+
+    ``sphinx.ext.autosummary`` only collects this ``classes`` context
+    variable for *modules*, not classes, so a class page's nested classes
+    (unlike its methods/attributes) go undocumented without this.
+
+    This is precomputed as a plain ``dict[str, list[str]]`` (fullname ->
+    nested class names), rather than looked up via a live function, because
+    Sphinx can't cache a function/class/module value in
+    ``autosummary_context`` across builds: it silently stores ``None`` in
+    place of the config value it can't pickle, which then always compares
+    as "changed" and forces a full rebuild of every doc on every build. See
+    ``Config.__getstate__`` in sphinx/config.py.
+    """
+    nested: dict[str, list[str]] = {}
+
+    def _record(obj: type, fullname: str) -> None:
+        children = sorted(
+            (name, value)
+            for name, value in vars(obj).items()
+            if inspect.isclass(value) and not name.startswith("_")
+        )
+        if not children:
+            return
+        nested[fullname] = [name for name, _ in children]
+        for name, child in children:
+            _record(child, f"{fullname}.{name}")
+
+    def _onerror(_modname: str) -> None:
+        pass  # Skip modules that fail to import (e.g. optional extras).
+
+    import archimedes
+
+    for module_info in pkgutil.walk_packages(
+        archimedes.__path__, prefix="archimedes.", onerror=_onerror
+    ):
+        # Only walk the public API surface, matching the leading-underscore
+        # convention for internal modules.
+        if any(part.startswith("_") for part in module_info.name.split(".")):
+            continue
+        try:
+            module = importlib.import_module(module_info.name)
+        except ImportError:
+            continue
+        for name, value in vars(module).items():
+            if inspect.isclass(value) and not name.startswith("_"):
+                _record(value, f"{module_info.name}.{name}")
+
+    return nested
+
+
+autosummary_context = {"nested_classes": _build_nested_classes_map()}
 
 # Render numpydoc "Attributes" sections as :ivar:/:vartype: fields rather than
 # separate `.. attribute::` directives, so they don't collide with the
