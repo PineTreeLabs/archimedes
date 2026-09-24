@@ -66,7 +66,6 @@ I'll be adding several pages to the "tutorials" section of the docs to go into m
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from scipy.special import factorial
 
 import archimedes as arc
 from archimedes.approximation import FunctionSpace
@@ -163,7 +162,6 @@ for theme in {"light", "dark"}:
         ax.plot(x_plt, f_i(x_plt), label=rf"$\phi_{i}(x)$")
         ax.plot(x, f_i(x), ".", color=ax.lines[-1].get_color())
 
-
     ax.grid()
     ax.set_ylabel(r"$\phi_i(x)$")
     ax.set_title("CG1 Lagrange Basis")
@@ -214,6 +212,7 @@ dPhi = V.basis_matrix(deriv=1)  # Derivative of test functions
 x = Phi.nodes
 u0 = V.function()
 left, right = V.basis.boundary_dofs()
+
 
 def res(c):
     u = u0.replace(coefficients=c)
@@ -341,13 +340,16 @@ t0, tf = 0.0, 1.0
 x0, xf = np.array([0.0, 0.0]), np.array([1.0, 0.0])
 p = 6  # polynomial degree
 
-quad_rule = arc.quadrature.composite_quad(arc.quadrature.gauss_lobatto(p + 1), [-1.0, 1.0])
+quad_rule = arc.quadrature.composite_quad(
+    arc.quadrature.gauss_lobatto(p + 1), [-1.0, 1.0]
+)
 V = FunctionSpace.piecewise(
     "lagrange", p, breakpoints=[t0, tf], nodes="lobatto", quad_rule=quad_rule
 )
 tp, w = V.quadrature()
 
-def f(x, u):
+
+def f(x, u):  # noqa: F811
     return np.array([x[1], u[0]], like=x)
 
 
@@ -402,7 +404,9 @@ print(f"Max absolute error: {max(abs(x_plt[:, 0] - x_ex(t_plt))):.4e}")
 
 fig, ax = plt.subplots(2, 1, figsize=(7, 3), sharex=True)
 ax[0].plot(t_plt, x_plt[:, 0])
-ax[0].scatter(tp, x_opt(tp)[:, 0], c=ax[0].lines[0].get_color(), label="Optimal trajectory")
+ax[0].scatter(
+    tp, x_opt(tp)[:, 0], c=ax[0].lines[0].get_color(), label="Optimal trajectory"
+)
 ax[0].plot(t_plt, x_ex(t_plt), "--", lw=2, label="Exact solution")
 ax[0].legend()
 ax[0].grid()
@@ -425,7 +429,9 @@ for theme in {"light", "dark"}:
 
     fig, ax = plt.subplots(2, 1, figsize=(7, 3), sharex=True)
     ax[0].plot(t_plt, x_plt[:, 0])
-    ax[0].scatter(tp, x_opt(tp)[:, 0], c=ax[0].lines[0].get_color(), label="Optimal trajectory")
+    ax[0].scatter(
+        tp, x_opt(tp)[:, 0], c=ax[0].lines[0].get_color(), label="Optimal trajectory"
+    )
     ax[0].plot(t_plt, x_ex(t_plt), "--", lw=2, label="Exact solution")
     ax[0].legend()
     ax[0].grid()
@@ -487,9 +493,7 @@ The data comes from a "chirp" response:
 df = pd.read_csv("chirp_response.csv")
 
 data = arc.sysid.Timeseries(
-    ts=df["t"].values,
-    ys=df[["x"]].values.T,
-    us=df[["u"]].values.T
+    ts=df["t"].values, ys=df[["x"]].values.T, us=df[["u"]].values.T
 )
 ```
 
@@ -497,12 +501,12 @@ data = arc.sysid.Timeseries(
 :tags: [hide-cell, remove-output]
 fig, ax = plt.subplots(2, 1, figsize=(7, 5), sharex=True)
 ax[0].plot(data.ts, data.us[0])
-ax[0].set_ylabel('Force [N]')
+ax[0].set_ylabel("Force [N]")
 ax[0].grid()
 ax[1].plot(data.ts, data.ys[0])
-ax[1].set_ylabel('Position [m]')
+ax[1].set_ylabel("Position [m]")
 ax[1].grid()
-ax[-1].set_xlabel('Time [s]')
+ax[-1].set_xlabel("Time [s]")
 plt.show()
 ```
 
@@ -514,12 +518,12 @@ for theme in {"light", "dark"}:
 
     fig, ax = plt.subplots(2, 1, figsize=(7, 4), sharex=True)
     ax[0].plot(data.ts, data.us[0])
-    ax[0].set_ylabel('Force [N]')
+    ax[0].set_ylabel("Force [N]")
     ax[0].grid()
     ax[1].plot(data.ts, data.ys[0])
-    ax[1].set_ylabel('Position [m]')
+    ax[1].set_ylabel("Position [m]")
     ax[1].grid()
-    ax[-1].set_xlabel('Time [s]')
+    ax[-1].set_xlabel("Time [s]")
 
     plt.savefig(plot_dir / f"approx_release_3_{theme}.png")
     plt.close()
@@ -566,7 +570,7 @@ def dyn(t, y, u, p):
     F = friction(abs(np.atleast_1d(v))).squeeze()
     F = np.where(v >= 0, F, -F)
 
-    # Known physics from Newton's laws 
+    # Known physics from Newton's laws
     F_net = -F - k * x + u
     return np.hstack([v, F_net / m])
 
@@ -574,7 +578,6 @@ def dyn(t, y, u, p):
 # Observation model
 def obs(t, y, u, p):
     return y[0]  # Observe position
-
 
 
 nx, ny = 2, 1  # State and output dimensions
@@ -615,14 +618,14 @@ for i in range(1, len(data.ts)):
 fig, ax = plt.subplots(2, 1, figsize=(7, 5), sharex=True)
 ax[0].plot(data.ts, data.ys[0], label="Data")
 ax[0].plot(data.ts, xs_pred[0], "--", alpha=0.8, label="Predicted")
-ax[0].set_ylabel('Position [m]')
+ax[0].set_ylabel("Position [m]")
 ax[0].grid()
 ax[0].legend()
 vs_fd = np.gradient(data.ys[0], data.ts)
 ax[1].plot(data.ts, vs_fd, label="Data")
 ax[1].plot(data.ts, xs_pred[1], "--", alpha=0.8, label="Predicted")
-ax[1].set_xlabel('Time [s]')
-ax[1].set_ylabel('Velocity [m/s]')
+ax[1].set_xlabel("Time [s]")
+ax[1].set_ylabel("Velocity [m/s]")
 ax[1].grid()
 plt.show()
 ```
@@ -636,14 +639,14 @@ for theme in {"light", "dark"}:
     fig, ax = plt.subplots(2, 1, figsize=(7, 4), sharex=True)
     ax[0].plot(data.ts, data.ys[0], label="Data")
     ax[0].plot(data.ts, xs_pred[0], "--", alpha=0.8, label="Predicted")
-    ax[0].set_ylabel('Position [m]')
+    ax[0].set_ylabel("Position [m]")
     ax[0].grid()
     ax[0].legend()
     vs_fd = np.gradient(data.ys[0], data.ts)
     ax[1].plot(data.ts, vs_fd, label="Data")
     ax[1].plot(data.ts, xs_pred[1], "--", alpha=0.8, label="Predicted")
-    ax[1].set_xlabel('Time [s]')
-    ax[1].set_ylabel('Velocity [m/s]')
+    ax[1].set_xlabel("Time [s]")
+    ax[1].set_ylabel("Velocity [m/s]")
     ax[1].grid()
 
     plt.savefig(plot_dir / f"approx_release_4_{theme}.png")
@@ -671,11 +674,13 @@ nodes = V.basis_matrix().nodes
 
 v_plt = np.linspace(0, 1, 1000)
 fig, ax = plt.subplots(1, 1, figsize=(7, 3))
-l, = ax.plot(v_plt, est_friction(v_plt), "--", alpha=0.8, label="Approximation")
-ax.plot(nodes, est_friction(nodes), ".", color=l.get_color(), label="Quadrature Nodes")
+(line,) = ax.plot(v_plt, est_friction(v_plt), "--", alpha=0.8, label="Approximation")
+ax.plot(
+    nodes, est_friction(nodes), ".", color=line.get_color(), label="Quadrature Nodes"
+)
 ax.legend()
-ax.set_xlabel('Velocity [m/s]')
-ax.set_ylabel('Friction Force [N]')
+ax.set_xlabel("Velocity [m/s]")
+ax.set_ylabel("Friction Force [N]")
 ax.set_xlim([0.0, 1.0])
 # ax.set_ylim([-0.1, 2.0])
 ax.grid()
@@ -689,11 +694,19 @@ for theme in {"light", "dark"}:
     arc.set_theme(theme)
 
     fig, ax = plt.subplots(1, 1, figsize=(7, 3))
-    l, = ax.plot(v_plt, est_friction(v_plt), "--", alpha=0.8, label="Approximation")
-    ax.plot(nodes, est_friction(nodes), ".", color=l.get_color(), label="Quadrature Nodes")
+    (line,) = ax.plot(
+        v_plt, est_friction(v_plt), "--", alpha=0.8, label="Approximation"
+    )
+    ax.plot(
+        nodes,
+        est_friction(nodes),
+        ".",
+        color=line.get_color(),
+        label="Quadrature Nodes",
+    )
     ax.legend()
-    ax.set_xlabel('Velocity [m/s]')
-    ax.set_ylabel('Friction Force [N]')
+    ax.set_xlabel("Velocity [m/s]")
+    ax.set_ylabel("Friction Force [N]")
     ax.set_xlim([0.0, 1.0])
     # ax.set_ylim([-0.1, 2.0])
     ax.grid()

@@ -284,7 +284,7 @@ For example, here are the leading Legendre basis functions:
 ```{code-cell} python
 :tags: [remove-output]
 n = 5  # Number of basis functions to use
-a, b, = -1, 1  # Domain bounds
+a, b = -1, 1  # Domain bounds
 
 # Basic orthogonal polynomial basis on [-1, 1]
 legendre = FunctionSpace.legendre(n, a, b)
@@ -320,7 +320,6 @@ for theme in {"light", "dark"}:
         f_i = legendre.function(e_i)
         ax.plot(x_plt, f_i(x_plt), label=rf"$\phi_{i}(x)$")
         ax.plot(x, f_i(x), ".", color=ax.lines[-1].get_color())
-
 
     ax.grid()
     ax.set_ylabel(r"$\phi_i(x)$")
@@ -388,7 +387,6 @@ for theme in {"light", "dark"}:
         ax.plot(x_plt, f_i(x_plt), label=rf"$\phi_{i}(x)$")
         ax.plot(x, f_i(x), ".", color=ax.lines[-1].get_color())
 
-
     ax.grid()
     ax.set_ylabel(r"$\phi_i(x)$")
     ax.set_title("Lagrange Basis")
@@ -454,7 +452,6 @@ for theme in {"light", "dark"}:
         ax.plot(x_plt, f_i(x_plt), label=rf"$\phi_{i}(x)$")
         ax.plot(x, f_i(x), ".", color=ax.lines[-1].get_color())
 
-
     ax.grid()
     ax.set_ylabel(r"$\phi_i(x)$")
     ax.set_title("CG1 Lagrange Basis")
@@ -516,7 +513,6 @@ for theme in {"light", "dark"}:
         f_i = V.function(e_i)
         ax.plot(x_plt, f_i(x_plt), label=rf"$\phi_{i}(x)$")
         ax.plot(x, f_i(x), ".", color=ax.lines[-1].get_color())
-
 
     ax.grid()
     ax.set_ylabel(r"$\phi_i(x)$")
@@ -580,7 +576,6 @@ for theme in {"light", "dark"}:
         ax.plot(x_plt, f_i(x_plt), label=rf"$\phi_{i}(x)$")
         ax.plot(x, f_i(x), ".", color=ax.lines[-1].get_color())
 
-
     ax.grid()
     ax.set_ylabel(r"$\phi_i(x)$")
     ax.set_title("Cubic Hermite Basis")
@@ -628,8 +623,8 @@ x, _w = legendre.quadrature()
 
 fig, ax = plt.subplots(1, 1, figsize=(7, 3))
 ax.plot(x_plt, f(x_plt), label="Exact", lw=2)
-ax.plot(x_plt, f_approx(x_plt), '--', label="Approximation", lw=2)
-ax.plot(x, f_approx(x), '.', label="Quadrature Nodes", color=ax.lines[-1].get_color())
+ax.plot(x_plt, f_approx(x_plt), "--", label="Approximation", lw=2)
+ax.plot(x, f_approx(x), ".", label="Quadrature Nodes", color=ax.lines[-1].get_color())
 ax.grid()
 ax.legend(loc="lower right")
 ax.set_xlabel("$x$")
@@ -644,8 +639,10 @@ for theme in {"light", "dark"}:
     arc.set_theme(theme)
     fig, ax = plt.subplots(1, 1, figsize=(7, 3))
     ax.plot(x_plt, f(x_plt), label="Exact", lw=2)
-    ax.plot(x_plt, f_approx(x_plt), '--', label="Approximation", lw=2)
-    ax.plot(x, f_approx(x), '.', label="Quadrature Nodes", color=ax.lines[-1].get_color())
+    ax.plot(x_plt, f_approx(x_plt), "--", label="Approximation", lw=2)
+    ax.plot(
+        x, f_approx(x), ".", label="Quadrature Nodes", color=ax.lines[-1].get_color()
+    )
     ax.grid()
     ax.legend(loc="lower right")
     ax.set_xlabel("$x$")

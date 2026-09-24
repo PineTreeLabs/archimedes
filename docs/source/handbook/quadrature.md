@@ -96,18 +96,20 @@ e_quad = abs(J_quad - J_ex)
 
 n_trapz = np.arange(2, 1000, 10)
 
+
 def trapz(n):
     x = np.linspace(a, b, n, endpoint=True)
     return np.trapezoid(f(x), x)
+
 
 J_trapz = np.array([trapz(n) for n in n_trapz])
 e_trapz = abs(J_trapz - J_ex)
 
 fig, ax = plt.subplots(1, 1, figsize=(7, 3))
-ax.plot(n_quad, e_quad, '.-', label="Gauss-Legendre")
-ax.plot(n_trapz, e_trapz, '.-', label="Trapezoidal")
-ax.set_yscale('log')
-ax.set_xscale('log')
+ax.plot(n_quad, e_quad, ".-", label="Gauss-Legendre")
+ax.plot(n_trapz, e_trapz, ".-", label="Trapezoidal")
+ax.set_yscale("log")
+ax.set_xscale("log")
 ax.legend()
 ax.grid()
 ax.set_xlabel("Number of points (function evaluations)")
@@ -121,10 +123,10 @@ plt.show()
 for theme in {"light", "dark"}:
     arc.set_theme(theme)
     fig, ax = plt.subplots(1, 1, figsize=(6, 4))
-    ax.plot(n_quad, e_quad, '.-', label="Gauss-Legendre")
-    ax.plot(n_trapz, e_trapz, '.-', label="Trapezoidal")
-    ax.set_yscale('log')
-    ax.set_xscale('log')
+    ax.plot(n_quad, e_quad, ".-", label="Gauss-Legendre")
+    ax.plot(n_trapz, e_trapz, ".-", label="Trapezoidal")
+    ax.set_yscale("log")
+    ax.set_xscale("log")
     ax.legend()
     ax.grid()
     ax.set_xlabel("Number of points (function evaluations)")
@@ -451,17 +453,16 @@ For example, to construct a quadrature rule for a uniform 10-element domain with
 ```{code-cell} python
 nel = 10
 p = 3
-breakpoints = np.linspace(-1, 1, nel+1, endpoint=True)
+breakpoints = np.linspace(-1, 1, nel + 1, endpoint=True)
 rule = arc.quadrature.composite_quad(
-    arc.quadrature.gauss_legendre(n=p+1),
-    breakpoints=breakpoints
+    arc.quadrature.gauss_legendre(n=p + 1), breakpoints=breakpoints
 )
 ```
 
 ```{code-cell} python
 :tags: [hide-cell, remove-output]
 fig, ax = plt.subplots(1, 1, figsize=(7, 2))
-ax.plot(rule.nodes, 0 * rule.nodes, '.')
+ax.plot(rule.nodes, 0 * rule.nodes, ".")
 ax.set_yticks([])
 ax.set_xticks(breakpoints)
 ax.grid()
@@ -475,7 +476,7 @@ plt.show()
 for theme in ("light", "dark"):
     arc.set_theme(theme)
     fig, ax = plt.subplots(1, 1, figsize=(7, 2))
-    ax.plot(rule.nodes, 0 * rule.nodes, '.')
+    ax.plot(rule.nodes, 0 * rule.nodes, ".")
     ax.set_yticks([])
     ax.set_xticks(breakpoints)
     ax.grid()
@@ -495,11 +496,11 @@ The composite rule does not need to use a uniform degree, nor even a uniform rul
 For example, here we add endpoints using left/right Radau rules, and locally refine two interior elements:
 
 ```{code-cell} python
-el_rules = [arc.quadrature.gauss_legendre(p+1) for _ in range(nel)]
-el_rules[0] = arc.quadrature.gauss_radau(p+1, "left")
-el_rules[-1] = arc.quadrature.gauss_radau(p+1, "right")
-el_rules[nel//2-1] = arc.quadrature.gauss_legendre(4*(p+1))
-el_rules[nel//2] = arc.quadrature.gauss_legendre(4*(p+1))
+el_rules = [arc.quadrature.gauss_legendre(p + 1) for _ in range(nel)]
+el_rules[0] = arc.quadrature.gauss_radau(p + 1, "left")
+el_rules[-1] = arc.quadrature.gauss_radau(p + 1, "right")
+el_rules[nel // 2 - 1] = arc.quadrature.gauss_legendre(4 * (p + 1))
+el_rules[nel // 2] = arc.quadrature.gauss_legendre(4 * (p + 1))
 
 rule = arc.quadrature.composite_quad(el_rules, breakpoints=breakpoints)
 ```
@@ -507,7 +508,7 @@ rule = arc.quadrature.composite_quad(el_rules, breakpoints=breakpoints)
 ```{code-cell} python
 :tags: [hide-cell, remove-output]
 fig, ax = plt.subplots(1, 1, figsize=(7, 2))
-ax.plot(rule.nodes, 0 * rule.nodes, '.')
+ax.plot(rule.nodes, 0 * rule.nodes, ".")
 ax.set_yticks([])
 ax.set_xticks(breakpoints)
 ax.grid()
@@ -521,7 +522,7 @@ plt.show()
 for theme in ("light", "dark"):
     arc.set_theme(theme)
     fig, ax = plt.subplots(1, 1, figsize=(7, 2))
-    ax.plot(rule.nodes, 0 * rule.nodes, '.')
+    ax.plot(rule.nodes, 0 * rule.nodes, ".")
     ax.set_yticks([])
     ax.set_xticks(breakpoints)
     ax.grid()
@@ -545,7 +546,7 @@ For instance, to construct a tenth-order 2D Gauss-Legendre rule:
 
 ```{code-cell} python
 p = 10
-dim_rules = [arc.quadrature.gauss_lobatto(p+1) for _ in range(2)]
+dim_rules = [arc.quadrature.gauss_lobatto(p + 1) for _ in range(2)]
 rule = arc.quadrature.tensor_quad(*dim_rules)
 ```
 
@@ -556,7 +557,7 @@ ax.scatter(rule.nodes[:, 0], rule.nodes[:, 1], s=2)
 ax.set_xlim([-1, 1])
 ax.set_ylim([-1, 1])
 plt.show()
-````
+```
 
 ```{code-cell} python
 :tags: [remove-cell]
