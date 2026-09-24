@@ -79,6 +79,11 @@ exclude = [
     "docs/source/conf.py"
 ]
 
+[tool.ruff.lint.per-file-ignores]
+# Mathematical notation exception (see dev/style_guide.md)
+"docs/source/tutorials/**/*.ipynb" = ["N802", "N803", "N806", "N816"]
+"src/archimedes/approximation/**" = ["N802", "N806"]
+
 [tool.ruff.lint.isort]
 known-first-party = ["archimedes"]
 section-order = ["future", "standard-library", "third-party", "first-party", "local-folder"]
