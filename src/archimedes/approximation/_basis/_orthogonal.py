@@ -15,8 +15,11 @@ __all__ = ["OrthogonalPolynomialBasis"]
 
 @dataclasses.dataclass(frozen=True)
 class OrthogonalPolynomialBasis(Basis):
-    r"""Orthonormal polynomials :math:`\{p_0, p_1, \ldots, p_{n-1}\}` for
-    ``measure``, built entirely from ``measure.recurrence_coeffs``.
+    r"""A classical orthonormal polynomial basis
+
+    Orthonormal polynomials :math:`\{p_0, p_1, \ldots, p_{n-1}\}`, constructed
+    to be orthonormal with respect to a given measure (reference domain and inner
+    product weight).
 
     The monic polynomials orthogonal w.r.t. any :class:`~archimedes.measure.Measure`
     satisfy the three-term recurrence
@@ -24,53 +27,32 @@ class OrthogonalPolynomialBasis(Basis):
     .. math::
         \pi_{k+1}(x) = (x - \alpha_k) \, \pi_k(x) - \beta_k \, \pi_{k-1}(x)
 
-    which holds for *any* classical orthogonal polynomial family, and gives
-    a squared norm :math:`\int \pi_k^2 \, w \, dx = \beta_0 \beta_1 \cdots
-    \beta_k` (with :math:`\beta_0` = the total mass) as a cumulative product
-    of the same coefficients.
+    which holds for any classical orthogonal polynomial family. The squared norm
+    for the associated weight function :math:`w(x)` is
+    :math:`\int \pi_k^2 \, w \, dx = \beta_0 \beta_1 \cdots \beta_k`.
 
-    Basis functions are the resulting *orthonormal* polynomials
-    :math:`p_k = \pi_k / \sqrt{\beta_0 \cdots \beta_k}`, preferred over the
-    monic ones because monic polynomials shrink rapidly with degree (on
-    :math:`[-1, 1]`, degree-30 monic Legendre is :math:`O(10^{-8})`), a real
-    conditioning problem at higher degree, whereas orthonormal polynomials
-    stay :math:`O(1)` by construction. Note this differs from "classical"
-    normalizations such as ``scipy.special.eval_legendre``'s
-    (:math:`P_n(1) = 1`), which are family-specific conventions.
+    The basis functions are additionally normalized with
+    :math:`p_k = \pi_k / \sqrt{\beta_0 \cdots \beta_k}` for conditioning
+    at high polynomial degree.
 
-    Parameters
-    ----------
-    measure : Measure
-        Defines the orthogonality weight and reference domain.
-    n_basis : int
-        Number of basis functions (polynomial degrees ``0`` through
-        ``n_basis - 1``).
-    density : bool, optional
-        If ``True``, normalize against the *probability* density
-        ``measure.weight / measure.mass(...)`` instead of the raw weight --
-        i.e. use ``beta_0' = 1`` in place of ``beta_0' = mass(...)`` in the
-        norm above. See :attr:`Basis.density`. Default ``False``.
+    Supported measures include:
 
-    Notes
-    -----
-    Differentiating the recurrence ``deriv`` times (the :math:`\alpha_k`,
-    :math:`\beta_k` are constants in :math:`x`) gives a recurrence for
-    :math:`\pi_k^{(m)}` for every :math:`m \leq` ``deriv`` simultaneously:
+    - :class:`~archimedes.measure.LegendreMeasure`
+    - :class:`~archimedes.measure.JacobiMeasure` (also Chebyshev as a special case)
+    - :class:`~archimedes.measure.PhysicistsHermiteMeasure`
+    - :class:`~archimedes.measure.ProbabilistsHermiteMeasure`
+    - :class:`~archimedes.measure.LaguerreMeasure`
 
-    .. math::
-        \pi_{k+1}^{(m)}(x) = m \, \pi_k^{(m-1)}(x) + (x - \alpha_k) \,
-            \pi_k^{(m)}(x) - \beta_k \, \pi_{k-1}^{(m)}(x)
+    However, customized measures may be constructed by defining a domain and weight
+    function, with recursions computed automatically using the discretized Stieltjes
+    procedure. See the [documentation on quadrature](handbook/quadrature) for details.
 
-    Target-domain evaluation maps ``measure.recurrence_coeffs``' *reference*
-    coefficients via the same ``(scale, shift) = measure.affine_params(...)``
-    used by ``archimedes.quadrature``: :math:`\alpha' = \mathrm{scale}
-    \cdot \alpha + \mathrm{shift}`, :math:`\beta' = \mathrm{scale}^2 \cdot
-    \beta` except :math:`\beta_0' = \mathrm{measure.mass}(\ldots)` (the
-    total mass on the target domain/measure) -- so the resulting basis is
-    orthonormal on the *target* domain, not just the reference one.
+    An orthogonal polynomial basis can be constructed from any such custom measure,
+    with the basis functions defined automatically via the three-term recurrence.
     """
 
     measure: Measure
+    """Defines the orthogonality weight and reference domain."""
     n_basis: int
     density: bool = False
 
@@ -85,41 +67,18 @@ class OrthogonalPolynomialBasis(Basis):
 
     @property
     def Parameters(self) -> type:  # noqa: N802
-        """Delegates to the measure's ``ReferenceDomain`` -- ``a``/``b`` for
-        a :class:`~archimedes.measure.UnitInterval` (Legendre/Jacobi),
-        ``loc``/``scale`` for :class:`~archimedes.measure.RealLine`
-        (Hermite), ``rate``/``start`` for
-        :class:`~archimedes.measure.HalfLine` (Laguerre)."""
         return type(self.measure.domain).Parameters
 
     @property
     def _reference_scale_exponent(self) -> float:
-        """``0.5`` with the raw weight (``density=False``), ``0.0`` with
-        ``density=True`` -- the extra uniform power of ``scale`` this
-        family's normalization needs on top of the per-column chain-rule
-        factor, since the mass term contributes one power of ``scale``
-        unless ``density=True`` folds it out of the normalization
-        entirely."""
         return 0.0 if self.density else 0.5
 
     def _default_quadrature(self):
-        r"""Gauss rule of ``n_basis`` points for this basis's own measure.
-
-        A rule of :math:`n` Gauss points is exact to degree :math:`2n - 1`,
-        which covers the degree-:math:`2(n_\mathrm{basis} - 1)` mass-matrix
-        integrand (and the lower-degree stiffness one).
-        """
         from archimedes.quadrature import golub_welsch_rule
 
         return golub_welsch_rule(self.measure, self.n_basis)
 
     def _product_basis(self, other):
-        """Same measure, ``n_1 + n_2 - 1`` functions.
-
-        Both operands must be built on the same measure: the orthogonality
-        weight is what defines the family, so polynomials orthogonal under
-        different weights don't share a product space in this form.
-        """
         if not isinstance(other, OrthogonalPolynomialBasis):
             raise ValueError(
                 f"cannot form a product basis between "
@@ -140,17 +99,6 @@ class OrthogonalPolynomialBasis(Basis):
         )
 
     def _derivative_basis(self, deriv=1):
-        r"""Same measure and normalization, ``n_basis - deriv`` functions.
-
-        The measure is unchanged even for families whose classical
-        derivative identity shifts it (Jacobi's
-        :math:`\frac{d}{dx} P_n^{(\alpha,\beta)} \propto
-        P_{n-1}^{(\alpha+1,\beta+1)}`). That identity says the derivative
-        is a *single term* in the shifted family -- a sparsity statement --
-        but the span here is all of :math:`P_{n-1}` regardless of which
-        weight makes the basis orthogonal, so the derivative is exactly
-        representable in this same family as a dense combination.
-        """
         if deriv < 0:
             raise ValueError(f"deriv must be >= 0, got {deriv}")
         if deriv == 0:
@@ -159,21 +107,13 @@ class OrthogonalPolynomialBasis(Basis):
             raise ValueError(
                 f"deriv={deriv} is at or past the degree of a {self.n_basis}-"
                 f"function basis, whose elements are polynomials of degree "
-                f"{self.n_basis - 1}; the derivative is identically zero and "
-                f"has no space of its own. Use `f(x, deriv={deriv})` if the "
-                f"zero values are what you want."
+                f"{self.n_basis - 1}; the derivative is identically zero."
             )
         return OrthogonalPolynomialBasis(
             self.measure, self.n_basis - deriv, density=self.density
         )
 
     def _integral_basis(self, order=1):
-        """Same measure and normalization, ``n_basis + order`` functions.
-
-        Dual of differentiation: integrating raises the polynomial degree
-        by one per order rather than lowering it, so (unlike
-        differentiation) this is always defined.
-        """
         if order < 0:
             raise ValueError(f"order must be >= 0, got {order}")
         if order == 0:
