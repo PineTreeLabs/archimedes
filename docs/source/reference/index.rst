@@ -17,6 +17,7 @@ Modules
     :template: module.rst
     :recursive:
 
+    approximation
     measure
     observers
     optimize

@@ -386,7 +386,7 @@ def pem(
 
     Solves the system identification problem by minimizing the prediction
     error between model predictions and measured outputs using a Kalman
-    filter framework. This approach provides optimal handling of process
+    filter framework [1]_. This approach provides optimal handling of process
     and measurement noise while enabling efficient gradient computation
     through automatic differentiation.
 

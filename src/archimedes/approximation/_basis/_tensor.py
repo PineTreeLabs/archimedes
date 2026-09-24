@@ -1,0 +1,352 @@
+from __future__ import annotations
+
+import dataclasses
+from typing import Any
+
+import numpy as np
+
+from archimedes import tree
+from archimedes.measure import Measure, ReferenceDomain
+
+from ._base import RIGHT, Basis, _check_side
+
+__all__ = ["ProductParameters", "TensorBasis"]
+
+
+@tree.struct
+class ProductParameters(ReferenceDomain.Parameters):
+    """Target-domain parameters for a :class:`TensorBasis`
+
+    Represents a multi-dimensional domain as one
+    :class:`~archimedes.measure.ReferenceDomain.Parameters` per dimension.
+
+    Parameters
+    ----------
+    dims : tuple of ReferenceDomain.Parameters
+        One entry per dimension, in the same order as the basis factors.
+    """
+
+    dims: tuple = ()
+
+    def __post_init__(self):
+        dims = tuple(self.dims)
+        if not dims:
+            raise ValueError("ProductParameters needs at least one dimension")
+        for i, spec in enumerate(dims):
+            if not isinstance(spec, ReferenceDomain.Parameters):
+                raise TypeError(
+                    f"dims[{i}] must be a ReferenceDomain.Parameters, got "
+                    f"{type(spec).__name__}"
+                )
+        object.__setattr__(self, "dims", dims)
+
+
+# TODO: Is this redundant with quadrature._tensor._dim_args?
+def _dim_kwargs(basis: Basis, spec: Any) -> dict:
+    """Normalize  domain parameters into keyword arguments for ``basis.evaluate``."""
+    if spec is None:
+        return {}
+    if isinstance(spec, ReferenceDomain.Parameters):
+        return {f.name: getattr(spec, f.name) for f in tree.fields(spec)}  # type: ignore[arg-type]
+    if isinstance(spec, dict):
+        return dict(spec)
+    if isinstance(spec, (tuple, list)):
+        names = [f.name for f in dataclasses.fields(basis.Parameters)]
+        if len(spec) > len(names):
+            raise ValueError(
+                f"got {len(spec)} positional domain parameters for "
+                f"{basis.Parameters.__qualname__}, which takes {len(names)}"
+            )
+        return dict(zip(names, spec))
+    raise TypeError(
+        f"per-dimension parameters must be None, a ReferenceDomain.Parameters, "
+        f"a tuple of positional arguments, or a dict of keyword arguments; "
+        f"got {type(spec).__name__}"
+    )
+
+
+class _DimensionView:
+    """One dimension of a tensor rule, presented as a 1-D quadrature rule."""
+
+    def __init__(self, rule, dim: int):
+        self._rule = rule
+        self._dim = dim
+
+    @property
+    def breakpoints(self):
+        return self._rule.breakpoints[self._dim]
+
+    @property
+    def elements(self):
+        elements = self._rule.elements
+        return None if elements is None else elements[:, self._dim]
+
+    @property
+    def nodes(self):
+        return self._rule.nodes[:, self._dim]
+
+
+def _row_kron(mats: list[np.ndarray]) -> np.ndarray:
+    """Row-wise Kronecker (Khatri-Rao) product of design matrices.
+
+    Given ``(npts, p)`` and ``(npts, q)``, returns ``(npts, p * q)`` with
+    ``out[:, i * q + j] = a[:, i] * b[:, j]``. The first factor varies
+    slowest, matching C order and ``TensorQuadratureRule`` node ordering.
+
+    Built column by column rather than as ``a[:, :, None] * b[:, None, :]``,
+    since ``SymbolicArray`` supports no more than two dimensions.
+    """
+    out = mats[0]
+    for phi in mats[1:]:
+        p, q = np.shape(out)[1], np.shape(phi)[1]
+        cols = [out[:, i] * phi[:, j] for i in range(p) for j in range(q)]
+        out = np.stack(cols, axis=-1)
+    return out
+
+
+@dataclasses.dataclass(frozen=True)
+class TensorBasis(Basis):
+    r"""Tensor product of univariate bases, one per dimension.
+
+    The basis functions are all products of one factor from each dimension,
+
+    .. math::
+        \Phi_{(i_1, \ldots, i_d)}(\mathbf{x}) = \phi^{(1)}_{i_1}(x_1) \cdots
+            \phi^{(d)}_{i_d}(x_d),
+
+    The number of basis functions ``n_basis`` is the product of ``n_basis``
+    for each factor. A :class:`Function` on this basis spans the full
+    ``(n_1, ..., n_d)`` coefficient array.
+
+    The multi-index is flattened in C order, with last dimension varying
+    fastest (the default of ``np.ravel_multi_index``). This matches the node
+    ordering of :class:`~archimedes.quadrature.TensorQuadratureRule`.
+    As a result, ``coefficients.reshape(n_1, ..., n_d)`` recovers the natural
+    array layout.
+
+    **Derivatives are multi-indices.** In more than one dimension "the
+    derivative" is ambiguous, so ``deriv`` is a tuple specifying the order in
+    each variable. For example, ``deriv=(1, 0)`` specifies :math:`\partial_x`
+    and ``deriv=(1, 1)`` specifies :math:`\partial_x \partial_y`. The scalar
+    ``0`` is accepted as shorthand for no derivative at all; any other integer
+    is rejected as ambiguous.
+
+    **Factors must be univariate.** Tensor products are associative, so
+    nesting adds no expressive power; write ``TensorBasis((a, b, c))``
+    rather than ``TensorBasis((a, TensorBasis((b, c))))``.
+
+    This class is typically not used directly; instead a set of
+    :class:`FunctionSpace` factors can be constructed and combined using
+    the :meth:`FunctionSpace.tensor` constructor, which internally creates
+    an instance of this class.
+
+    See Also
+    --------
+    archimedes.quadrature.tensor_quad : The matching quadrature construction.
+    FunctionSpace.tensor : Construct a tensor product of multiple function spaces,
+        which internally creates a :class:`TensorBasis` instance.
+    """
+
+    bases: tuple[Basis, ...]
+    """The factors comprising this tensor basis.
+    
+    One univariate basis per dimension, in order. The families may
+    differ, and so may their reference domains. All factors must have the
+    same value of ``density`` since quadrature weights are normalized
+    (or not) for the product measure as a whole.
+    """
+
+    def __post_init__(self):
+        bases = tuple(self.bases)
+        if len(bases) < 1:
+            raise ValueError("a tensor basis needs at least one dimension")
+        for i, basis in enumerate(bases):
+            if not isinstance(basis, Basis):
+                raise TypeError(
+                    f"bases[{i}] must be a Basis, got {type(basis).__name__}"
+                )
+            if basis.ndim != 1:
+                raise ValueError(
+                    f"bases[{i}] is {basis.ndim}-dimensional; tensor factors "
+                    f"must be univariate (tensor products are associative, so "
+                    f"flatten rather than nest)"
+                )
+        if len({basis.density for basis in bases}) > 1:
+            raise ValueError(
+                "all tensor factors must agree on `density`, since quadrature "
+                "weights are normalized for the product measure as a whole; got "
+                f"{[basis.density for basis in bases]}"
+            )
+        object.__setattr__(self, "bases", bases)
+
+    @property
+    def ndim(self) -> int:
+        return len(self.bases)
+
+    @property
+    def n_basis(self) -> int:
+        return int(np.prod([basis.n_basis for basis in self.bases]))
+
+    @property
+    def shape(self) -> tuple[int, ...]:
+        """Per-dimension sizes, so ``coefficients.reshape(basis.shape)``
+        gives the natural multi-index array."""
+        return tuple(basis.n_basis for basis in self.bases)
+
+    @property
+    def density(self) -> bool:
+        return self.bases[0].density
+
+    @property
+    def _measures(self) -> tuple[Measure | None, ...]:
+        # The per-dimension orthogonality weights. The dimensions
+        # are independent and may use different families.
+        return sum((basis._measures for basis in self.bases), ())
+
+    @property
+    def Parameters(self) -> type[ProductParameters]:
+        return ProductParameters
+
+    @property
+    def _required_breakpoints(self) -> tuple:
+        """Per-dimension breakpoints, one entry per dimension."""
+        return tuple(basis._required_breakpoints for basis in self.bases)
+
+    def _default_quadrature(self):
+        """The tensor product of the default rules for each factor."""
+        from archimedes.quadrature import tensor_quad
+
+        return tensor_quad(*[basis._default_quadrature() for basis in self.bases])
+
+    def _product_basis(self, other):
+        """Tensor basis of the product bases of the factors."""
+        if not isinstance(other, TensorBasis):
+            raise ValueError(
+                f"cannot form a product basis between "
+                f"{type(self).__name__} and {type(other).__name__}"
+            )
+        if self.ndim != other.ndim:
+            raise ValueError(
+                f"product requires the same number of dimensions, got "
+                f"{self.ndim} and {other.ndim}"
+            )
+        return TensorBasis(
+            tuple(a._product_basis(b) for a, b in zip(self.bases, other.bases))
+        )
+
+    def _derivative_basis(self, deriv=1):
+        """Tensor basis of the derivative bases of the factors."""
+        alpha = self._multi_index(deriv)
+        derived = []
+        for d, (basis, order) in enumerate(zip(self.bases, alpha)):
+            try:
+                derived.append(basis._derivative_basis(order))
+            except ValueError as exc:
+                # Name the dimension; the factor only knows its own size.
+                raise ValueError(f"in dimension {d}: {exc}") from exc
+        return TensorBasis(tuple(derived))
+
+    def _multi_index(self, deriv) -> tuple[int, ...]:
+        """Normalize ``deriv`` into a length-``ndim`` multi-index."""
+        if isinstance(deriv, (int, np.integer)):
+            if deriv == 0:
+                return (0,) * self.ndim
+            raise ValueError(
+                f"deriv must be a multi-index (one order per dimension) for a "
+                f"{self.ndim}-dimensional basis, got {deriv}; use e.g. "
+                f"{(1,) + (0,) * (self.ndim - 1)} for the first partial "
+                f"derivative. Only the scalar 0 is accepted as shorthand."
+            )
+        alpha = tuple(int(order) for order in deriv)
+        if len(alpha) != self.ndim:
+            raise ValueError(
+                f"deriv must have one entry per dimension, got {len(alpha)} "
+                f"for a {self.ndim}-dimensional basis"
+            )
+        if any(order < 0 for order in alpha):
+            raise ValueError(f"deriv orders must be >= 0, got {alpha}")
+        return alpha
+
+    def _side_specs(self, side) -> tuple:
+        """Normalize ``side`` into one entry per dimension."""
+        if isinstance(side, str):
+            return (_check_side(side),) * self.ndim
+        specs = tuple(side)
+        if len(specs) != self.ndim:
+            raise ValueError(
+                f"side must have one entry per dimension, got {len(specs)} "
+                f"for a {self.ndim}-dimensional basis"
+            )
+        return tuple(_check_side(entry) for entry in specs)
+
+    def _dim_specs(self, dims) -> tuple:
+        if dims is None:
+            return (None,) * self.ndim
+        specs = tuple(dims)
+        if len(specs) != self.ndim:
+            raise ValueError(
+                f"expected {self.ndim} per-dimension parameters, got {len(specs)}"
+            )
+        return specs
+
+    # Explicit domain parameters narrow the base's `**domain_kwargs`, which
+    # mypy reports as an incompatible override.
+    def evaluate(self, x, deriv=0, *, dims=None, side=RIGHT):  # type: ignore[override]
+        """Evaluate all ``n_basis`` product functions at ``x``.
+
+        Parameters
+        ----------
+        x : array_like
+            Evaluation points, shape ``(npts, ndim)`` with one row per point and
+            one column per dimension.
+        deriv : tuple of int, optional
+            Multi-index of derivative orders, one per dimension. The scalar
+            ``0`` (the default) means no derivative.
+        dims : sequence, optional
+            Per-dimension target-domain parameters.
+        side : str or sequence of str, optional
+            One-sided limit per dimension, where a factor is two-valued. A
+            bare string broadcasts to every dimension. Default ``"right"``.
+
+        Returns
+        -------
+        phi : ndarray
+            Shape ``(npts, n_basis)``, with the multi-index flattened in C order.
+        """
+        alpha = self._multi_index(deriv)
+        specs = self._dim_specs(dims)
+        sides = self._side_specs(side)
+
+        shape = np.shape(x)
+        if len(shape) != 2 or shape[1] != self.ndim:
+            raise ValueError(
+                f"x must have shape (npts, {self.ndim}) for a {self.ndim}-"
+                f"dimensional basis, got {shape}"
+            )
+
+        return _row_kron(
+            [
+                basis.evaluate(
+                    x[:, d],
+                    deriv=alpha[d],
+                    side=sides[d],
+                    **_dim_kwargs(basis, spec),
+                )
+                for d, (basis, spec) in enumerate(zip(self.bases, specs))
+            ]
+        )
+
+    # Explicit domain parameters narrow the base's `**domain_kwargs`, which
+    # mypy reports as an incompatible override.
+    def _evaluate_at_nodes(self, rule, deriv=0, *, dims=None):  # type: ignore[override]
+        """Per-dimension evaluation at the rule's nodes."""
+        alpha = self._multi_index(deriv)
+        specs = self._dim_specs(dims)
+        return _row_kron(
+            [
+                basis._evaluate_at_nodes(
+                    _DimensionView(rule, d), deriv=alpha[d], **_dim_kwargs(basis, spec)
+                )
+                for d, (basis, spec) in enumerate(zip(self.bases, specs))
+            ]
+        )

@@ -114,10 +114,12 @@ Documentation
 
 .. toctree::
    :maxdepth: 1
-   :caption: Reference
+   :caption: Handbook
 
    gotchas
    reference/index
+   handbook/quadrature
+   handbook/approximation
 
 .. toctree::
    :maxdepth: 1

@@ -244,3 +244,39 @@ h1:has(.hidden-title) {
     margin-top: 0.5rem;
     margin-bottom: 0.5rem;
 }
+
+/* Shrink page titles on generated API reference pages (function/class/method/
+   attribute/property), whose titles are fully-qualified dotted names and can
+   easily exceed the default 2.5em heading size, wrapping badly. Scoped via
+   the object-description block that always immediately follows the title on
+   these pages, so ordinary prose/module-index pages are unaffected. */
+section:has(> dl.py) > h1 {
+    font-size: 1.5em;
+    overflow-wrap: anywhere;
+}
+/* Breadcrumb trail above page content (see _templates/page.html) */
+.breadcrumbs {
+    font-size: var(--font-size--small);
+    color: var(--color-foreground-secondary);
+    padding-top: 0.5rem;
+    margin-bottom: 1rem;
+    overflow-wrap: anywhere;
+}
+
+.breadcrumbs a {
+    color: inherit;
+    text-decoration: none;
+}
+
+.breadcrumbs a:hover {
+    color: var(--color-link-hover);
+    text-decoration: underline;
+}
+
+.breadcrumbs-sep {
+    margin: 0 0.35em;
+}
+
+.breadcrumbs-current {
+    color: var(--color-foreground-primary);
+}

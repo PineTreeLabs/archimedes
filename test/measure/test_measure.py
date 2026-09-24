@@ -1,14 +1,20 @@
 import numpy as np
 import pytest
+from scipy.integrate import quad
 from scipy.special import beta as beta_fn
 
 from archimedes import tree
 from archimedes.measure import (
-    HermiteMeasure,
-    HermiteNormMeasure,
+    HalfLine,
     JacobiMeasure,
     LaguerreMeasure,
     LegendreMeasure,
+    Measure,
+    PhysicistsHermiteMeasure,
+    ProbabilistsHermiteMeasure,
+    RealLine,
+    UnitInterval,
+    stieltjes_recurrence,
 )
 
 # -- Measure implementations --
@@ -17,6 +23,7 @@ from archimedes.measure import (
 def test_legendre_measure():
     measure = LegendreMeasure()
     assert measure.uniform_weight is True
+    assert measure.affine_invariant is True
     assert measure.support == (-1.0, 1.0)
     np.testing.assert_array_equal(measure.weight(np.array([-0.5, 0.5])), [1.0, 1.0])
     assert measure.reference_mass == 2.0
@@ -40,6 +47,7 @@ def test_jacobi_measure_invalid_parameters(alpha, beta):
 def test_jacobi_measure_weight_and_shared_affine_params():
     measure = JacobiMeasure(alpha=1.0, beta=2.0)
     assert measure.uniform_weight is False
+    assert measure.affine_invariant is True
     assert measure.support == (-1.0, 1.0)
 
     x = np.array([0.0, 0.5])
@@ -56,6 +64,7 @@ def test_jacobi_measure_weight_and_shared_affine_params():
 def test_laguerre_measure():
     measure = LaguerreMeasure()
     assert measure.uniform_weight is False
+    assert measure.affine_invariant is True
     assert measure.support == (0.0, np.inf)
     np.testing.assert_allclose(
         measure.weight(np.array([0.0, 1.0])), [1.0, np.exp(-1.0)]
@@ -78,8 +87,9 @@ def test_laguerre_measure():
 
 
 def test_hermite_measure():
-    measure = HermiteMeasure()
+    measure = PhysicistsHermiteMeasure()
     assert measure.uniform_weight is False
+    assert measure.affine_invariant is True
     assert measure.support == (-np.inf, np.inf)
     np.testing.assert_allclose(
         measure.weight(np.array([0.0, 1.0])), [1.0, np.exp(-1.0)]
@@ -88,24 +98,24 @@ def test_hermite_measure():
 
     assert measure.affine_params() == (1.0, 0.0)
 
-    scale, shift = measure.affine_params(mean=1.0, std=2.0)
+    scale, shift = measure.affine_params(loc=1.0, scale=2.0)
     assert np.isclose(scale, 2.0)
     assert np.isclose(shift, 1.0)
 
-    # std defaults to 1.0 when only mean is given
-    scale, shift = measure.affine_params(mean=1.0)
+    # scale defaults to 1.0 when only loc is given
+    scale, shift = measure.affine_params(loc=1.0)
     assert np.isclose(scale, 1.0)
     assert np.isclose(shift, 1.0)
 
     with pytest.raises(ValueError):
-        measure.affine_params(std=-1.0)
+        measure.affine_params(scale=-1.0)
 
 
-# -- Measure.Parameters structs --
+# -- ReferenceDomain.Parameters structs --
 
 
 def test_legendre_parameters_flatten_and_replace():
-    params = LegendreMeasure.Parameters(a=0.0, b=2.0)
+    params = UnitInterval.Parameters(a=0.0, b=2.0)
     assert params.a == 0.0
     assert params.b == 2.0
     assert tree.is_struct(params)
@@ -119,56 +129,91 @@ def test_legendre_parameters_flatten_and_replace():
 
 
 def test_legendre_parameters_defaults_and_validation():
-    identity = LegendreMeasure.Parameters()
+    identity = UnitInterval.Parameters()
     assert identity.a is None
     assert identity.b is None
 
     with pytest.raises(ValueError):
-        LegendreMeasure.Parameters(a=0.0)
+        UnitInterval.Parameters(a=0.0)
     with pytest.raises(ValueError):
-        LegendreMeasure.Parameters(b=1.0)
+        UnitInterval.Parameters(b=1.0)
     with pytest.raises(ValueError):
-        LegendreMeasure.Parameters(a=-np.inf, b=1.0)
+        UnitInterval.Parameters(a=-np.inf, b=1.0)
 
 
-def test_jacobi_parameters_shares_legendre_parameters_type():
-    # Jacobi doesn't override affine_params, so it shares Legendre's Parameters
-    assert JacobiMeasure.Parameters is LegendreMeasure.Parameters
+def test_families_sharing_a_domain_share_its_parameters_type():
+    # Legendre and Jacobi differ only in weight, not domain, so both are
+    # UnitInterval -- as are both Hermite conventions on RealLine. The
+    # parameters belong to the domain, so sharing one means sharing them.
+    assert type(JacobiMeasure(alpha=1.0, beta=2.0).domain) is UnitInterval
+    assert type(LegendreMeasure().domain) is UnitInterval
+    assert type(PhysicistsHermiteMeasure().domain) is RealLine
+    assert type(ProbabilistsHermiteMeasure().domain) is RealLine
+    assert type(LaguerreMeasure().domain) is HalfLine
 
 
 def test_laguerre_parameters_defaults_and_validation():
-    identity = LaguerreMeasure.Parameters()
+    identity = HalfLine.Parameters()
     assert identity.rate == 1.0
     assert identity.start == 0.0
 
-    params = LaguerreMeasure.Parameters(rate=2.0, start=1.0)
+    params = HalfLine.Parameters(rate=2.0, start=1.0)
     assert tree.is_struct(params)
     flat, _ = tree.flatten(params)
     assert flat == [2.0, 1.0]
 
     with pytest.raises(ValueError):
-        LaguerreMeasure.Parameters(rate=-1.0)
+        HalfLine.Parameters(rate=-1.0)
 
 
-@pytest.mark.parametrize("measure_cls", [HermiteMeasure, HermiteNormMeasure])
-def test_hermite_parameters_defaults_and_validation(measure_cls):
-    identity = measure_cls.Parameters()
-    assert identity.mean == 0.0
-    assert identity.std == 1.0
+@pytest.mark.parametrize("domain_cls", [RealLine])
+def test_hermite_parameters_defaults_and_validation(domain_cls):
+    identity = domain_cls.Parameters()
+    assert identity.loc == 0.0
+    assert identity.scale == 1.0
 
-    params = measure_cls.Parameters(mean=1.0, std=2.0)
+    params = domain_cls.Parameters(loc=1.0, scale=2.0)
     assert tree.is_struct(params)
     flat, _ = tree.flatten(params)
     assert flat == [1.0, 2.0]
 
     with pytest.raises(ValueError):
-        measure_cls.Parameters(std=-1.0)
+        domain_cls.Parameters(scale=-1.0)
+
+
+def test_unit_interval_resolve_params_matches_affine_params():
+    domain = UnitInterval()
+    assert domain.resolve_params() == UnitInterval.Parameters(None, None)
+    assert domain.resolve_params(0.0, 2.0) == UnitInterval.Parameters(0.0, 2.0)
+    assert domain.affine_params(0.0, 2.0) == LegendreMeasure().affine_params(0.0, 2.0)
+
+
+def test_half_line_resolve_params_matches_affine_params():
+    domain = HalfLine()
+    assert domain.resolve_params() == HalfLine.Parameters(rate=1.0, start=0.0)
+    assert domain.resolve_params(rate=2.0) == HalfLine.Parameters(rate=2.0, start=0.0)
+    assert domain.resolve_params(start=1.0) == HalfLine.Parameters(rate=1.0, start=1.0)
+    scale, shift = domain.affine_params(rate=2.0, start=1.0)
+    params = domain.resolve_params(rate=2.0, start=1.0)
+    assert (scale, shift) == (1.0 / params.rate, params.start)
+
+
+def test_real_line_resolve_params_matches_affine_params():
+    domain = RealLine()
+    assert domain.resolve_params() == RealLine.Parameters(loc=0.0, scale=1.0)
+    assert domain.resolve_params(loc=1.0) == RealLine.Parameters(loc=1.0, scale=1.0)
+    assert domain.resolve_params(scale=2.0) == RealLine.Parameters(loc=0.0, scale=2.0)
+    scale, shift = domain.affine_params(loc=1.0, scale=2.0)
+    params = domain.resolve_params(loc=1.0, scale=2.0)
+    assert (scale, shift) == (params.scale, params.loc)
 
 
 def test_measure_mass_reference_domain():
     # mass() with no args is just reference_mass (scale == 1)
     assert LegendreMeasure().mass() == LegendreMeasure().reference_mass
-    assert HermiteMeasure().mass() == HermiteMeasure().reference_mass
+    assert (
+        PhysicistsHermiteMeasure().mass() == PhysicistsHermiteMeasure().reference_mass
+    )
     assert LaguerreMeasure().mass() == LaguerreMeasure().reference_mass
 
 
@@ -176,9 +221,9 @@ def test_measure_mass_mapped_domain():
     # Legendre: mapping [-1, 1] (mass 2) onto [0, 4] (width 4) scales mass by 2
     assert LegendreMeasure().mass(0.0, 4.0) == 4.0
 
-    # Hermite (prob.): mass scales by std, matching the affine Jacobian
-    measure = HermiteNormMeasure()
-    assert np.isclose(measure.mass(mean=1.0, std=2.0), 2.0 * measure.reference_mass)
+    # Hermite (prob.): mass scales by scale, matching the affine Jacobian
+    measure = ProbabilistsHermiteMeasure()
+    assert np.isclose(measure.mass(loc=1.0, scale=2.0), 2.0 * measure.reference_mass)
 
     # mass() is exactly what scaled_weights(density=True) divides by
     measure = LaguerreMeasure()
@@ -186,16 +231,163 @@ def test_measure_mass_mapped_domain():
     assert np.isclose(measure.mass(rate=2.0), scale * measure.reference_mass)
 
 
-def test_hermite_and_hermitenorm_parameters_are_distinct_types():
-    # Same field shape, but kept as separate types since the measures are
-    # separate (mirrors HermiteMeasure vs. HermiteNormMeasure not sharing an
-    # `affine_params` implementation).
-    assert HermiteMeasure.Parameters is not HermiteNormMeasure.Parameters
+# -- Measure.__call__ --
+
+
+def test_call_with_no_params_matches_weight():
+    x = np.array([-0.5, 0.0, 0.5])
+    measure = LegendreMeasure()
+    np.testing.assert_array_equal(measure(x), measure.weight(x))
+
+
+def test_call_defaults_to_unnormalized():
+    # density=False (the default) is the *raw* weight, not divided by mass --
+    # matching QuadratureRule.integrate/sum's own density=False default,
+    # since that's what a quadrature rule built on this measure actually
+    # integrates against.
+    a, b = 0.0, 4.0
+    x = np.array([1.0, 2.0, 3.0])
+    measure = LegendreMeasure()
+    np.testing.assert_array_equal(measure(x, a, b), measure(x, a, b, density=False))
+    # Legendre's weight is uniform (1), so the raw call is just that
+    # constant, not 1/mass.
+    np.testing.assert_array_equal(measure(x, a, b), np.ones_like(x))
+
+
+def test_call_inverts_affine_params_correctly():
+    # Regression case for a bug caught in practice: naively swapping
+    # (x - scale) / shift for (x - shift) / scale is invisible whenever
+    # a == 0 makes scale == shift by coincidence, so check with a != 0.
+    a, b = -3.0, 8.5
+    measure = JacobiMeasure(alpha=1.0, beta=2.0)
+    scale, shift = measure.affine_params(a, b)
+    x = np.array([-2.0, 0.0, 5.0])
+    expected = measure.weight((x - shift) / scale)
+    np.testing.assert_allclose(measure(x, a, b), expected)
+
+
+def test_call_density_integrates_to_one():
+    a, b = -3.0, 8.5
+    measure = JacobiMeasure(alpha=1.0, beta=2.0)
+
+    def rho(x):
+        return measure(x, a, b, density=True)
+
+    result, _ = quad(rho, a, b)
+    assert np.isclose(result, 1.0)
+
+
+@pytest.mark.parametrize(
+    "measure,kwparams,bounds",
+    [
+        (LaguerreMeasure(), {"rate": 2.0, "start": 1.0}, (1.0, np.inf)),
+        (ProbabilistsHermiteMeasure(), {"loc": 1.0, "scale": 2.0}, (-np.inf, np.inf)),
+    ],
+)
+def test_call_density_integrates_to_one_infinite_domains(measure, kwparams, bounds):
+    def rho(x):
+        return measure(x, **kwparams, density=True)
+
+    result, _ = quad(rho, *bounds)
+    assert np.isclose(result, 1.0, atol=1e-6)
+
+
+def test_call_raises_for_non_affine_invariant_measure_with_args():
+    measure = _StieltjesLegendre()
+    # No arguments is always allowed, regardless of affine_invariant.
+    np.testing.assert_array_equal(
+        measure(np.array([0.0])), measure.weight(np.array([0.0]))
+    )
+    with pytest.raises(ValueError, match="affine_invariant"):
+        measure(np.array([0.0]), 0.0, 1.0)
+
+
+def test_hermite_and_hermitenorm_share_a_domain_parameters_type():
+    # These were separate types before the domain refactor. They're now one:
+    # both measures live on the same location-scaled RealLine and had
+    # byte-identical affine_params. Only the *weight* differs (and hence the
+    # interpretation of `scale` relative to it -- see the measure docstrings),
+    # which is a Measure concern, not a domain one.
+    assert (
+        PhysicistsHermiteMeasure().domain.Parameters
+        is ProbabilistsHermiteMeasure().domain.Parameters
+    )
+
+
+# -- recurrence_coeffs --
+
+
+def test_legendre_recurrence_coeffs():
+    measure = LegendreMeasure()
+    alpha, beta = measure.recurrence_coeffs(4)
+    np.testing.assert_array_equal(alpha, [0.0, 0.0, 0.0, 0.0])
+    assert beta[0] == measure.reference_mass == 2.0
+    np.testing.assert_allclose(beta[1:], [1 / 3, 4 / 15, 9 / 35])
+
+
+@pytest.mark.parametrize(
+    "alpha,beta,expected_beta1",
+    [
+        (0.0, 0.0, 1 / 3),  # Legendre special case
+        (-0.5, -0.5, 0.5),  # Chebyshev 1st kind
+        (0.5, 0.5, 0.25),  # Chebyshev 2nd kind
+        (1.0, 2.0, 0.16),  # generic asymmetric
+    ],
+)
+def test_jacobi_recurrence_coeffs(alpha, beta, expected_beta1):
+    measure = JacobiMeasure(alpha=alpha, beta=beta)
+    a, b = measure.recurrence_coeffs(5)
+    assert b[0] == measure.reference_mass
+    assert np.isclose(b[1], expected_beta1)
+
+    # alpha_0 = (beta - alpha) / (alpha + beta + 2), directly from the
+    # (simplified) closed form -- not the k >= 1 general formula
+    assert np.isclose(a[0], (beta - alpha) / (alpha + beta + 2))
+
+
+def test_jacobi_recurrence_coeffs_matches_legendre():
+    # Legendre is the alpha=beta=0 special case of Jacobi
+    jacobi_a, jacobi_b = JacobiMeasure(alpha=0.0, beta=0.0).recurrence_coeffs(5)
+    legendre_a, legendre_b = LegendreMeasure().recurrence_coeffs(5)
+    np.testing.assert_allclose(jacobi_a, legendre_a)
+    np.testing.assert_allclose(jacobi_b, legendre_b)
+
+
+def test_jacobi_recurrence_coeffs_chebyshev_first_kind():
+    # Known monic recurrence for Chebyshev T: alpha_k = 0, beta_1 = 1/2,
+    # beta_k = 1/4 for k >= 2
+    _, beta = JacobiMeasure(alpha=-0.5, beta=-0.5).recurrence_coeffs(5)
+    np.testing.assert_allclose(beta[2:], [0.25, 0.25, 0.25])
+
+
+def test_laguerre_recurrence_coeffs():
+    measure = LaguerreMeasure()
+    alpha, beta = measure.recurrence_coeffs(4)
+    np.testing.assert_array_equal(alpha, [1.0, 3.0, 5.0, 7.0])
+    assert beta[0] == measure.reference_mass == 1.0
+    np.testing.assert_array_equal(beta[1:], [1.0, 4.0, 9.0])
+
+
+def test_hermite_recurrence_coeffs():
+    measure = PhysicistsHermiteMeasure()
+    alpha, beta = measure.recurrence_coeffs(4)
+    np.testing.assert_array_equal(alpha, [0.0, 0.0, 0.0, 0.0])
+    assert beta[0] == measure.reference_mass
+    np.testing.assert_array_equal(beta[1:], [0.5, 1.0, 1.5])
+
+
+def test_hermite_norm_recurrence_coeffs():
+    measure = ProbabilistsHermiteMeasure()
+    alpha, beta = measure.recurrence_coeffs(4)
+    np.testing.assert_array_equal(alpha, [0.0, 0.0, 0.0, 0.0])
+    assert beta[0] == measure.reference_mass
+    np.testing.assert_array_equal(beta[1:], [1.0, 2.0, 3.0])
 
 
 def test_hermite_norm_measure():
-    measure = HermiteNormMeasure()
+    measure = ProbabilistsHermiteMeasure()
     assert measure.uniform_weight is False
+    assert measure.affine_invariant is True
     assert measure.support == (-np.inf, np.inf)
     np.testing.assert_allclose(
         measure.weight(np.array([0.0, 1.0])), [1.0, np.exp(-0.5)]
@@ -204,14 +396,176 @@ def test_hermite_norm_measure():
 
     assert measure.affine_params() == (1.0, 0.0)
 
-    scale, shift = measure.affine_params(mean=1.0, std=2.0)
+    scale, shift = measure.affine_params(loc=1.0, scale=2.0)
     assert np.isclose(scale, 2.0)
     assert np.isclose(shift, 1.0)
 
-    # std defaults to 1.0 when only mean is given
-    scale, shift = measure.affine_params(mean=1.0)
+    # scale defaults to 1.0 when only loc is given
+    scale, shift = measure.affine_params(loc=1.0)
     assert np.isclose(scale, 1.0)
     assert np.isclose(shift, 1.0)
 
     with pytest.raises(ValueError):
-        measure.affine_params(std=-1.0)
+        measure.affine_params(scale=-1.0)
+
+
+# -- stieltjes_recurrence (discretized Stieltjes fallback) --
+
+
+@pytest.mark.parametrize(
+    "measure",
+    [LegendreMeasure(), LaguerreMeasure(), PhysicistsHermiteMeasure()],
+)
+@pytest.mark.parametrize("n", [1, 2, 3, 5, 8, 10])
+def test_stieltjes_recurrence_matches_closed_form(measure, n):
+    alpha, beta = stieltjes_recurrence(measure.weight, measure.support, n)
+    expected_alpha, expected_beta = measure.recurrence_coeffs(n)
+    np.testing.assert_allclose(alpha, expected_alpha, atol=1e-8)
+    np.testing.assert_allclose(beta, expected_beta, atol=1e-8)
+
+
+@pytest.mark.parametrize("n", [1, 2, 3, 5])
+def test_stieltjes_recurrence_matches_jacobi(n):
+    # Endpoint-singular weight, so accuracy degrades sooner than the
+    # smooth/bounded families above -- stay well clear of that regime.
+    measure = JacobiMeasure(alpha=1.5, beta=0.5)
+    alpha, beta = stieltjes_recurrence(measure.weight, measure.support, n)
+    expected_alpha, expected_beta = measure.recurrence_coeffs(n)
+    np.testing.assert_allclose(alpha, expected_alpha, atol=1e-6)
+    np.testing.assert_allclose(beta, expected_beta, atol=1e-6)
+
+
+def test_stieltjes_recurrence_shape_and_zeroth_moment():
+    measure = LegendreMeasure()
+    n = 6
+    alpha, beta = stieltjes_recurrence(measure.weight, measure.support, n)
+    assert alpha.shape == (n,)
+    assert beta.shape == (n,)
+
+    # The standalone function's beta[0] is its own quadrature estimate of
+    # the zeroth moment, not (necessarily) an exact reference_mass.
+    expected, _ = quad(measure.weight, *measure.support)
+    assert np.isclose(beta[0], expected)
+
+
+# -- Measure.recurrence_coeffs default (Stieltjes fallback wiring) --
+
+
+class _StieltjesLegendre(Measure):
+    """Minimal custom Measure: no recurrence_coeffs override, so it relies
+    entirely on the base class's discretized Stieltjes fallback. Overrides
+    ``reference_mass`` (exactly, unlike the base class's quadrature-based
+    default) to isolate that fallback from the one under test below."""
+
+    domain = UnitInterval()
+
+    def weight(self, x):
+        return np.ones_like(x)
+
+    @property
+    def reference_mass(self):
+        return 2.0
+
+
+def test_stieltjes_fallback_measure_defaults_affine_invariant_false():
+    # A custom Measure relying on the generic Stieltjes-based
+    # recurrence_coeffs fallback hasn't proven itself affine-closed, so
+    # `affine_invariant` must default False rather than inheriting `True`.
+    assert _StieltjesLegendre().affine_invariant is False
+
+
+def test_measure_default_recurrence_coeffs_matches_legendre():
+    measure = _StieltjesLegendre()
+    alpha, beta = measure.recurrence_coeffs(8)
+    expected_alpha, expected_beta = LegendreMeasure().recurrence_coeffs(8)
+    np.testing.assert_allclose(alpha, expected_alpha, atol=1e-8)
+    np.testing.assert_allclose(beta, expected_beta, atol=1e-8)
+
+
+def test_measure_default_recurrence_coeffs_uses_reference_mass():
+    # beta[0] comes from reference_mass, not the internal quadrature
+    # estimate of the zeroth moment -- exact here since reference_mass is
+    # exact, even though the estimate would only be approximate.
+    measure = _StieltjesLegendre()
+    _, beta = measure.recurrence_coeffs(5)
+    assert beta[0] == 2.0
+
+
+def test_measure_is_not_directly_instantiable():
+    with pytest.raises(TypeError):
+        Measure()
+
+
+# -- Measure.reference_mass default (quadrature, cached) --
+
+
+class _CountingLegendre(Measure):
+    """Minimal custom Measure: neither ``reference_mass`` nor
+    ``recurrence_coeffs`` is overridden, so both fall back to their
+    quadrature-based defaults. Counts ``weight`` calls to probe caching."""
+
+    domain = UnitInterval()
+
+    def __init__(self):
+        self.weight_calls = 0
+
+    def weight(self, x):
+        self.weight_calls += 1
+        return np.ones_like(x)
+
+
+def test_measure_default_reference_mass_matches_closed_form():
+    measure = _CountingLegendre()
+    assert np.isclose(measure.reference_mass, LegendreMeasure().reference_mass)
+
+
+def test_measure_default_reference_mass_is_cached():
+    measure = _CountingLegendre()
+    assert measure.weight_calls == 0
+
+    assert measure.reference_mass == measure.reference_mass
+    calls_after_two_accesses = measure.weight_calls
+    assert calls_after_two_accesses > 0
+
+    measure.reference_mass
+    assert measure.weight_calls == calls_after_two_accesses
+
+
+def test_measure_fully_automatic_recurrence_coeffs_matches_legendre():
+    # Only weight + domain defined -- reference_mass and recurrence_coeffs
+    # both fall back to their quadrature-based defaults, end to end.
+    measure = _CountingLegendre()
+    alpha, beta = measure.recurrence_coeffs(8)
+    expected_alpha, expected_beta = LegendreMeasure().recurrence_coeffs(8)
+    np.testing.assert_allclose(alpha, expected_alpha, atol=1e-8)
+    np.testing.assert_allclose(beta, expected_beta, atol=1e-8)
+
+
+# -- equality / hashing --
+
+
+def test_measure_equality_is_by_type():
+    # Parameterless measures are fully determined by their class, so two
+    # separately-constructed instances must compare (and hash) equal --
+    # otherwise a FunctionSpace built from one wouldn't match the other.
+    assert LegendreMeasure() == LegendreMeasure()
+    assert LegendreMeasure() != PhysicistsHermiteMeasure()
+    assert hash(LegendreMeasure()) == hash(LegendreMeasure())
+    assert len({LegendreMeasure(), LegendreMeasure(), PhysicistsHermiteMeasure()}) == 2
+
+    # PhysicistsHermiteMeasure vs. ProbabilistsHermiteMeasure share a domain
+    # but are distinct measures (different weights), so they must not
+    # compare equal.
+    assert PhysicistsHermiteMeasure() != ProbabilistsHermiteMeasure()
+
+
+def test_measure_equality_against_non_measure_is_not_implemented():
+    assert LegendreMeasure().__eq__(object()) is NotImplemented
+    assert LegendreMeasure() != object()
+
+
+def test_parametrized_measure_equality_includes_parameters():
+    # Jacobi is a dataclass, so it keeps the field-wise __eq__ rather than the
+    # type-only one inherited from Measure.
+    assert JacobiMeasure(alpha=1.0, beta=2.0) == JacobiMeasure(alpha=1.0, beta=2.0)
+    assert JacobiMeasure(alpha=1.0, beta=2.0) != JacobiMeasure(alpha=1.0, beta=3.0)

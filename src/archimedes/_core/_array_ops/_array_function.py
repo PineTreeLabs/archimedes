@@ -49,12 +49,6 @@ import casadi as cs
 import numpy as np
 
 try:
-    import numpy.exceptions as npex
-except ImportError:  # pragma: no cover
-    # AxisError lives at numpy.AxisError in <1.25
-    import numpy as npex  # type: ignore[no-redef]
-
-try:
     from numpy._core.shape_base import (  # type: ignore[no-redef, attr-defined]
         _block_setup,
     )
@@ -226,25 +220,20 @@ def _diag(x):
 
 
 def _append(arr, values, axis=None):
-    # If axis is None, both `arr` and `values` are flattened
-    if axis not in {None, 0, 1}:
-        raise ValueError("Only 2D arrays are supported")
-
     arr, values = map(array, (arr, values))
-    shape = None
 
+    # If axis is None, both `arr` and `values` are flattened first
     if axis is None:
         arr = arr.flatten()
         values = values.flatten()
         axis = 0
-        shape = (len(arr) + len(values),)
 
-    arr_ = arr if not isinstance(arr, SymbolicArray) else arr._sym
-    values_ = values if not isinstance(values, SymbolicArray) else values._sym
-    dtype = _result_type(arr, values)
-
-    _cs_append = cs.vertcat if axis == 0 else cs.horzcat
-    return SymbolicArray(_cs_append(arr_, values_), dtype=dtype, shape=shape)
+    # Delegate rather than calling cs.vertcat/horzcat directly: `_concatenate`
+    # already handles negative axes, dtype promotion, and shape validation.
+    # Building the result here instead passed `shape=None` for the explicit-
+    # axis case, which inherited CasADi's always-2D convention and silently
+    # returned (n, 1) where NumPy gives (n,).
+    return np.concatenate((arr, values), axis=axis)
 
 
 def _astype(arr, dtype):
@@ -504,10 +493,19 @@ def _squeeze(a, axis=None):
     # Remove axes of length one from a.
     # https://github.com/numpy/numpy/blob/v2.0.0/numpy/_core/fromnumeric.py#L1564-L1632
 
-    if axis is not None:
-        raise NotImplementedError("axis argument is not yet supported")
+    if axis is None:
+        shape = tuple(n for n in a.shape if n != 1)
+    else:
+        axes = axis if isinstance(axis, tuple) else (axis,)
+        axes = tuple(normalize_axis_index(ax, a.ndim, "axis") for ax in axes)
+        for ax in axes:
+            if a.shape[ax] != 1:
+                raise ValueError(
+                    "cannot select an axis to squeeze out which has size not "
+                    "equal to one"
+                )
+        shape = tuple(n for i, n in enumerate(a.shape) if i not in axes)
 
-    shape = tuple(n for n in a.shape if n > 1)
     return np.reshape(a, shape)
 
 
@@ -543,12 +541,28 @@ def _norm(x, ord=None, axis=None, keepdims=False):
     if ord not in {None, 1, 2, np.inf, "fro"}:
         raise ValueError("Invalid norm order")
 
-    # CasADi will throw an error for 2-norm applied to a matrix,
-    # whereas NumPy will assume the Frobenius norm if axis is None.
-    # Since we don't support axis, we will just use the Frobenius norm
     if len(x.shape) == 2:
-        if ord in {None, 2}:
-            ord = "fro"
+        # NumPy's matrix norms are *induced operator* norms, but CasADi's
+        # similarly-named functions are entrywise: `norm_1` sums every
+        # |entry| and `norm_inf` takes the largest one. Mapping straight
+        # onto them returns plausible-looking wrong numbers, so the induced
+        # norms are built explicitly from row/column sums here.
+        if ord == 1:  # max column sum
+            return SymbolicArray(
+                cs.mmax(cs.sum1(cs.fabs(x._sym))), dtype=float, shape=()
+            )
+        if ord == np.inf:  # max row sum
+            return SymbolicArray(
+                cs.mmax(cs.sum2(cs.fabs(x._sym))), dtype=float, shape=()
+            )
+        if ord == 2:
+            raise NotImplementedError(
+                "2-norm of a matrix (the spectral norm, i.e. the largest "
+                "singular value) is not yet supported, since there is no "
+                "symbolic SVD; use ord='fro' for the Frobenius norm"
+            )
+        # NumPy defaults a matrix to the Frobenius norm.
+        ord = "fro"
     else:
         if ord == "fro":
             raise ValueError("Frobenius norm only defined for matrices")
@@ -630,33 +644,76 @@ def _interp1d(x, xp, fp, left=None, right=None, period=None, method="linear"):
     return f
 
 
-def _sum(x, axis=None, dtype=None):
+def _accumulate(binary_ufunc, x, axis=None):
+    """Unrolled prefix scan (``cumsum``/``cumprod``) along a static-length axis.
+
+    CasADi has no scan primitive, so this unrolls into a chain of binary ops.
+    That is exactly what a caller would write by hand, and the axis length is
+    always static, so there is no correctness hazard; the graph grows as O(n).
+    (A lower-triangular matmul is tempting and far more compact in MX, but
+    expands to a dense O(n^2) graph in SX, which is the code-generation path.)
+    """
+    x = array(x)
+
+    if axis is None:
+        x = x.flatten()
+        axis = 0
+    else:
+        axis = normalize_axis_index(axis, x.ndim, "axis")
+
+    # Accumulate along the leading axis, transposing for a 2D column scan
+    xt = x if axis == 0 else x.T
+    acc = [xt[0]]
+    for i in range(1, xt.shape[0]):
+        acc.append(binary_ufunc(acc[-1], xt[i]))
+    out = np.stack(acc, axis=0)
+    return out if axis == 0 else out.T
+
+
+def _cumsum(x, axis=None, dtype=None):
+    if dtype is not None:
+        raise NotImplementedError("dtype argument not yet supported for cumsum")
+    return _accumulate(np.add, x, axis)
+
+
+def _cumprod(x, axis=None, dtype=None):
+    if dtype is not None:
+        raise NotImplementedError("dtype argument not yet supported for cumprod")
+    return _accumulate(np.multiply, x, axis)
+
+
+def _sum(x, axis=None, dtype=None, keepdims=False):
     if dtype is not None:
         raise NotImplementedError("dtype argument not yet supported for sum")
 
     if np.isscalar(x) or len(x.shape) == 0:
         return x
 
-    if axis is not None and axis >= len(x.shape):
-        raise npex.AxisError(
-            f"axis {axis} is out of bounds for array of dimension {len(x.shape)}"
-        )
+    ndim = len(x.shape)
+    if axis is not None:
+        # Use the shared helper rather than a local bounds check: the old one
+        # tested only `axis >= ndim`, so a negative axis matched no branch
+        # below and fell through to an unbound `res`.
+        axis = normalize_axis_index(axis, ndim, "axis")
 
     dtype = x.dtype
     shape: tuple[int, ...] = ()
     arg = x._sym if isinstance(x, SymbolicArray) else x
 
-    if axis is None or len(x.shape) == 1:
-        shape = ()
-        arg = cs.reshape(arg, (-1, 1))
-        res = cs.sum1(arg)
+    if axis is None:
+        shape = (1,) * ndim if keepdims else ()
+        res = cs.sum1(cs.reshape(arg, (-1, 1)))
+
+    elif ndim == 1:
+        shape = (1,) if keepdims else ()
+        res = cs.sum1(cs.reshape(arg, (-1, 1)))
 
     elif axis == 0:
-        shape = (x.shape[1],)
+        shape = (1, x.shape[1]) if keepdims else (x.shape[1],)
         res = cs.sum1(arg)
 
-    elif axis == 1:
-        shape = (x.shape[0],)
+    else:  # axis == 1; `axis` is normalized and ndim <= 2
+        shape = (x.shape[0], 1) if keepdims else (x.shape[0],)
         res = cs.sum2(arg)
 
     return SymbolicArray(res, dtype=dtype, shape=shape)
@@ -724,7 +781,10 @@ def _roll(a, shift, axis=None):
         return a
 
     if axis is None:
-        a = a.flatten()
+        # NumPy flattens, rolls, then restores the original shape; returning
+        # the flattened result silently changed the shape of 2D inputs.
+        if a.ndim > 1:
+            return np.reshape(_roll(a.flatten(), shift, 0), a.shape)
         axis = 0
 
     n = a.shape[axis]
@@ -737,10 +797,11 @@ def _roll(a, shift, axis=None):
         bottom = a[:-shift]
         return np.concatenate((top, bottom), axis=0)
 
-    elif axis == 1:
-        left = a[:, -shift:]
-        right = a[:, :-shift]
-        return np.concatenate((left, right), axis=1)
+    # `axis` is necessarily 1 here: it has been normalized against ndim <= 2,
+    # and the axis=None case returned above.
+    left = a[:, -shift:]
+    right = a[:, :-shift]
+    return np.concatenate((left, right), axis=1)
 
 
 def _polyval(p: np.ndarray, x: np.ndarray) -> np.ndarray:
@@ -800,7 +861,7 @@ SUPPORTED_FUNCTIONS = {
     "asfarray": NotImplemented,
     "less_equal": NotImplemented,
     "polyint": NotImplemented,
-    "cumprod": NotImplemented,
+    "cumprod": _cumprod,
     "polyder": NotImplemented,
     "greater": NotImplemented,
     "meshgrid": NotImplemented,
@@ -814,7 +875,7 @@ SUPPORTED_FUNCTIONS = {
     "less": NotImplemented,
     "insert": NotImplemented,
     "polyfit": NotImplemented,
-    "ndim": NotImplemented,
+    "ndim": lambda x: x.ndim,
     "fix": NotImplemented,
     "polyval": _polyval,
     "union1d": NotImplemented,
@@ -1085,6 +1146,6 @@ SUPPORTED_FUNCTIONS = {
     "nanstd": NotImplemented,
     "cross": _cross,
     "cov": NotImplemented,
-    "cumsum": NotImplemented,
+    "cumsum": _cumsum,
     "swapcase": NotImplemented,
 }

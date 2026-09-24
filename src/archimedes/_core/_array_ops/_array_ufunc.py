@@ -219,6 +219,8 @@ SUPPORTED_UFUNCS = {
     "equal": binary_op(cs.eq, result_type=bool),
     "logaddexp": NotImplemented,
     "trunc": NotImplemented,
+    "erf": unary_op(cs.erf, result_type=DEFAULT_FLOAT),
+    "erfinv": unary_op(cs.erfinv, result_type=DEFAULT_FLOAT),
     "exp": unary_op(cs.exp, result_type=DEFAULT_FLOAT),
     "logaddexp2": NotImplemented,
     "exp2": NotImplemented,

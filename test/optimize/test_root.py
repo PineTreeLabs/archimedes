@@ -4,8 +4,22 @@
 
 import numpy as np
 
+import archimedes as arc
+from archimedes import tree
 from archimedes.error import ShapeDtypeError
 from archimedes.optimize import implicit, root
+
+
+@arc.struct
+class State:
+    x: float
+    y: float
+
+
+@arc.struct
+class Coeffs:
+    a: float
+    b: float
 
 
 class TestImplicitFunction:
@@ -55,6 +69,34 @@ class TestImplicitFunction:
         with np.testing.assert_raises(ShapeDtypeError):
             g(x0=np.ones(2))
 
+    def test_implicit_tree_x0(self):
+        # An implicit function with a struct-valued decision variable
+        def F(state):
+            return tree.replace(state, x=state.x**2 - 1, y=state.y**2 - 4)
+
+        g = implicit(F)
+        x0 = State(x=2.0, y=1.0)
+        sol = g(x0=x0)
+
+        assert isinstance(sol, State)
+        assert np.allclose(sol.x, 1.0)
+        assert np.allclose(sol.y, 2.0)
+
+    def test_implicit_dict_x0_with_args(self):
+        # Dict-valued decision variable combined with struct-valued args
+        def F(params, coeffs):
+            return {
+                "x": coeffs.a * params["x"] ** 2 - coeffs.b,
+                "y": params["y"] - coeffs.b,
+            }
+
+        g = implicit(F)
+        x0 = {"x": 1.0, "y": 0.0}
+        sol = g(x0=x0, coeffs=Coeffs(a=1.0, b=4.0))
+
+        assert np.allclose(sol["x"], 2.0)
+        assert np.allclose(sol["y"], 4.0)
+
 
 class TestRoot:
     def test_root(self):
@@ -98,5 +140,48 @@ class TestRoot:
         with np.testing.assert_raises(ShapeDtypeError):
             root(f, x0=np.ones(2))
 
-        with np.testing.assert_raises(ValueError):
-            root(f, x0=np.ones((2, 2)))
+    def test_root_matrix_x0(self):
+        # Matrix-valued decision variables are supported by flattening
+        # internally; the solution preserves the original shape.
+        def f(x):
+            return x - np.eye(2)
+
+        x = root(f, x0=np.zeros((2, 2)))
+        assert x.shape == (2, 2)
+        assert np.allclose(x, np.eye(2))
+
+    def test_root_tree_x0(self):
+        # Struct-valued decision variable
+        def f(state):
+            return tree.replace(state, x=state.x**2 - 1, y=state.y**2 - 4)
+
+        x0 = State(x=2.0, y=1.0)
+        sol = root(f, x0=x0)
+
+        assert isinstance(sol, State)
+        assert np.allclose(sol.x, 1.0)
+        assert np.allclose(sol.y, 2.0)
+
+    def test_root_dict_x0_with_struct_args(self):
+        # Dict-valued decision variable together with struct-valued args,
+        # which already worked prior to this test but is included here
+        # to confirm the two compose correctly.
+        def f(params, coeffs):
+            return {
+                "x": coeffs.a * params["x"] ** 2 - coeffs.b,
+                "y": params["y"] - coeffs.b,
+            }
+
+        x0 = {"x": 1.0, "y": 0.0}
+        sol = root(f, x0=x0, args=(Coeffs(a=1.0, b=4.0),))
+
+        assert np.allclose(sol["x"], 2.0)
+        assert np.allclose(sol["y"], 4.0)
+
+    def test_root_tree_x0_shape_mismatch(self):
+        # The residual must flatten to the same size/dtype as x0
+        def f(state):
+            return state.x**2 - 1  # drops the `y` component
+
+        with np.testing.assert_raises(ShapeDtypeError):
+            root(f, x0=State(x=2.0, y=1.0))

@@ -190,7 +190,7 @@ class KalmanFilterBase(metaclass=abc.ABCMeta):
 class ExtendedKalmanFilter(KalmanFilterBase):
     """Extended Kalman Filter for nonlinear state estimation.
 
-    The Extended Kalman Filter (EKF) handles nonlinear dynamics and observation
+    The Extended Kalman Filter (EKF) [1]_ handles nonlinear dynamics and observation
     models by linearizing them around the current state estimate using Jacobian
     matrices. This makes it computationally efficient while providing reasonable
     performance for mildly nonlinear systems.
@@ -240,7 +240,8 @@ class ExtendedKalmanFilter(KalmanFilterBase):
 
     The linearization can introduce bias in the state estimates and may cause
     filter divergence if the nonlinearities are too strong or if the initial
-    estimate is far from the true state.
+    estimate is far from the true state. See Gelb [2]_ for a general treatment
+    of the underlying estimation theory.
 
     Examples
     --------
@@ -458,7 +459,7 @@ def _julier_weights(n, kappa):
 class UnscentedKalmanFilter(KalmanFilterBase):
     """Unscented Kalman Filter for highly nonlinear state estimation.
 
-    The Unscented Kalman Filter (UKF) uses the unscented transform to handle
+    The Unscented Kalman Filter (UKF) [2]_ uses the unscented transform to handle
     nonlinear dynamics and observation models. Instead of linearizing like the
     EKF, it propagates a carefully chosen set of sample points (sigma points)
     through the nonlinear transformations to capture the mean and covariance
@@ -472,7 +473,7 @@ class UnscentedKalmanFilter(KalmanFilterBase):
     - **Better stability**: Less prone to divergence with strong nonlinearities
     - **Symmetric treatment**: Handles positive and negative perturbations equally
 
-    The filter uses the Julier sigma point generation scheme with symmetric
+    The filter uses the Julier sigma point generation scheme [1]_ with symmetric
     scaling, providing 2n+1 sigma points for an n-dimensional state.
 
     Parameters
@@ -521,6 +522,7 @@ class UnscentedKalmanFilter(KalmanFilterBase):
 
     The implementation uses the Julier symmetric sigma point scheme with equal
     weights for covariance calculations, providing excellent numerical properties.
+    See Van der Merwe [3]_ for a comprehensive treatment of sigma-point filtering.
 
     Examples
     --------

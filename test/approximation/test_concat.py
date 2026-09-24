@@ -1,0 +1,183 @@
+"""Tests for ``ConcatBasis``: the direct sum of several bases' functions."""
+
+import numpy as np
+import pytest
+
+import archimedes as arc
+from archimedes._core._array_impl import SymbolicArray
+from archimedes.approximation import (
+    ConcatBasis,
+    ConstrainedBasis,
+    FunctionSpace,
+    LagrangeBasis,
+    OrthogonalPolynomialBasis,
+    PiecewiseBasis,
+)
+from archimedes.measure import LegendreMeasure, PhysicistsHermiteMeasure, UnitInterval
+from archimedes.quadrature import gauss_legendre
+
+
+@pytest.fixture
+def legendre6():
+    return OrthogonalPolynomialBasis(LegendreMeasure(), 6)
+
+
+@pytest.fixture
+def vertex():
+    # Two linear "hat" functions: the classical SEM vertex modes.
+    return LagrangeBasis(reference_nodes=np.array([-1.0, 1.0]))
+
+
+@pytest.fixture
+def bubble(legendre6):
+    return ConstrainedBasis.dirichlet(legendre6)  # 4 functions, vanish at +-1
+
+
+@pytest.fixture
+def rule():
+    return gauss_legendre(6)
+
+
+@pytest.fixture
+def combo(vertex, bubble, rule):
+    return ConcatBasis((vertex, bubble), quad_rule=rule)
+
+
+# -- construction --
+
+
+def test_construction_validation(vertex, rule):
+    with pytest.raises(ValueError, match="non-empty"):
+        ConcatBasis((), quad_rule=rule)
+
+    hermite_piece = OrthogonalPolynomialBasis(PhysicistsHermiteMeasure(), 4)
+    with pytest.raises(TypeError, match="Parameters type"):
+        ConcatBasis((vertex, hermite_piece), quad_rule=rule)
+
+
+def test_properties(combo, vertex, bubble, rule):
+    assert combo.n_basis == vertex.n_basis + bubble.n_basis
+    assert combo.Parameters is vertex.Parameters
+    assert combo._measures == (None,)
+    assert combo._default_quadrature() is rule
+
+
+# -- evaluate --
+
+
+def test_evaluate(combo, vertex, bubble):
+    x = np.linspace(-1.0, 1.0, 9)
+    got = combo.evaluate(x)
+    expected = np.concatenate(
+        [vertex.evaluate(x, a=None, b=None), bubble.evaluate(x, a=None, b=None)],
+        axis=-1,
+    )
+    np.testing.assert_allclose(got, expected)
+
+    got = combo.evaluate(x, deriv=1)
+    expected = np.concatenate(
+        [
+            vertex.evaluate(x, deriv=1, a=None, b=None),
+            bubble.evaluate(x, deriv=1, a=None, b=None),
+        ],
+        axis=-1,
+    )
+    np.testing.assert_allclose(got, expected)
+
+
+def test_side_validation(combo):
+    with pytest.raises(ValueError, match="side must be"):
+        combo.evaluate(np.array([0.0]), side="up")
+
+
+# -- boundary_dofs --
+
+
+def test_boundary_dofs(combo, vertex):
+    left, right = combo.boundary_dofs(0)
+    vertex_left, vertex_right = vertex.boundary_dofs(0)
+    assert (left, right) == (vertex_left, vertex_right)
+
+    # Order 1 (derivative DOF) isn't claimed by either the linear vertex
+    # functions or the modal bubble space.
+    assert combo.boundary_dofs(1) == (None, None)
+
+
+def test_boundary_dofs_rejects_conflict(rule):
+    left_claimer = LagrangeBasis(reference_nodes=np.array([-1.0, 0.0]))
+    other_left_claimer = LagrangeBasis(reference_nodes=np.array([-1.0, 0.5]))
+    combo = ConcatBasis((left_claimer, other_left_claimer), quad_rule=rule)
+    with pytest.raises(ValueError, match="more than one piece claims the left"):
+        combo.boundary_dofs(0)
+
+    right_claimer = LagrangeBasis(reference_nodes=np.array([0.0, 1.0]))
+    other_right_claimer = LagrangeBasis(reference_nodes=np.array([0.5, 1.0]))
+    combo = ConcatBasis((right_claimer, other_right_claimer), quad_rule=rule)
+    with pytest.raises(ValueError, match="more than one piece claims the right"):
+        combo.boundary_dofs(0)
+
+
+# -- required_breakpoints --
+
+
+def test_required_breakpoints(combo, vertex, rule):
+    # Should be None when no piece has any required breakpoints.
+    assert combo._required_breakpoints is None
+
+    # Should be a union of the required breakpoints of the individual pieces.
+    a = PiecewiseBasis(vertex, np.array([-1.0, 0.0, 1.0]), continuity=-1)
+    b = PiecewiseBasis(vertex, np.array([-1.0, 0.5, 1.0]), continuity=-1)
+    combo = ConcatBasis((a, b), quad_rule=rule)
+    np.testing.assert_array_equal(combo._required_breakpoints, [-1.0, 0.0, 0.5, 1.0])
+
+
+# -- _dof_order --
+
+
+def test_dof_order(vertex, bubble, combo):
+    np.testing.assert_array_equal(
+        combo._dof_order,
+        np.concatenate([vertex._dof_order, bubble._dof_order]),
+    )
+
+
+# -- end-to-end: vertex + bubble reproduces the full polynomial space --
+
+
+def test_vertex_bubble(legendre6, combo):
+    def target(x):
+        return 2 - 3 * x + x**2 - 0.5 * x**3 + 0.2 * x**4 - 0.1 * x**5
+
+    space_full = FunctionSpace(legendre6, UnitInterval.Parameters(a=-1.0, b=1.0))
+    space_combo = FunctionSpace(combo, UnitInterval.Parameters(a=-1.0, b=1.0))
+
+    f_full = space_full.project(target)
+    f_combo = space_combo.project(target)
+
+    # Check that the full space and combination are the same
+    xs = np.linspace(-1.0, 1.0, 25)
+    np.testing.assert_allclose(f_combo(xs), f_full(xs), atol=1e-10)
+    np.testing.assert_allclose(f_combo(xs), target(xs), atol=1e-10)
+
+    # Check that the vertex coefficients match the boundary values
+    space_combo = FunctionSpace(combo, UnitInterval.Parameters(a=-1.0, b=1.0))
+    f_combo = space_combo.project(target)
+    np.testing.assert_allclose(f_combo.coefficients[0], target(-1.0), atol=1e-10)
+    np.testing.assert_allclose(f_combo.coefficients[1], target(1.0), atol=1e-10)
+
+
+# -- static (NumPy) vs. dynamic (symbolic) evaluation agreement --
+
+
+@pytest.mark.parametrize("deriv", [0, 1])
+def test_static_and_dynamic_evaluation(combo, deriv):
+    x = np.array([-1.0, -0.4, 0.0, 0.55, 1.0])
+    static_phi = combo.evaluate(x, deriv=deriv)
+
+    @arc.compile
+    def traced(xi):
+        assert isinstance(xi, SymbolicArray)
+        return combo.evaluate(np.atleast_1d(xi), deriv=deriv)
+
+    dynamic_phi = np.array([np.asarray(traced(xi)).ravel() for xi in x])
+    np.testing.assert_allclose(static_phi, dynamic_phi, atol=1e-10)

@@ -43,6 +43,7 @@
 
 from __future__ import annotations
 
+import operator
 from functools import wraps
 
 import casadi as cs
@@ -59,8 +60,12 @@ from .._type_inference import shape_inference, type_inference
 
 
 def normalize_axis_index(axis, ndim, msg_prefix="axis"):
-    if not isinstance(axis, int):
-        raise TypeError(f"integer argument expected, got {type(axis)}")
+    # `operator.index` rather than `isinstance(axis, int)`, which rejects
+    # NumPy integer scalars (np.int64 etc.) that NumPy itself accepts.
+    try:
+        axis = operator.index(axis)
+    except TypeError:
+        raise TypeError(f"integer argument expected, got {type(axis)}") from None
     if axis >= ndim or axis < -ndim:
         raise npex.AxisError(
             f"{msg_prefix} {axis} is out of bounds for array of dimension {ndim}"

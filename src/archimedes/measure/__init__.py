@@ -7,16 +7,23 @@ probability/uncertainty code as well.
 """
 
 from ._base import Measure
-from ._hermite import HermiteMeasure, HermiteNormMeasure
+from ._domain import HalfLine, RealLine, ReferenceDomain, UnitInterval
+from ._hermite import PhysicistsHermiteMeasure, ProbabilistsHermiteMeasure
 from ._jacobi import JacobiMeasure
 from ._laguerre import LaguerreMeasure
 from ._legendre import LegendreMeasure
+from ._stieltjes import stieltjes_recurrence
 
 __all__ = [
     "Measure",
-    "HermiteMeasure",
-    "HermiteNormMeasure",
+    "ReferenceDomain",
+    "UnitInterval",
+    "HalfLine",
+    "RealLine",
+    "PhysicistsHermiteMeasure",
+    "ProbabilistsHermiteMeasure",
     "JacobiMeasure",
     "LaguerreMeasure",
     "LegendreMeasure",
+    "stieltjes_recurrence",
 ]
