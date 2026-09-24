@@ -116,27 +116,48 @@ class Basis(metaclass=abc.ABCMeta):
     coefficients.
     """
 
-    ndim: int = 1
-    """Number of independent variables the basis functions take.
+    # Each attribute below is declared twice. The type checker sees a
+    # read-only property, which subclasses may override with either a
+    # dataclass field (e.g. OrthogonalPolynomialBasis.n_basis) or a computed
+    # property (e.g. TensorBasis.n_basis). At runtime it is a plain class
+    # attribute, so it neither shadows subclass dataclass fields nor hides
+    # the docstring from Sphinx.
+    if TYPE_CHECKING:
 
-    Typically 1, since most bases are univariate. :class:`TensorBasis` is
-    the exception, with one variable per tensored factor.
-    """
+        @property
+        def n_basis(self) -> int: ...
 
-    density: bool = False
-    """Whether this basis is orthonormal with respect to a probability
-    measure (unit mass) rather than the raw weight of the associated
-    :class:`~archimedes.measure.Measure`.
+        @property
+        def ndim(self) -> int: ...
 
-    Only meaningful for orthogonal polynomial families based on a
-    ``Measure`` (in particular :class:`OrthogonalPolynomialBasis`);
-    other families should leave this ``False``.
-    """
+        @property
+        def density(self) -> bool: ...
+
+    else:
+        n_basis: int
+        """Number of basis functions in this basis."""
+
+        ndim: int = 1
+        """Number of independent variables the basis functions take.
+
+        Typically 1, since most bases are univariate. :class:`TensorBasis` is
+        the exception, with one variable per tensored factor.
+        """
+
+        density: bool = False
+        """Whether this basis is orthonormal with respect to a probability
+        measure (unit mass) rather than the raw weight of the associated
+        :class:`~archimedes.measure.Measure`.
+
+        Only meaningful for orthogonal polynomial families based on a
+        ``Measure`` (in particular :class:`OrthogonalPolynomialBasis`);
+        other families should leave this ``False``.
+        """
 
     @property
     @abc.abstractmethod
     def Parameters(self) -> type[ReferenceDomain.Parameters]:  # noqa: N802
-        """The target-domain parameters this basis expects.
+        r"""The target-domain parameters this basis expects.
 
         A :class:`~archimedes.measure.ReferenceDomain.Parameters` subclass
         (e.g. ``UnitInterval.Parameters``). Returns the type, not an instance.

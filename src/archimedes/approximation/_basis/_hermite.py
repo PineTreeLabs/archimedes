@@ -69,6 +69,7 @@ class CubicHermiteBasis(Basis):
 
     @property
     def n_basis(self) -> int:
+        """Always 4: a value and a slope at each endpoint."""
         return 4
 
     @property

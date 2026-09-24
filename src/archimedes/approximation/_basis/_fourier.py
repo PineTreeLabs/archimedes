@@ -1,5 +1,3 @@
-"""Fourier (trigonometric) basis on a periodic interval."""
-
 from __future__ import annotations
 
 import dataclasses
@@ -22,11 +20,10 @@ _PRODUCT_KIND: dict[tuple[str, str], Literal["cosine", "sine"]] = {
 
 
 def _interleave_matrix(n: int) -> np.ndarray:
-    """Static permutation matrix mapping ``[cos_1..cos_n, sin_1..sin_n]``
-    (columns concatenated block-wise) to ``[cos_1, sin_1, ..., cos_n,
-    sin_n]`` (interleaved) under right-multiplication: ``combined @
-    _interleave_matrix(n)``. Pure NumPy -- built once per call from ``n``
-    alone, never from traced data."""
+    # Static permutation matrix mapping ``[cos_1..cos_n, sin_1..sin_n]``
+    # (columns concatenated block-wise) to ``[cos_1, sin_1, ..., cos_n,
+    # sin_n]`` (interleaved) under right-multiplication: ``combined @
+    # _interleave_matrix(n)``.
     perm = np.empty(2 * n, dtype=int)
     perm[0::2] = np.arange(n)
     perm[1::2] = np.arange(n, 2 * n)

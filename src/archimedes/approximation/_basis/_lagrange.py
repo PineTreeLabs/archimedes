@@ -246,6 +246,7 @@ class LagrangeBasis(Basis):
 
     @property
     def n_basis(self) -> int:
+        """Number of interpolation nodes."""
         return len(self.reference_nodes)
 
     @property

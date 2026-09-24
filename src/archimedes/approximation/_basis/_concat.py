@@ -1,5 +1,3 @@
-"""Direct sum of heterogeneous bases -- functions stacked side by side."""
-
 from __future__ import annotations
 
 import dataclasses
@@ -17,38 +15,64 @@ __all__ = ["ConcatBasis"]
 
 @dataclasses.dataclass(frozen=True)
 class ConcatBasis(Basis):
-    r"""A basis whose functions are the concatenation of several pieces.
+    r"""A basis made of combining other bases.
 
-    Where :class:`ConstrainedBasis` recombines *one* basis's functions by
-    a matrix (a change of basis), this stacks functions from *several*,
-    possibly unrelated, bases side by side:
+    The functions in this basis are the set of functions from one or more
+    bases:
 
     .. math::
-        \Phi(x) = \big[\, \Phi_1(x) \;\; \Phi_2(x) \;\; \cdots \,\big]
+        \Phi(x) = \big[\, \Phi_1(x) ~ \Phi_2(x) ~ \cdots \,\big]
 
-    This is a direct sum, not a linear combination. The two compose. For
-    example, a spectral-element "vertex + bubble" basis is
-    ``ConcatBasis((vertex, ConstrainedBasis.dirichlet(base)))``, pairing two
-    plain Lagrange vertex functions (carrying the boundary values) with the
-    homogeneous interior modes from ``base``.
+    This is a direct sum of the spaces, not a linear combination.
 
     Parameters
     ----------
     pieces : tuple of Basis
         The bases to concatenate, in order. Must all report the same
-        :attr:`Parameters` type (they need to be evaluable at the same
-        target-domain kwargs), but may otherwise be unrelated families.
+        :attr:`Parameters` type (i.e. live on the same kind of domain:
+        interval, half-line, or real-line), but may otherwise be unrelated
+        families.
     quad_rule : Quadrature
-        This basis's default quadrature rule, **required** rather than
-        derived. Unlike a single family, a concatenation's pieces have no
-        one shared notion of "enough points" or "the natural weight": pass
-        something adequate (e.g. the finest of the pieces' own
-        default, or a plain Gauss-Legendre rule with
-        enough points for the combined degree).
+        This basis's default quadrature rule. There is no "natural rule"
+        for an arbitrarily concatenated basis, so this is required.
+
+    Examples
+    --------
+    Augment a quadratic polynomial basis with four sine modes:
+
+    >>> import numpy as np
+    >>> from archimedes.approximation import ConcatBasis, FourierBasis, MonomialBasis
+    >>> from archimedes.quadrature import gauss_legendre
+    >>> poly = MonomialBasis(3)
+    >>> sines = FourierBasis(4, kind="sine")
+    >>> basis = ConcatBasis((poly, sines), quad_rule=gauss_legendre(16))
+    >>> basis.n_basis
+    7
+    >>> basis.evaluate(np.array([0.0, 0.5])).shape
+    (2, 7)
+
+    A spectral-element "vertex + bubble" basis pairs two linear Lagrange
+    vertex functions (which carry the boundary values) with interior
+    Legendre modes that vanish at both endpoints:
+
+    >>> from archimedes.approximation import (
+    ...     ConstrainedBasis,
+    ...     LagrangeBasis,
+    ...     OrthogonalPolynomialBasis,
+    ... )
+    >>> from archimedes.measure import LegendreMeasure
+    >>> vertex = LagrangeBasis(reference_nodes=np.array([-1.0, 1.0]))
+    >>> legendre = OrthogonalPolynomialBasis(LegendreMeasure(), 6)
+    >>> bubble = ConstrainedBasis.dirichlet(legendre)
+    >>> sem = ConcatBasis((vertex, bubble), quad_rule=gauss_legendre(8))
+    >>> sem.n_basis
+    6
+    >>> sem.boundary_dofs()
+    (0, 1)
     """
 
     pieces: tuple[Basis, ...]
-    quad_rule: "Quadrature"
+    quad_rule: Quadrature
 
     def __post_init__(self):
         if len(self.pieces) == 0:
@@ -65,6 +89,7 @@ class ConcatBasis(Basis):
 
     @property
     def n_basis(self) -> int:
+        """Total number of functions across all pieces."""
         return sum(piece.n_basis for piece in self.pieces)
 
     @property
@@ -73,12 +98,10 @@ class ConcatBasis(Basis):
 
     @property
     def _measures(self):
-        """Always ``(None,)``. See the class docstring for why."""
         return (None,)
 
     @property
     def _required_breakpoints(self):
-        """Union of every piece's own, or ``None`` if none has any."""
         per_piece = [piece._required_breakpoints for piece in self.pieces]
         present = [bp for bp in per_piece if bp is not None]
         if not present:
@@ -90,19 +113,9 @@ class ConcatBasis(Basis):
         return np.concatenate([piece._dof_order for piece in self.pieces])
 
     def _default_quadrature(self):
-        """The ``quad_rule`` given at construction. See the class
-        docstring for why this is required rather than derived."""
         return self.quad_rule
 
     def boundary_dofs(self, order: int = 0) -> tuple[int | None, int | None]:
-        """Union of each piece's own ``boundary_dofs``, offset into the
-        concatenated index space.
-
-        Raises
-        ------
-        ValueError
-            If more than one piece claims the same side at this ``order``.
-        """
         offset = 0
         left = right = None
         for piece in self.pieces:

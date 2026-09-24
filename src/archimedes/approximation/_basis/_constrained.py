@@ -1,10 +1,3 @@
-"""A basis built as a fixed linear combination of another basis's functions.
-
-Typically the recombination is chosen so that every combination satisfies a
-set of linear constraints (e.g. boundary conditions) by construction rather
-than by enforcement in an assembled system.
-"""
-
 from __future__ import annotations
 
 import dataclasses
@@ -20,12 +13,14 @@ __all__ = ["ConstrainedBasis"]
 
 
 def _reference_kwargs(base: Basis) -> dict:
-    """``base``'s own reference-domain parameters, e.g. ``{"a": None, "b":
-    None}`` for an interval or ``{"rate": 1.0, "start": 0.0}`` for a
-    half-line -- whatever ``base.Parameters()`` (no args) defaults to.
-    ``ReferenceDomain.affine_params`` guarantees this is the identity map,
-    so evaluating ``base`` with these kwargs gives the *reference* basis
-    functions, independent of any later target domain.
+    """The reference-domain parameters from ``base``
+
+    For example:
+    - ``{"a": None, "b": None}`` for an interval
+    - ``{"rate": 1.0, "start": 0.0}`` for a half-line
+
+    The result is the default from ``base.Parameters()`` (no args) defaults to,
+    guaranteed to produce the reference basis functions when evaluating ``base``.
     """
     ref = base.Parameters()
     return {f.name: getattr(ref, f.name) for f in tree.fields(ref)}
@@ -36,7 +31,8 @@ class ConstrainedBasis(Basis):
     r"""A basis whose functions are fixed linear combinations of another's
 
     Usually built so that every combination satisfies a set of linear
-    constraints on the *reference* domain.
+    constraints on the reference domain, for example to satisfy a boundary
+    condition by construction.
 
     Given a constraint matrix :math:`A` (one row per constraint, one column
     per ``base`` function), the new basis functions are
@@ -46,54 +42,17 @@ class ConstrainedBasis(Basis):
 
     where the columns of :math:`N` span :math:`\mathrm{null}(A)`, i.e.
     :math:`A N \approx 0`. Every function in the new basis therefore
-    satisfies every constraint row exactly (to numerical precision), rather
-    than the constraint being imposed afterwards on an assembled system.
+    satisfies every constraint row to numerical precision.
 
-    Because differentiation is linear, ``evaluate(..., deriv=k)`` is simply
-    ``base.evaluate(..., deriv=k) @ matrix`` -- the same transform works at
-    every derivative order, so a constraint on a derivative (Neumann) is no
-    different in kind from a constraint on a value (Dirichlet).
-
-    This trades ``base.n_basis`` degrees of freedom for
-    ``base.n_basis - n_constraints``; use :meth:`from_constraints` (or one
-    of the convenience constructors below), which checks that the
-    constraint rows are linearly independent so the result has the
-    expected size.
-
-    Parameters
-    ----------
-    base : Basis
-        The underlying basis being combined.
-    matrix : ndarray
-        Shape ``(base.n_basis, n_basis)``; ``matrix[:, i]`` is the
-        coefficient vector (in ``base``) of this basis's ``i``-th
-        function.
-
-    Notes
-    -----
-    Any subspace that is *smaller* than ``base``'s can be described as
-    ``null(A)`` for some constraint matrix ``A``. A dimension-*preserving*
-    change of basis (``matrix`` square and invertible, e.g. reshuffling
-    normalization conventions) isn't a constraint in any useful sense, but
-    can still be constructed directly with ``ConstrainedBasis(base, matrix)``,
-    bypassing :meth:`from_constraints`.
-
-    The constraint matrix is evaluated once, at ``base``'s own
-    reference-domain defaults -- *not* at whatever target domain a later
-    ``FunctionSpace`` supplies. A pure value or derivative constraint is
-    invariant under the target domain's affine rescaling (an endpoint is
-    still an endpoint, and rescaling a row does not change its null
-    space), so the same ``matrix`` is reused verbatim for every target
-    domain. A constraint that mixes *different* derivative orders with
-    fixed nonzero relative weights (e.g. Robin, :math:`u'(a) + c\,u(a) =
-    0` for :math:`c \neq 0`) does **not** have this property, since the
-    relative weight of the two terms changes with domain scale. For this
-    reason, the satisfied-by-basis-construction approach is not recommended
-    for Robin boundary conditions.
+    Should typically not be constructed directly; use one of the classmethod
+    constructors instead.
     """
 
     base: Basis
+    """The basis that is recombined to form the constrained basis."""
+
     matrix: np.ndarray
+    """Constraint matrix defining the new basis as linear combinations of ``base``."""
 
     def __post_init__(self):
         if self.matrix.shape[0] != self.base.n_basis:
@@ -105,9 +64,18 @@ class ConstrainedBasis(Basis):
     @classmethod
     def from_constraints(
         cls, base: Basis, constraints: Callable[[Basis], np.ndarray]
-    ) -> "ConstrainedBasis":
-        """Build ``matrix`` as an orthonormal basis for ``null(A)``, with
-        ``A = constraints(base)``.
+    ) -> ConstrainedBasis:
+        """Construct a basis from the nullspace of a provided matrix.
+
+        The constraint matrix is ``null(A)``, where ``A = constraints(base)``.
+
+        A useful way to construct the ``constraints`` function is by evaluating
+        the ``base`` basis. :meth:`Basis.evaluate` returns a Vandermonde-like matrix
+        with one row per point and one column per basis function. If
+        ``A = base.evaluate(x)``, then ``A @ c`` evaluates the function defined
+        by coefficient vector ``c`` at ``x``. Hence the condition that the function
+        vanish at ``x`` is the same as ``A @ c = 0``; in other words ``null(A)`` is the
+        set of coefficient vectors whose function vanishes at ``x``. See example below.
 
         Parameters
         ----------
@@ -115,17 +83,41 @@ class ConstrainedBasis(Basis):
             The basis to combine.
         constraints : callable
             ``constraints(base) -> ndarray`` of shape ``(n_constraints,
-            base.n_basis)``. Typically built by calling ``base.evaluate``
-            at reference-domain points (see :meth:`dirichlet`/:meth:`neumann`
-            for worked examples).
+            base.n_basis)``.
 
-        Raises
-        ------
-        ValueError
-            Raised when the constraint rows are not linearly independent
-            (rank < number of rows). The null space is then larger than
-            the caller expects, so some constraints are redundant instead
-            of each cutting the dimension by one.
+        Examples
+        --------
+        Build a basis where every function vanishes at the left endpoint only:
+
+        >>> import numpy as np
+        >>> from archimedes.approximation import (
+        ...     ConstrainedBasis,
+        ...     FunctionSpace,
+        ...     OrthogonalPolynomialBasis,
+        ... )
+        >>> from archimedes.measure import LegendreMeasure, UnitInterval
+        >>> legendre = OrthogonalPolynomialBasis(LegendreMeasure(), 6)
+        >>> basis = ConstrainedBasis.from_constraints(
+        ...     legendre, lambda base: base.evaluate(np.array([-1.0]))
+        ... )
+        >>> basis.n_basis
+        5
+
+        Any combination of the new functions satisfies the constraint:
+
+        >>> coeffs = np.random.default_rng(0).standard_normal(basis.n_basis)
+        >>> x = np.array([-1.0, 0.0, 1.0])
+        >>> u = basis.evaluate(x) @ coeffs
+        >>> bool(np.isclose(u[0], 0.0))
+        True
+
+        The constraint is imposed on the reference domain, so it holds at the
+        left endpoint of any target interval:
+
+        >>> space = FunctionSpace(basis, UnitInterval.Parameters(a=0.0, b=2.0))
+        >>> f = space.project(np.sin)
+        >>> bool(np.isclose(f(np.array([0.0]))[0], 0.0))
+        True
         """
         A = np.asarray(constraints(base))
         if A.ndim != 2 or A.shape[1] != base.n_basis:
@@ -148,13 +140,35 @@ class ConstrainedBasis(Basis):
 
     @classmethod
     def dirichlet(cls, base: Basis) -> "ConstrainedBasis":
-        r"""Every function vanishes at both reference endpoints,
+        r"""Construct a basis that vanishes at both reference endpoints.
+
+        The resulting basis satisfies the Dirichlet boundary condition
         :math:`\phi(-1) = \phi(1) = 0`.
 
         Spans the same space as the classical hand-derived combinations
         (e.g. Shen's Chebyshev-Galerkin basis :math:`T_k - T_{k+2}`), but
-        is not necessarily numerically identical to them -- both are valid
+        is not necessarily numerically identical to them. Both are valid
         bases of :math:`\mathrm{null}(A)`.
+
+        This cannot be constructed to hold nonzero values at the endpoints;
+        see :class:`ConcatBasis` for combining this with another "vertex"
+        basis to hold nonzero endpoint values.
+
+        Examples
+        --------
+        >>> import numpy as np
+        >>> from archimedes.approximation import (
+        ...     ConstrainedBasis,
+        ...     OrthogonalPolynomialBasis,
+        ... )
+        >>> from archimedes.measure import LegendreMeasure
+        >>> legendre = OrthogonalPolynomialBasis(LegendreMeasure(), 6)
+        >>> basis = ConstrainedBasis.dirichlet(legendre)
+        >>> basis.n_basis
+        4
+        >>> x = np.array([-1.0, 1.0])
+        >>> bool(np.allclose(basis.evaluate(x), 0.0))
+        True
         """
 
         def constraints(base):
@@ -167,8 +181,28 @@ class ConstrainedBasis(Basis):
 
     @classmethod
     def neumann(cls, base: Basis) -> "ConstrainedBasis":
-        r"""Every function has zero derivative at both reference endpoints,
-        :math:`\phi'(-1) = \phi'(1) = 0`."""
+        r"""Construct a basis whose derivatives vanish at both reference endpoints.
+
+        The resulting basis satisfies the Neumann boundary condition
+        :math:`\phi'(-1) = \phi'(1) = 0`.
+
+        Examples
+        --------
+        >>> import numpy as np
+        >>> from archimedes.approximation import (
+        ...     ConstrainedBasis,
+        ...     OrthogonalPolynomialBasis,
+        ... )
+        >>> from archimedes.measure import LegendreMeasure
+        >>> legendre = OrthogonalPolynomialBasis(LegendreMeasure(), 6)
+        >>> basis = ConstrainedBasis.neumann(legendre)
+        >>> basis.n_basis
+        4
+        >>> x = np.array([-1.0, 1.0])
+        >>> dphi = basis.evaluate(x, deriv=1)
+        >>> bool(np.allclose(dphi, 0.0))
+        True
+        """
 
         def constraints(base):
             kwargs = _reference_kwargs(base)
